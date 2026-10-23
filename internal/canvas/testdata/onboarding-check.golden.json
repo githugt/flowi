@@ -1,0 +1,379 @@
+{
+  "units": [
+    {
+      "id": "session",
+      "kind": "request",
+      "nodes": [
+        "session"
+      ],
+      "types": [
+        "subflow"
+      ],
+      "path": "$.nodes[0]",
+      "x": 0,
+      "y": 0,
+      "w": 220,
+      "h": 64
+    },
+    {
+      "id": "who",
+      "kind": "strip",
+      "nodes": [
+        "who",
+        "profile"
+      ],
+      "types": [
+        "extract",
+        "generate"
+      ],
+      "path": "$.nodes[1]",
+      "x": 280,
+      "y": 8,
+      "w": 260,
+      "h": 48
+    },
+    {
+      "id": "checks",
+      "kind": "container",
+      "nodes": [
+        "checks"
+      ],
+      "types": [
+        "batch"
+      ],
+      "path": "$.nodes[3]",
+      "x": 600,
+      "y": 12,
+      "w": 396,
+      "h": 144
+    },
+    {
+      "id": "config",
+      "kind": "action",
+      "nodes": [
+        "config"
+      ],
+      "types": [
+        "fetch"
+      ],
+      "path": "$.nodes[3].body[0]",
+      "x": 628,
+      "y": 80,
+      "w": 140,
+      "h": 48,
+      "parent": "checks"
+    },
+    {
+      "id": "double",
+      "kind": "strip",
+      "nodes": [
+        "double"
+      ],
+      "types": [
+        "calc"
+      ],
+      "path": "$.nodes[3].body[1]",
+      "x": 828,
+      "y": 80,
+      "w": 140,
+      "h": 48,
+      "parent": "checks"
+    },
+    {
+      "id": "both",
+      "kind": "container",
+      "nodes": [
+        "both"
+      ],
+      "types": [
+        "parallel"
+      ],
+      "path": "$.nodes[4]",
+      "x": 1056,
+      "y": 12,
+      "w": 276,
+      "h": 246
+    },
+    {
+      "id": "notify",
+      "kind": "action",
+      "nodes": [
+        "notify"
+      ],
+      "types": [
+        "webhook"
+      ],
+      "path": "$.nodes[4].branches[0].nodes[0]",
+      "x": 1084,
+      "y": 80,
+      "w": 140,
+      "h": 48,
+      "parent": "both"
+    },
+    {
+      "id": "client",
+      "kind": "request",
+      "nodes": [
+        "client"
+      ],
+      "types": [
+        "request"
+      ],
+      "path": "$.nodes[4].branches[1].nodes[0]",
+      "x": 1084,
+      "y": 166,
+      "w": 220,
+      "h": 64,
+      "parent": "both",
+      "lane": 1
+    },
+    {
+      "id": "poll",
+      "kind": "container",
+      "nodes": [
+        "poll"
+      ],
+      "types": [
+        "run_till"
+      ],
+      "path": "$.nodes[5]",
+      "x": 1392,
+      "y": 12,
+      "w": 200,
+      "h": 144
+    },
+    {
+      "id": "status",
+      "kind": "action",
+      "nodes": [
+        "status"
+      ],
+      "types": [
+        "fetch"
+      ],
+      "path": "$.nodes[5].body[0]",
+      "x": 1420,
+      "y": 80,
+      "w": 140,
+      "h": 48,
+      "parent": "poll"
+    },
+    {
+      "id": "decide",
+      "kind": "container",
+      "nodes": [
+        "decide"
+      ],
+      "types": [
+        "condition"
+      ],
+      "path": "$.nodes[6]",
+      "x": 1652,
+      "y": 12,
+      "w": 200,
+      "h": 238
+    },
+    {
+      "id": "ready",
+      "kind": "strip",
+      "nodes": [
+        "ready"
+      ],
+      "types": [
+        "note"
+      ],
+      "path": "$.nodes[6].then[0]",
+      "x": 1680,
+      "y": 80,
+      "w": 140,
+      "h": 48,
+      "parent": "decide"
+    },
+    {
+      "id": "stuck",
+      "kind": "strip",
+      "nodes": [
+        "stuck"
+      ],
+      "types": [
+        "log"
+      ],
+      "path": "$.nodes[6].else[0]",
+      "x": 1680,
+      "y": 174,
+      "w": 140,
+      "h": 48,
+      "parent": "decide",
+      "lane": 1
+    },
+    {
+      "id": "passed",
+      "kind": "strip",
+      "nodes": [
+        "passed",
+        "all-checked",
+        "keep",
+        "summary"
+      ],
+      "types": [
+        "transform",
+        "assert",
+        "save",
+        "digest"
+      ],
+      "path": "$.nodes[7]",
+      "x": 1912,
+      "y": 8,
+      "w": 500,
+      "h": 48
+    }
+  ],
+  "edges": [
+    {
+      "from": "session",
+      "to": "who"
+    },
+    {
+      "from": "config",
+      "to": "double"
+    },
+    {
+      "from": "checks",
+      "to": "config",
+      "curve": true,
+      "into": true
+    },
+    {
+      "from": "who",
+      "to": "checks"
+    },
+    {
+      "from": "both",
+      "to": "notify",
+      "curve": true,
+      "into": true
+    },
+    {
+      "from": "both",
+      "to": "client",
+      "curve": true,
+      "into": true
+    },
+    {
+      "from": "double",
+      "to": "both",
+      "curve": true
+    },
+    {
+      "from": "poll",
+      "to": "status",
+      "curve": true,
+      "into": true
+    },
+    {
+      "from": "notify",
+      "to": "poll",
+      "curve": true
+    },
+    {
+      "from": "client",
+      "to": "poll",
+      "curve": true
+    },
+    {
+      "from": "decide",
+      "to": "ready",
+      "curve": true,
+      "into": true
+    },
+    {
+      "from": "decide",
+      "to": "stuck",
+      "curve": true,
+      "into": true
+    },
+    {
+      "from": "status",
+      "to": "decide",
+      "curve": true
+    },
+    {
+      "from": "ready",
+      "to": "passed",
+      "curve": true
+    },
+    {
+      "from": "stuck",
+      "to": "passed",
+      "curve": true
+    }
+  ],
+  "lanes": [
+    {
+      "container": "checks",
+      "index": 0,
+      "path": "$.nodes[3].body",
+      "x": 620,
+      "y": 72,
+      "w": 356,
+      "h": 64,
+      "portY": 104,
+      "label": "body"
+    },
+    {
+      "container": "both",
+      "index": 0,
+      "path": "$.nodes[4].branches[0].nodes",
+      "x": 1076,
+      "y": 72,
+      "w": 236,
+      "h": 64,
+      "portY": 104,
+      "label": "ping"
+    },
+    {
+      "container": "both",
+      "index": 1,
+      "path": "$.nodes[4].branches[1].nodes",
+      "x": 1076,
+      "y": 166,
+      "w": 236,
+      "h": 72,
+      "portY": 198,
+      "label": "cfg"
+    },
+    {
+      "container": "poll",
+      "index": 0,
+      "path": "$.nodes[5].body",
+      "x": 1412,
+      "y": 72,
+      "w": 160,
+      "h": 64,
+      "portY": 104,
+      "label": "body"
+    },
+    {
+      "container": "decide",
+      "index": 0,
+      "path": "$.nodes[6].then",
+      "x": 1672,
+      "y": 72,
+      "w": 160,
+      "h": 64,
+      "portY": 104,
+      "label": "then"
+    },
+    {
+      "container": "decide",
+      "index": 1,
+      "path": "$.nodes[6].else",
+      "x": 1672,
+      "y": 166,
+      "w": 160,
+      "h": 64,
+      "portY": 198,
+      "label": "else"
+    }
+  ]
+}

@@ -1,0 +1,119 @@
+{
+  "units": [
+    {
+      "id": "login",
+      "kind": "request",
+      "nodes": [
+        "login"
+      ],
+      "types": [
+        "request"
+      ],
+      "path": "$.nodes[0]",
+      "x": 0,
+      "y": 0,
+      "w": 220,
+      "h": 64
+    },
+    {
+      "id": "session",
+      "kind": "strip",
+      "nodes": [
+        "session",
+        "wait-for-code"
+      ],
+      "types": [
+        "extract",
+        "delay"
+      ],
+      "path": "$.nodes[1]",
+      "x": 280,
+      "y": 8,
+      "w": 260,
+      "h": 48
+    },
+    {
+      "id": "verify",
+      "kind": "request",
+      "nodes": [
+        "verify"
+      ],
+      "types": [
+        "request"
+      ],
+      "path": "$.nodes[3]",
+      "x": 600,
+      "y": 0,
+      "w": 220,
+      "h": 64
+    },
+    {
+      "id": "profile",
+      "kind": "strip",
+      "nodes": [
+        "profile"
+      ],
+      "types": [
+        "generate"
+      ],
+      "path": "$.nodes[4]",
+      "x": 880,
+      "y": 8,
+      "w": 140,
+      "h": 48
+    },
+    {
+      "id": "page-1",
+      "kind": "request",
+      "nodes": [
+        "page-1"
+      ],
+      "types": [
+        "request"
+      ],
+      "path": "$.nodes[5]",
+      "x": 1080,
+      "y": 0,
+      "w": 220,
+      "h": 64
+    },
+    {
+      "id": "page-2",
+      "kind": "request",
+      "nodes": [
+        "page-2"
+      ],
+      "types": [
+        "request"
+      ],
+      "path": "$.nodes[6]",
+      "x": 1360,
+      "y": 0,
+      "w": 220,
+      "h": 64
+    }
+  ],
+  "edges": [
+    {
+      "from": "login",
+      "to": "session"
+    },
+    {
+      "from": "session",
+      "to": "verify"
+    },
+    {
+      "from": "verify",
+      "to": "profile"
+    },
+    {
+      "from": "profile",
+      "to": "page-1"
+    },
+    {
+      "from": "page-1",
+      "to": "page-2"
+    }
+  ],
+  "lanes": null
+}

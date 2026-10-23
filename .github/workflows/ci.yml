@@ -1,0 +1,103 @@
+name: ci
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+permissions:
+  contents: read
+
+env:
+  REPO_DIR: flowi
+
+jobs:
+  test:
+    name: test (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        working-directory: flowi
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          path: flowi
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: flowi/go.mod
+      - name: install GUI build dependencies
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libgtk-4-dev libwebkitgtk-6.0-dev libsoup-3.0-dev pkg-config
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      - name: build the frontend (the app embeds it)
+        working-directory: flowi/frontend
+        run: npm ci && npm run build
+      - run: go test -race ./...
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          path: flowi
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: flowi/go.mod
+      - name: install GUI build dependencies
+        run: sudo apt-get update && sudo apt-get install -y libgtk-4-dev libwebkitgtk-6.0-dev libsoup-3.0-dev pkg-config
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      - name: build the frontend (the app embeds it)
+        working-directory: flowi/frontend
+        run: npm ci && npm run build
+      - uses: golangci/golangci-lint-action@v8
+        with:
+          version: v2.14
+          working-directory: flowi
+
+  vuln:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: flowi
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          path: flowi
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: flowi/go.mod
+      - name: install GUI build dependencies
+        run: sudo apt-get update && sudo apt-get install -y libgtk-4-dev libwebkitgtk-6.0-dev libsoup-3.0-dev pkg-config
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      - name: build the frontend (the app embeds it)
+        working-directory: flowi/frontend
+        run: npm ci && npm run build
+      - run: go run golang.org/x/vuln/cmd/govulncheck@latest ./...
+
+  # The front end has its own checks: types and Svelte warnings, unit tests, and known-vulnerable packages.
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: flowi/frontend
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          path: flowi
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      - run: npm ci
+      - run: npm run check
+      - run: npm test
+      - run: npm audit --audit-level=high

@@ -1,0 +1,15 @@
+{
+	"fixed": {
+		"file_version": "0.0.1"
+	},
+	"info": {
+		"0409": {
+			"ProductVersion": "0.0.1",
+			"CompanyName": "Flow-I",
+			"FileDescription": "Compose API requests into flows",
+			"LegalCopyright": "AGPL-3.0-or-later",
+			"ProductName": "Flow-I",
+			"Comments": "Build API requests and stitch them into flows"
+		}
+	}
+}

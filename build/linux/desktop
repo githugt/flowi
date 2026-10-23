@@ -1,0 +1,13 @@
+[Desktop Entry]
+Version=1.0
+Name=Flow-I
+Comment=Compose API requests into flows
+# The Exec line includes %u to pass the URL to the application
+Exec=/usr/local/bin/wspike %u
+Terminal=false
+Type=Application
+Icon=wspike
+Categories=Utility;
+StartupWMClass=wspike
+
+ 
