@@ -3,31 +3,42 @@
 #
 # The lines below are called `modelines`. See `:help modeline`
 
-name: "flowi"
+# "flowi-app", because the command line tool is "flowi" and both would otherwise install /usr/bin/flowi.
+name: "flowi-app"
 arch: ${GOARCH}
 platform: "linux"
-version: "0.0.1"
+# From the release tag (see .github/workflows/release.yml); "0.1.0-alpha.1" becomes "0.1.0~alpha.1" in a deb or rpm,
+# so a pre-release sorts before the release.
+version: ${VERSION}
+version_schema: semver
 section: "default"
 priority: "extra"
-maintainer: ${GIT_COMMITTER_NAME} <${GIT_COMMITTER_EMAIL}>
+maintainer: "Flow-I <githugt@users.noreply.github.com>"
 description: "Compose API requests into flows"
 vendor: "Flow-I"
-homepage: "https://wails.io"
-license: "MIT"
+homepage: "https://github.com/githugt/flowi"
+license: "AGPL-3.0-or-later"
 release: "1"
 
+# Under /usr, not /usr/local: that is where a distribution package belongs, and Arch packages may not use /usr/local.
 contents:
-  - src: "./bin/flowi"
-    dst: "/usr/local/bin/flowi"
+  - src: "./bin/flowi-app"
+    dst: "/usr/bin/flowi-app"
   - src: "./build/appicon.png"
     dst: "/usr/share/icons/hicolor/128x128/apps/flowi.png"
-  - src: "./build/linux/flowi.desktop"
+  - src: "./build/linux/desktop"
     dst: "/usr/share/applications/flowi.desktop"
+  - src: "./LICENSE"
+    dst: "/usr/share/licenses/flowi/LICENSE"
 
-# Default dependencies for the GTK4 + WebKitGTK 6.0 stack (Ubuntu 24.04+ / Debian 13+)
+# What the window needs: GTK 4, WebKitGTK 6.0 and libsoup 3 (Ubuntu 24.04+ / Debian 13+), plus the two helpers
+# WebKit starts to sandbox its web content: bubblewrap and xdg-dbus-proxy. Without them the window dies at start.
 depends:
   - libgtk-4-1
   - libwebkitgtk-6.0-4
+  - libsoup-3.0-0
+  - bubblewrap
+  - xdg-dbus-proxy
 
 # Distribution-specific overrides for different package formats
 overrides:
@@ -36,12 +47,18 @@ overrides:
     depends:
       - gtk4
       - webkitgtk6.0
+      - libsoup3
+      - bubblewrap
+      - xdg-dbus-proxy
 
   # Arch Linux packages
   archlinux:
     depends:
       - gtk4
       - webkitgtk-6.0
+      - libsoup3
+      - bubblewrap
+      - xdg-dbus-proxy
 
 # scripts section to ensure desktop database is updated after install
 scripts:

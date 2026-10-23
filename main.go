@@ -36,6 +36,10 @@ var assets embed.FS
 var changelog string
 
 func main() {
+	// WebKitGTK kills the program with a signal when its helpers are missing; say what to install instead.
+	if !systemReady() {
+		os.Exit(1)
+	}
 	if err := run(); err != nil {
 		log.Fatal(err)
 	}

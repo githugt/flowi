@@ -64,5 +64,6 @@ Instructions for AI coding agents (and a useful checklist for people) working in
 | `internal/bridge` | one Go service per area (workspace, flows, requests, settings…); Svelte calls their methods |
 | `internal/vm` | screen logic, tested without a window; `vmtest` is a fake backend |
 | `internal/canvas` | the layout of the flow canvas |
+| `internal/preflight` | the Linux start-up check: WebKit's helpers and sandbox tools, and the install command per distribution |
 | `internal/backend`, `internal/uithread` | the adapter to `flowi-lib`, and the UI-goroutine guard |
 | `frontend/src` | Svelte components; `lib/` holds shared TypeScript |

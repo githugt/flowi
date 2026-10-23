@@ -5,7 +5,7 @@
 !include "FileFunc.nsh"
 
 !ifndef INFO_PROJECTNAME
-    !define INFO_PROJECTNAME "flowi"
+    !define INFO_PROJECTNAME "flowi-app"
 !endif
 !ifndef INFO_COMPANYNAME
     !define INFO_COMPANYNAME "Flow-I"

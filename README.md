@@ -80,6 +80,29 @@ Environments and an encrypted **secrets** vault; **impact analysis** of what use
 (templates); drafts you can try things in before saving; a trash for abandoned drafts; themes; and a
 settings screen where every setting is explained.
 
+## Install a release
+
+Download the package for your system from the [releases page](https://github.com/githugt/flowi/releases).
+
+- **macOS:** unzip `flowi-app_*_macos_arm64.zip` and open `flowi-gui.app`. The app is not notarized yet: right-click and choose Open the first time.
+- **Windows 10 or later:** run `flowi-app_*_windows_amd64_setup.exe`. The installer is not signed yet, so SmartScreen warns first.
+- **Debian 13 or Ubuntu 24.04 or later:** `sudo apt install ./flowi-app_*_linux_amd64.deb`
+- **Fedora:** `sudo dnf install ./flowi-app_*_linux_amd64.rpm`
+- **Arch, CachyOS, Manjaro:** `sudo pacman -U flowi-app_*_linux_amd64.pkg.tar.zst`
+
+The Linux packages install what the window needs, so you do not have to. The command is `flowi-app`: `flowi` is the
+command line tool. If you run the program some other way
+(built from source), install these yourself. The window refuses to start without them and tells you what is missing:
+
+| System | Packages |
+|---|---|
+| Arch and derivatives | `sudo pacman -S gtk4 webkitgtk-6.0 libsoup3 bubblewrap xdg-dbus-proxy` |
+| Debian 13, Ubuntu 24.04 and later | `sudo apt install libgtk-4-1 libwebkitgtk-6.0-4 libsoup-3.0-0 bubblewrap xdg-dbus-proxy` |
+| Fedora | `sudo dnf install gtk4 webkitgtk6.0 libsoup3 bubblewrap xdg-dbus-proxy` |
+
+`bubblewrap` and `xdg-dbus-proxy` are what WebKit runs web content under. There is no AppImage: WebKitGTK has
+the Debian and Ubuntu paths of its helper programs built in, so an AppImage built on Ubuntu starts only there.
+
 ## Install and run
 
 You need [Go](https://go.dev/dl/) 1.27 or later, [Node.js](https://nodejs.org/) 22 or later and
@@ -89,7 +112,7 @@ Xcode command line tools; on Windows the WebView2 runtime.
 ```bash
 git clone https://github.com/githugt/flowi && cd flowi
 just run          # build the front end, then start the app
-just build        # or build a binary into ./bin/flowi
+just build        # or build a binary into ./bin/flowi-app
 ```
 
 ### Supported systems

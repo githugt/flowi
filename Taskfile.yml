@@ -1,7 +1,9 @@
 version: '3'
 
 vars:
-  APP_NAME: "flowi"
+  APP_NAME: "flowi-app"
+  # What the macOS bundle (the .app folder) is called. The program inside it is APP_NAME.
+  BUNDLE_NAME: "flowi-gui"
   BIN_DIR: "bin"
   PACKAGE_MANAGER: '{{.PACKAGE_MANAGER | default "npm"}}'
   VITE_PORT: '{{.WAILS_VITE_PORT | default 9245}}'
