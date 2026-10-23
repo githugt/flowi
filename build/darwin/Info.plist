@@ -3,7 +3,7 @@
 <plist version="1.0">
 	<dict>
 		<key>CFBundleExecutable</key>
-		<string>flowi</string>
+		<string>flowi-app</string>
 		<key>CFBundleGetInfoString</key>
 		<string>Build API requests and stitch them into flows</string>
 		<key>CFBundleIconFile</key>

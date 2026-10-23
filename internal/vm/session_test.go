@@ -132,9 +132,12 @@ func TestSessionWriter_should_write_only_the_latest_of_queued_writes_and_never_i
 	var running, maxRunning atomic.Int32
 	var wrote []string
 	var mu sync.Mutex
-	gate := make(chan struct{})
+	gate, started := make(chan struct{}), make(chan struct{})
 	w := vm.NewSessionWriter(func(error) {})
-	w.Queue("tabs", func() error { <-gate; return nil }) // holds the writer busy
+	// Holds the writer busy. Before: the three writes were queued without waiting for this one to start, so on a
+	// loaded machine the writer could pick up "a" before "b" and "c" were queued and the test failed now and then.
+	w.Queue("tabs", func() error { close(started); <-gate; return nil })
+	<-started
 	for _, v := range []string{"a", "b", "c"} {
 		w.Queue("tabs", func() error {
 			n := running.Add(1)

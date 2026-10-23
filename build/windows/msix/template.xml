@@ -8,7 +8,7 @@
         AllowPromptForPassword="false">
     </Settings>
     <Installer
-        Path="flowi"
+        Path="flowi-app"
         Arguments=""
         InstallLocation="C:\Program Files\My Company\My Product">
     </Installer>
@@ -28,7 +28,7 @@
                 Id="io.github.githugt.flowi"
                 Description="Compose API requests into flows"
                 DisplayName="My Product"
-                ExecutableName="flowi"
+                ExecutableName="flowi-app"
                 EntryPoint="Windows.FullTrustApplication">
                 
             </Application>
@@ -47,7 +47,7 @@
             <Logo>Assets\AppIcon.png</Logo>
         </Properties>
     </PackageInformation>
-    <SaveLocation PackagePath="flowi.msix" />
+    <SaveLocation PackagePath="flowi-app.msix" />
     <PackageIntegrity>
         <CertificatePath></CertificatePath>
     </PackageIntegrity>

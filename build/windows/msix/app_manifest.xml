@@ -29,7 +29,7 @@
   </Resources>
   
   <Applications>
-    <Application Id="io.github.githugt.flowi" Executable="flowi" EntryPoint="Windows.FullTrustApplication">
+    <Application Id="io.github.githugt.flowi" Executable="flowi-app" EntryPoint="Windows.FullTrustApplication">
       <uap:VisualElements
         DisplayName="My Product"
         Description="Compose API requests into flows"
@@ -41,7 +41,7 @@
       </uap:VisualElements>
       
       <Extensions>
-        <desktop:Extension Category="windows.fullTrustProcess" Executable="flowi" />
+        <desktop:Extension Category="windows.fullTrustProcess" Executable="flowi-app" />
         
         
       </Extensions>

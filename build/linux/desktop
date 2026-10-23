@@ -1,13 +1,10 @@
 [Desktop Entry]
 Version=1.0
+Type=Application
 Name=Flow-I
 Comment=Compose API requests into flows
-# The Exec line includes %u to pass the URL to the application
-Exec=/usr/local/bin/flowi %u
-Terminal=false
-Type=Application
+Exec=flowi-app
 Icon=flowi
-Categories=Utility;
-StartupWMClass=flowi
-
- 
+Terminal=false
+Categories=Development;
+StartupWMClass=flowi-app

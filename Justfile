@@ -11,9 +11,9 @@ ldflags := if os() == "macos" { "-ldflags=-extldflags=-Wl,-no_warn_duplicate_lib
 run *args: frontend
     go run {{ldflags}} . "$@"
 
-# Build the app into ./bin/flowi (the front end first: the binary embeds it).
+# Build the app into ./bin/flowi-app (the front end first: the binary embeds it).
 build: frontend
-    go build {{ldflags}} -o bin/flowi .
+    go build {{ldflags}} -o bin/flowi-app .
 
 # Install the frontend dependencies when missing, and build it (the app embeds frontend/dist).
 frontend:
