@@ -1,0 +1,41 @@
+{
+  "units": [
+    {
+      "id": "login",
+      "kind": "request",
+      "nodes": [
+        "login"
+      ],
+      "types": [
+        "request"
+      ],
+      "path": "$.nodes[0]",
+      "x": 0,
+      "y": 0,
+      "w": 220,
+      "h": 64
+    },
+    {
+      "id": "session",
+      "kind": "strip",
+      "nodes": [
+        "session"
+      ],
+      "types": [
+        "extract"
+      ],
+      "path": "$.nodes[1]",
+      "x": 280,
+      "y": 8,
+      "w": 140,
+      "h": 48
+    }
+  ],
+  "edges": [
+    {
+      "from": "login",
+      "to": "session"
+    }
+  ],
+  "lanes": null
+}

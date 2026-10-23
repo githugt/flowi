@@ -1,0 +1,129 @@
+:root {
+  --bg: #0f1116;
+  --panel: #171a21;
+  --line: #2a2f3a;
+  --text: #e6e9ef;
+  --muted: #8b93a3;
+  --accent: #6ea8fe;
+  --request: #1f3a5f;
+  --strip: #3a2f5f;
+  --action: #2f4a3a;
+  --container: #4a3a2a;
+  --fail: #e5534b;
+  color-scheme: dark;
+}
+@media (prefers-color-scheme: light) {
+  :root {
+    --bg: #f5f6f8;
+    --panel: #ffffff;
+    --line: #d5d9e0;
+    --text: #1c2230;
+    --muted: #5d6677;
+    --accent: #2563eb;
+    --request: #dbe8fb;
+    --strip: #e6defa;
+    --action: #dcf0e3;
+    --container: #f6e8d6;
+    color-scheme: light;
+  }
+}
+/* Scales: every size, radius and gap in the components comes from these. */
+:root {
+  --fs-xs: 11px; --fs-sm: 12px; --fs-md: 13px; --fs-lg: 16px; --fs-xl: 22px;
+  /* The section tab bars of the request and response panes, which sit side by side and line up. */
+  --tabbar-h: 38px;
+  --r-sm: 4px; --r-md: 6px; --r-lg: 8px; --r-pill: 999px;
+  --sp-1: 4px; --sp-2: 8px; --sp-3: 12px; --sp-4: 16px; --sp-6: 24px;
+  --mono: ui-monospace, Menlo, monospace;
+  --shadow: 0 8px 24px rgb(0 0 0 / 0.3);
+}
+
+/* Status colours. The dark set is the default; light themes get a darker set that reads on white. */
+:root {
+  --ok: #4caf84; --warn: #e0a43a; --dirty: #f0a35e; --info: #5bc0de; --literal: #c586c0; --pending: #e0c34a; --data: #2dd4bf;
+  --on-accent: #fff;
+  /* The send button, one colour per mode. Each keeps white text at 4.5:1 or better; the accent
+     itself (#6ea8fe) gave white text only about 2.3:1, which read as washed out. */
+  --act-send: #2f6fe0; --act-receive: #0e7d6b; --act-both: #7a4fd6; --on-act: #fff;
+}
+@media (prefers-color-scheme: light) { :root:not([data-theme]) { --ok: #1f8a5a; --warn: #a16207; --dirty: #c2620a; --info: #0e7490; --literal: #8b3fa0; --pending: #8a6d00; --data: #0f766e; --shadow: 0 8px 24px rgb(0 0 0 / 0.12); } }
+:root[data-theme='light'], :root[data-theme='flowi-light'], :root[data-theme='solarized-light'], :root[data-theme='anuppuccin-light'] {
+  --ok: #1f8a5a; --warn: #a16207; --dirty: #c2620a; --info: #0e7490; --literal: #8b3fa0; --pending: #8a6d00; --data: #0f766e; --shadow: 0 8px 24px rgb(0 0 0 / 0.12);
+}
+:root[data-theme='high-contrast'] { --on-accent: #000; --act-send: var(--accent); --act-receive: var(--accent); --act-both: var(--accent); --on-act: #000; }
+
+/* Syntax colours for code (bodies, messages, schemas, snippets): lib/highlight.ts and the code editor mark
+   text with tok-* classes. Templates use --literal, as they do in the address field. */
+:root { --syn-key: #79b8ff; --syn-string: #9ece6a; --syn-number: #ff9e64; --syn-atom: #56b6c2; --syn-punct: var(--muted); }
+@media (prefers-color-scheme: light) { :root:not([data-theme]) { --syn-key: #0b5cad; --syn-string: #2f7d32; --syn-number: #b45309; --syn-atom: #0e7490; } }
+:root[data-theme='light'], :root[data-theme='flowi-light'], :root[data-theme='solarized-light'], :root[data-theme='anuppuccin-light'] {
+  --syn-key: #0b5cad; --syn-string: #2f7d32; --syn-number: #b45309; --syn-atom: #0e7490;
+}
+.tok-propertyName { color: var(--syn-key); }
+.tok-string { color: var(--syn-string); }
+.tok-propertyName.tok-string, .tok-propertyName .tok-string { color: var(--syn-key); }
+.tok-number { color: var(--syn-number); }
+.tok-bool, .tok-null, .tok-atom, .tok-keyword { color: var(--syn-atom); }
+.tok-punctuation, .tok-meta, .tok-comment { color: var(--syn-punct); }
+.tok-comment { font-style: italic; }
+.tok-template { color: var(--literal); background: color-mix(in srgb, var(--literal) 14%, transparent); border-radius: 3px; }
+.tok-template * { color: var(--literal); } /* the editor nests a string's own span inside the mark */
+
+html, body, #app { height: 100%; margin: 0; }
+
+/* One visible focus ring for keyboard users everywhere; fields show it whenever they hold the caret. */
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+input:focus-visible, textarea:focus-visible, select:focus-visible { outline: 2px solid color-mix(in srgb, var(--accent) 55%, transparent); outline-offset: 0; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font: var(--font-size, 13px)/1.4 var(--font, -apple-system), BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  overflow: hidden;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* Themes: appearance.theme sets data-theme on the root; "system" sets none and follows the OS. */
+:root[data-theme='dark'], :root[data-theme='classic'], :root[data-theme='flowi-dark'] {
+  --bg: #0f1116; --panel: #171a21; --line: #2a2f3a; --text: #e6e9ef; --muted: #8b93a3; --accent: #6ea8fe;
+  --request: #1f3a5f; --strip: #3a2f5f; --action: #2f4a3a; --container: #4a3a2a; color-scheme: dark;
+}
+:root[data-theme='light'], :root[data-theme='flowi-light'] {
+  --bg: #f5f6f8; --panel: #ffffff; --line: #d5d9e0; --text: #1c2230; --muted: #5d6677; --accent: #2563eb;
+  --request: #dbe8fb; --strip: #e6defa; --action: #dcf0e3; --container: #f6e8d6; color-scheme: light;
+}
+:root[data-theme='high-contrast'] {
+  --bg: #000000; --panel: #0a0a0a; --line: #ffffff; --text: #ffffff; --muted: #d0d0d0; --accent: #ffd700;
+  --request: #00264d; --strip: #2a0050; --action: #003d1a; --container: #4d2600; --fail: #ff5555; color-scheme: dark;
+}
+:root[data-theme='solarized-light'] {
+  --bg: #fdf6e3; --panel: #eee8d5; --line: #d3cbb7; --text: #073642; --muted: #657b83; --accent: #268bd2;
+  --request: #d5e6ee; --strip: #e4def0; --action: #dde8cf; --container: #f0e1c8; color-scheme: light;
+}
+:root[data-theme='solarized-dark'] {
+  --bg: #002b36; --panel: #073642; --line: #17505e; --text: #eee8d5; --muted: #93a1a1; --accent: #2aa1f0;
+  --request: #0e4a63; --strip: #3a3a6e; --action: #1c5440; --container: #5a4424; color-scheme: dark;
+}
+:root[data-theme='nord'] {
+  --bg: #2e3440; --panel: #3b4252; --line: #4c566a; --text: #eceff4; --muted: #a3acbd; --accent: #88c0d0;
+  --request: #3d5a78; --strip: #5b4d7a; --action: #3f6350; --container: #6a5640; color-scheme: dark;
+}
+:root[data-theme='anuppuccin-dark'] {
+  --bg: #1e1e2e; --panel: #181825; --line: #313244; --text: #cdd6f4; --muted: #9399b2; --accent: #89b4fa;
+  --request: #2a3f66; --strip: #4a3a6e; --action: #2e5040; --container: #5a4430; --fail: #f38ba8; color-scheme: dark;
+}
+
+:root[data-theme='anuppuccin-light'] {
+  --bg: #eff1f5; --panel: #e6e9ef; --line: #ccd0da; --text: #4c4f69; --muted: #6c6f85; --accent: #1e66f5;
+  --request: #d4e1fb; --strip: #e3dcf7; --action: #d9efdf; --container: #f5e6d3; --fail: #d20f39; color-scheme: light;
+}
+
+/* Colours of the verbs (HTTP methods and message protocols); the light set reads on a light background. */
+:root { --v-GET: #35c58a; --v-POST: #f4b84a; --v-PUT: #60a5fa; --v-PATCH: #b59af7; --v-DELETE: #f06470; --v-WS: #2dd4bf; --v-SSE: #38bdf8; --v-MQTT: #ff8a5b; --v-KAFKA: #e879f9; --v-AMQP: #a3e635; --v-NATS: #818cf8; --v-GRPC: #5eead4; --v-REDIS: #ff6b6b; --v-SQS: #fb923c; --v-SNS: #fb7185; --v-BUS: #4aa8ff; --v-PUBSUB: #22d3ee; --v-OTHER: #a7b3c6; }
+@media (prefers-color-scheme: light) { :root:not([data-theme]) { --v-GET: #147d57; --v-POST: #8a5700; --v-PUT: #245ddb; --v-PATCH: #7042b8; --v-DELETE: #c43142; --v-WS: #0f766e; --v-SSE: #0369a1; --v-MQTT: #b4441a; --v-KAFKA: #a21caf; --v-AMQP: #4d7c0f; --v-NATS: #4338ca; --v-GRPC: #0f766e; --v-REDIS: #b91c1c; --v-SQS: #b45309; --v-SNS: #be123c; --v-BUS: #0b5cad; --v-PUBSUB: #0e7490; --v-OTHER: #536178; } }
+:root[data-theme='light'], :root[data-theme='flowi-light'], :root[data-theme='solarized-light'], :root[data-theme='anuppuccin-light'] { --v-GET: #147d57; --v-POST: #8a5700; --v-PUT: #245ddb; --v-PATCH: #7042b8; --v-DELETE: #c43142; --v-WS: #0f766e; --v-SSE: #0369a1; --v-MQTT: #b4441a; --v-KAFKA: #a21caf; --v-AMQP: #4d7c0f; --v-NATS: #4338ca; --v-GRPC: #0f766e; --v-REDIS: #b91c1c; --v-SQS: #b45309; --v-SNS: #be123c; --v-BUS: #0b5cad; --v-PUBSUB: #0e7490; --v-OTHER: #536178; }
+
+/* Flows have a pill too. */
+:root { --v-FLOW: #e0b0ff; }
+@media (prefers-color-scheme: light) { :root:not([data-theme]) { --v-FLOW: #7e22ce; } }
+:root[data-theme='light'], :root[data-theme='flowi-light'], :root[data-theme='solarized-light'], :root[data-theme='anuppuccin-light'] { --v-FLOW: #7e22ce; }

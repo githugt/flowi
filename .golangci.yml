@@ -1,0 +1,46 @@
+version: "2"
+
+linters:
+  enable:
+    - bodyclose
+    - errorlint
+    - forbidigo
+    - gochecknoglobals
+    - gochecknoinits
+    - gocritic
+    - gosec
+    - misspell
+    - noctx
+    - revive
+  settings:
+    forbidigo:
+      forbid:
+        - pattern: '^fmt\.Print(f|ln)?$'
+          msg: use slog or an injected io.Writer
+        - pattern: '^os\.(Getenv|LookupEnv|Environ)$'
+          msg: read environment variables only in the flowi-lib settings package
+  exclusions:
+    presets:
+      - std-error-handling
+    rules:
+      # Tests may use fixed file modes and paths built from test data.
+      - path: _test\.go
+        linters: [gosec]
+      # Flow-I exists to read files the user points it at (collections,
+      # workspace, settings), so variable file paths are expected.
+      - linters: [gosec]
+        text: G304
+      # The library adapter and the test fake implement vm.Backend method by
+      # method; the interface documents each method once.
+      - path: internal/(backend/workspace|vm/vmtest/vmtest)\.go
+        linters: [revive]
+        text: "exported: exported method"
+      # Environment access is allowed only where the plan places it.
+      - path: ^(cmd/|main\.go$)
+        linters: [forbidigo]
+        text: 'os\.'
+
+formatters:
+  enable:
+    - gofmt
+    - goimports

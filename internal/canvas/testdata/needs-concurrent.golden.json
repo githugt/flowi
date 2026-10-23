@@ -1,0 +1,87 @@
+{
+  "units": [
+    {
+      "id": "a",
+      "kind": "strip",
+      "nodes": [
+        "a"
+      ],
+      "types": [
+        "set"
+      ],
+      "path": "$.nodes[0]",
+      "x": 0,
+      "y": 8,
+      "w": 140,
+      "h": 48
+    },
+    {
+      "id": "b",
+      "kind": "action",
+      "nodes": [
+        "b"
+      ],
+      "types": [
+        "fetch"
+      ],
+      "path": "$.nodes[1]",
+      "x": 200,
+      "y": 8,
+      "w": 140,
+      "h": 48
+    },
+    {
+      "id": "c",
+      "kind": "action",
+      "nodes": [
+        "c"
+      ],
+      "types": [
+        "fetch"
+      ],
+      "path": "$.nodes[2]",
+      "x": 400,
+      "y": 8,
+      "w": 140,
+      "h": 48,
+      "concurrent": true
+    },
+    {
+      "id": "d",
+      "kind": "action",
+      "nodes": [
+        "d"
+      ],
+      "types": [
+        "log"
+      ],
+      "path": "$.nodes[3]",
+      "x": 600,
+      "y": 8,
+      "w": 140,
+      "h": 48
+    }
+  ],
+  "edges": [
+    {
+      "from": "a",
+      "to": "b"
+    },
+    {
+      "from": "a",
+      "to": "c",
+      "needs": true
+    },
+    {
+      "from": "b",
+      "to": "d",
+      "needs": true
+    },
+    {
+      "from": "c",
+      "to": "d",
+      "needs": true
+    }
+  ],
+  "lanes": null
+}

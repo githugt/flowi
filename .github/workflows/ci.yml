@@ -1,0 +1,83 @@
+name: ci
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+permissions:
+  contents: read
+
+env:
+  REPO_DIR: flowi
+
+jobs:
+  test:
+    name: test (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        working-directory: flowi
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          path: flowi
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: flowi/go.mod
+      - name: install GUI build dependencies
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      - name: build the frontend (the app embeds it)
+        working-directory: flowi/frontend
+        run: npm ci && npm run build
+      - run: go test -race ./...
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          path: flowi
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: flowi/go.mod
+      - name: install GUI build dependencies
+        run: sudo apt-get update && sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      - name: build the frontend (the app embeds it)
+        working-directory: flowi/frontend
+        run: npm ci && npm run build
+      - uses: golangci/golangci-lint-action@v8
+        with:
+          version: v2.14
+          working-directory: flowi
+
+  vuln:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: flowi
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          path: flowi
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: flowi/go.mod
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      - name: build the frontend (the app embeds it)
+        working-directory: flowi/frontend
+        run: npm ci && npm run build
+      - run: go run golang.org/x/vuln/cmd/govulncheck@latest ./...
