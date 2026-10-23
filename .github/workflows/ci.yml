@@ -84,7 +84,7 @@ jobs:
         run: npm ci && npm run build
       - run: go run golang.org/x/vuln/cmd/govulncheck@latest ./...
 
-  # The front end has its own checks: types and Svelte warnings, unit tests, and known-vulnerable packages.
+  # The front end has its own checks: types and Svelte warnings, and unit tests.
   frontend:
     runs-on: ubuntu-latest
     defaults:
@@ -100,4 +100,19 @@ jobs:
       - run: npm ci
       - run: npm run check
       - run: npm test
+
+  # Apart from "frontend" so that a new advisory does not block every merge; do not make it a required check.
+  frontend-audit:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: flowi/frontend
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          path: flowi
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      - run: npm ci
       - run: npm audit --audit-level=high

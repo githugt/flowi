@@ -92,6 +92,14 @@ just run          # build the front end, then start the app
 just build        # or build a binary into ./bin/flowi
 ```
 
+### Supported systems
+
+- **Windows 10 or later, 64-bit.** Windows 7, 8 and 8.1 do not work, for two reasons: programs built with Go 1.21
+  or later need Windows 10, and the window uses Microsoft's WebView2, which no longer supports those versions.
+- **macOS and Linux:** a release that is still supported by its vendor. The app shows its screens in the system's own
+  web engine instead of bundling one (WKWebView on macOS, WebKitGTK 6.0 with GTK 4 on Linux). On Linux that means a
+  distribution that ships those libraries, such as Ubuntu 24.04, which is what the tests run on.
+
 `go install` does not work for this app: the web front end is built from source and embedded in the binary.
 
 `FLOWI_CONFIG_DIR` points the app at another config folder, so you can try it without touching your own
