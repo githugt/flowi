@@ -3,7 +3,7 @@
 <plist version="1.0">
 <dict>
     <key>CFBundleExecutable</key>
-    <string>wspike</string>
+    <string>flowi</string>
     <key>CFBundleIdentifier</key>
     <string>io.github.githugt.flowi</string>
     <key>CFBundleName</key>

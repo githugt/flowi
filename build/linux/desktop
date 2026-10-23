@@ -3,11 +3,11 @@ Version=1.0
 Name=Flow-I
 Comment=Compose API requests into flows
 # The Exec line includes %u to pass the URL to the application
-Exec=/usr/local/bin/wspike %u
+Exec=/usr/local/bin/flowi %u
 Terminal=false
 Type=Application
-Icon=wspike
+Icon=flowi
 Categories=Utility;
-StartupWMClass=wspike
+StartupWMClass=flowi
 
  

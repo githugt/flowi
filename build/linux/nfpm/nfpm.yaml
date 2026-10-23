@@ -3,7 +3,7 @@
 #
 # The lines below are called `modelines`. See `:help modeline`
 
-name: "wspike"
+name: "flowi"
 arch: ${GOARCH}
 platform: "linux"
 version: "0.0.1"
@@ -17,12 +17,12 @@ license: "MIT"
 release: "1"
 
 contents:
-  - src: "./bin/wspike"
-    dst: "/usr/local/bin/wspike"
+  - src: "./bin/flowi"
+    dst: "/usr/local/bin/flowi"
   - src: "./build/appicon.png"
-    dst: "/usr/share/icons/hicolor/128x128/apps/wspike.png"
-  - src: "./build/linux/wspike.desktop"
-    dst: "/usr/share/applications/wspike.desktop"
+    dst: "/usr/share/icons/hicolor/128x128/apps/flowi.png"
+  - src: "./build/linux/flowi.desktop"
+    dst: "/usr/share/applications/flowi.desktop"
 
 # Default dependencies for the GTK4 + WebKitGTK 6.0 stack (Ubuntu 24.04+ / Debian 13+)
 depends:
