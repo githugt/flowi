@@ -1,0 +1,107 @@
+openapi: 3.0.3
+info:
+  title: Petstore
+  version: 1.4.0
+paths:
+  /v1/pets:
+    get:
+      operationId: listPets
+      tags: [pets]
+      parameters:
+        - name: limit
+          in: query
+          schema: { type: integer }
+        - name: X-Trace
+          in: header
+          schema: { type: string }
+      responses:
+        "200":
+          description: A page of pets
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Pet" }
+    post:
+      operationId: createPet
+      tags: [pets]
+      requestBody:
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/NewPet" }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Pet" }
+          links:
+            GetCreatedPet:
+              operationId: getPet
+              parameters:
+                petId: $response.body#/id
+  /v1/pets/{petId}:
+    get:
+      operationId: getPet
+      tags: [pets]
+      parameters:
+        - name: petId
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: A pet
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Pet" }
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error: { type: string }
+  /v2/pets/{petId}:
+    get:
+      operationId: getPetV2
+      tags: [pets]
+      parameters:
+        - name: petId
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: A pet
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  pet: { $ref: "#/components/schemas/Pet" }
+  /health:
+    get:
+      responses:
+        "200":
+          description: OK
+components:
+  schemas:
+    NewPet:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string }
+        age: { type: integer }
+        vaccinated: { type: boolean }
+        tags:
+          type: array
+          items: { type: string }
+    Pet:
+      allOf:
+        - $ref: "#/components/schemas/NewPet"
+        - type: object
+          properties:
+            id: { type: integer }
+            parent: { $ref: "#/components/schemas/Pet" }

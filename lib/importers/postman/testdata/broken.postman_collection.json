@@ -1,0 +1,7 @@
+{
+  "info": {"name": "Broken", "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"},
+  "item": [
+    {"name": "A", "request": {"method": "GET", "url": "https://x/a"}}
+    {"name": "B", "request": {"method": "GET", "url": "https://x/b"}}
+  ]
+}

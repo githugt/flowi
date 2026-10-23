@@ -1,0 +1,18 @@
+id: 01JA003M4N5P6Q7R8S9T0VWXYZ
+name: Default
+collections:
+  - id: 01J9Z8K3M4N5P6Q7R8S9T0VWXY
+    path: ~/code/acme/onboarding-api
+schedules:
+  - name: nightly-smoke
+    flow: user-creation
+    collection: onboarding-api
+    cron: 0 3 * * *
+    env: staging
+    inputs:
+      email: nightly@example.com
+    tz: Europe/Berlin
+  - name: hourly-health
+    flow: health
+    cron: "@hourly"
+    disabled: true

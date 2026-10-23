@@ -28,6 +28,18 @@ go.work.sum
 # env file
 .env
 
-# Editor/IDE
-# .idea/
-# .vscode/
+# macOS, editors and local tool state
+.DS_Store
+.idea/
+.vscode/
+*.swp
+.claude/settings.local.json
+
+# Local env files; the example is kept
+.env.*
+!.env.example
+
+# Profiles and logs
+*.prof
+*.pprof
+*.log

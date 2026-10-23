@@ -1,0 +1,27 @@
+format: 1
+id: 01J9Z8K3M4N5P6Q7R8S9T0VWXY
+name: Acme Onboarding
+description: User journeys for the onboarding service
+depends_on:
+  - id: 01JB12K3M4N5P6Q7R8S9T0VWXY
+    name: identity-api
+    repo: https://github.com/acme/identity-api
+  - id: 01JB13K3M4N5P6Q7R8S9T0VWXY
+    name: payments
+settings:
+  timeout: 30s
+  responses:
+    save: last
+  http:
+    follow_redirects: true
+    max_redirects: 5
+hooks:
+  pre:
+    - flow:
+        id: 01J9ZD3M4N5P6Q7R8S9T0VWXYZ
+        path: hooks/sign-request
+    - inline:
+        - id: trace
+          type: set
+          target: request.headers.X-Trace
+          value: "{{$uuid-v4}}"

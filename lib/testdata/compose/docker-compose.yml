@@ -1,0 +1,80 @@
+# Brokers for the integration tests of the async transports (just test-integration).
+# Runtime-neutral: fully qualified image names and nothing Docker-only, so
+# `podman compose` and `docker compose` both read it. Ports are on localhost.
+services:
+  mosquitto:
+    image: docker.io/library/eclipse-mosquitto:2
+    command: ["mosquitto", "-c", "/mosquitto-no-auth.conf"]
+    ports: ["1883:1883"]
+
+  nats:
+    image: docker.io/library/nats:2
+    command: ["-js"]
+    ports: ["4222:4222"]
+
+  kafka:
+    image: docker.io/apache/kafka:3.9.0
+    hostname: kafka
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_LISTENERS: PLAINTEXT_HOST://:9092,CONTROLLER://:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT_HOST://localhost:9092
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT_HOST
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_NUM_PARTITIONS: 1
+    ports: ["9092:9092"]
+
+  rabbitmq:
+    image: docker.io/library/rabbitmq:3
+    environment:
+      # guest may only connect from the container itself; this user can connect through the port mapping.
+      RABBITMQ_DEFAULT_USER: flowi
+      RABBITMQ_DEFAULT_PASS: flowi
+    ports: ["5672:5672"]
+
+  redis:
+    image: docker.io/library/redis:7
+    ports: ["6379:6379"]
+
+  # SQS and SNS in one emulator; credentials are ignored (any key works).
+  localstack:
+    image: docker.io/localstack/localstack:3.8
+    environment:
+      SERVICES: sqs,sns
+    ports: ["4566:4566"]
+
+  pubsub:
+    image: gcr.io/google.com/cloudsdktool/google-cloud-cli:emulators
+    command: ["gcloud", "beta", "emulators", "pubsub", "start", "--host-port=0.0.0.0:8085", "--project=flowi-it"]
+    ports: ["8085:8085"]
+
+  # Azure Service Bus emulator. It needs SQL Server and listens on 5672 like
+  # RabbitMQ, so it is behind a profile and is started on its own:
+  #   podman compose --profile servicebus up -d servicebus
+  # then FLOWI_TEST_SERVICEBUS="Endpoint=sb://localhost;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=SAS_KEY_VALUE;UseDevelopmentEmulator=true;"
+  # (stop rabbitmq first). Not run by `just test-integration`.
+  servicebus-sql:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    profiles: ["servicebus"]
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_SA_PASSWORD: "Flowi-Test-1234"
+
+  servicebus:
+    image: mcr.microsoft.com/azure-messaging/servicebus-emulator:latest
+    profiles: ["servicebus"]
+    depends_on: [servicebus-sql]
+    environment:
+      ACCEPT_EULA: "Y"
+      SQL_SERVER: servicebus-sql
+      MSSQL_SA_PASSWORD: "Flowi-Test-1234"
+    volumes:
+      - ./servicebus-config.json:/ServiceBus_Emulator/ConfigFiles/Config.json:ro
+    ports: ["5672:5672"]

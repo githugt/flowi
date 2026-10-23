@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/githugt/flowi-lib/schema/folder.schema.json",
+  "title": "Flow-I folder settings (_folder.yaml)",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "settings": {
+      "$ref": "common.schema.json#/$defs/settings"
+    },
+    "hooks": {
+      "$ref": "common.schema.json#/$defs/hooks"
+    },
+    "order": {
+      "type": "array",
+      "description": "The order the folder's entries are shown in: names of requests or flows (without their file suffix) and of sub-folders.",
+      "items": {
+        "type": "string"
+      }
+    }
+  }
+}

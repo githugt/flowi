@@ -1,0 +1,50 @@
+arazzo: 1.1.0
+info:
+  title: Log in
+  version: 1.0.0
+sourceDescriptions:
+  - name: flowi
+    url: ../../descriptions/requests.openapi.yaml
+    type: openapi
+workflows:
+  - workflowId: shared-login
+    summary: Log in
+    description: Logs a user in and returns the token and subject; used as a subflow.
+    inputs:
+      type: object
+      properties:
+        email:
+          type: string
+          default: "{{$email}}"
+    steps:
+      - stepId: login
+        operationId: $sourceDescriptions.flowi.auth_login
+        requestBody:
+          contentType: application/json
+          payload:
+            email: $inputs.email
+    x-flowi-digest: sha256:a18f5ba352268081411c115ed3bf7fcc2d8624082676ded4b4e287784c5dc978
+    x-flowi-flow:
+      id: 01JA0000000000000000000022
+      name: Log in
+      description: Logs a user in and returns the token and subject; used as a subflow.
+      prefer_version: "2"
+      inputs:
+        email:
+          default: "{{$email}}"
+      outputs:
+        token: "{{vars.token}}"
+        subject: "{{vars.subject}}"
+      nodes:
+        - id: login
+          type: request
+          request:
+            id: 01JA0000000000000000000010
+            path: auth/login
+          with:
+            email: "{{inputs.email}}"
+        - id: session
+          type: extract
+          token: "{{nodes.login.token}}"
+          subject: "{{nodes.login.subject}}"
+x-flowi-version: 1

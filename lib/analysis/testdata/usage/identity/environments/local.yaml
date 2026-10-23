@@ -1,0 +1,6 @@
+id: 01JB0000000000000000000002
+vars:
+  base: http://localhost:8080
+  region: eu
+  password:
+    secret: true

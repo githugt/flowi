@@ -1,0 +1,9 @@
+format: 1
+id: 01JB0000000000000000000001
+name: identity
+hooks:
+  post:
+    - inline:
+        - id: audit
+          type: log
+          value: "{{response.headers[\"x-request-id\"]}}"

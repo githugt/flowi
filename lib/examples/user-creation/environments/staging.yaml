@@ -1,0 +1,6 @@
+id: 01JA0000000000000000000003
+vars:
+  base_url: https://staging.example.com
+  password:
+    secret: true
+  verify_wait: 2s

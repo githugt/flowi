@@ -1,0 +1,6 @@
+{
+  "version": "1",
+  "status": 200,
+  "headers": [{"name": "X-Request-Id", "value": "r1"}],
+  "body": {"data": {"token": "t", "sub": "s"}}
+}

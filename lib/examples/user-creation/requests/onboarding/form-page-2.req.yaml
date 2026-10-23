@@ -1,0 +1,12 @@
+id: 01JA0000000000000000000013
+name: Form page 2
+description: Address details.
+versions:
+  "1":
+    method: PUT
+    url: "{{env.base_url}}/v1/onboarding/{{subject}}/address"
+    headers:
+      Authorization: Bearer {{token}}
+    body:
+      json: |
+        { "city": "{{city}}" }

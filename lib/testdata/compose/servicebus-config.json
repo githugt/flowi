@@ -1,0 +1,16 @@
+{
+  "UserConfig": {
+    "Namespaces": [
+      {
+        "Name": "sbemulatorns",
+        "Queues": [
+          { "Name": "flowi-it", "Properties": { "MaxDeliveryCount": 10, "LockDuration": "PT1M" } }
+        ],
+        "Topics": [
+          { "Name": "flowi-topic", "Subscriptions": [ { "Name": "flowi-sub", "Properties": { "MaxDeliveryCount": 10, "LockDuration": "PT1M" } } ] }
+        ]
+      }
+    ],
+    "Logging": { "Type": "File" }
+  }
+}

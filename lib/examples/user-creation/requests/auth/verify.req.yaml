@@ -1,0 +1,20 @@
+id: 01JA0000000000000000000011
+name: Verify
+description: Confirm the account with the verification code.
+versions:
+  "1":
+    method: POST
+    url: "{{env.base_url}}/v1/verify"
+    headers:
+      Authorization: Bearer {{token}}
+      X-Client-Id: "{{vars.client_id}}"
+    body:
+      json: |
+        { "subject": "{{subject}}", "code": "{{code}}" }
+    assert:
+      - status == 204
+hooks:
+  pre:
+    - flow:
+        id: 01JA0000000000000000000021
+        path: hooks/fetch-config

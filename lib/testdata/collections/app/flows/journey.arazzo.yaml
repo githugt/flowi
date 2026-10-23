@@ -1,0 +1,25 @@
+arazzo: 1.1.0
+info:
+  title: journey
+  version: 1.0.0
+sourceDescriptions:
+  - name: flowi
+    url: ../descriptions/requests.openapi.yaml
+    type: openapi
+workflows:
+  - workflowId: journey
+    x-flowi-flow:
+      id: 01J9ZB3M4N5P6Q7R8S9T0VWXYZ
+      name: Journey
+      nodes:
+        - id: login
+          type: request
+          request:
+            id: 01J9ZA3M4N5P6Q7R8S9T0VWXYZ
+            path: auth/login
+        - id: verify
+          type: request
+          request:
+            collection: identity
+            id: 01J9ZC3M4N5P6Q7R8S9T0VWXYZ
+            path: auth/verify

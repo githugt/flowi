@@ -1,0 +1,8 @@
+format: 1
+id: 01JA0000000000000000000001
+name: x
+hooks:
+  pre:
+    - inline:
+        - id: n
+          type: log

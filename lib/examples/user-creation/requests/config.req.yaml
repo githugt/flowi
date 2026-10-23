@@ -1,0 +1,9 @@
+id: 01JA0000000000000000000014
+name: Config
+description: Public client configuration, fetched by the verify hook.
+versions:
+  "1":
+    method: GET
+    url: "{{env.base_url}}/v1/config"
+    assert:
+      - status == 200

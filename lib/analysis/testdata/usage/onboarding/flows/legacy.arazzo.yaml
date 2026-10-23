@@ -1,0 +1,23 @@
+arazzo: 1.1.0
+info:
+  title: legacy
+  version: 1.0.0
+sourceDescriptions:
+  - name: flowi
+    url: ../descriptions/requests.openapi.yaml
+    type: openapi
+workflows:
+  - workflowId: legacy
+    x-flowi-flow:
+      id: 01JC0000000000000000000021
+      name: Legacy
+      prefer_version: "2"
+      nodes:
+        - id: login
+          type: request
+          request:
+            collection: 01JB0000000000000000000001
+            id: 01JB0000000000000000000010
+            path: auth/login
+          with:
+            email: a@b.c

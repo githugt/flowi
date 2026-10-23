@@ -1,0 +1,79 @@
+id: 01J9ZB3M4N5P6Q7R8S9T0VWXYZ
+name: User creation journey
+description: Sign up, verify, complete onboarding forms
+prefer_version: "2"
+inputs:
+  email:
+    default: "{{$email}}"
+execution:
+  max_concurrency: 4
+  rate_limit: 20/s
+  on_branch_error: fail_fast
+run:
+  until: nodes.status.body.state == 'ready'
+  max_iterations: 50
+  max_duration: 10m
+  interval: 5s
+nodes:
+  - id: login
+    type: request
+    request:
+      id: 01J9ZA3M4N5P6Q7R8S9T0VWXYZ
+      path: auth/login
+    with:
+      email: "{{inputs.email}}"
+  - id: wait
+    type: delay
+    duration: 2s
+  - id: verify
+    type: request
+    request:
+      collection: identity-api
+      id: 01J9ZC3M4N5P6Q7R8S9T0VWXYZ
+      path: auth/verify
+    version: "1.1"
+    hooks:
+      skip:
+        - post
+    headers:
+      Authorization: Bearer {{nodes.login.token}}
+  - id: forms
+    type: parallel
+    branches:
+      - id: a
+        nodes:
+          - id: page1
+            type: request
+            request:
+              id: 01J9ZF3M4N5P6Q7R8S9T0VWXYZ
+              path: onboarding/form-page-1
+      - id: b
+        nodes:
+          - id: lane-note
+            type: note
+            text: second lane
+  - id: check
+    type: condition
+    if: nodes.verify.status == 200
+    then:
+      - id: ok
+        type: log
+        value: done
+    else:
+      - id: failed
+        type: log
+        value: failed
+  - id: users
+    type: batch
+    needs:
+      - login
+    concurrency: 2
+    items: "{{inputs.users}}"
+    body:
+      - id: create
+        type: subflow
+        flow:
+          id: 01J9ZG3M4N5P6Q7R8S9T0VWXYZ
+          path: shared/create-user
+        with:
+          user: "{{item}}"

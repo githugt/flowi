@@ -1,0 +1,15 @@
+flowchart LR
+  %% Flow-I flow user-creation; labels follow Flow-I's Mermaid conventions
+  login["req: auth/login"]
+  session["extract session"]
+  wait-for-code["delay: {{env.verify_wait}}"]
+  verify["req: auth/verify"]
+  profile["generate profile"]
+  page-1["req: onboarding/form-page-1"]
+  page-2["req: onboarding/form-page-2"]
+  login --> session
+  session --> wait-for-code
+  wait-for-code --> verify
+  verify --> profile
+  profile --> page-1
+  page-1 --> page-2

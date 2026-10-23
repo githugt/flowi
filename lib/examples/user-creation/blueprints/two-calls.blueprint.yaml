@@ -1,0 +1,21 @@
+id: 01JA0000000000000000000024
+name: Two calls
+description: Calls one request, then another. Use it to chain any two requests of a collection.
+params:
+  first:
+    type: request-ref
+    description: The request to call first
+    default: auth/login
+  second:
+    type: request-ref
+    description: The request to call second
+    default: config
+nodes:
+  - id: first
+    type: request
+    request:
+      param: first
+  - id: second
+    type: request
+    request:
+      param: second

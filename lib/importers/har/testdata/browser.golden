@@ -1,0 +1,113 @@
+item "har/api.example.com/post-v1-login" imported at 19:7
+  warning FLW-IMPORT-006 19:7 the recorded request body (1 values) looked like a credential and was replaced by (redacted)
+  warning FLW-IMPORT-006 19:7 the recorded response (1 values) looked like a credential and was replaced by (redacted)
+  warning FLW-IMPORT-006 19:7 response header set-cookie looked like a credential and was replaced by (redacted)
+item "har/api.example.com/get-v1-users-id" imported at 39:7
+  warning FLW-IMPORT-006 39:7 header authorization looked like a credential and was replaced by {{secret.authorization}}
+item "har/api.example.com/put-v1-users-id-avatar" imported at 74:7
+  warning FLW-IMPORT-001 74:7 file part file has no Flow-I equivalent and was kept with its file name: the recording does not hold the file
+item "entry at line 85" skipped at 85:7
+  error FLW-IMPORT-005 85:7 entry at line 85 was skipped: the entry has no request method or URL
+item "left out of the recording" imported at 0:0
+  warning FLW-IMPORT-001 0:0 static resources (3) has no Flow-I equivalent and was left out: only HTTP API calls are imported
+  warning FLW-IMPORT-001 0:0 wss traffic (1) has no Flow-I equivalent and was left out: only HTTP API calls are imported
+--- request har/api.example.com/post-v1-login
+name: POST /v1/login
+versions:
+  "1":
+    method: POST
+    url: https://api.example.com/v1/login
+    headers:
+      content-type: application/json
+      x-client: web
+    body:
+      json: "{\"email\":\"ada@example.com\",\"password\":\"(redacted)\"}"
+--- request har/api.example.com/get-v1-users-id
+name: GET /v1/users/{id}
+versions:
+  "1":
+    method: GET
+    url: https://api.example.com/v1/users/{{id}}
+    query:
+      include: roles
+    headers:
+      authorization: "{{secret.authorization}}"
+      accept: application/json
+--- request har/api.example.com/put-v1-users-id-avatar
+name: PUT /v1/users/{id}/avatar
+versions:
+  "1":
+    method: PUT
+    url: https://api.example.com/v1/users/{{id}}/avatar
+    headers:
+      content-type: multipart/form-data; boundary=x
+    body:
+      multipart:
+        caption: me
+        file:
+          file: me.png
+--- flow har/browser
+name: browser
+nodes:
+  - id: post-login
+    type: request
+    request:
+      path: har/api.example.com/post-v1-login
+  - id: get-users
+    type: request
+    request:
+      path: har/api.example.com/get-v1-users-id
+    with:
+      id: "42"
+  - id: get-users-2
+    type: request
+    request:
+      path: har/api.example.com/get-v1-users-id
+    with:
+      id: "7"
+  - id: put-avatar
+    type: request
+    request:
+      path: har/api.example.com/put-v1-users-id-avatar
+    with:
+      id: "42"
+--- example har/api.example.com/post-v1-login har-200
+{
+  "version": "1",
+  "status": 200,
+  "headers": [
+    {
+      "name": "content-type",
+      "value": "application/json"
+    },
+    {
+      "name": "set-cookie",
+      "value": "(redacted)"
+    }
+  ],
+  "body": {
+    "access_token": "(redacted)",
+    "user": {
+      "id": 42,
+      "name": "Ada"
+    }
+  }
+}
+--- example har/api.example.com/get-v1-users-id har-200
+{
+  "version": "1",
+  "status": 200,
+  "headers": [
+    {
+      "name": "content-type",
+      "value": "application/json; charset=utf-8"
+    }
+  ],
+  "body": {
+    "id": 42,
+    "name": "Ada",
+    "roles": [
+      "admin"
+    ]
+  }
+}

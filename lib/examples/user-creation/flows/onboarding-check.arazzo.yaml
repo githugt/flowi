@@ -1,0 +1,137 @@
+arazzo: 1.1.0
+info:
+  title: Onboarding check
+  version: 1.0.0
+sourceDescriptions:
+  - name: flowi
+    url: ../descriptions/requests.openapi.yaml
+    type: openapi
+workflows:
+  - workflowId: onboarding-check
+    summary: Onboarding check
+    description: Logs in through a subflow, exercises the containers, polls until onboarding is ready, and reports.
+    steps:
+      - stepId: session
+        operationId: $sourceDescriptions.flowi.flowiCustomStep
+        x-flowi-node: session
+      - stepId: who
+        operationId: $sourceDescriptions.flowi.flowiCustomStep
+        x-flowi-node: who
+      - stepId: profile
+        operationId: $sourceDescriptions.flowi.flowiCustomStep
+        x-flowi-node: profile
+      - stepId: checks
+        operationId: $sourceDescriptions.flowi.flowiCustomStep
+        x-flowi-node: checks
+      - stepId: both
+        operationId: $sourceDescriptions.flowi.flowiCustomStep
+        x-flowi-node: both
+      - stepId: poll
+        operationId: $sourceDescriptions.flowi.flowiCustomStep
+        x-flowi-node: poll
+      - stepId: decide
+        operationId: $sourceDescriptions.flowi.flowiCustomStep
+        x-flowi-node: decide
+      - stepId: passed
+        operationId: $sourceDescriptions.flowi.flowiCustomStep
+        x-flowi-node: passed
+      - stepId: all-checked
+        operationId: $sourceDescriptions.flowi.flowiCustomStep
+        x-flowi-node: all-checked
+      - stepId: keep
+        operationId: $sourceDescriptions.flowi.flowiCustomStep
+        x-flowi-node: keep
+      - stepId: summary
+        operationId: $sourceDescriptions.flowi.flowiCustomStep
+        x-flowi-node: summary
+    x-flowi-digest: sha256:4dd1024ed6ebad161619e85ad47626537bba266707abc5fa0dc071bbc64612ac
+    x-flowi-flow:
+      id: 01JA0000000000000000000023
+      name: Onboarding check
+      description: Logs in through a subflow, exercises the containers, polls until onboarding is ready, and reports.
+      execution:
+        max_concurrency: 4
+        rate_limit: 50/s
+      nodes:
+        - id: session
+          type: subflow
+          flow:
+            id: 01JA0000000000000000000022
+            path: shared/login
+        - id: who
+          type: extract
+          token: "{{nodes.session.token}}"
+          subject: "{{nodes.session.subject}}"
+        - id: profile
+          type: generate
+          seed: 42
+          nickname: "{{$first-name}}"
+        - id: checks
+          type: batch
+          times: 3
+          concurrency: 2
+          body:
+            - id: config
+              type: fetch
+              url: "{{env.base_url}}/v1/config"
+              transform: "{{response.body.client_id}}"
+            - id: double
+              type: calc
+              twice: "{{index * 2}}"
+        - id: both
+          type: parallel
+          wait: all
+          branches:
+            - id: ping
+              nodes:
+                - id: notify
+                  type: webhook
+                  url: "{{env.base_url}}/echo"
+                  payload:
+                    run: "{{run.id}}"
+                    subject: "{{vars.subject}}"
+            - id: cfg
+              nodes:
+                - id: client
+                  type: request
+                  request:
+                    id: 01JA0000000000000000000014
+                    path: config
+        - id: poll
+          type: run_till
+          until: nodes.status.body.state == 'ready'
+          max: 5
+          interval: 10ms
+          body:
+            - id: status
+              type: fetch
+              url: "{{env.base_url}}/v1/onboarding/{{vars.subject}}/status"
+              headers:
+                Authorization: Bearer {{vars.token}}
+        - id: decide
+          type: condition
+          check: nodes.poll.met
+          then:
+            - id: ready
+              type: note
+              text: Onboarding of {{vars.subject}} ({{vars.nickname}}) is ready after {{nodes.poll.iterations}} polls.
+          else:
+            - id: stuck
+              type: log
+              value: Onboarding is still pending.
+        - id: passed
+          type: transform
+          value: "{{nodes.checks.passed}}"
+          into: checked
+        - id: all-checked
+          type: assert
+          check: vars.checked == 3
+        - id: keep
+          type: save
+          key: onboarding-status
+          value: "{{nodes.poll.last.status}}"
+          mode: latest-by-status
+        - id: summary
+          type: digest
+          format: markdown
+x-flowi-version: 1
