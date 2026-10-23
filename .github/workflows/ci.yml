@@ -83,3 +83,21 @@ jobs:
         working-directory: flowi/frontend
         run: npm ci && npm run build
       - run: go run golang.org/x/vuln/cmd/govulncheck@latest ./...
+
+  # The front end has its own checks: types and Svelte warnings, unit tests, and known-vulnerable packages.
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: flowi/frontend
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          path: flowi
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      - run: npm ci
+      - run: npm run check
+      - run: npm test
+      - run: npm audit --audit-level=high
