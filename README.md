@@ -83,7 +83,7 @@ settings screen where every setting is explained.
 ## Install and run
 
 You need [Go](https://go.dev/dl/) 1.27 or later, [Node.js](https://nodejs.org/) 22 or later and
-[just](https://github.com/casey/just). On Linux also `libgtk-3-dev` and `libwebkit2gtk-4.1-dev`; on macOS the
+[just](https://github.com/casey/just). On Linux also `libgtk-4-dev` and `libwebkitgtk-6.0-dev`; on macOS the
 Xcode command line tools; on Windows the WebView2 runtime.
 
 ```bash

@@ -31,7 +31,7 @@ jobs:
           go-version-file: flowi/go.mod
       - name: install GUI build dependencies
         if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev
+        run: sudo apt-get update && sudo apt-get install -y libgtk-4-dev libwebkitgtk-6.0-dev libsoup-3.0-dev pkg-config
       - uses: actions/setup-node@v5
         with:
           node-version: 22
@@ -50,7 +50,7 @@ jobs:
         with:
           go-version-file: flowi/go.mod
       - name: install GUI build dependencies
-        run: sudo apt-get update && sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev
+        run: sudo apt-get update && sudo apt-get install -y libgtk-4-dev libwebkitgtk-6.0-dev libsoup-3.0-dev pkg-config
       - uses: actions/setup-node@v5
         with:
           node-version: 22
@@ -74,6 +74,8 @@ jobs:
       - uses: actions/setup-go@v6
         with:
           go-version-file: flowi/go.mod
+      - name: install GUI build dependencies
+        run: sudo apt-get update && sudo apt-get install -y libgtk-4-dev libwebkitgtk-6.0-dev libsoup-3.0-dev pkg-config
       - uses: actions/setup-node@v5
         with:
           node-version: 22
