@@ -3,7 +3,7 @@
 package preflight_test
 
 import (
-	"path/filepath"
+	"path"
 	"strings"
 	"testing"
 
@@ -75,12 +75,12 @@ func (f fakeSystem) ReadFile(path string) string {
 	return ""
 }
 
-// Glob matches the patterns against the fake files, as filepath.Match does for a directory.
+// Glob matches the patterns against the fake files' directories. The paths are Linux paths, so it uses package path.
 func (f fakeSystem) Glob(pattern string) []string {
 	var dirs []string
 	for file := range f.files {
-		dir := filepath.Dir(file)
-		if ok, _ := filepath.Match(pattern, dir); ok {
+		dir := path.Dir(file)
+		if ok, _ := path.Match(pattern, dir); ok {
 			dirs = append(dirs, dir)
 		}
 	}

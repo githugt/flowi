@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"path"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -77,10 +78,12 @@ func Check(sys System) Report {
 	return report
 }
 
+// helperFound looks in each helper directory of the system. The paths are Linux paths, always written with "/", so this
+// uses package path and not filepath, which would use "\\" on Windows.
 func helperFound(sys System, program string) bool {
 	for _, pattern := range helperDirPatterns() {
 		for _, dir := range sys.Glob(pattern) {
-			if sys.FileExists(filepath.Join(dir, program)) {
+			if sys.FileExists(path.Join(dir, program)) {
 				return true
 			}
 		}
