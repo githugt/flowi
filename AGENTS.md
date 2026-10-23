@@ -34,6 +34,11 @@ Instructions for AI coding agents (and a useful checklist for people) working in
 - **No hard-coded paths, names or home directories** in code, tests or screenshots. Use temporary directories and
   fake data.
 - **Do not commit build output** (`bin/`, `frontend/dist`, `frontend/node_modules`).
+- **Do not let a Wails build task rewrite tracked files.** `wails3 task package`, `wails3 task build` and
+  `wails3 task common:update:build-assets` regenerate `frontend/bindings` as TypeScript (deleting the `.js` files),
+  the icons and the platform plists. Run them in a throw-away clone, or check `git status` afterwards and restore what
+  you did not mean to change (`git checkout -- frontend/bindings build/...`). `frontend/bindings` comes from
+  `just bindings` only.
 - **No `console.log` or leftover debug code** in the front end; no `fmt.Print*` in Go (use `slog`).
 
 ## Dos
