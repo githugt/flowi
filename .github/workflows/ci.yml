@@ -57,7 +57,7 @@ jobs:
       - name: build the frontend (the app embeds it)
         working-directory: flowi/frontend
         run: npm ci && npm run build
-      - uses: golangci/golangci-lint-action@v8
+      - uses: golangci/golangci-lint-action@v9
         with:
           version: v2.14
           working-directory: flowi
