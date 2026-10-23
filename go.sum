@@ -255,8 +255,8 @@ github.com/twmb/franz-go/pkg/kfake v0.0.0-20261013022759-7b6cac30a57a h1:dUzXDhE
 github.com/twmb/franz-go/pkg/kfake v0.0.0-20261013022759-7b6cac30a57a/go.mod h1:7XoYdOMQWHU4FLD9qg991kFuEiUua9DqluFE+JVdXjM=
 github.com/twmb/franz-go/pkg/kmsg v1.15.0 h1:mILdOQm4JkWojbSYVQ7KJNJ1qMdYNsLrdNOBUVKM6IA=
 github.com/twmb/franz-go/pkg/kmsg v1.15.0/go.mod h1:sGkGxKexpRLBThFHJLjjywcyfkK09qB/g+X+wFWZQ/A=
-github.com/wailsapp/wails/v3 v3.0.0-beta.30 h1:uMf8QlaESexqKKQISwXowS4/RiYeXDfB8Ttzb1UC1tQ=
-github.com/wailsapp/wails/v3 v3.0.0-beta.30/go.mod h1:5DR/EG5FHU8+BNV7tQYQ/rJMjoFsVlYpM+0gp1+gcTI=
+github.com/wailsapp/wails/v3 v3.0.0-beta.34 h1:3p/s+rk6olaquzaDWWowVTJ1ZMIBDHEsTUqxsffR4Zw=
+github.com/wailsapp/wails/v3 v3.0.0-beta.34/go.mod h1:Tk3i8pyehpIdV4aS9GfpgGjk7eOjuSpCrpyJXpS6y64=
 github.com/xyproto/randomstring v1.0.5 h1:YtlWPoRdgMu3NZtP45drfy1GKoojuR7hmRcnhZqKjWU=
 github.com/xyproto/randomstring v1.0.5/go.mod h1:rgmS5DeNXLivK7YprL0pY+lTuhNQW3iGxZ18UQApw/E=
 github.com/yuin/gopher-lua v1.1.1 h1:kYKnWBjvbNP4XLT3+bPEwAXJx262OhaHDWDVOPjL46M=
