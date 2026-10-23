@@ -38,7 +38,7 @@ jobs:
       - name: install the Linux build dependencies
         if: runner.os == 'Linux'
         uses: ./flowi/.github/actions/linux-deps
-      - uses: actions/setup-node@v5
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
       - name: build the frontend (the app embeds it)
@@ -58,7 +58,7 @@ jobs:
           go-version-file: flowi/go.mod
       - name: install the Linux build dependencies
         uses: ./flowi/.github/actions/linux-deps
-      - uses: actions/setup-node@v5
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
       - name: build the frontend (the app embeds it)
@@ -84,7 +84,7 @@ jobs:
           go-version-file: flowi/go.mod
       - name: install the Linux build dependencies
         uses: ./flowi/.github/actions/linux-deps
-      - uses: actions/setup-node@v5
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
       - name: build the frontend (the app embeds it)
@@ -103,7 +103,7 @@ jobs:
       - uses: actions/checkout@v5
         with:
           path: flowi
-      - uses: actions/setup-node@v5
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
       - run: npm ci
@@ -121,7 +121,7 @@ jobs:
       - uses: actions/checkout@v5
         with:
           path: flowi
-      - uses: actions/setup-node@v5
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
       - run: npm ci
