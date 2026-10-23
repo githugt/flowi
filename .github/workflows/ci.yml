@@ -24,6 +24,7 @@ jobs:
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
     defaults:
       run:
         working-directory: flowi
@@ -36,7 +37,7 @@ jobs:
           go-version-file: flowi/go.mod
       - name: install GUI build dependencies
         if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y libgtk-4-dev libwebkitgtk-6.0-dev libsoup-3.0-dev pkg-config
+        run: sudo apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=30 update && sudo apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=30 install -y libgtk-4-dev libwebkitgtk-6.0-dev libsoup-3.0-dev pkg-config
       - uses: actions/setup-node@v5
         with:
           node-version: 22
@@ -47,6 +48,7 @@ jobs:
 
   lint:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v5
         with:
@@ -55,7 +57,7 @@ jobs:
         with:
           go-version-file: flowi/go.mod
       - name: install GUI build dependencies
-        run: sudo apt-get update && sudo apt-get install -y libgtk-4-dev libwebkitgtk-6.0-dev libsoup-3.0-dev pkg-config
+        run: sudo apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=30 update && sudo apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=30 install -y libgtk-4-dev libwebkitgtk-6.0-dev libsoup-3.0-dev pkg-config
       - uses: actions/setup-node@v5
         with:
           node-version: 22
@@ -69,6 +71,7 @@ jobs:
 
   vuln:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     defaults:
       run:
         working-directory: flowi
@@ -80,7 +83,7 @@ jobs:
         with:
           go-version-file: flowi/go.mod
       - name: install GUI build dependencies
-        run: sudo apt-get update && sudo apt-get install -y libgtk-4-dev libwebkitgtk-6.0-dev libsoup-3.0-dev pkg-config
+        run: sudo apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=30 update && sudo apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=30 install -y libgtk-4-dev libwebkitgtk-6.0-dev libsoup-3.0-dev pkg-config
       - uses: actions/setup-node@v5
         with:
           node-version: 22
@@ -92,6 +95,7 @@ jobs:
   # The front end has its own checks: types and Svelte warnings, and unit tests.
   frontend:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     defaults:
       run:
         working-directory: flowi/frontend
@@ -109,6 +113,7 @@ jobs:
   # Apart from "frontend" so that a new advisory does not block every merge; do not make it a required check.
   frontend-audit:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     defaults:
       run:
         working-directory: flowi/frontend
