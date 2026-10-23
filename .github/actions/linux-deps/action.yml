@@ -1,0 +1,22 @@
+name: Install the Linux build dependencies
+description: >
+  GTK 4, WebKitGTK 6.0 and libsoup 3 headers, which the window is built against. The download from the Ubuntu mirror
+  sometimes crawls for half an hour, so each attempt is cut off after a few minutes and tried again.
+
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      run: |
+        set -uo pipefail
+        opts="-o Acquire::Retries=3 -o Acquire::http::Timeout=30"
+        for attempt in 1 2 3; do
+          if sudo timeout 5m apt-get $opts update &&
+             sudo timeout 8m apt-get $opts install -y --no-install-recommends \
+               libgtk-4-dev libwebkitgtk-6.0-dev libsoup-3.0-dev pkg-config; then
+            exit 0
+          fi
+          echo "attempt $attempt failed or timed out; trying again"
+        done
+        echo "the dependencies could not be installed" >&2
+        exit 1
