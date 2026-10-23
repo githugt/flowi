@@ -32,7 +32,7 @@ jobs:
       - uses: actions/checkout@v5
         with:
           path: flowi
-      - uses: actions/setup-go@v6
+      - uses: actions/setup-go@v7
         with:
           go-version-file: flowi/go.mod
       - name: install the Linux build dependencies
@@ -53,7 +53,7 @@ jobs:
       - uses: actions/checkout@v5
         with:
           path: flowi
-      - uses: actions/setup-go@v6
+      - uses: actions/setup-go@v7
         with:
           go-version-file: flowi/go.mod
       - name: install the Linux build dependencies
@@ -79,7 +79,7 @@ jobs:
       - uses: actions/checkout@v5
         with:
           path: flowi
-      - uses: actions/setup-go@v6
+      - uses: actions/setup-go@v7
         with:
           go-version-file: flowi/go.mod
       - name: install the Linux build dependencies
