@@ -245,6 +245,19 @@ export function Drop(node, unit, step, lift, x, y, snap, atX, atY) {
 }
 
 /**
+ * ExpressionNames lists the names an expression in the selected step can read, written out in
+ * full: flow inputs, environment keys, secrets, and the outputs of earlier steps, including body
+ * fields known from their pinned examples or last saved responses.
+ * @param {string} node
+ * @returns {$CancellablePromise<$models.SuggestionView[]>}
+ */
+export function ExpressionNames(node) {
+    return $Call.ByID(2066550995, node).then(/** @type {($result: any) => any} */(($result) => {
+        return $$createType5($result);
+    }));
+}
+
+/**
  * Insert adds a step of type typ into the list at listPath, at index, and
  * returns its id.
  * @param {string} node
@@ -298,7 +311,7 @@ export function MoveAttachedBy(node, id, delta) {
  */
 export function NodeData(node, step, format) {
     return $Call.ByID(1628224575, node, step, format).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType4($result);
+        return $$createType6($result);
     }));
 }
 
@@ -310,7 +323,7 @@ export function NodeData(node, step, format) {
  */
 export function Open(node) {
     return $Call.ByID(1260168827, node).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType5($result);
+        return $$createType7($result);
     }));
 }
 
@@ -331,7 +344,7 @@ export function Open(node) {
  */
 export function Preview(node, unit, step, lift, x, y, snap) {
     return $Call.ByID(1816426113, node, unit, step, lift, x, y, snap).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType6($result);
+        return $$createType8($result);
     }));
 }
 
@@ -605,7 +618,7 @@ export function SetText(node, field, value) {
  */
 export function Source(node) {
     return $Call.ByID(3798280834, node).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType7($result);
+        return $$createType9($result);
     }));
 }
 
@@ -633,7 +646,9 @@ const $$createType0 = $Create.Array($Create.Any);
 const $$createType1 = $models.DiffView.createFrom;
 const $$createType2 = $Create.Array($$createType1);
 const $$createType3 = $models.SuggestView.createFrom;
-const $$createType4 = $models.NodeData.createFrom;
-const $$createType5 = $models.FlowView.createFrom;
-const $$createType6 = canvas$0.Slot.createFrom;
-const $$createType7 = $models.FlowSourceView.createFrom;
+const $$createType4 = $models.SuggestionView.createFrom;
+const $$createType5 = $Create.Array($$createType4);
+const $$createType6 = $models.NodeData.createFrom;
+const $$createType7 = $models.FlowView.createFrom;
+const $$createType8 = canvas$0.Slot.createFrom;
+const $$createType9 = $models.FlowSourceView.createFrom;

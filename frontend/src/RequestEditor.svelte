@@ -15,6 +15,7 @@
   import MessageSections from './MessageSections.svelte'
   import AreaField from './AreaField.svelte'
   import AssertCards from './AssertCards.svelte'
+  import { requestVocabulary } from './lib/vocabulary'
   import Dropdown from './Dropdown.svelte'
   import ExprHelp from './ExprHelp.svelte'
   import ReplayBar from './ReplayBar.svelte'
@@ -315,11 +316,11 @@
          nobody looked for them; they open from the Save button now. -->
     <div class="send savegrp">
       {#if view.inScratch}
-        <button class="primary saveicon main" title="Save to a collection…" aria-label="Save to a collection" onclick={saveTo}><Icon name="save" size={15} /></button>
+        <button class="saveicon main pending" title="Save to a collection…" aria-label="Save to a collection" onclick={saveTo}><Icon name="save" size={15} /></button>
       {:else}
-        <button class="saveicon main" title="Save (⌘S)" aria-label="Save" disabled={!view.dirty} onclick={() => RequestService.Save(node)}><Icon name="save" size={15} /></button>
+        <button class="saveicon main" class:pending={view.dirty} title="Save (⌘S)" aria-label="Save" disabled={!view.dirty} onclick={() => RequestService.Save(node)}><Icon name="save" size={15} /></button>
       {/if}
-      <button class="more" class:primary={view.inScratch} aria-label="Save options" aria-expanded={menu === 'save'} onpointerdown={(e) => e.stopPropagation()} onclick={() => (menu = menu === 'save' ? null : 'save')}>▾</button>
+      <button class="more" aria-label="Save options" aria-expanded={menu === 'save'} onpointerdown={(e) => e.stopPropagation()} onclick={() => (menu = menu === 'save' ? null : 'save')}>▾</button>
       {#if menu === 'save'}
         <div class="menu" role="menu" tabindex="-1" onpointerdown={(e) => e.stopPropagation()}>
           <button role="menuitem" onclick={() => menuAction(save)}><span class="tick"></span>Save current version<kbd>⌘S</kbd></button>
@@ -438,6 +439,7 @@
           {:else if section === 'Assert'}
             <p class="muted">One card per check, for example <code>{view.kind === 'http' ? 'status == 200' : 'received >= 1'}</code>. A failing check fails the send. <ExprHelp context={view.kind === 'http' ? 'request.check' : 'message.check'} /></p>
             <AssertCards checks={v.Assert ?? []} outcome={view.response ?? undefined} example={view.kind === 'http' ? 'status == 200' : 'received >= 1'}
+              vocabulary={requestVocabulary(view.kind === 'http' ? 'request.check' : 'message.check', node, view.response, view.kind)}
               onchange={(c) => RequestService.SetAssert(node, c)} />
           {:else if section === 'Variables'}
             {#if v.Variables?.length}<p class="muted">Default values for {'{{var.name}}'}; the environment's variable of the same name wins.</p>{/if}
@@ -508,7 +510,6 @@
   button { background: transparent; }
   button:hover:not(:disabled) { border-color: var(--accent); }
   button:disabled { opacity: 0.4; }
-  .primary { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
   .send { position: relative; display: flex; gap: 2px; }
   .more { padding: 5px 8px; }
   .menu {
@@ -545,7 +546,8 @@
   .send .main { border-radius: 6px 0 0 6px; white-space: nowrap; }
   .send .more { border-radius: 0 6px 6px 0; border-left-color: color-mix(in srgb, var(--on-act) 35%, transparent); }
   .savegrp .more:not(.primary) { border-left-color: var(--line); }
-  .savegrp .more.primary { border-left-color: color-mix(in srgb, var(--on-accent) 35%, transparent); }
+  /* The button stays dark; the disk takes the accent colour while there is something to save. */
+  .savegrp .pending { color: var(--accent); }
   .menu .tick { width: 14px; display: inline-block; }
   .menu hr { border: 0; border-top: 1px solid var(--line); margin: 4px 0; }
   .menu kbd { margin-left: auto; padding-left: 16px; color: var(--muted); font: inherit; font-size: var(--fs-xs); }

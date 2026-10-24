@@ -1260,6 +1260,22 @@ export class EnvView {
              */
             this["rows"] = [];
         }
+        if (!("colour" in $$source)) {
+            /**
+             * "" for the default
+             * @member
+             * @type {string}
+             */
+            this["colour"] = "";
+        }
+        if (!("colours" in $$source)) {
+            /**
+             * what it can be set to
+             * @member
+             * @type {string[]}
+             */
+            this["colours"] = [];
+        }
         if (!("dirty" in $$source)) {
             /**
              * @member
@@ -1299,9 +1315,13 @@ export class EnvView {
      */
     static createFrom($$source = {}) {
         const $$createField2_0 = $$createType17;
+        const $$createField4_0 = $$createType2;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("rows" in $$parsedSource) {
             $$parsedSource["rows"] = $$createField2_0($$parsedSource["rows"]);
+        }
+        if ("colours" in $$parsedSource) {
+            $$parsedSource["colours"] = $$createField4_0($$parsedSource["colours"]);
         }
         return new EnvView(/** @type {Partial<EnvView>} */($$parsedSource));
     }
@@ -5046,8 +5066,8 @@ export class SchemaView {
 }
 
 /**
- * SecretView is a secret declared by an environment. Values are never sent
- * to the window.
+ * SecretView is a secret declared by an environment. Values are not part of it:
+ * the window asks for one at a time with Reveal.
  */
 export class SecretView {
     /**
@@ -6371,6 +6391,14 @@ export class Tree {
              */
             this["environments"] = [];
         }
+        if (!("envColours" in $$source)) {
+            /**
+             * by environment name; absent: the default colour
+             * @member
+             * @type {{ [_ in string]?: string }}
+             */
+            this["envColours"] = {};
+        }
         if (!("selected" in $$source)) {
             /**
              * @member
@@ -6390,12 +6418,16 @@ export class Tree {
     static createFrom($$source = {}) {
         const $$createField2_0 = $$createType121;
         const $$createField3_0 = $$createType2;
+        const $$createField4_0 = $$createType90;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("roots" in $$parsedSource) {
             $$parsedSource["roots"] = $$createField2_0($$parsedSource["roots"]);
         }
         if ("environments" in $$parsedSource) {
             $$parsedSource["environments"] = $$createField3_0($$parsedSource["environments"]);
+        }
+        if ("envColours" in $$parsedSource) {
+            $$parsedSource["envColours"] = $$createField4_0($$parsedSource["envColours"]);
         }
         return new Tree(/** @type {Partial<Tree>} */($$parsedSource));
     }

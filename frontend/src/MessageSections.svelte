@@ -6,6 +6,8 @@
   import AreaField from './AreaField.svelte'
   import CodeArea from './CodeArea.svelte'
   import TextField from './TextField.svelte'
+  import TemplateField from './TemplateField.svelte'
+  import { requestVocabulary } from './lib/vocabulary'
   import KVRows from './KVRows.svelte'
   import EmptyState from './EmptyState.svelte'
   import { parseDuration, showDuration } from './lib/duration'
@@ -119,7 +121,7 @@
       }}
     />
     {#if timeoutBad}<p class="err">Write the timeout as a duration like 500ms, 30s or 2m.</p>{/if}
-    <TextField label="Only if" help="message.filter" mono placeholder={'body.type == "order"'} value={receive.Match} oninput={(t) => putReceive((r) => (r.Match = t))} />
+    <TemplateField label="Only if" help="message.filter" placeholder={'body.type == "order"'} value={receive.Match} oninput={(t) => putReceive((r) => (r.Match = t))} vocabulary={requestVocabulary('message.filter', node, view.response, view.kind)} />
     <p class="muted">Stops after this many messages, or fails when the timeout passes. Only messages the filter accepts count.</p>
   {/if}
 {:else if section === 'Credentials' && a}

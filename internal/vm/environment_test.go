@@ -63,8 +63,23 @@ func TestEnvVM_turning_a_secret_off_unsets_the_vault_value(t *testing.T) {
 	env.Save(false)
 	w.Wait()
 
-	if !b.Called("UnsetSecret staging/password") || b.SavedEnvs[0].Vars[1].Value != "plain-now" {
+	if !b.Called("DiscardSecret staging/password") || b.SavedEnvs[0].Vars[1].Value != "plain-now" {
 		t.Fatalf("calls %v saved %+v", b.Calls, b.SavedEnvs)
+	}
+}
+
+// UnsetSecret needs the variable to be declared secret, which it no longer is once the file is saved;
+// Discard does not, so the value cannot be left behind in the vault.
+func TestEnvVM_removing_a_secret_variable_discards_its_vault_value(t *testing.T) {
+	env, b, w := newEnvVM(t)
+	rows := env.Rows()
+
+	env.SetRows(rows[:1])
+	env.Save(false)
+	w.Wait()
+
+	if !b.Called("DiscardSecret staging/password") || b.Called("UnsetSecret staging/password") {
+		t.Fatalf("calls %v", b.Calls)
 	}
 }
 
@@ -75,7 +90,7 @@ func TestEnvVM_save_keeps_existing_secret_when_no_new_value(t *testing.T) {
 	env.Save(false)
 	w.Wait()
 
-	if b.Called("SetSecret staging/password") || b.Called("UnsetSecret staging/password") {
+	if b.Called("SetSecret staging/password") || b.Called("DiscardSecret staging/password") {
 		t.Fatalf("calls %v", b.Calls)
 	}
 }
@@ -125,5 +140,28 @@ func TestEnvVM_Given_save_fails_Then_edits_and_typed_secret_kept(t *testing.T) {
 
 	if !env.Dirty() || env.Err() == "" || env.Rows()[2].Value != "k-1" {
 		t.Fatalf("dirty %v err %q rows %+v", env.Dirty(), env.Err(), env.Rows())
+	}
+}
+
+func TestEnvVM_Given_a_colour_is_chosen_When_saved_Then_the_file_carries_it(t *testing.T) {
+	env, b, w := newEnvVM(t)
+
+	env.SetColour("red")
+	dirty := env.Dirty()
+	env.Save(false)
+	w.Wait()
+
+	if !dirty || env.Colour() != "red" || b.SavedEnvs[0].Colour != "red" {
+		t.Fatalf("dirty %v colour %q saved %+v", dirty, env.Colour(), b.SavedEnvs)
+	}
+}
+
+func TestEnvVM_should_ignore_a_colour_outside_the_palette(t *testing.T) {
+	env, _, _ := newEnvVM(t)
+
+	env.SetColour("chartreuse")
+
+	if env.Colour() != "" || env.Dirty() {
+		t.Fatalf("colour %q dirty %v", env.Colour(), env.Dirty())
 	}
 }

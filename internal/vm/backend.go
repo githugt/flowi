@@ -106,6 +106,8 @@ type Backend interface {
 
 	Secrets() ([]flowi.SecretInfo, error)
 	SetSecret(env, name, value string) error
+	RevealSecret(env, name string) (string, error)
+	DiscardSecret(env, name string) error
 	UnsetSecret(env, name string) error
 
 	Mount(dir string) (model.Manifest, error)

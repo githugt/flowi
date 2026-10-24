@@ -31,6 +31,7 @@
   import ReplayerScreen from './ReplayerScreen.svelte'
   import BlueprintsScreen from './BlueprintsScreen.svelte'
   import TrashScreen from './TrashScreen.svelte'
+  import { envSwatch } from './lib/envcolours'
 
   onMount(() => app.init())
 
@@ -41,6 +42,8 @@
   })
 
   const tab = $derived(app.tabs.find((t) => t.node === app.active))
+  // The picker takes the colour of the environment it shows, so a production one cannot be mistaken for a test one.
+  const selectedSwatch = $derived(envSwatch(app.tree?.envColours?.[app.tree?.selected ?? '']))
   const NEW_ENV = ':new' // the picker's "New environment…" entry; ':' is not allowed in an environment name
 
   // Tabs are reordered by dragging with the pointer (the browser's own drag and drop
@@ -145,7 +148,7 @@
         <button class="plus" title="New…" aria-label="New" onpointerdown={(e) => e.stopPropagation()} onclick={(e) => { const r = e.currentTarget.getBoundingClientRect(); ui.openMenu(r.left, r.bottom + 4, newMenu()) }}><Icon name="plus" /></button>
         {#if app.tree}
           <!-- Always shown, even with no environments yet: it is where a new user learns they need one. -->
-          <select class="envsel" class:none={!app.tree.selected} title="Environment: where {'{{env.…}}'} values come from" aria-label="Environment" value={app.tree.selected}
+          <select class="envsel" class:none={!app.tree.selected} class:tinted={!!selectedSwatch} style:--env={selectedSwatch} title="Environment: where {'{{env.…}}'} values come from" aria-label="Environment" value={app.tree.selected}
             onchange={(e) => {
               const v = e.currentTarget.value
               if (v === NEW_ENV) {
@@ -266,6 +269,7 @@
   .fixed { flex: none; display: flex; align-items: center; gap: 6px; padding: 0 10px 8px 6px; --wails-draggable: no-drag; }
   .plus { background: none; border: 1px solid var(--line); border-radius: var(--r-md); color: var(--muted); padding: 3px 5px; display: grid; place-items: center; }
   .plus:hover { color: var(--text); border-color: var(--accent); }
+  .envsel.tinted { background: color-mix(in srgb, var(--env) 30%, var(--bg)); border-color: var(--env); }
   .envsel.none { color: var(--warn); border-color: color-mix(in srgb, var(--warn) 60%, var(--line)); }
   .envsel { background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); font: inherit; padding: 3px 6px; max-width: 160px; }
   .body { flex: 1; min-height: 0; position: relative; }

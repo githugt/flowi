@@ -3,6 +3,8 @@
   // edit for pasting a list. Like KVRows, it keeps what is being typed while Go round-trips the edit.
   import { tick } from 'svelte'
   import EmptyState from './EmptyState.svelte'
+  import TemplateField from './TemplateField.svelte'
+  import type { Item } from './lib/exprcomplete'
   import { checkStates, type CheckOutcome } from './lib/checks'
 
   let {
@@ -10,12 +12,15 @@
     outcome,
     onchange,
     example,
+    vocabulary,
   }: {
     checks: string[]
     outcome?: CheckOutcome
     onchange: (checks: string[]) => void
     /** A sample check shown as the placeholder. */
     example: string
+    /** What a check can name, for completing the word being typed. */
+    vocabulary?: () => Promise<Item[]>
   } = $props()
 
   let local = $state<string[]>([])
@@ -41,7 +46,7 @@
   async function add() {
     local.push('')
     await tick()
-    const inputs = box?.querySelectorAll<HTMLInputElement>('input.c')
+    const inputs = box?.querySelectorAll<HTMLInputElement>('.c input')
     inputs?.[inputs.length - 1]?.focus()
   }
 
@@ -82,7 +87,7 @@
     {#each local as check, i}
       <div class="card {states[i]}">
         <span class="tick" title={hint[states[i]]} aria-label={hint[states[i]]}>{mark[states[i]]}</span>
-        <input class="c" placeholder={example} bind:value={local[i]} oninput={commit} spellcheck="false" aria-label="Check {i + 1}" />
+        <div class="c"><TemplateField plain {vocabulary} placeholder={example} aria="Check {i + 1}" value={local[i]} oninput={(t) => { local[i] = t; commit() }} /></div>
         <button class="x" aria-label="Remove check" onclick={() => { local.splice(i, 1); commit() }}>×</button>
       </div>
     {/each}
@@ -105,10 +110,8 @@
   .tick { flex: none; width: 16px; text-align: center; color: var(--muted); }
   .passed .tick { color: var(--ok); }
   .failed .tick, .error .tick { color: var(--fail); }
-  input {
-    flex: 1; min-width: 0; background: transparent; color: var(--text); border: 0; outline: 0; padding: 2px 0;
-    font: 12px ui-monospace, SFMono-Regular, Menlo, monospace; -webkit-user-select: text; user-select: text;
-  }
+  .c { flex: 1; min-width: 0; }
+  .c :global(input) { outline: 0; font: 12px ui-monospace, SFMono-Regular, Menlo, monospace; }
   .card:focus-within { border-color: var(--accent); }
   button { background: none; border: 0; color: var(--muted); font: inherit; }
   .add { color: var(--accent); padding: 2px 0; }

@@ -1,6 +1,7 @@
 <script lang="ts">
   import ExprHelp from './ExprHelp.svelte'
   import HiddenChars from './HiddenChars.svelte'
+  import { inTemplate, suggestFor, type Item } from './lib/exprcomplete'
   // A single-line input for text with {{templates}}: it colours the text when
   // Go can (spans), and offers what a template can be completed with.
   // The input keeps what the user types while Go round-trips the edit.
@@ -25,6 +26,9 @@
     mono = true,
     spans,
     suggest,
+    vocabulary,
+    plain = false,
+    aria = '',
   }: {
     value: string
     oninput?: (text: string) => void
@@ -35,6 +39,12 @@
     mono?: boolean
     spans?: (text: string) => Promise<Span[]>
     suggest?: (text: string, caret: number) => Promise<Suggest>
+    /** What a bare expression (no braces) can name; completes the word before the caret. Read on first use. */
+    vocabulary?: () => Promise<Item[]>
+    /** Without its own border and background, for a field that sits in a card. */
+    plain?: boolean
+    /** The accessible name when there is no visible label. */
+    aria?: string
   } = $props()
 
   let local = $state('')
@@ -62,29 +72,46 @@
   const inSync = $derived(coloured !== null && coloured.text === local)
 
   // ---- suggestions
-  let open = $state<Suggest | null>(null)
+  let open = $state<(Suggest & { bare: boolean }) | null>(null)
   let choice = $state(0)
   let asked = 0
+  let words: Item[] | null = null // the vocabulary, fetched once the field is first used
   async function ask() {
-    if (!suggest || !input) return
+    if (!input) return
     const mine = ++asked
-    const s = await suggest(local, input.selectionStart ?? local.length)
+    const caret = input.selectionStart ?? local.length
+    const found = await suggestions(caret)
     if (mine !== asked) return
-    open = s.items.length ? s : null
+    open = found && found.items.length ? found : null
     choice = 0
+  }
+
+  // Inside {{ }} the template completion answers; elsewhere a field that reads a bare expression
+  // completes the word before the caret.
+  async function suggestions(caret: number): Promise<(Suggest & { bare: boolean }) | null> {
+    if (suggest && (!vocabulary || inTemplate(local, caret))) return { ...(await suggest(local, caret)), bare: false }
+    if (!vocabulary) return null
+    words ??= await vocabulary().catch(() => [])
+    const s = suggestFor(local, caret, words)
+    return s && { ...s, bare: true }
   }
 
   function apply(i: number) {
     if (!open) return
     const s = open
+    const insert = s.items[i].insert
     const rest = local.slice(s.to)
-    const closing = rest.startsWith('}}') ? '' : '}}'
-    const next = local.slice(0, s.from) + s.items[i].insert + closing + rest
-    const caret = s.from + s.items[i].insert.length + 2
+    const closing = s.bare || rest.startsWith('}}') ? '' : '}}'
+    const next = local.slice(0, s.from) + insert + closing + rest
+    const caret = s.from + insert.length + (s.bare ? 0 : 2)
     local = next
     oninput?.(next)
     open = null
-    queueMicrotask(() => input?.setSelectionRange(caret, caret))
+    queueMicrotask(() => {
+      input?.setSelectionRange(caret, caret)
+      // "body." and "len(" are the start of a longer word: keep offering what follows.
+      if (s.bare && /[.(]$/.test(insert)) ask()
+    })
   }
 
   function onkeydown(e: KeyboardEvent) {
@@ -113,12 +140,14 @@
     <input
       bind:this={input}
       class:mono
+      class:plain
       class:hide={inSync}
       value={local}
       {placeholder}
+      aria-label={aria || undefined}
       spellcheck="false"
       autocomplete="off"
-      onfocus={() => (focused = true)}
+      onfocus={() => ((focused = true), (words = null))}
       onblur={() => ((focused = false), (open = null))}
       oninput={(e) => {
         local = e.currentTarget.value
@@ -163,6 +192,7 @@
     position: relative;
   }
   input:focus { border-color: var(--accent); }
+  input.plain { background: transparent; border: 0; padding: 2px 0; }
   .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: var(--fs-sm); }
   /* With colours drawn behind, the input's own text is clear but its caret stays. */
   .hide { background: transparent; color: transparent; caret-color: var(--text); }

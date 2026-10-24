@@ -3,6 +3,7 @@
 package bridge
 
 import (
+	"slices"
 	"unicode/utf16"
 
 	"github.com/githugt/flowi/internal/vm"
@@ -121,4 +122,55 @@ func (s *FlowService) Complete(node, text string, caret int) SuggestView {
 		return nil
 	})
 	return v
+}
+
+// ExpressionVocabulary lists what can start a word in an expression written in the given
+// context (see vm.ExprContext): the names that context reads, functions and keywords. The page
+// filters it as the user types, so no round trip is needed per key.
+func (s *SystemService) ExpressionVocabulary(context string) []SuggestionView {
+	out := []SuggestionView{}
+	for _, it := range vm.ExpressionVocabulary(vm.ExprContext(context)) {
+		out = append(out, SuggestionView{Insert: it.Insert, Detail: it.Detail})
+	}
+	return out
+}
+
+// ExpressionNames lists the names an expression in the selected step can read, written out in
+// full: flow inputs, environment keys, secrets, and the outputs of earlier steps, including body
+// fields known from their pinned examples or last saved responses.
+func (s *FlowService) ExpressionNames(node string) []SuggestionView {
+	out := []SuggestionView{}
+	_ = s.edit(node, func(o *openFlow) error {
+		path := ""
+		if o.selected != "" {
+			path = o.doc.NodePath(o.selected)
+		}
+		all, err := s.app.backend.Completions(o.doc.Collection().Manifest.ID, o.doc.Draft(), path)
+		if err != nil {
+			return nil // no names is no problem for the field
+		}
+		for _, c := range all {
+			out = append(out, SuggestionView{Insert: c.Text, Detail: c.Detail})
+		}
+		return nil
+	})
+	return out
+}
+
+// ExpressionNames lists the environment variables and the request's own variables an expression
+// can read, written out in full ("env.base_url", "var.page").
+func (s *RequestService) ExpressionNames(node string) []SuggestionView {
+	out := []SuggestionView{}
+	s.with(node, func(o *openRequest) {
+		vars, _ := s.app.workspace.VariableNames()
+		for _, n := range slices.Sorted(slices.Values(vars)) {
+			out = append(out, SuggestionView{Insert: "env." + n, Detail: "environment"})
+		}
+		for _, kv := range o.req.Current().Variables {
+			if kv.Key != "" {
+				out = append(out, SuggestionView{Insert: "var." + kv.Key, Detail: "request variable"})
+			}
+		}
+	})
+	return out
 }

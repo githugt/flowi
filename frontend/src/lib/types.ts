@@ -18,6 +18,8 @@ export interface Tree {
   folder: string
   roots: TreeNode[]
   environments: string[]
+  /** By environment name; a name with the default colour is absent. */
+  envColours: Record<string, string>
   selected: string
 }
 
@@ -394,6 +396,9 @@ export interface EnvView {
   node: string
   name: string
   rows: EnvRow[]
+  /** "" for the default. */
+  colour: string
+  colours: string[]
   dirty: boolean
   onDisk: boolean
   needsDrop: boolean

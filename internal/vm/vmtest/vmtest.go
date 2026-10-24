@@ -126,6 +126,7 @@ type Backend struct {
 	ParsedFlow   *model.Flow             // ParseFlowSource returns this flow (else the stored flow, unchanged)
 	SourceDiags  diag.List               // ParseFlowSource reports these
 	SecretErr    error                   // SetSecret and UnsetSecret fail with it
+	SecretValues map[string]string       // RevealSecret answers from these, by "env/name"; others are FLW-SEC-001
 	CookieJar    []flowi.CookieInfo      // Cookies lists these; DeleteCookie removes from them
 	CookiesErr   error                   // Cookies fails with it
 	// FailDeleteAt makes the nth (1-based) Delete* call fail with it, the others succeed.
@@ -848,6 +849,25 @@ func (f *Backend) Secrets() ([]flowi.SecretInfo, error) {
 func (f *Backend) SetSecret(env, name, _ string) error {
 	f.record("SetSecret " + env + "/" + name)
 	return f.markSecret(env, name, true)
+}
+
+func (f *Backend) RevealSecret(env, name string) (string, error) {
+	f.record("RevealSecret " + env + "/" + name)
+	f.Mu.Lock()
+	defer f.Mu.Unlock()
+	if f.SecretErr != nil {
+		return "", f.SecretErr
+	}
+	value, ok := f.SecretValues[env+"/"+name]
+	if !ok {
+		return "", diag.List{diag.New(diag.CodeSecretMissing, diag.Location{}, map[string]string{"name": name, "env": env})}.Err()
+	}
+	return value, nil
+}
+
+func (f *Backend) DiscardSecret(env, name string) error {
+	f.record("DiscardSecret " + env + "/" + name)
+	return f.markSecret(env, name, false)
 }
 
 func (f *Backend) UnsetSecret(env, name string) error {

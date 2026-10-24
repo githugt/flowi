@@ -277,6 +277,16 @@ func (b *Workspace) SetSecret(env, name, value string) error {
 	return b.ws.SetSecret(env, name, value)
 }
 
+func (b *Workspace) RevealSecret(env, name string) (string, error) {
+	b.guard.Check("RevealSecret")
+	return b.ws.RevealSecret(env, name)
+}
+
+func (b *Workspace) DiscardSecret(env, name string) error {
+	b.guard.Check("DiscardSecret")
+	return b.ws.DiscardSecret(env, name)
+}
+
 func (b *Workspace) UnsetSecret(env, name string) error {
 	b.guard.Check("UnsetSecret")
 	return b.ws.UnsetSecret(env, name)
