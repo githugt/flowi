@@ -14,6 +14,7 @@
   import RequestExtras from './RequestExtras.svelte'
   import MessageSections from './MessageSections.svelte'
   import AreaField from './AreaField.svelte'
+  import AssertCards from './AssertCards.svelte'
   import Dropdown from './Dropdown.svelte'
   import ExprHelp from './ExprHelp.svelte'
   import ReplayBar from './ReplayBar.svelte'
@@ -435,9 +436,9 @@
             {/each}
             <button class="add" onclick={() => { extract.push(newExtraction()) }}>+ Add</button>
           {:else if section === 'Assert'}
-            <p class="muted">One check per line, for example <code>{view.kind === 'http' ? 'status == 200' : 'received >= 1'}</code>. A failing check fails the send. <ExprHelp context={view.kind === 'http' ? 'request.check' : 'message.check'} /></p>
-            <AreaField value={(v.Assert ?? []).join('\n')} oninput={(t) => RequestService.SetAssert(node, t.split('\n').filter((l) => l.trim() !== ''))}
-              empty={{ icon: 'assert', title: 'No checks', hint: 'Click to write one per line.' }} />
+            <p class="muted">One card per check, for example <code>{view.kind === 'http' ? 'status == 200' : 'received >= 1'}</code>. A failing check fails the send. <ExprHelp context={view.kind === 'http' ? 'request.check' : 'message.check'} /></p>
+            <AssertCards checks={v.Assert ?? []} outcome={view.response ?? undefined} example={view.kind === 'http' ? 'status == 200' : 'received >= 1'}
+              onchange={(c) => RequestService.SetAssert(node, c)} />
           {:else if section === 'Variables'}
             {#if v.Variables?.length}<p class="muted">Default values for {'{{var.name}}'}; the environment's variable of the same name wins.</p>{/if}
             <KVRows rows={v.Variables} describe onchange={(r) => RequestService.SetRows(node, 'variables', r)}

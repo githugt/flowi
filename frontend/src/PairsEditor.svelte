@@ -15,13 +15,19 @@
     if (!within) local = rows.map((r) => ({ ...r }))
   })
 
+  let box = $state<HTMLDivElement>()
+  // Focus moving between this form's own controls is not leaving it (see KVRows).
+  function leave(e: FocusEvent) {
+    if (!box?.contains(e.relatedTarget as Node | null)) within = false
+  }
+
   // Blank rows stay in the form until they get a name; Go only hears of named ones.
   function commit() {
     onchange(local.filter((r) => r.key.trim() !== ''))
   }
 </script>
 
-<div class="pairs" onfocusin={() => (within = true)} onfocusout={() => (within = false)}>
+<div class="pairs" bind:this={box} onfocusin={() => (within = true)} onfocusout={leave}>
   {#each local as row, i}
     <div class="row">
       <input class="k" placeholder={keyLabel} bind:value={row.key} oninput={commit} spellcheck="false" />
