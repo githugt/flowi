@@ -8,7 +8,7 @@ require (
 	charm.land/lipgloss/v2 v2.0.6
 	github.com/bufbuild/protocompile v0.14.1
 	github.com/coder/websocket v1.8.15
-	github.com/githugt/flowi-lib v0.1.0-alpha.1
+	github.com/githugt/flowi-lib v0.1.0-alpha.3
 	github.com/rogpeppe/go-internal v1.16.0
 	github.com/samber/do/v2 v2.1.0
 	github.com/spf13/cobra v1.10.2
