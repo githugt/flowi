@@ -64,7 +64,7 @@ func (w *Workspace) NewEnvironment(name string) (string, error) {
 	} else if !errors.Is(err, fs.ErrNotExist) {
 		return "", fmt.Errorf("checking %s: %w", file, err)
 	}
-	env := model.Environment{Meta: model.Meta{ID: w.newID(), Name: name}, File: file}
+	env := model.Environment{Meta: model.Meta{ID: w.newID(), Name: name}, File: file, Colour: model.DefaultEnvColour(name)}
 	data, err := w.store.EncodeEnvironment(env)
 	if err != nil {
 		return "", fmt.Errorf("encoding %s: %w", file, err)

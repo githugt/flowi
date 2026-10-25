@@ -23,6 +23,7 @@ func (c *Codec) DecodeEnvironment(file string, data []byte) (model.Environment, 
 		return env, d.diags
 	}
 	env.Meta = m.meta()
+	env.Colour = m.str("colour")
 	env.Vars = m.envVars()
 	m.closeStrict()
 	return env, d.diags
@@ -60,6 +61,7 @@ func (m *mapping) secretFlag() bool {
 func (c *Codec) EncodeEnvironment(env model.Environment) ([]byte, error) {
 	var o omap
 	putMeta(&o, env.Meta)
+	o.put("colour", env.Colour)
 	var vars yaml.MapSlice
 	for _, v := range env.Vars {
 		var value any = v.Value

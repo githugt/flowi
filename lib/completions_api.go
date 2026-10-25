@@ -247,3 +247,72 @@ func findRequest(cs []model.Collection, from model.Collection, ref model.Ref) (m
 	}
 	return model.Collection{}, model.Request{}, false
 }
+
+// responseFieldDepth is how deep ResponseFields follows a body.
+const responseFieldDepth = 4
+
+// ResponseFields lists the body fields version of a request is known to return, written as an
+// expression reads them: body, body.user.id, body.items[0].id. They come from its schema, its
+// pinned examples or its last saved response, in that order of preference (an empty version
+// is the one a run resolves to); a request with none
+// of them has no fields to offer. A list is named by its first item.
+func (w *Workspace) ResponseFields(t RequestTarget, version string) ([]Completion, error) {
+	w.mu.RLock()
+	c, ok := w.collection(t.Collection)
+	w.mu.RUnlock()
+	if !ok {
+		return nil, diagErr(diag.CodeWSUnknownCollection, map[string]string{"name": string(t.Collection)})
+	}
+	i := slices.IndexFunc(c.Requests, func(r model.Request) bool { return r.ID == t.Request })
+	if i < 0 {
+		return nil, fmt.Errorf("collection %s has no request %s", t.Collection, t.Request)
+	}
+	r := c.Requests[i]
+	if v, ok := sites.ResolvedVersion(r, version, ""); ok {
+		version = v.Label // an empty version is the one a run resolves to
+	}
+	contract, _ := analysis.FileContracts{DataDir: w.DataDir}.Contract(c, r, version)
+	seen := map[string]bool{}
+	var out []Completion
+	add := func(text string) {
+		if !seen[text] {
+			seen[text] = true
+			out = append(out, Completion{Text: text, Detail: "from " + contract.Source})
+		}
+	}
+	for _, sample := range contract.Samples {
+		if sample.Body == nil {
+			continue
+		}
+		add("body")
+		for _, text := range bodyFieldTexts("body", sample.Body, responseFieldDepth) {
+			add(text)
+		}
+	}
+	return out, nil
+}
+
+// bodyFieldTexts lists the paths under prefix in a parsed JSON body, depth levels deep, object
+// keys in order. Keys that are not plain words are left out: they are written with ["…"].
+func bodyFieldTexts(prefix string, v any, depth int) []string {
+	if depth == 0 {
+		return nil
+	}
+	var out []string
+	switch x := v.(type) {
+	case map[string]any:
+		for _, k := range slices.Sorted(maps.Keys(x)) {
+			if strings.ContainsAny(k, " .-[]") {
+				continue
+			}
+			out = append(out, prefix+"."+k)
+			out = append(out, bodyFieldTexts(prefix+"."+k, x[k], depth-1)...)
+		}
+	case []any:
+		if len(x) > 0 {
+			out = append(out, prefix+"[0]")
+			out = append(out, bodyFieldTexts(prefix+"[0]", x[0], depth-1)...)
+		}
+	}
+	return out
+}

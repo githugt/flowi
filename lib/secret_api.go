@@ -74,6 +74,43 @@ func (w *Workspace) UnsetSecret(env, name string) error {
 	return vaultErr(w.secrets().Unset(entry))
 }
 
+// DiscardSecret removes a stored value whose variable is no longer a secret of the environment:
+// it was deleted, or turned into a plain variable. UnsetSecret cannot do that, because it requires the
+// declaration. Without this the value would stay in the vault with nothing left to show or remove it.
+// The environment must exist (FLW-REQ-004); a name with no stored value is not an error.
+func (w *Workspace) DiscardSecret(env, name string) error {
+	envs := w.Environments()
+	i := slices.IndexFunc(envs, func(e model.Environment) bool { return e.Name == env })
+	if i < 0 {
+		return diagErr(diag.CodeRequestEnvUnknown, map[string]string{"env": env})
+	}
+	return vaultErr(w.secrets().Unset(vault.Entry{Collection: vault.WorkspaceScope, Environment: envs[i].ID, Name: name}))
+}
+
+// RevealSecret returns the stored value of one secret variable, for the person who owns it to read
+// again. It is the only call that returns a value: Secrets lists none. A secret provided by a
+// FLOWI_SECRET_<ENV>_<NAME> variable is not revealed (FLW-SEC-004): it is not stored here, and the
+// variable is already in the reader's environment. A secret with no value is FLW-SEC-001.
+// Callers decide when to show it and for how long; this does not log.
+func (w *Workspace) RevealSecret(env, name string) (string, error) {
+	entry, err := w.secretEntry(env, name)
+	if err != nil {
+		return "", err
+	}
+	args := map[string]string{"name": name, "env": env}
+	if overridden(w.opts.Environ, env, name) {
+		return "", diagErr(diag.CodeSecretFromEnvironment, args)
+	}
+	value, ok, err := w.secrets().Get(entry, env)
+	if err != nil {
+		return "", vaultErr(err)
+	}
+	if !ok {
+		return "", diagErr(diag.CodeSecretMissing, args)
+	}
+	return value, nil
+}
+
 // vaultErr reports a locked vault as a user problem (FLW-SEC-002): the fix
 // is FLOWI_VAULT_KEY or the right passphrase, not a system repair.
 func vaultErr(err error) error {

@@ -17,6 +17,19 @@
     "description": {
       "type": "string"
     },
+    "colour": {
+      "enum": [
+        "red",
+        "orange",
+        "yellow",
+        "lime",
+        "green",
+        "aqua",
+        "blue",
+        "purple",
+        "gray"
+      ]
+    },
     "vars": {
       "type": "object",
       "additionalProperties": {

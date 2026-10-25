@@ -127,9 +127,10 @@ const (
 	CodeTemplateGenerator Code = "FLW-TPL-004"
 
 	// Diagnostic code names, not credentials (gosec G101 matches "Secret").
-	CodeSecretMissing    Code = "FLW-SEC-001" //nolint:gosec // see above
-	CodeSecretLocked     Code = "FLW-SEC-002" //nolint:gosec // see above
-	CodeSecretUndeclared Code = "FLW-SEC-003" //nolint:gosec // see above
+	CodeSecretMissing         Code = "FLW-SEC-001" //nolint:gosec // see above
+	CodeSecretLocked          Code = "FLW-SEC-002" //nolint:gosec // see above
+	CodeSecretUndeclared      Code = "FLW-SEC-003" //nolint:gosec // see above
+	CodeSecretFromEnvironment Code = "FLW-SEC-004" //nolint:gosec // see above
 
 	CodeRequestNotFound    Code = "FLW-REQ-001"
 	CodeRequestAmbiguous   Code = "FLW-REQ-002"
@@ -302,9 +303,10 @@ func codeTable() map[Code]codeInfo {
 		CodeTemplateEmpty:     {e, "{field} is empty (empty: error)"},
 		CodeTemplateGenerator: {e, "unknown generator ${name}"},
 
-		CodeSecretMissing:    {e, `secret "{name}" is not set for environment "{env}"` + hintMarker + "set it with `flowi secret set {env} {name}`"},
-		CodeSecretLocked:     {e, "cannot unlock the vault: {detail}"},
-		CodeSecretUndeclared: {e, `"{name}" is not a secret variable of environment "{env}"` + hintMarker + "declare it as `{name}: { secret: true }` in environments/{env}.yaml"},
+		CodeSecretMissing:         {e, `secret "{name}" is not set for environment "{env}"` + hintMarker + "set it with `flowi secret set {env} {name}`"},
+		CodeSecretLocked:          {e, "cannot unlock the vault: {detail}"},
+		CodeSecretFromEnvironment: {e, `secret "{name}" of environment "{env}" is provided by an environment variable, not stored` + hintMarker + "read it from where that variable is set"},
+		CodeSecretUndeclared:      {e, `"{name}" is not a secret variable of environment "{env}"` + hintMarker + "declare it as `{name}: { secret: true }` in environments/{env}.yaml"},
 
 		CodeRequestNotFound:    {e, `no request matches "{ref}"`},
 		CodeRequestAmbiguous:   {e, `"{ref}" matches requests in {count} collections` + hintMarker + "use --collection"},

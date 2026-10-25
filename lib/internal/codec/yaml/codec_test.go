@@ -309,3 +309,22 @@ func TestDecodeFolder_should_read_and_write_the_order_of_its_entries(t *testing.
 		t.Fatalf("got %+v\n%s (%v)", f.Order, out, err)
 	}
 }
+
+func TestEncodeEnvironment_should_round_trip_its_colour(t *testing.T) {
+	c := newCodec()
+	data := []byte("id: 01J9ZE3M4N5P6Q7R8S9T0VWXYZ\nname: prod\ncolour: red\nvars:\n  host: example.com\n")
+
+	env, diags := c.DecodeEnvironment("prod.yaml", data)
+	requireNoDiagnostics(t, diags)
+	out, err := c.EncodeEnvironment(env)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+	if env.Colour != "red" {
+		t.Fatalf("colour = %q, want red", env.Colour)
+	}
+	if !bytes.Equal(out, data) {
+		t.Fatalf("round trip differs:\n%s", out)
+	}
+}

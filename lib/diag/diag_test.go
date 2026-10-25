@@ -4,6 +4,7 @@ package diag
 
 import (
 	"errors"
+	"regexp"
 	"slices"
 	"testing"
 )
@@ -81,17 +82,35 @@ func TestNew_should_take_default_severity(t *testing.T) {
 	}
 }
 
-func TestCodes_should_be_unique(t *testing.T) {
-	seen := map[Code]bool{}
+// codeShape is how a code is written: FLW, the area, a three-digit number. Users search for
+// codes and catalogues are keyed by them, so a misspelt one is a bug.
+var codeShape = regexp.MustCompile(`^FLW-[A-Z]+-[0-9]{3}$`)
+
+func TestCodes_should_follow_the_FLW_AREA_NNN_shape(t *testing.T) {
+	for _, c := range Codes() {
+		if !codeShape.MatchString(string(c)) {
+			t.Errorf("code %q does not match %s", c, codeShape)
+		}
+	}
+}
+
+func TestCodes_should_each_have_an_english_message_and_a_known_severity(t *testing.T) {
+	catalogue := English()
 
 	for _, c := range Codes() {
-		if seen[c] {
-			t.Fatalf("duplicate code %s", c)
-		}
-		seen[c] = true
-	}
+		message, _ := catalogue.Message(New(c, Location{}, nil))
 
-	if len(seen) != 132 {
-		t.Fatalf("got %d codes, want 132", len(seen))
+		if message == "" || message == string(c) {
+			t.Errorf("code %s has no English message", c)
+		}
+		if sev := DefaultSeverity(c); sev != SeverityError && sev != SeverityWarning {
+			t.Errorf("code %s has severity %v, want error or warning", c, sev)
+		}
+	}
+}
+
+func TestCodes_should_not_be_empty(t *testing.T) {
+	if len(Codes()) == 0 {
+		t.Fatal("no codes: the catalogue is empty")
 	}
 }

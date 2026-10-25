@@ -278,3 +278,21 @@ func TestSetFolderOrder_Given_a_bad_tree_or_name_Then_refuses_and_writes_nothing
 		t.Fatalf("errors %v %v %v", errTree, errName, errDir)
 	}
 }
+
+func TestNewEnvironment_should_colour_a_prod_environment_red_and_leave_others_plain(t *testing.T) {
+	w := demoWorkspace(t)
+
+	_, errProd := w.NewEnvironment("Production")
+	_, errQA := w.NewEnvironment("qa-box")
+
+	if errProd != nil || errQA != nil {
+		t.Fatal(errProd, errQA)
+	}
+	colours := map[string]string{}
+	for _, e := range w.Collections()[0].Environments {
+		colours[e.Name] = e.Colour
+	}
+	if colours["Production"] != "red" || colours["qa-box"] != "" {
+		t.Fatalf("colours %v", colours)
+	}
+}

@@ -102,3 +102,37 @@ func TestCompletionsIn_use_the_draft_flow(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestResponseFields_should_offer_the_body_fields_a_request_is_known_to_return(t *testing.T) {
+	w := demoWorkspace(t)
+	target, err := w.FindRequest("auth/login", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := w.ResponseFields(target, "")
+
+	if err != nil {
+		t.Fatal(err)
+	}
+	var texts []string
+	for _, c := range got {
+		texts = append(texts, c.Text)
+	}
+	for _, want := range []string{"body", "body.data", "body.data.token"} {
+		if !slices.Contains(texts, want) {
+			t.Errorf("missing %s in %v", want, texts)
+		}
+	}
+}
+
+func TestResponseFields_should_name_a_list_by_its_first_item(t *testing.T) {
+	body := map[string]any{"items": []any{map[string]any{"sku": "x"}}, "x-id": 1}
+
+	got := bodyFieldTexts("body", body, 4)
+
+	want := []string{"body.items", "body.items[0]", "body.items[0].sku"}
+	if !slices.Equal(got, want) {
+		t.Errorf("got %v, want %v (keys that are not plain words are left out)", got, want)
+	}
+}
