@@ -14,6 +14,8 @@
   import RequestExtras from './RequestExtras.svelte'
   import MessageSections from './MessageSections.svelte'
   import AreaField from './AreaField.svelte'
+  import AssertCards from './AssertCards.svelte'
+  import { requestVocabulary } from './lib/vocabulary'
   import Dropdown from './Dropdown.svelte'
   import ExprHelp from './ExprHelp.svelte'
   import ReplayBar from './ReplayBar.svelte'
@@ -314,11 +316,11 @@
          nobody looked for them; they open from the Save button now. -->
     <div class="send savegrp">
       {#if view.inScratch}
-        <button class="primary saveicon main" title="Save to a collection…" aria-label="Save to a collection" onclick={saveTo}><Icon name="save" size={15} /></button>
+        <button class="saveicon main pending" title="Save to a collection…" aria-label="Save to a collection" onclick={saveTo}><Icon name="save" size={15} /></button>
       {:else}
-        <button class="saveicon main" title="Save (⌘S)" aria-label="Save" disabled={!view.dirty} onclick={() => RequestService.Save(node)}><Icon name="save" size={15} /></button>
+        <button class="saveicon main" class:pending={view.dirty} title="Save (⌘S)" aria-label="Save" disabled={!view.dirty} onclick={() => RequestService.Save(node)}><Icon name="save" size={15} /></button>
       {/if}
-      <button class="more" class:primary={view.inScratch} aria-label="Save options" aria-expanded={menu === 'save'} onpointerdown={(e) => e.stopPropagation()} onclick={() => (menu = menu === 'save' ? null : 'save')}>▾</button>
+      <button class="more" aria-label="Save options" aria-expanded={menu === 'save'} onpointerdown={(e) => e.stopPropagation()} onclick={() => (menu = menu === 'save' ? null : 'save')}>▾</button>
       {#if menu === 'save'}
         <div class="menu" role="menu" tabindex="-1" onpointerdown={(e) => e.stopPropagation()}>
           <button role="menuitem" onclick={() => menuAction(save)}><span class="tick"></span>Save current version<kbd>⌘S</kbd></button>
@@ -435,9 +437,10 @@
             {/each}
             <button class="add" onclick={() => { extract.push(newExtraction()) }}>+ Add</button>
           {:else if section === 'Assert'}
-            <p class="muted">One check per line, for example <code>{view.kind === 'http' ? 'status == 200' : 'received >= 1'}</code>. A failing check fails the send. <ExprHelp context={view.kind === 'http' ? 'request.check' : 'message.check'} /></p>
-            <AreaField value={(v.Assert ?? []).join('\n')} oninput={(t) => RequestService.SetAssert(node, t.split('\n').filter((l) => l.trim() !== ''))}
-              empty={{ icon: 'assert', title: 'No checks', hint: 'Click to write one per line.' }} />
+            <p class="muted">One card per check, for example <code>{view.kind === 'http' ? 'status == 200' : 'received >= 1'}</code>. A failing check fails the send. <ExprHelp context={view.kind === 'http' ? 'request.check' : 'message.check'} /></p>
+            <AssertCards checks={v.Assert ?? []} outcome={view.response ?? undefined} example={view.kind === 'http' ? 'status == 200' : 'received >= 1'}
+              vocabulary={requestVocabulary(view.kind === 'http' ? 'request.check' : 'message.check', node, view.response, view.kind)}
+              onchange={(c) => RequestService.SetAssert(node, c)} />
           {:else if section === 'Variables'}
             {#if v.Variables?.length}<p class="muted">Default values for {'{{var.name}}'}; the environment's variable of the same name wins.</p>{/if}
             <KVRows rows={v.Variables} describe onchange={(r) => RequestService.SetRows(node, 'variables', r)}
@@ -491,7 +494,7 @@
 
 <style>
   .req { position: absolute; inset: 0; display: flex; flex-direction: column; }
-  header { display: flex; gap: 8px; padding: 8px 12px; border-bottom: 1px solid var(--line); align-items: center; }
+  header { display: flex; gap: 8px; padding: 10px 12px; border-bottom: 1px solid var(--line); align-items: center; }
   .url { flex: 1; min-width: 0; }
   .url2 { flex: 1; min-width: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
   .url2 :global(input) { width: 100%; box-sizing: border-box; }
@@ -503,13 +506,14 @@
     border-radius: var(--r-md);
     font: inherit;
   }
-  select, button { padding: 5px 10px; }
+  /* The toolbar's controls share one height, so the method, the address and the buttons sit on one line. */
+  select, button { padding: 5px 10px; min-height: 32px; box-sizing: border-box; }
+  header :global(input) { min-height: 32px; box-sizing: border-box; }
   button { background: transparent; }
   button:hover:not(:disabled) { border-color: var(--accent); }
   button:disabled { opacity: 0.4; }
-  .primary { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
   .send { position: relative; display: flex; gap: 2px; }
-  .more { padding: 5px 8px; }
+  .more { padding: 5px 8px; min-height: 32px; }
   .menu {
     position: absolute; top: 100%; right: 0; margin-top: 4px; min-width: 150px; display: flex; flex-direction: column; padding: 4px;
     background: var(--panel); border: 1px solid var(--line); border-radius: var(--r-lg); box-shadow: var(--shadow); z-index: 20;
@@ -537,19 +541,20 @@
   .more-secs.on :global(.btn) { border-color: var(--accent); }
   .typebar { flex: none; display: flex; align-items: center; gap: 10px; padding: 6px 10px; border-top: 1px solid var(--line); }
   .ver { display: flex; align-items: center; gap: 4px; }
-  .act { background: var(--act); color: var(--on-act); border-color: var(--act); font-weight: 600; }
+  .act { background: var(--act); color: var(--on-act); border-color: var(--act); font-weight: 600; box-shadow: 0 2px 10px color-mix(in srgb, var(--act) 32%, transparent); }
   .act:hover:not(:disabled) { border-color: var(--act); background: color-mix(in srgb, var(--act) 88%, white); }
   /* The floppy disk is the save everyone knows; the words stay as the tooltip and the name read aloud. */
   .saveicon { display: flex; align-items: center; padding-inline: 9px; }
   .send .main { border-radius: 6px 0 0 6px; white-space: nowrap; }
   .send .more { border-radius: 0 6px 6px 0; border-left-color: color-mix(in srgb, var(--on-act) 35%, transparent); }
   .savegrp .more:not(.primary) { border-left-color: var(--line); }
-  .savegrp .more.primary { border-left-color: color-mix(in srgb, var(--on-accent) 35%, transparent); }
+  /* The button stays dark; the disk takes the accent colour while there is something to save. */
+  .savegrp .pending { color: var(--accent); }
   .menu .tick { width: 14px; display: inline-block; }
   .menu hr { border: 0; border-top: 1px solid var(--line); margin: 4px 0; }
   .menu kbd { margin-left: auto; padding-left: 16px; color: var(--muted); font: inherit; font-size: var(--fs-xs); }
   .menu button { display: flex; align-items: center; white-space: nowrap; }
-  .section { flex: 1; overflow: auto; padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+  .section { flex: 1; overflow: auto; padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; }
   .radio { display: flex; gap: 4px; align-items: center; }
   .muted { color: var(--muted); font-size: var(--fs-sm); margin: 0; }
   .row { display: flex; gap: 4px; }

@@ -118,6 +118,8 @@ func run() error {
 		Mac: application.MacWindow{
 			TitleBar: application.MacTitleBarHiddenInset,
 		},
+		// On Linux the menus sit behind a button in the title bar instead of taking a row of their own.
+		Linux:            application.LinuxWindow{MenuStyle: application.LinuxMenuStylePrimaryMenu},
 		BackgroundColour: application.NewRGB(15, 17, 22),
 		URL:              "/",
 	})

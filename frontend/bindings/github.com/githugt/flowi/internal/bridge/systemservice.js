@@ -28,6 +28,19 @@ export function ExpressionHelp(context) {
 }
 
 /**
+ * ExpressionVocabulary lists what can start a word in an expression written in the given
+ * context (see vm.ExprContext): the names that context reads, functions and keywords. The page
+ * filters it as the user types, so no round trip is needed per key.
+ * @param {string} context
+ * @returns {$CancellablePromise<$models.SuggestionView[]>}
+ */
+export function ExpressionVocabulary(context) {
+    return $Call.ByID(1855283012, context).then(/** @type {($result: any) => any} */(($result) => {
+        return $$createType2($result);
+    }));
+}
+
+/**
  * PickFile asks for a file. It returns "" when cancelled.
  * @param {string} title
  * @returns {$CancellablePromise<string>}
@@ -65,3 +78,5 @@ export function QuitKeeping() {
 
 // Private type creation functions
 const $$createType0 = $models.ExprHelpView.createFrom;
+const $$createType1 = $models.SuggestionView.createFrom;
+const $$createType2 = $Create.Array($$createType1);

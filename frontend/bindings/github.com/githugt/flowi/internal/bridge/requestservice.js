@@ -143,6 +143,18 @@ export function Edit(node, v) {
 }
 
 /**
+ * ExpressionNames lists the environment variables and the request's own variables an expression
+ * can read, written out in full ("env.base_url", "var.page").
+ * @param {string} node
+ * @returns {$CancellablePromise<$models.SuggestionView[]>}
+ */
+export function ExpressionNames(node) {
+    return $Call.ByID(1263971440, node).then(/** @type {($result: any) => any} */(($result) => {
+        return $$createType2($result);
+    }));
+}
+
+/**
  * ExtractAsVariable adds a value of the response body (by JSONPath) to the
  * version's extractions, and saves the request.
  * @param {string} node
@@ -170,14 +182,13 @@ export function FillFromPaste(node, kind, text) {
 
 /**
  * GenerateRequests makes a gRPC request for each loaded method, in the
- * request's collection under grpc/, with its server and schema files. The
- * window's Fyne predecessor had this in its method list; the web view lost it.
+ * request's collection under grpc/, with its server and schema files.
  * @param {string} node
  * @returns {$CancellablePromise<$models.GeneratedView>}
  */
 export function GenerateRequests(node) {
     return $Call.ByID(3985437955, node).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType1($result);
+        return $$createType3($result);
     }));
 }
 
@@ -215,7 +226,7 @@ export function LoadMethods(node) {
  */
 export function Missing(node) {
     return $Call.ByID(950141702, node).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType2($result);
+        return $$createType4($result);
     }));
 }
 
@@ -237,7 +248,7 @@ export function NewVersion(node, label) {
  */
 export function Open(node) {
     return $Call.ByID(1087292378, node).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType3($result);
+        return $$createType5($result);
     }));
 }
 
@@ -303,7 +314,7 @@ export function PrettyJSON(text) {
  */
 export function PreviewOverlay(node) {
     return $Call.ByID(2934596182, node).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType4($result);
+        return $$createType6($result);
     }));
 }
 
@@ -366,7 +377,7 @@ export function SaveToOverlay(node, chosen) {
  */
 export function Schemas(node) {
     return $Call.ByID(3608768970, node).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType6($result);
+        return $$createType8($result);
     }));
 }
 
@@ -594,7 +605,7 @@ export function SetSchemasInfer(node, on) {
  */
 export function SetSettings(node, rows) {
     return $Call.ByID(1704834215, node, rows).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType7($result);
+        return $$createType9($result);
     }));
 }
 
@@ -648,7 +659,7 @@ export function SetVersionDetails(node, name, docs) {
  */
 export function Settings(node) {
     return $Call.ByID(2029961655, node).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType8($result);
+        return $$createType10($result);
     }));
 }
 
@@ -692,7 +703,7 @@ export function ShowStored(node, version, name) {
  */
 export function SpecOrigin(node) {
     return $Call.ByID(1104662111, node).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType9($result);
+        return $$createType11($result);
     }));
 }
 
@@ -704,7 +715,7 @@ export function SpecOrigin(node) {
  */
 export function StoredResponses(node) {
     return $Call.ByID(3817148967, node).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType11($result);
+        return $$createType13($result);
     }));
 }
 
@@ -719,7 +730,7 @@ export function StoredResponses(node) {
  */
 export function Suggest(node, text, caret) {
     return $Call.ByID(170145176, node, text, caret).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType12($result);
+        return $$createType14($result);
     }));
 }
 
@@ -742,7 +753,7 @@ export function SuggestSavePath(node) {
  */
 export function URLSpans(node, text) {
     return $Call.ByID(3722086932, node, text).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType14($result);
+        return $$createType16($result);
     }));
 }
 
@@ -753,24 +764,26 @@ export function URLSpans(node, text) {
  */
 export function UsedBy(node) {
     return $Call.ByID(1396383790, node).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType15($result);
+        return $$createType17($result);
     }));
 }
 
 // Private type creation functions
 const $$createType0 = $models.CookiesView.createFrom;
-const $$createType1 = $models.GeneratedView.createFrom;
-const $$createType2 = $models.MissingView.createFrom;
-const $$createType3 = $models.RequestView.createFrom;
-const $$createType4 = $models.OverlayPreviewView.createFrom;
-const $$createType5 = $models.SchemaView.createFrom;
-const $$createType6 = $Create.Array($$createType5);
-const $$createType7 = $Create.Array($Create.Any);
-const $$createType8 = $models.RequestSettingsView.createFrom;
-const $$createType9 = $models.SpecOriginView.createFrom;
-const $$createType10 = $models.StoredView.createFrom;
-const $$createType11 = $Create.Array($$createType10);
-const $$createType12 = $models.SuggestView.createFrom;
-const $$createType13 = $models.SpanView.createFrom;
-const $$createType14 = $Create.Array($$createType13);
-const $$createType15 = $models.UsedByView.createFrom;
+const $$createType1 = $models.SuggestionView.createFrom;
+const $$createType2 = $Create.Array($$createType1);
+const $$createType3 = $models.GeneratedView.createFrom;
+const $$createType4 = $models.MissingView.createFrom;
+const $$createType5 = $models.RequestView.createFrom;
+const $$createType6 = $models.OverlayPreviewView.createFrom;
+const $$createType7 = $models.SchemaView.createFrom;
+const $$createType8 = $Create.Array($$createType7);
+const $$createType9 = $Create.Array($Create.Any);
+const $$createType10 = $models.RequestSettingsView.createFrom;
+const $$createType11 = $models.SpecOriginView.createFrom;
+const $$createType12 = $models.StoredView.createFrom;
+const $$createType13 = $Create.Array($$createType12);
+const $$createType14 = $models.SuggestView.createFrom;
+const $$createType15 = $models.SpanView.createFrom;
+const $$createType16 = $Create.Array($$createType15);
+const $$createType17 = $models.UsedByView.createFrom;

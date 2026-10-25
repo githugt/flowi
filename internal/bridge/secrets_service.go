@@ -3,13 +3,15 @@
 package bridge
 
 import (
+	"errors"
+
 	flowi "github.com/githugt/flowi-lib"
 
 	"github.com/githugt/flowi/internal/vm"
 )
 
-// SecretView is a secret declared by an environment. Values are never sent
-// to the window.
+// SecretView is a secret declared by an environment. Values are not part of it:
+// the window asks for one at a time with Reveal.
 type SecretView struct {
 	Environment string `json:"environment"`
 	Name        string `json:"name"`
@@ -53,6 +55,18 @@ func (s *SecretsService) Set(environment, name, value string) {
 	s.app.actor.Do(func() {
 		s.vm.Set(flowi.SecretInfo{Environment: environment, Name: name}, value, func(error) {})
 	})
+}
+
+// Reveal returns one stored value for the window to show for a moment; it is the only call that sends a
+// value to the window, and it sends one. The window asks the passphrase first (PassphraseService.Unlock),
+// so this never waits for the user. The reveal is logged, without the value.
+func (s *SecretsService) Reveal(environment, name string) (string, error) {
+	value, err := s.app.backend.RevealSecret(environment, name)
+	if err != nil {
+		return "", errors.New(vm.ErrorText(err))
+	}
+	s.app.logger.Info("a secret was revealed", "Event", "SecretRevealed", "Environment", environment, "Name", name)
+	return value, nil
 }
 
 // Unset removes the stored value.

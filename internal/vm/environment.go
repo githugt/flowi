@@ -30,6 +30,7 @@ type Environment struct {
 	file     string
 	disk     model.Environment
 	rows     []EnvVarRow
+	colour   string
 	dirty    bool
 	onDisk   bool
 	confirm  bool
@@ -56,6 +57,7 @@ func (e *Environment) load(envs []model.Environment) {
 		return
 	}
 	e.disk = envs[i]
+	e.colour = e.disk.Colour
 	e.rows = make([]EnvVarRow, len(e.disk.Vars))
 	for j, v := range e.disk.Vars {
 		e.rows[j] = EnvVarRow{Name: v.Name, Value: v.Value, Secret: v.Secret}
@@ -129,6 +131,21 @@ func (e *Environment) NeedsDropConfirm() bool { return e.confirm }
 // Err is the last problem, or "".
 func (e *Environment) Err() string { return e.err }
 
+// Colour is the colour the environment is marked with: one of model.EnvColours, or "" for the default.
+func (e *Environment) Colour() string { return e.colour }
+
+// SetColour marks the environment with a colour of model.EnvColours, or "" for the default. It is an
+// edit like a variable's: Save writes both. Any other name is ignored: the file would hold a colour
+// nothing can draw.
+func (e *Environment) SetColour(colour string) {
+	if colour != "" && !slices.Contains(model.EnvColours(), colour) {
+		return
+	}
+	e.colour = colour
+	e.dirty = true
+	e.changed()
+}
+
 // SetRows replaces the variables.
 func (e *Environment) SetRows(rows []EnvVarRow) {
 	e.rows = slices.Clone(rows)
@@ -141,6 +158,7 @@ func (e *Environment) SetRows(rows []EnvVarRow) {
 // no longer secret.
 func (e *Environment) Save(dropComments bool) {
 	env := e.disk
+	env.Colour = e.colour
 	env.Vars = make([]model.EnvVar, 0, len(e.rows))
 	for _, r := range e.rows {
 		v := model.EnvVar{Name: r.Name, Value: r.Value, Secret: r.Secret}
@@ -171,14 +189,27 @@ func (e *Environment) write(env model.Environment, rows []EnvVarRow, wasSecret m
 	}
 	var errs []error
 	for _, r := range rows {
-		switch {
-		case r.Secret && r.Value != "":
+		if r.Secret && r.Value != "" {
 			errs = append(errs, e.b.SetSecret(env.Name, r.Name, r.Value))
-		case !r.Secret && wasSecret[r.Name]:
-			errs = append(errs, e.b.UnsetSecret(env.Name, r.Name))
 		}
 	}
+	for _, name := range noLongerSecret(wasSecret, rows) {
+		errs = append(errs, e.b.DiscardSecret(env.Name, name))
+	}
 	return errors.Join(errs...)
+}
+
+// noLongerSecret names the variables that were secrets on disk and are not now: removed, or made plain.
+// Their vault values go once the file no longer declares them.
+func noLongerSecret(wasSecret map[string]bool, rows []EnvVarRow) []string {
+	var out []string
+	for name := range wasSecret {
+		if !slices.ContainsFunc(rows, func(r EnvVarRow) bool { return r.Name == name && r.Secret }) {
+			out = append(out, name)
+		}
+	}
+	slices.Sort(out)
+	return out
 }
 
 func (e *Environment) saved(env model.Environment, err error) {

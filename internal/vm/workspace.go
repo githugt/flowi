@@ -216,6 +216,17 @@ func (ws *Workspace) Environment() []model.Environment { return ws.snap.environm
 // Environments lists the environment names, sorted.
 func (ws *Workspace) Environments() []string { return ws.snap.envs }
 
+// EnvColours maps each environment name to its colour; an environment with the default colour is absent.
+func (ws *Workspace) EnvColours() map[string]string {
+	out := map[string]string{}
+	for _, e := range ws.snap.environment {
+		if e.Colour != "" {
+			out[e.Name] = e.Colour
+		}
+	}
+	return out
+}
+
 // SelectedEnv is the environment sends use.
 func (ws *Workspace) SelectedEnv() string { return ws.env }
 

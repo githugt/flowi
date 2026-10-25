@@ -3,6 +3,8 @@
   import { EnvironmentService } from '../bindings/github.com/githugt/flowi/internal/bridge'
   import type { EnvRow, EnvView, MissingVar } from './lib/types'
   import FileBanner from './FileBanner.svelte'
+  import Hint from './Hint.svelte'
+  import { envSwatch } from './lib/envcolours'
 
   let { view }: { view: EnvView } = $props()
   const node = $derived(view.node)
@@ -12,6 +14,12 @@
   $effect(() => {
     if (!within) rows = view.rows.map((r) => ({ ...r }))
   })
+
+  // Focus moving between the form's own controls is not leaving it: on Linux a clicked button takes the focus,
+  // and the form would reset from the saved rows and drop a blank row before a click on it landed.
+  function leave(e: FocusEvent & { currentTarget: HTMLElement }) {
+    if (!e.currentTarget.contains(e.relatedTarget as Node | null)) within = false
+  }
 
   const push = () => EnvironmentService.SetRows(node, $state.snapshot(rows))
 
@@ -40,10 +48,16 @@
 <svelte:window {onkeydown} />
 
 <div class="env">
-  <header>
+  <header style:border-left={envSwatch(view.colour) ? `4px solid ${envSwatch(view.colour)}` : undefined}>
     <strong>{view.name}</strong>
     {#if view.dirty}<span class="dirty">unsaved</span>{/if}
     <span class="spacer"></span>
+    <div class="swatches" role="radiogroup" aria-label="Colour">
+      <button class="sw none" class:on={!view.colour} role="radio" aria-checked={!view.colour} title="Default colour" aria-label="Default colour" onclick={() => EnvironmentService.SetColour(node, '')}></button>
+      {#each view.colours as c}
+        <button class="sw" class:on={view.colour === c} role="radio" aria-checked={view.colour === c} title={c} aria-label={c} style:background={envSwatch(c)} onclick={() => EnvironmentService.SetColour(node, c)}></button>
+      {/each}
+    </div>
     <button class="primary" disabled={!view.dirty} onclick={() => EnvironmentService.Save(node)}>Save</button>
   </header>
   <FileBanner
@@ -54,7 +68,7 @@
     declineDrop={() => EnvironmentService.DeclineDrop(node)}
   />
   {#if view.error}<p class="err">{view.error}</p>{/if}
-  <div class="body" onfocusin={() => (within = true)} onfocusout={() => (within = false)}>
+  <div class="body" onfocusin={() => (within = true)} onfocusout={leave}>
     {#if unset.length}
       <div class="unset">
         <span>Used by your requests and flows but not set here:</span>
@@ -62,7 +76,7 @@
         {#if unset.length > 1}<button class="all" onclick={() => addRows(unset)}>Add all</button>{/if}
       </div>
     {/if}
-    <p class="muted">Secrets (🔒) are kept in the encrypted workspace vault, never in the file. Leave a secret empty to keep its stored value.</p>
+    <p class="muted">Secrets (🔒) are kept in the encrypted workspace vault, never in the file, and are not shown again once saved. To change one, type a new value; leave the box blank to keep the saved one.<Hint>To see a stored secret again, open <b>Workspace → Secrets…</b> and choose <b>Show</b> on that secret, or run <code>flowi secret get &lt;env&gt; &lt;name&gt; --reveal</code> in a terminal. It shows one secret for a few seconds.</Hint></p>
     <div class="head"><span>Name</span><span>Value</span><span>Secret</span><span></span></div>
     {#each rows as r, i}
       <div class="row">
@@ -89,6 +103,10 @@
 
 <style>
   .env { position: absolute; inset: 0; display: flex; flex-direction: column; }
+  .swatches { display: flex; align-items: center; gap: 6px; margin-right: 8px; }
+  .sw { width: 16px; height: 16px; padding: 0; border-radius: 50%; border: 2px solid transparent; box-sizing: border-box; background: var(--bg); }
+  .sw.none { border: 1px dashed var(--muted); }
+  .sw.on { outline: 2px solid var(--text); outline-offset: 1px; }
   header { height: 40px; flex: none; display: flex; align-items: center; gap: 8px; padding: 0 12px; border-bottom: 1px solid var(--line); }
   .dirty { color: var(--accent); font-size: var(--fs-xs); }
   .spacer { flex: 1; }

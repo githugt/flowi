@@ -35,6 +35,12 @@
   })
 
   let box = $state<HTMLDivElement>()
+  // Focus moving between this form's own controls is not leaving it. On Linux (WebKitGTK) the Add button
+  // takes the focus when clicked, so the move from it to the new row would otherwise reset the form
+  // and drop the blank row before the click on it lands.
+  function leave(e: FocusEvent) {
+    if (!box?.contains(e.relatedTarget as Node | null)) within = false
+  }
   // A row added from the empty state takes the focus, so typing can start at once.
   async function addFirst() {
     local.push({ Key: '', Value: '', Description: '' })
@@ -69,7 +75,7 @@
     <button onclick={addFirst}>{empty.add}</button><button onclick={startBulk}>Bulk edit</button>
   </EmptyState>
 {/if}
-<div class="rows" bind:this={box} hidden={!!empty && !local.length && !bulk} onfocusin={() => (within = true)} onfocusout={() => (within = false)}>
+<div class="rows" bind:this={box} hidden={!!empty && !local.length && !bulk} onfocusin={() => (within = true)} onfocusout={leave}>
   {#if bulk}
     <textarea
       class="bulk"
@@ -105,8 +111,8 @@
 
 <style>
   .rows[hidden] { display: none; }
-  .rows { display: flex; flex-direction: column; gap: 4px; }
-  .row { display: flex; gap: 4px; }
+  .rows { display: flex; flex-direction: column; gap: 6px; }
+  .row { display: flex; gap: 6px; }
   input {
     flex: 1;
     min-width: 0;
@@ -115,6 +121,8 @@
     border: 1px solid var(--line);
     border-radius: var(--r-md);
     padding: 5px 8px;
+    min-height: 30px;
+    box-sizing: border-box;
     font: 12px ui-monospace, SFMono-Regular, Menlo, monospace;
     -webkit-user-select: text;
     user-select: text;

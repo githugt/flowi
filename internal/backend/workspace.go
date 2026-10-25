@@ -277,6 +277,16 @@ func (b *Workspace) SetSecret(env, name, value string) error {
 	return b.ws.SetSecret(env, name, value)
 }
 
+func (b *Workspace) RevealSecret(env, name string) (string, error) {
+	b.guard.Check("RevealSecret")
+	return b.ws.RevealSecret(env, name)
+}
+
+func (b *Workspace) DiscardSecret(env, name string) error {
+	b.guard.Check("DiscardSecret")
+	return b.ws.DiscardSecret(env, name)
+}
+
 func (b *Workspace) UnsetSecret(env, name string) error {
 	b.guard.Check("UnsetSecret")
 	return b.ws.UnsetSecret(env, name)
@@ -480,6 +490,11 @@ func (b *Workspace) FlowLayout(t flowi.FlowTarget) (model.Layout, diag.List, err
 func (b *Workspace) SaveFlowLayout(t flowi.FlowTarget, l model.Layout) error {
 	b.guard.Check("SaveFlowLayout")
 	return b.ws.SaveFlowLayout(t, l)
+}
+
+func (b *Workspace) ResponseFields(t flowi.RequestTarget, version string) ([]flowi.Completion, error) {
+	b.guard.Check("ResponseFields")
+	return b.ws.ResponseFields(t, version)
 }
 
 func (b *Workspace) Completions(collection model.ID, f model.Flow, nodePath string) ([]flowi.Completion, error) {

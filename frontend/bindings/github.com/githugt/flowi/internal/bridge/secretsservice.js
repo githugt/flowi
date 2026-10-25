@@ -16,6 +16,18 @@ import { Call as $Call, CancellablePromise as $CancellablePromise, Create as $Cr
 import * as $models from "./models.js";
 
 /**
+ * Reveal returns one stored value for the window to show for a moment; it is the only call that sends a
+ * value to the window, and it sends one. The window asks the passphrase first (PassphraseService.Unlock),
+ * so this never waits for the user. The reveal is logged, without the value.
+ * @param {string} environment
+ * @param {string} name
+ * @returns {$CancellablePromise<string>}
+ */
+export function Reveal(environment, name) {
+    return $Call.ByID(4148868931, environment, name);
+}
+
+/**
  * Set stores a value in the vault. It is never read back.
  * @param {string} environment
  * @param {string} name

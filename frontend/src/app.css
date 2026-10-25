@@ -36,7 +36,19 @@
   --sp-1: 4px; --sp-2: 8px; --sp-3: 12px; --sp-4: 16px; --sp-6: 24px;
   --mono: ui-monospace, Menlo, monospace;
   --shadow: 0 8px 24px rgb(0 0 0 / 0.3);
+  /* Hover and selected rows: one tint of the accent each, so lists, menus and tabs agree. */
+  --tint-hover: color-mix(in srgb, var(--accent) 9%, transparent);
+  --tint-sel: color-mix(in srgb, var(--accent) 20%, transparent);
 }
+
+/* A small count beside a tab or heading ("Messages 3"): muted until the tab is the open one. */
+.count { display: inline-block; min-width: 16px; box-sizing: border-box; margin-left: 6px; padding: 0 5px; border-radius: var(--r-pill); background: color-mix(in srgb, var(--muted) 22%, transparent); color: var(--text); font: 600 var(--fs-xs)/16px var(--font, system-ui); text-align: center; }
+.active > .count, .on > .count, [aria-selected='true'] > .count { background: color-mix(in srgb, var(--accent) 28%, transparent); }
+
+/* A status as a pill: the HTTP code of a response, in the tone of how it went. */
+.status-pill { display: inline-block; padding: 1px 8px; border-radius: var(--r-pill); font: 700 var(--fs-xs)/16px var(--font, system-ui); background: color-mix(in srgb, var(--muted) 20%, transparent); color: var(--text); }
+.status-pill.ok { background: color-mix(in srgb, var(--ok) 22%, transparent); color: var(--ok); }
+.status-pill.bad { background: color-mix(in srgb, var(--fail) 22%, transparent); color: var(--fail); }
 
 /* Status colours. The dark set is the default; light themes get a darker set that reads on white. */
 :root {

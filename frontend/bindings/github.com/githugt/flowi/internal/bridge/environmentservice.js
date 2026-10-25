@@ -73,6 +73,16 @@ export function SaveDroppingComments(node) {
 }
 
 /**
+ * SetColour marks the environment with a colour; "" is the default.
+ * @param {string} node
+ * @param {string} colour
+ * @returns {$CancellablePromise<void>}
+ */
+export function SetColour(node, colour) {
+    return $Call.ByID(1224744022, node, colour);
+}
+
+/**
  * SetRows replaces the variables.
  * @param {string} node
  * @param {$models.EnvRow[]} rows

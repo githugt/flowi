@@ -1,9 +1,10 @@
 <script lang="ts">
   import { confirmDeleteSteps } from './lib/flowDelete'
   import { errorText } from './lib/errors'
-  import { FlowService } from '../bindings/github.com/githugt/flowi/internal/bridge'
+  import { FlowService, SystemService } from '../bindings/github.com/githugt/flowi/internal/bridge'
   import type { FlowView, Pair } from './lib/types'
   import TextField from './TextField.svelte'
+  import type { Item } from './lib/exprcomplete'
   import Hint from './Hint.svelte'
   import TemplateField from './TemplateField.svelte'
   import ExprHelp from './ExprHelp.svelte'
@@ -56,6 +57,12 @@
     ui.openMenu(r.left, r.bottom + 4, attachable.map((p) => ({ label: p.type, run: () => (side ? FlowService.AddAttachedAt(node, p.type, side) : FlowService.AddAttached(node, p.type, after)) })))
   }
   const complete = (t: string, c: number) => FlowService.Complete(node, t, c) as unknown as Promise<any>
+  // What a bare expression (a test, a "run when") can name: the context's roots, functions and keywords,
+  // then the real names of this step's surroundings, such as nodes.login.body.token.
+  const vocabularyFor = (context: string) => async (): Promise<Item[]> => {
+    const [roots, names] = await Promise.all([SystemService.ExpressionVocabulary(context), FlowService.ExpressionNames(node)])
+    return [...(names as Item[]), ...(roots as Item[])]
+  }
 
   const failLabels: Record<string, string> = {
     fail: 'Stop the run',
@@ -167,6 +174,7 @@
           mono={p.kind === 'text' || p.kind === 'expr'}
           oninput={(v) => FlowService.SetParam(node, p.name, v)}
           suggest={complete}
+          vocabulary={p.kind === 'expr' ? vocabularyFor('flow.check') : undefined}
         />
         {#if p.kind === 'expr'}<p class="hint">{p.doc || 'True or false, written without braces.'} {exprHint}</p>{/if}
       {/if}
@@ -182,7 +190,7 @@
         <h4>If … else if … else<Hint>Tried from the top: the first test that is true runs its steps. When none is, the else lane runs. Drop steps into a lane on the canvas.</Hint></h4>
         {#each step.cases as c, i}
           <div class="lane">
-            <TextField label={`${c.label} (a test, no braces)`} help="flow.check" placeholder="nodes.login.status == 404" value={c.when ?? ''} mono oninput={(v) => FlowService.SetCaseWhen(node, i, v)} />
+            <TemplateField label={`${c.label} (a test, no braces)`} help="flow.check" placeholder="nodes.login.status == 404" value={c.when ?? ''} oninput={(v) => FlowService.SetCaseWhen(node, i, v)} vocabulary={vocabularyFor('flow.check')} />
             <button disabled={!c.empty} title={c.empty ? 'Remove this case' : 'Move its steps out first'} onclick={() => FlowService.RemoveLane(node, i)}>×</button>
           </div>
         {/each}
@@ -238,7 +246,7 @@
       <TextField label="Id (Enter to rename)" value={step.id} onenter={rename} />
       <TextField label="Name" value={step.name} oninput={(v) => text('name', v)} />
       <TextField label="Description" value={step.description} oninput={(v) => text('description', v)} />
-      <TemplateField label="Run when (expression)" help="flow.when" placeholder="vars.count > 3" value={step.when} oninput={(v) => text('when', v)} suggest={complete} />
+      <TemplateField label="Run when (expression)" help="flow.when" placeholder="vars.count > 3" value={step.when} oninput={(v) => text('when', v)} suggest={complete} vocabulary={vocabularyFor('flow.when')} />
       <TextField label="Timeout (e.g. 5s)" value={step.timeout} oninput={(v) => text('timeout', v)} />
       <label class="check">
         <input type="checkbox" checked={step.concurrent} onchange={(e) => FlowService.SetConcurrent(node, e.currentTarget.checked)} />

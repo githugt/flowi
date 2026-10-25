@@ -3,7 +3,7 @@ module github.com/githugt/flowi
 go 1.27
 
 require (
-	github.com/githugt/flowi-lib v0.1.0-alpha.1
+	github.com/githugt/flowi-lib v0.1.0-alpha.3
 	github.com/wailsapp/wails/v3 v3.0.0-beta.30
 )
 

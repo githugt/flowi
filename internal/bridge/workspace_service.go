@@ -22,11 +22,12 @@ type TreeNode struct {
 
 // Tree is the workspace as the sidebar shows it.
 type Tree struct {
-	Name         string     `json:"name"`
-	Folder       string     `json:"folder"` // where workspace.yaml lives; "" when unknown
-	Roots        []TreeNode `json:"roots"`
-	Environments []string   `json:"environments"`
-	Selected     string     `json:"selected"`
+	Name         string            `json:"name"`
+	Folder       string            `json:"folder"` // where workspace.yaml lives; "" when unknown
+	Roots        []TreeNode        `json:"roots"`
+	Environments []string          `json:"environments"`
+	EnvColours   map[string]string `json:"envColours"` // by environment name; absent: the default colour
+	Selected     string            `json:"selected"`
 }
 
 func kindNames() map[vm.NodeKind]string {
@@ -138,6 +139,7 @@ func (s *WorkspaceService) tree() Tree {
 		Folder:       s.app.workspaceFolder(),
 		Roots:        s.nodes(ws.Children("")),
 		Environments: append([]string{}, ws.Environments()...),
+		EnvColours:   ws.EnvColours(),
 		Selected:     ws.SelectedEnv(),
 	}
 }

@@ -149,9 +149,9 @@
   .row.dropBefore { box-shadow: inset 0 2px 0 var(--accent); }
   .row.dropAfter { box-shadow: inset 0 -2px 0 var(--accent); }
   .row.dropInto { box-shadow: inset 0 0 0 2px var(--accent); background: color-mix(in srgb, var(--accent) 16%, transparent); }
-  .row:hover { background: color-mix(in srgb, var(--accent) 10%, transparent); }
+  .row:hover { background: var(--tint-hover); }
   .row.marked { background: color-mix(in srgb, var(--accent) 32%, transparent); }
-  .row.active { background: color-mix(in srgb, var(--accent) 22%, transparent); }
+  .row.active { background: var(--tint-sel); box-shadow: inset 2px 0 0 var(--accent); }
   .group { color: var(--muted); font-weight: 600; font-size: var(--fs-xs); text-transform: uppercase; letter-spacing: 0.05em; }
   .twist { flex: none; width: 12px; height: 12px; color: var(--muted); display: grid; place-items: center; transition: transform 0.12s; }
   .twist.open { transform: rotate(90deg); }

@@ -19,7 +19,7 @@
     text-align: center;
     padding: 1px 6px;
     border-radius: var(--r-md);
-    background: color-mix(in srgb, var(--v) 15%, transparent);
+    background: color-mix(in srgb, var(--v) 16%, transparent);
     border: 1px solid color-mix(in srgb, var(--v) 50%, transparent);
     box-shadow: 0 0 6px color-mix(in srgb, var(--v) 30%, transparent);
   }

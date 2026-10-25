@@ -106,7 +106,7 @@
     --wails-draggable: no-drag; min-width: 0; display: flex; align-items: center; gap: 4px; padding: 3px 6px; margin-left: -6px;
     background: none; border: 0; border-radius: var(--r-md); color: var(--text); font: inherit; font-weight: 600;
   }
-  .ws:hover, .ws[aria-expanded='true'] { background: color-mix(in srgb, var(--accent) 12%, transparent); }
+  .ws:hover, .ws[aria-expanded='true'] { background: var(--tint-hover); }
   .wsname { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .caret { color: var(--muted); font-size: var(--fs-xs); }
   .wsmenu {
@@ -115,13 +115,13 @@
     background: var(--panel); border: 1px solid var(--line); border-radius: var(--r-lg); box-shadow: var(--shadow);
   }
   .wsmenu button { background: none; border: 0; border-radius: var(--r-sm); color: var(--text); font: inherit; text-align: left; padding: 5px 10px; }
-  .wsmenu button:hover:not(:disabled) { background: color-mix(in srgb, var(--accent) 18%, transparent); }
+  .wsmenu button:hover:not(:disabled) { background: var(--tint-sel); }
   .wsmenu button:disabled { opacity: 0.4; }
   .wsmenu hr { width: 100%; border: 0; border-top: 1px solid var(--line); margin: 4px 0; }
   .rail { display: flex; gap: 2px; padding: 0 8px 6px; }
   .rail button { background: none; border: 0; border-radius: var(--r-md); color: var(--muted); padding: 5px 7px; display: grid; place-items: center; }
-  .rail button:hover { color: var(--text); background: color-mix(in srgb, var(--accent) 12%, transparent); }
-  .rail button.on { color: var(--accent); background: color-mix(in srgb, var(--accent) 18%, transparent); }
+  .rail button:hover { color: var(--text); background: var(--tint-hover); }
+  .rail button.on { color: var(--accent); background: var(--tint-sel); }
   .tree { flex: 1; overflow: auto; padding: 4px 6px 12px; }
   .selbar {
     display: flex; align-items: center; gap: 6px; padding: 6px 10px; border-top: 1px solid var(--line);

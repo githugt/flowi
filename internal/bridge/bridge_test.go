@@ -1641,3 +1641,35 @@ func TestWelcomeService_Given_a_changelog_Then_whats_new_is_its_newest_release(t
 		t.Fatalf("what's new %q", v.WhatsNew)
 	}
 }
+
+func TestSystemService_ExpressionVocabulary_should_offer_names_for_the_context(t *testing.T) {
+	// Arrange
+	app, _ := fixture(t)
+
+	// Act
+	got := app.System().ExpressionVocabulary("message.check")
+
+	// Assert
+	found := false
+	for _, it := range got {
+		found = found || it.Insert == "all_messages"
+	}
+	if !found {
+		t.Errorf("all_messages is not offered for a message check: %v", got)
+	}
+}
+
+func TestRequestService_ExpressionNames_should_offer_the_body_fields_the_request_is_known_to_return(t *testing.T) {
+	reqs, v, _, b := openLogin(t)
+	b.FieldList = []flowi.Completion{{Text: "body.data.id", Detail: "from schema"}}
+
+	got := reqs.ExpressionNames(v.Node)
+
+	found := false
+	for _, it := range got {
+		found = found || (it.Insert == "body.data.id" && it.Detail == "from schema")
+	}
+	if !found {
+		t.Errorf("body.data.id is not offered: %v", got)
+	}
+}

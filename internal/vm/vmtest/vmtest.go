@@ -40,8 +40,9 @@ type StoredEdit struct {
 // recorded in Calls. mu guards every field: the worker Calls it from other
 // goroutines.
 type Backend struct {
-	Mu          sync.Mutex // guards every field; tests lock it to change state mid-test
-	Name        string     // the workspace name; "default" when empty
+	Mu          sync.Mutex         // guards every field; tests lock it to change state mid-test
+	FieldList   []flowi.Completion // what ResponseFields returns
+	Name        string             // the workspace name; "default" when empty
 	Cols        []model.Collection
 	MissingIDs  []model.ID
 	Paths       map[model.ID]string
@@ -126,6 +127,7 @@ type Backend struct {
 	ParsedFlow   *model.Flow             // ParseFlowSource returns this flow (else the stored flow, unchanged)
 	SourceDiags  diag.List               // ParseFlowSource reports these
 	SecretErr    error                   // SetSecret and UnsetSecret fail with it
+	SecretValues map[string]string       // RevealSecret answers from these, by "env/name"; others are FLW-SEC-001
 	CookieJar    []flowi.CookieInfo      // Cookies lists these; DeleteCookie removes from them
 	CookiesErr   error                   // Cookies fails with it
 	// FailDeleteAt makes the nth (1-based) Delete* call fail with it, the others succeed.
@@ -850,6 +852,25 @@ func (f *Backend) SetSecret(env, name, _ string) error {
 	return f.markSecret(env, name, true)
 }
 
+func (f *Backend) RevealSecret(env, name string) (string, error) {
+	f.record("RevealSecret " + env + "/" + name)
+	f.Mu.Lock()
+	defer f.Mu.Unlock()
+	if f.SecretErr != nil {
+		return "", f.SecretErr
+	}
+	value, ok := f.SecretValues[env+"/"+name]
+	if !ok {
+		return "", diag.List{diag.New(diag.CodeSecretMissing, diag.Location{}, map[string]string{"name": name, "env": env})}.Err()
+	}
+	return value, nil
+}
+
+func (f *Backend) DiscardSecret(env, name string) error {
+	f.record("DiscardSecret " + env + "/" + name)
+	return f.markSecret(env, name, false)
+}
+
 func (f *Backend) UnsetSecret(env, name string) error {
 	f.record("UnsetSecret " + env + "/" + name)
 	return f.markSecret(env, name, false)
@@ -1121,6 +1142,12 @@ func (f *Backend) SaveFlowLayout(_ flowi.FlowTarget, l model.Layout) error {
 	defer f.Mu.Unlock()
 	f.Layout = l
 	return nil
+}
+
+func (f *Backend) ResponseFields(flowi.RequestTarget, string) ([]flowi.Completion, error) {
+	f.Mu.Lock()
+	defer f.Mu.Unlock()
+	return slices.Clone(f.FieldList), nil
 }
 
 func (f *Backend) Completions(model.ID, model.Flow, string) ([]flowi.Completion, error) {

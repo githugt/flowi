@@ -5,6 +5,8 @@ package bridge
 import (
 	"fmt"
 
+	"github.com/githugt/flowi-lib/model"
+
 	"github.com/githugt/flowi/internal/vm"
 )
 
@@ -23,6 +25,8 @@ type EnvView struct {
 	Node      string   `json:"node"`
 	Name      string   `json:"name"`
 	Rows      []EnvRow `json:"rows"`
+	Colour    string   `json:"colour"`  // "" for the default
+	Colours   []string `json:"colours"` // what it can be set to
 	Dirty     bool     `json:"dirty"`
 	OnDisk    bool     `json:"onDisk"`
 	NeedsDrop bool     `json:"needsDrop"`
@@ -70,6 +74,11 @@ func (s *EnvironmentService) with(node string, f func(e *vm.Environment)) {
 	})
 }
 
+// SetColour marks the environment with a colour; "" is the default.
+func (s *EnvironmentService) SetColour(node, colour string) {
+	s.with(node, func(e *vm.Environment) { e.SetColour(colour) })
+}
+
 // SetRows replaces the variables.
 func (s *EnvironmentService) SetRows(node string, rows []EnvRow) {
 	s.with(node, func(e *vm.Environment) {
@@ -106,5 +115,5 @@ func envViewOf(node string, e *vm.Environment) EnvView {
 	for _, r := range e.Rows() {
 		rows = append(rows, EnvRow{Name: r.Name, Value: r.Value, Secret: r.Secret, SecretSet: r.SecretSet, Override: r.Override})
 	}
-	return EnvView{Node: node, Name: e.Name(), Rows: rows, Dirty: e.Dirty(), OnDisk: e.ChangedOnDisk(), NeedsDrop: e.NeedsDropConfirm(), Error: e.Err()}
+	return EnvView{Node: node, Name: e.Name(), Rows: rows, Colour: e.Colour(), Colours: model.EnvColours(), Dirty: e.Dirty(), OnDisk: e.ChangedOnDisk(), NeedsDrop: e.NeedsDropConfirm(), Error: e.Err()}
 }
