@@ -494,7 +494,7 @@
 
 <style>
   .req { position: absolute; inset: 0; display: flex; flex-direction: column; }
-  header { display: flex; gap: 8px; padding: 8px 12px; border-bottom: 1px solid var(--line); align-items: center; }
+  header { display: flex; gap: 8px; padding: 10px 12px; border-bottom: 1px solid var(--line); align-items: center; }
   .url { flex: 1; min-width: 0; }
   .url2 { flex: 1; min-width: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
   .url2 :global(input) { width: 100%; box-sizing: border-box; }
@@ -506,12 +506,14 @@
     border-radius: var(--r-md);
     font: inherit;
   }
-  select, button { padding: 5px 10px; }
+  /* The toolbar's controls share one height, so the method, the address and the buttons sit on one line. */
+  select, button { padding: 5px 10px; min-height: 32px; box-sizing: border-box; }
+  header :global(input) { min-height: 32px; box-sizing: border-box; }
   button { background: transparent; }
   button:hover:not(:disabled) { border-color: var(--accent); }
   button:disabled { opacity: 0.4; }
   .send { position: relative; display: flex; gap: 2px; }
-  .more { padding: 5px 8px; }
+  .more { padding: 5px 8px; min-height: 32px; }
   .menu {
     position: absolute; top: 100%; right: 0; margin-top: 4px; min-width: 150px; display: flex; flex-direction: column; padding: 4px;
     background: var(--panel); border: 1px solid var(--line); border-radius: var(--r-lg); box-shadow: var(--shadow); z-index: 20;
@@ -539,7 +541,7 @@
   .more-secs.on :global(.btn) { border-color: var(--accent); }
   .typebar { flex: none; display: flex; align-items: center; gap: 10px; padding: 6px 10px; border-top: 1px solid var(--line); }
   .ver { display: flex; align-items: center; gap: 4px; }
-  .act { background: var(--act); color: var(--on-act); border-color: var(--act); font-weight: 600; }
+  .act { background: var(--act); color: var(--on-act); border-color: var(--act); font-weight: 600; box-shadow: 0 2px 10px color-mix(in srgb, var(--act) 32%, transparent); }
   .act:hover:not(:disabled) { border-color: var(--act); background: color-mix(in srgb, var(--act) 88%, white); }
   /* The floppy disk is the save everyone knows; the words stay as the tooltip and the name read aloud. */
   .saveicon { display: flex; align-items: center; padding-inline: 9px; }
@@ -552,7 +554,7 @@
   .menu hr { border: 0; border-top: 1px solid var(--line); margin: 4px 0; }
   .menu kbd { margin-left: auto; padding-left: 16px; color: var(--muted); font: inherit; font-size: var(--fs-xs); }
   .menu button { display: flex; align-items: center; white-space: nowrap; }
-  .section { flex: 1; overflow: auto; padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+  .section { flex: 1; overflow: auto; padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; }
   .radio { display: flex; gap: 4px; align-items: center; }
   .muted { color: var(--muted); font-size: var(--fs-sm); margin: 0; }
   .row { display: flex; gap: 4px; }

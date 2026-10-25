@@ -113,10 +113,10 @@
 <section>
   <div class="bar">
     <div class="tabs">
-      <button class:active={tab === 'received'} onclick={() => (tab = 'received')}>Response{#if r}<b class="tone" class:ok={r.passed} class:bad={!r.passed}>{r.code}</b>{:else if view.sending}<b class="tone">…</b>{/if}</button>
+      <button class:active={tab === 'received'} onclick={() => (tab = 'received')}>Response{#if r}<span class="status-pill" class:ok={r.passed} class:bad={!r.passed}>{r.code}</span>{:else if view.sending}<b class="tone">…</b>{/if}</button>
       <!-- Every tab is there before a send, as httpie has it: each says "Not sent" until there is something to show. -->
       <button class:active={tab === 'sent'} onclick={() => (tab = 'sent')}>Request sent</button>
-      {#if view.kind === 'async' || r?.messages.length}<button class:active={tab === 'messages'} onclick={() => (tab = 'messages')}>Messages{#if r?.messages.length}<b class="tone">{r.messages.length}</b>{/if}</button>{/if}
+      {#if view.kind === 'async' || r?.messages.length}<button class:active={tab === 'messages'} onclick={() => (tab = 'messages')}>Messages{#if r?.messages.length}<span class="count">{r.messages.length}</span>{/if}</button>{/if}
       {#if view.kind === 'http'}<button class:active={tab === 'timing'} onclick={() => (tab = 'timing')}>Timing</button>{/if}
       <button class:active={tab === 'pipeline'} onclick={() => (tab = 'pipeline')}>Hooks{#if pipeTone}<b class="tone {pipeTone}">●</b>{/if}</button>
     </div>
@@ -248,6 +248,7 @@
     white-space: nowrap;
   }
   .tone { margin-left: 6px; font-size: var(--fs-xs); }
+  .tabs .status-pill { margin-left: 8px; }
   .tone.run { color: var(--accent); }
   .tabs .active { color: var(--text); border-bottom-color: var(--accent); }
   select { background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); font: inherit; font-size: var(--fs-xs); }

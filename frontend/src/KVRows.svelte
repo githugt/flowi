@@ -111,8 +111,8 @@
 
 <style>
   .rows[hidden] { display: none; }
-  .rows { display: flex; flex-direction: column; gap: 4px; }
-  .row { display: flex; gap: 4px; }
+  .rows { display: flex; flex-direction: column; gap: 6px; }
+  .row { display: flex; gap: 6px; }
   input {
     flex: 1;
     min-width: 0;
@@ -121,6 +121,8 @@
     border: 1px solid var(--line);
     border-radius: var(--r-md);
     padding: 5px 8px;
+    min-height: 30px;
+    box-sizing: border-box;
     font: 12px ui-monospace, SFMono-Regular, Menlo, monospace;
     -webkit-user-select: text;
     user-select: text;

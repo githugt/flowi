@@ -255,7 +255,7 @@
     position: absolute; top: 100%; right: 0; transform: translate(-4px, 4px); padding: 1px 6px; white-space: nowrap;
     font-size: var(--fs-xs); color: var(--on-accent); background: var(--accent); border-radius: var(--r-sm);
   }
-  .tab:hover { background: color-mix(in srgb, var(--accent) 8%, transparent); }
+  .tab:hover { background: var(--tint-hover); }
   .tab.active { background: var(--bg); border-color: var(--line); border-bottom-color: var(--accent); }
   .tab button { background: none; border: 0; color: var(--text); font: inherit; }
   .tab .name { display: flex; align-items: center; gap: 6px; padding: 8px 6px 8px 8px; min-width: 0; }

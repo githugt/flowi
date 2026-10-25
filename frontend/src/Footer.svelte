@@ -117,11 +117,11 @@
 
 <style>
   footer { flex: none; border-top: 1px solid var(--line); background: var(--panel); display: flex; flex-direction: column; }
-  .tabs { display: flex; align-items: center; gap: 2px; padding: 0 8px; height: 28px; }
-  .tabs button { background: none; border: 0; color: var(--muted); font: inherit; font-size: var(--fs-sm); padding: 3px 10px; border-radius: var(--r-md); }
-  .tabs button.on { color: var(--text); background: color-mix(in srgb, var(--accent) 18%, transparent); }
+  .tabs { display: flex; align-items: flex-end; gap: 2px; padding: 0 8px; height: 28px; }
+  .tabs button { background: none; border: 0; border-bottom: 2px solid transparent; color: var(--muted); font: inherit; font-size: var(--fs-sm); padding: 4px 10px 2px; border-radius: 0; }
+  .tabs button.on { color: var(--text); border-bottom-color: var(--accent); }
   .tabs button:hover { color: var(--text); }
-  .badge { margin-left: 6px; background: var(--line); color: var(--text); border-radius: var(--r-pill); padding: 0 6px; font-size: var(--fs-xs); }
+  .badge { margin-left: 6px; background: color-mix(in srgb, var(--muted) 22%, transparent); color: var(--text); border-radius: var(--r-pill); padding: 0 6px; font-size: var(--fs-xs); }
   .badge.err { background: var(--fail); color: var(--on-accent); }
   .where-tab { margin-left: auto; color: var(--muted); font-size: var(--fs-sm); padding-right: 4px; white-space: nowrap; cursor: default; }
   .branch { color: var(--text); }
