@@ -40,9 +40,9 @@ type StoredEdit struct {
 // recorded in Calls. mu guards every field: the worker Calls it from other
 // goroutines.
 type Backend struct {
-	Mu          sync.Mutex // guards every field; tests lock it to change state mid-test
+	Mu          sync.Mutex         // guards every field; tests lock it to change state mid-test
 	FieldList   []flowi.Completion // what ResponseFields returns
-	Name        string     // the workspace name; "default" when empty
+	Name        string             // the workspace name; "default" when empty
 	Cols        []model.Collection
 	MissingIDs  []model.ID
 	Paths       map[model.ID]string

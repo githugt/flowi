@@ -5,22 +5,26 @@ package vm
 import "strings"
 
 // exprFunctions are the functions an expression can call, offered with their bracket open.
-var exprFunctions = []Suggestion{
-	{"len(", "how many items or characters"}, {"count(", "how many items pass a test"},
-	{"map(", "work on every item of a list"}, {"filter(", "keep the items that pass a test"},
-	{"any(", "does any item pass"}, {"all(", "do all items pass"},
-	{"upper(", "upper case"}, {"lower(", "lower case"}, {"trim(", "cut spaces at both ends"},
-	{"split(", "cut text into a list"}, {"join(", "join a list into text"}, {"replace(", "replace text"},
-	{"hasPrefix(", "starts with"}, {"hasSuffix(", "ends with"},
-	{"int(", "convert to a whole number"}, {"float(", "convert to a decimal number"},
-	{"string(", "convert to text"}, {"toJSON(", "value as JSON text"}, {"fromJSON(", "JSON text as a value"},
+func exprFunctions() []Suggestion {
+	return []Suggestion{
+		{"len(", "how many items or characters"}, {"count(", "how many items pass a test"},
+		{"map(", "work on every item of a list"}, {"filter(", "keep the items that pass a test"},
+		{"any(", "does any item pass"}, {"all(", "do all items pass"},
+		{"upper(", "upper case"}, {"lower(", "lower case"}, {"trim(", "cut spaces at both ends"},
+		{"split(", "cut text into a list"}, {"join(", "join a list into text"}, {"replace(", "replace text"},
+		{"hasPrefix(", "starts with"}, {"hasSuffix(", "ends with"},
+		{"int(", "convert to a whole number"}, {"float(", "convert to a decimal number"},
+		{"string(", "convert to text"}, {"toJSON(", "value as JSON text"}, {"fromJSON(", "JSON text as a value"},
+	}
 }
 
 // exprKeywords are the words an expression reads besides names and functions.
-var exprKeywords = []Suggestion{
-	{"empty", "null, an empty text, list or map"}, {"contains", "text contains text"},
-	{"and", "both tests are true"}, {"or", "either test is true"}, {"not", "the test is false"},
-	{"in", "is one of a list"}, {"true", ""}, {"false", ""}, {"null", ""},
+func exprKeywords() []Suggestion {
+	return []Suggestion{
+		{"empty", "null, an empty text, list or map"}, {"contains", "text contains text"},
+		{"and", "both tests are true"}, {"or", "either test is true"}, {"not", "the test is false"},
+		{"in", "is one of a list"}, {"true", ""}, {"false", ""}, {"null", ""},
+	}
 }
 
 // ExpressionVocabulary lists what can start a word in an expression written in ctx: the names that
@@ -43,10 +47,10 @@ func ExpressionVocabulary(ctx ExprContext) []Suggestion {
 			}
 		}
 	}
-	for _, s := range exprFunctions {
+	for _, s := range exprFunctions() {
 		add(s)
 	}
-	for _, s := range exprKeywords {
+	for _, s := range exprKeywords() {
 		add(s)
 	}
 	return out

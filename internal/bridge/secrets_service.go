@@ -4,6 +4,7 @@ package bridge
 
 import (
 	"errors"
+
 	flowi "github.com/githugt/flowi-lib"
 
 	"github.com/githugt/flowi/internal/vm"
