@@ -320,11 +320,15 @@ func (p *poller) poll(ctx context.Context) {
 			return
 		}
 		for _, r := range fetches.Records() {
+			// Noted before it is handed over: once the run has what it wants it commits at once, and a
+			// record noted only after the hand-over could be missing then, so its offset would never be
+			// committed. A record noted but never handed over is harmless: commit keeps only the
+			// records the run kept.
+			p.mu.Lock()
+			p.read = append(p.read, r)
+			p.mu.Unlock()
 			select {
 			case p.messages <- received(r):
-				p.mu.Lock()
-				p.read = append(p.read, r)
-				p.mu.Unlock()
 			case <-ctx.Done():
 				return
 			}

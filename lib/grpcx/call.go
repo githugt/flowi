@@ -283,6 +283,13 @@ func readStream(ctx context.Context, stream grpc.ClientStream, md protoreflect.M
 	}
 }
 
+// timeIsUp says the wait ended because its time ran out. The call's deadline and the wait's timer
+// are the same length, so either can fire first: the wait reports ErrTimeout, the call reports
+// context.DeadlineExceeded or, once the stream notices, a gRPC DeadlineExceeded status.
+func timeIsUp(err error) bool {
+	return errors.Is(err, transport.ErrTimeout) || errors.Is(err, context.DeadlineExceeded) || status.Code(err) == codes.DeadlineExceeded
+}
+
 // streamOutcome turns how the wait ended into the result's status and the
 // error to return: the end of the stream is success, a timeout is
 // transport.ErrTimeout (with the partial messages), a gRPC failure is the code.
@@ -291,7 +298,7 @@ func streamOutcome(err error, res *Result, unbounded bool) error {
 	case err == nil, errors.Is(err, errStreamEnded):
 		res.Code = codes.OK
 		return nil
-	case unbounded && (errors.Is(err, transport.ErrTimeout) || errors.Is(err, context.DeadlineExceeded)):
+	case unbounded && timeIsUp(err):
 		res.Code = codes.OK // nothing was waited for: the time is up, and what came is the result
 		return nil
 	case errors.Is(err, transport.ErrTimeout), errors.Is(err, transport.ErrTooLarge):
