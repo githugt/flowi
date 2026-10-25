@@ -41,6 +41,7 @@ type StoredEdit struct {
 // goroutines.
 type Backend struct {
 	Mu          sync.Mutex // guards every field; tests lock it to change state mid-test
+	FieldList   []flowi.Completion // what ResponseFields returns
 	Name        string     // the workspace name; "default" when empty
 	Cols        []model.Collection
 	MissingIDs  []model.ID
@@ -1141,6 +1142,12 @@ func (f *Backend) SaveFlowLayout(_ flowi.FlowTarget, l model.Layout) error {
 	defer f.Mu.Unlock()
 	f.Layout = l
 	return nil
+}
+
+func (f *Backend) ResponseFields(flowi.RequestTarget, string) ([]flowi.Completion, error) {
+	f.Mu.Lock()
+	defer f.Mu.Unlock()
+	return slices.Clone(f.FieldList), nil
 }
 
 func (f *Backend) Completions(model.ID, model.Flow, string) ([]flowi.Completion, error) {

@@ -25,13 +25,19 @@ export function responsePaths(response: ResponseView | null | undefined, kind: s
   return asMessages ? [...bodyPaths(body, 'body', source), ...bodyPaths(body, 'messages[0].body', source)] : bodyPaths(body, 'body', source)
 }
 
+/** The first entry of each name: the live response says more than the saved one, so it goes first. */
+export function unique(items: Item[]): Item[] {
+  const seen = new Set<string>()
+  return items.filter((i) => !seen.has(i.insert) && !!seen.add(i.insert))
+}
+
 /**
  * What a check or filter on a request can name: the body fields of its last response, the
- * environment and its own variables, then the roots, functions and keywords of the context.
+ * environment and its own variables, the fields it is known to return (schema, examples, last saved response), then the roots, functions and keywords of the context.
  */
 export function requestVocabulary(context: string, node: string, response: ResponseView | null | undefined, kind: string) {
   return async (): Promise<Item[]> => {
     const [roots, names] = await Promise.all([SystemService.ExpressionVocabulary(context), RequestService.ExpressionNames(node)])
-    return [...responsePaths(response, kind, context !== 'message.filter'), ...(names as Item[]), ...(roots as Item[])]
+    return unique([...responsePaths(response, kind, context !== 'message.filter'), ...(names as Item[]), ...(roots as Item[])])
   }
 }

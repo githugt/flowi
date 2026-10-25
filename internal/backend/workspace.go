@@ -492,6 +492,11 @@ func (b *Workspace) SaveFlowLayout(t flowi.FlowTarget, l model.Layout) error {
 	return b.ws.SaveFlowLayout(t, l)
 }
 
+func (b *Workspace) ResponseFields(t flowi.RequestTarget, version string) ([]flowi.Completion, error) {
+	b.guard.Check("ResponseFields")
+	return b.ws.ResponseFields(t, version)
+}
+
 func (b *Workspace) Completions(collection model.ID, f model.Flow, nodePath string) ([]flowi.Completion, error) {
 	b.guard.Check("Completions")
 	return b.ws.CompletionsIn(collection, f, nodePath)

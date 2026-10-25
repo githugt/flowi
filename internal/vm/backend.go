@@ -133,6 +133,8 @@ type Backend interface {
 	FlowLayout(t flowi.FlowTarget) (model.Layout, diag.List, error)
 	SaveFlowLayout(t flowi.FlowTarget, l model.Layout) error
 	Completions(collection model.ID, f model.Flow, nodePath string) ([]flowi.Completion, error)
+	// ResponseFields lists the body fields a request version is known to return (body.user.id).
+	ResponseFields(t flowi.RequestTarget, version string) ([]flowi.Completion, error)
 	RunFlow(ctx context.Context, t flowi.FlowTarget, o flowi.RunOptions) (Running, error)
 
 	ServeDefaults() flowi.ServeOptions

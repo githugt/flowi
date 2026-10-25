@@ -171,6 +171,13 @@ func (s *RequestService) ExpressionNames(node string) []SuggestionView {
 				out = append(out, SuggestionView{Insert: "var." + kv.Key, Detail: "request variable"})
 			}
 		}
+		// What the request is known to return, from its schema, examples or last saved response: no
+		// send is needed to offer body.data.id.
+		if fields, err := s.app.backend.ResponseFields(o.req.Target(), o.req.SelectedLabel()); err == nil {
+			for _, f := range fields {
+				out = append(out, SuggestionView{Insert: f.Text, Detail: f.Detail})
+			}
+		}
 	})
 	return out
 }
