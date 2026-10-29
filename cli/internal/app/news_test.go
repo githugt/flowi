@@ -46,14 +46,14 @@ func (f newsFeed) env(e *sendEnv) *sendEnv {
 }
 
 func TestNews_should_list_verified_announcements(t *testing.T) {
-	e := newNewsFeed(t, "Flow-I 1.0 is out", "Maintenance window").env(newSendEnv(t))
+	e := newNewsFeed(t, "Flowi 1.0 is out", "Maintenance window").env(newSendEnv(t))
 
 	code, out, errOut := e.run(context.Background(), "news")
 
 	if code != 0 {
 		t.Fatalf("exit %d\n%s", code, errOut)
 	}
-	for _, want := range []string{"Flow-I 1.0 is out", "Details of Flow-I 1.0 is out", "https://example.com/a", "Maintenance window"} {
+	for _, want := range []string{"Flowi 1.0 is out", "Details of Flowi 1.0 is out", "https://example.com/a", "Maintenance window"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("news lacks %q:\n%s", want, out)
 		}

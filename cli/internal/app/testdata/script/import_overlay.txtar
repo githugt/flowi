@@ -13,6 +13,15 @@ exec flowi validate
 ! exec flowi import openapi spec.yaml --overlay spec.yaml --collection o
 stderr 'FLW-IMPORT-002'
 
+# The same format fixes an Arazzo document: the workflow names an operation that
+# does not exist until the overlay corrects it.
+exec flowi import arazzo wf.arazzo.yaml --overlay wf-fix.overlay.yaml --collection o
+exists o/flows/arazzo/listAll.arazzo.yaml
+exists o/descriptions/wf.arazzo.yaml
+exists o/descriptions/wf.overlay.yaml
+! exec flowi import arazzo wf.arazzo.yaml --overlay spec.yaml --collection o
+stderr 'FLW-IMPORT-002'
+
 -- spec.yaml --
 openapi: 3.0.3
 info: {title: Examples, version: "1.0"}
@@ -31,3 +40,20 @@ actions:
     update: {operationId: listExamples}
   - target: $.paths['/internal']
     remove: true
+-- wf.arazzo.yaml --
+arazzo: 1.0.1
+info: {title: wf, version: 1.0.0}
+sourceDescriptions: [{name: examples, url: ./spec.yaml, type: openapi}]
+workflows:
+  - workflowId: listAll
+    steps:
+      - stepId: list
+        operationId: listExample
+        successCriteria:
+          - condition: $statusCode == 200
+-- wf-fix.overlay.yaml --
+overlay: 1.0.0
+info: {title: fix, version: 1.0.0}
+actions:
+  - target: $.workflows[0].steps[0]
+    update: {operationId: listExamples}

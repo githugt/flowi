@@ -16,7 +16,7 @@ import (
 func NewRootCommand(i do.Injector) *cobra.Command {
 	root := &cobra.Command{
 		Use:           "flowi",
-		Short:         "Flow-I: compose API requests into flows",
+		Short:         "Flowi: compose API requests into flows",
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		// Cobra reports unknown subcommands as untyped errors; validating
@@ -44,6 +44,9 @@ func NewRootCommand(i do.Injector) *cobra.Command {
 		newSendCommand(i),
 		newRunCommand(i),
 		newImpactCommand(i),
+		newAccessCommand(i),
+		newCoverageCommand(i),
+		newDriftCommand(i),
 		newImportCommand(i),
 		newExportCommand(i),
 		newSecretCommand(i),
@@ -54,6 +57,7 @@ func NewRootCommand(i do.Injector) *cobra.Command {
 		newTelemetryCommand(i),
 		newNewCommand(i),
 		newBlueprintCommand(i),
+		newOverlayCommand(i),
 		newNewsCommand(i),
 		newChangelogCommand(g),
 	)

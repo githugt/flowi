@@ -21,9 +21,12 @@ import (
 
 type serveFlags struct {
 	replayAddr, triggerAddr, record   string
-	recordTo                          string
+	recordTo, recordHAR               string
 	valkeyAddr                        string
 	latency, shutdown                 time.Duration
+	faultError, faultDrop             float64
+	faultStatus                       int
+	faultJitter                       time.Duration
 	sequence, cors, quiet             bool
 	noReplay, noTriggers, noSchedules bool
 }
@@ -36,7 +39,7 @@ func newServeCommand(i do.Injector) *cobra.Command {
 		Long: "Run a long-lived process with up to three parts:\n\n" +
 			"  Replayer   answers HTTP calls with the pinned examples and saved responses of your requests\n" +
 			"             (default 127.0.0.1:8525). Steer it with request headers: X-Flowi-Status, X-Flowi-Example,\n" +
-			"             X-Flowi-Request, X-Flowi-Version, X-Flowi-Latency. GET /__flowi/routes lists what it knows.\n" +
+			"             X-Flowi-Request, X-Flowi-Version, X-Flowi-Latency, X-Flowi-Fault (none, drop, error or error:<status>). GET /__flowi/routes lists what it knows.\n" +
 			"  Triggers   POST /flows/<flow>/run starts a flow (default 127.0.0.1:8526). Needs a bearer token:\n" +
 			"             create one with `flowi serve token`, or set FLOWI_SECRET_SERVE_TRIGGER_TOKEN.\n" +
 			"  Schedules  runs the cron schedules of workspace.yaml (see `flowi schedule`).\n\n" +
@@ -50,10 +53,15 @@ func newServeCommand(i do.Injector) *cobra.Command {
 	fl.StringVar(&f.replayAddr, "replay-addr", "", "replayer address (default: the serve.replay_addr setting)")
 	fl.StringVar(&f.triggerAddr, "trigger-addr", "", "trigger address (default: the serve.trigger_addr setting)")
 	fl.DurationVar(&f.latency, "latency", 0, "delay added to every replayed answer (default: the serve.latency setting)")
+	fl.Float64Var(&f.faultError, "fault-error", 0, "share of replayed calls (0 to 1) answered with an error on purpose, to try retries and error handling")
+	fl.IntVar(&f.faultStatus, "fault-status", 0, "status of an injected error (default 503)")
+	fl.Float64Var(&f.faultDrop, "fault-drop", 0, "share of replayed calls (0 to 1) whose connection is closed with no answer")
+	fl.DurationVar(&f.faultJitter, "fault-jitter", 0, "up to this much extra random delay on every replayed answer")
 	fl.BoolVar(&f.sequence, "sequence", false, "answer a request's responses one call at a time, in file-name order, then start over")
 	fl.BoolVar(&f.cors, "cors", false, "let browsers call the replayer from any origin")
 	fl.StringVar(&f.record, "record", "", "forward calls to this real API and save its responses; a call no request matches becomes a new request")
 	fl.StringVar(&f.recordTo, "record-to", "", "with --record: the collection (name or id) new requests are saved in (default: the Scratch draft)")
+	fl.StringVar(&f.recordHAR, "record-har", "", "with --record: also write the calls to this HAR file, in order (credentials masked); `flowi import har` turns it into a flow whose steps read the values earlier responses gave")
 	fl.BoolVar(&f.noReplay, "no-replay", false, "do not start the replayer")
 	fl.BoolVar(&f.noTriggers, "no-triggers", false, "do not start the HTTP triggers")
 	fl.BoolVar(&f.noSchedules, "no-schedules", false, "do not run schedules")
@@ -82,7 +90,8 @@ func (f serveFlags) options(cmd *cobra.Command, base flowi.ServeOptions) flowi.S
 	if changed("shutdown-timeout") {
 		base.ShutdownTimeout = f.shutdown
 	}
-	base.Sequence, base.CORS, base.Record, base.RecordTo = f.sequence, f.cors, f.record, f.recordTo
+	base.Faults = replay.Faults{ErrorRate: f.faultError, ErrorStatus: f.faultStatus, DropRate: f.faultDrop, Jitter: f.faultJitter}
+	base.Sequence, base.CORS, base.Record, base.RecordTo, base.RecordHAR = f.sequence, f.cors, f.record, f.recordTo, f.recordHAR
 	base.NoReplay, base.NoTriggers, base.NoSchedules = f.noReplay, f.noTriggers, f.noSchedules
 	return base
 }

@@ -76,3 +76,16 @@ func waitUntilAnswers(t *testing.T, url string) {
 		<-time.After(50 * time.Millisecond) // the server starts in another goroutine
 	}
 }
+
+func TestServe_Given_a_fault_rate_over_one_Then_it_exits_2_before_listening(t *testing.T) {
+	// Arrange
+	e := newSendEnv(t)
+
+	// Act
+	code, _, errOut := e.run(t.Context(), "serve", "--replay-addr", "127.0.0.1:0", "--fault-error", "1.5")
+
+	// Assert
+	if code != 2 || !strings.Contains(errOut, "error rate") {
+		t.Fatalf("exit %d\n%s", code, errOut)
+	}
+}

@@ -1,6 +1,6 @@
 # flowi-cli
 
-`flowi`, the command-line tool of **Flow-I**: send saved API requests, run flows in CI, import and
+`flowi`, the command-line tool of **Flowi**: send saved API requests, run flows in CI, import and
 export API descriptions, and serve a fake API from your saved responses.
 
 > Status: **pre-alpha**. Commands and the file format will change.

@@ -27,7 +27,7 @@ mkdir empty
 ! exec flowi workspace mount ./empty
 stderr 'is not a collection'
 
--- config/workspaces/default/workspace.yaml --
+-- config/workspaces/default-workspace/workspace.yaml --
 id: 01JA00000000000000000000W1
 name: Default
 collections:

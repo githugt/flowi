@@ -19,7 +19,7 @@ exec flowi workspace mount ./identity
 exec flowi validate ./identity
 stderr '^0 errors, 0 warnings$'
 
--- config/workspaces/default/workspace.yaml --
+-- config/workspaces/default-workspace/workspace.yaml --
 id: 01JA00000000000000000000W1
 name: Default
 collections:

@@ -14,6 +14,8 @@ import (
 
 	"github.com/githugt/flowi-lib/diag"
 	"github.com/githugt/flowi-lib/engine"
+
+	"github.com/githugt/flowi-cli/internal/tui"
 )
 
 // textReport prints a send for people: progress and summary on stderr,
@@ -26,7 +28,7 @@ type textReport struct {
 }
 
 func (r textReport) render(send *engine.Send) (engine.SendResult, error) {
-	for ev := range send.Events() {
+	for ev := range watchPrompts(send.Events(), openBrowser) {
 		if !r.quiet {
 			r.event(ev)
 		}
@@ -59,6 +61,8 @@ func (r textReport) event(ev engine.Event) {
 		if e.Wait > 0 {
 			r.line("  attempt %d: %s; retrying in %s", e.Attempt, attemptOutcome(e), roundDuration(e.Wait))
 		}
+	case engine.AuthPrompted:
+		r.line("%s", tui.PromptText(e))
 	case engine.RunCancelled:
 		r.line("cancelled")
 	}
@@ -233,7 +237,7 @@ func (r textReport) line(format string, args ...any) {
 // saved records, and diagnostics have the shape `validate --output json`
 // prints. This is a scripting interface: keep it stable.
 func writeNDJSON(w io.Writer, send *engine.Send) (engine.SendResult, error) {
-	for ev := range send.Events() {
+	for ev := range watchPrompts(send.Events(), openBrowser) {
 		if err := writeEvent(w, ev); err != nil {
 			drainEvents(send)
 			return send.Wait(), err
@@ -324,7 +328,7 @@ func mustQuote(s string) []byte {
 }
 
 func drainEvents(send *engine.Send) {
-	for range send.Events() {
+	for range watchPrompts(send.Events(), openBrowser) {
 	}
 }
 

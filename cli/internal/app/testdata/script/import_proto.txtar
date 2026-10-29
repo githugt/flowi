@@ -1,12 +1,11 @@
-# import proto adds one gRPC request per unary or server-streaming method,
-# copies the .proto files it needs to protos/ and reports the rest.
+# import proto adds one gRPC request per method (a client-streaming one starts
+# with an array of one message) and copies the .proto files it needs to protos/.
 exec flowi import proto api/example.proto --init ./grpc
 stdout '^Created collection grpc'
-stderr 'FLW-IMPORT-001'
-stderr 'Upload'
 exists grpc/requests/ExampleService/GetExample.req.yaml
 exists grpc/requests/ExampleService/ListExamples.req.yaml
-! exists grpc/requests/ExampleService/Upload.req.yaml
+exists grpc/requests/ExampleService/Upload.req.yaml
+grep '\[' grpc/requests/ExampleService/Upload.req.yaml
 exists grpc/protos/example.proto
 exists grpc/protos/common/types.proto
 grep 'method: myexampleapp.ExampleService/GetExample' grpc/requests/ExampleService/GetExample.req.yaml

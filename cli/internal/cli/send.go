@@ -14,6 +14,7 @@ import (
 	flowi "github.com/githugt/flowi-lib"
 	"github.com/githugt/flowi-lib/diag"
 	"github.com/githugt/flowi-lib/engine"
+	"github.com/githugt/flowi-lib/flowioverlay"
 	"github.com/githugt/flowi-lib/model"
 
 	"github.com/githugt/flowi-cli/internal/tui"
@@ -25,6 +26,7 @@ const pinDefault = "\x00status"
 
 type sendFlags struct {
 	collection, env, version, prefer, save, pin string
+	overlays                                    []string
 	with, skip                                  []string
 	noHooks, headers, quiet                     bool
 	seed                                        uint64
@@ -45,10 +47,11 @@ func newSendCommand(i do.Injector) *cobra.Command {
 	fl.StringVar(&f.collection, "collection", "", "collection (name or id) to look in")
 	fl.StringVar(&f.env, "env", "", "environment (default: the defaults.environment setting)")
 	fl.StringVar(&f.version, "version", "", "send this version")
+	fl.StringArrayVar(&f.overlays, "flowi-overlay", nil, "lay this flowi overlay over the version (see: flowi overlay ls); repeat, or join names with +, to stack several in order")
 	fl.StringVar(&f.prefer, "prefer-version", "", "send this version if the request has it")
 	fl.StringArrayVar(&f.with, "with", nil, "value for a name the request uses, as key=value (repeatable)")
 	fl.BoolVar(&f.noHooks, "no-hooks", false, "run no API hooks")
-	fl.StringSliceVar(&f.skip, "skip", nil, "skip pre or post hooks")
+	fl.StringSliceVar(&f.skip, "skip", nil, "skip pre, post or message hooks")
 	fl.Uint64Var(&f.seed, "seed", 0, "seed for generated values (default: random, printed)")
 	fl.StringVar(&f.save, "save", "", "save the response: none, last or per-status (default: the responses.save setting)")
 	fl.StringVar(&f.pin, "pin", "", "pin the response as an example, named after its status or the given name")
@@ -101,15 +104,15 @@ func (f sendFlags) options() (flowi.SendOptions, error) {
 	if f.save != "" && !slices.Contains([]string{"none", "last", "per-status"}, f.save) {
 		return flowi.SendOptions{}, &UsageError{Err: fmt.Errorf("--save must be none, last or per-status, got %q", f.save)}
 	}
-	return flowi.SendOptions{Env: f.env, Version: f.version, PreferVersion: f.prefer, Save: f.save, With: with, Hooks: hooks, Seed: f.seed}, nil
+	return flowi.SendOptions{Env: f.env, Version: f.version, PreferVersion: f.prefer, Save: f.save, With: with, Hooks: hooks, Seed: f.seed, Overlay: strings.Join(f.overlays, flowioverlay.StackSeparator)}, nil
 }
 
 func parseWith(pairs []string) (map[string]string, error) { return parsePairs("--with", pairs) }
 
 func hookControl(none bool, skip []string) (model.HookControl, error) {
 	for _, s := range skip {
-		if s != "pre" && s != "post" {
-			return model.HookControl{}, &UsageError{Err: fmt.Errorf("--skip takes pre or post, got %q", s)}
+		if s != "pre" && s != "post" && s != "message" {
+			return model.HookControl{}, &UsageError{Err: fmt.Errorf("--skip takes pre, post or message, got %q", s)}
 		}
 	}
 	if none {
@@ -128,7 +131,7 @@ func renderSend(cmd *cobra.Command, i do.Injector, send *engine.Send, f sendFlag
 	case tui.RendererJSON:
 		return writeNDJSON(cmd.OutOrStdout(), send)
 	case tui.RendererLive:
-		seen, err := tui.RunSend(send.Events(), cmd.ErrOrStderr(), tui.Options{Color: !console.NoColor})
+		seen, err := tui.RunSend(watchPrompts(send.Events(), openBrowser), cmd.ErrOrStderr(), tui.Options{Color: !console.NoColor})
 		if err != nil {
 			drainEvents(send) // the live view failed; the send still has to finish
 			cmd.PrintErrf("warning: %v\n", err)

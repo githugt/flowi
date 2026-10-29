@@ -3,11 +3,15 @@
 package cli
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"path/filepath"
 	"strings"
 
+	"github.com/spf13/cobra"
+
+	flowi "github.com/githugt/flowi-lib"
 	"github.com/githugt/flowi-lib/analysis"
 )
 
@@ -98,4 +102,37 @@ func impactSummary(counts map[analysis.Status]int) string {
 		return "no consumers"
 	}
 	return strings.Join(parts, ", ")
+}
+
+// writeSpecImpact prints the consumers a changed description breaks, grouped by request, or as JSON.
+func writeSpecImpact(cmd *cobra.Command, output string, res flowi.SpecImpact) error {
+	if output == OutputJSON {
+		data, err := json.MarshalIndent(res, "", "  ")
+		if err != nil {
+			return fmt.Errorf("encoding impact report: %w", err)
+		}
+		_, err = fmt.Fprintln(cmd.OutOrStdout(), string(data))
+		return err
+	}
+	w := cmd.OutOrStdout()
+	if !res.Broken() {
+		fmt.Fprintf(w, "Nothing breaks if %s changes as given.\n", res.Spec)
+		return nil
+	}
+	lastRequest := ""
+	for _, b := range res.Breakages {
+		if heading := b.Request + " (version " + b.Version + ")"; heading != lastRequest {
+			fmt.Fprintln(w, heading)
+			lastRequest = heading
+		}
+		fmt.Fprintf(w, "  ✗ %s\n", consumerName(analysis.Report{Collection: b.Consumer.Collection}, b.Consumer))
+		if b.Consumer.Reason != "" {
+			fmt.Fprintf(w, "      %s\n", b.Consumer.Reason)
+		}
+		for _, r := range b.Consumer.Reads {
+			fmt.Fprintf(w, "      %s: %s\n", readName(b.Consumer, r), r.Reason)
+		}
+	}
+	fmt.Fprintf(w, "%d consumer(s) would break if %s changes as given.\n", len(res.Breakages), res.Spec)
+	return nil
 }

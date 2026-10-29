@@ -8,7 +8,7 @@ require (
 	charm.land/lipgloss/v2 v2.0.6
 	github.com/bufbuild/protocompile v0.14.1
 	github.com/coder/websocket v1.8.15
-	github.com/githugt/flowi-lib v0.1.0-alpha.3
+	github.com/githugt/flowi-lib v0.2.0-alpha.1
 	github.com/rogpeppe/go-internal v1.16.0
 	github.com/samber/do/v2 v2.1.0
 	github.com/spf13/cobra v1.10.2
@@ -61,6 +61,7 @@ require (
 	github.com/clipperhouse/uax29/v2 v2.7.0 // indirect
 	github.com/danieljoos/wincred v1.2.3 // indirect
 	github.com/eclipse/paho.golang v0.23.0 // indirect
+	github.com/eclipse/paho.mqtt.golang v1.5.1 // indirect
 	github.com/expr-lang/expr v1.17.8 // indirect
 	github.com/felixge/httpsnoop v1.1.0 // indirect
 	github.com/fsnotify/fsnotify v1.10.1 // indirect
@@ -73,6 +74,7 @@ require (
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/googleapis/enterprise-certificate-proxy v0.3.17 // indirect
 	github.com/googleapis/gax-go/v2 v2.23.0 // indirect
+	github.com/gorilla/websocket v1.5.3 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/klauspost/compress v1.20.3 // indirect
 	github.com/kylelemons/godebug v1.1.0 // indirect

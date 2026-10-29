@@ -23,7 +23,7 @@ func newNewsCommand(i do.Injector) *cobra.Command {
 	var refresh bool
 	cmd := &cobra.Command{
 		Use:   "news",
-		Short: "Show Flow-I announcements (only when a signed feed is configured)",
+		Short: "Show Flowi announcements (only when a signed feed is configured)",
 		Long: "Fetches the announcements feed named by announcements_url, checks that it is signed by one of announcements_keys, " +
 			"and prints it. Nothing is fetched unless both are set, and flowi never fetches announcements by itself.",
 		Args: cobra.NoArgs,

@@ -135,7 +135,8 @@ type sendModel struct {
 	spin      spinner.Model
 	items     []item
 	cancelled bool
-	finished  bool // the stream closed: the live area is cleared
+	finished  bool   // the stream closed: the live area is cleared
+	prompt    string // what the request waits for the person to do, until it goes on
 }
 
 func newSendModel(o Options) sendModel {
@@ -170,7 +171,10 @@ func (m *sendModel) apply(ev engine.Event) {
 		if h := m.runningHook(); h != nil {
 			h.status, h.duration = e.Status, e.Duration
 		}
+	case engine.AuthPrompted:
+		m.prompt = PromptText(e)
 	case engine.RequestSent:
+		m.prompt = ""
 		if e.Depth == 0 {
 			r := m.request(e.Method, e.URL)
 			r.attempt, r.done = e.Attempt, false
@@ -230,6 +234,9 @@ func (m sendModel) View() tea.View {
 			b.WriteString(m.requestText(*it.request))
 		}
 		b.WriteByte('\n')
+	}
+	if m.prompt != "" {
+		b.WriteString(m.spin.View() + " " + m.prompt + "\n")
 	}
 	if m.cancelled {
 		b.WriteString(m.styles.fail.Render("cancelled") + "\n")

@@ -36,21 +36,31 @@ func importKinds() []importKind {
 			"become request versions), bodies generated from schemas, response schemas kept as the\n" +
 			"request's contract for impact analysis, and flows suggested from links.", "<file>"},
 		{flowi.ImportAsyncAPI, "Import an AsyncAPI document", "Import an AsyncAPI 3.x document (2.x as far as it maps): one async request per operation, with the\n" +
-			"protocol, server and channel and an example of the message it sends. A server whose protocol Flow-I has no\n" +
+			"protocol, server and channel and an example of the message it sends. A server whose protocol Flowi has no\n" +
 			"client for is reported (FLW-IMPORT-001) and its operations are left out. The document is kept in descriptions/.", "<file>"},
-		{flowi.ImportProto, "Import a .proto file as gRPC requests", "Import a .proto file: one gRPC request per unary or server-streaming method of its services,\n" +
-			"with an example message. The file and the local files it imports are copied to protos/ for the requests\n" +
-			"to compile; set {{env.grpc_server}} (or edit the server) to call them. Client and bidirectional streaming\n" +
-			"methods are reported (FLW-IMPORT-001) and left out.", "<file>"},
+		{flowi.ImportProto, "Import a .proto file as gRPC requests", "Import a .proto file: one gRPC request per method of its services, with an example message\n" +
+			"(an array of one message for a method that streams from the client). The file and the local files it\n" +
+			"imports are copied to protos/ for the requests to compile; set {{env.grpc_server}} (or edit the server)\n" +
+			"to call them.", "<file>"},
 		{flowi.ImportArazzo, "Import an Arazzo document", "Import Arazzo 1.0/1.1 workflows as flows under flows/arazzo/. Steps call the collection's\n" +
 			"requests by OpenAPI operationId, so import the OpenAPI document first. Anything without\n" +
-			"a Flow-I equivalent is reported (FLW-IMPORT-001) and kept as a note node.", "<file>"},
+			"a Flowi equivalent is reported (FLW-IMPORT-001) and kept as a note node.", "<file>"},
 		{flowi.ImportPostman, "Import a Postman collection or environment", "Import a Postman v2.0/v2.1 collection (folders, requests, auth, bodies, saved responses as\n" +
 			"examples, collection variables as an environment) or a Postman environment file.\n" +
 			"Variables become {{env.x}} (or {{secret.x}} for credentials), dynamic variables become\n" +
 			"generators; scripts are reported.", "<file>"},
 		{flowi.ImportBruno, "Import a Bruno collection folder", "Import a Bruno collection folder: .bru requests with their folders, environments,\n" +
 			"inherited headers and auth, asserts and post-response variables (as extracts).", "<folder>"},
+		{flowi.ImportInsomnia, "Import an Insomnia export", "Import an Insomnia export (JSON format 4, or the YAML collection of Insomnia 10): folders, requests, auth\n" +
+			"(including OAuth 2.0 client credentials and password, digest, Hawk, OAuth 1.0 and AWS) and environments.\n" +
+			"{{ _.name }} becomes {{env.name}}; template tags and scripts are reported.", "<file>"},
+		{flowi.ImportThunderClient, "Import a Thunder Client collection or environment", "Import a Thunder Client collection export (folders, requests, auth, bodies, response tests) or an\n" +
+			"environment export. {{name}} becomes {{env.name}}; credentials become secret placeholders.", "<file>"},
+		{flowi.ImportHoppscotch, "Import a Hoppscotch collection or environment", "Import a Hoppscotch collection export (nested folders, requests, auth and headers inherited from\n" +
+			"folders) or an environment export. <<name>> becomes {{env.name}}; scripts are reported.", "<file>"},
+		{flowi.ImportOpenRPC, "Import an OpenRPC document", "Import an OpenRPC document (the description of a JSON-RPC 2.0 service): one request for each method, which POSTs\n" +
+			"the JSON-RPC envelope with example parameters, and the method's examples as pinned responses. The document's\n" +
+			"first server becomes the openrpc environment's base_url.", "<file>"},
 		{flowi.ImportHAR, "Import a HAR recording", "Import an HTTP Archive saved from a browser: one request per endpoint (ids in paths become\n" +
 			"{{id}}), a 2xx JSON response as each request's example, and a flow replaying the\n" +
 			"recording in order. Static resources are left out.", "<file>"},
@@ -59,7 +69,7 @@ func importKinds() []importKind {
 			"handlers and scripts are reported (FLW-IMPORT-001) and left out.", "<file|->"},
 		{flowi.ImportCurl, "Import curl commands", "Import curl commands (bash or Windows cmd quoting, as \"Copy as cURL\" writes them), one\n" +
 			"request per command. Use - to read them from standard input.", "<file|->"},
-		{flowi.ImportMermaid, "Import a Mermaid flowchart as a flow", "Import a Mermaid flowchart as a flow under flows/mermaid/. Labels follow Flow-I's\n" +
+		{flowi.ImportMermaid, "Import a Mermaid flowchart as a flow", "Import a Mermaid flowchart as a flow under flows/mermaid/. Labels follow Flowi's\n" +
 			"conventions (req: auth/login@2, delay: 2s, extract: token=$.data.token, set: x=1,\n" +
 			"assert: …, log: …, note: …); what does not resolve becomes a placeholder note.", "<file|->"},
 	}
@@ -68,7 +78,7 @@ func importKinds() []importKind {
 func newImportCommand(i do.Injector) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "import",
-		Short: "Import requests and flows from OpenAPI, AsyncAPI, .proto, Arazzo, Postman, Bruno, HAR, .http, curl or Mermaid",
+		Short: "Import requests and flows from OpenAPI, AsyncAPI, .proto, Arazzo, Postman, Bruno, Insomnia, Thunder Client, Hoppscotch, HAR, .http, curl or Mermaid",
 		Args:  cobra.NoArgs,
 		RunE:  func(cmd *cobra.Command, _ []string) error { return cmd.Help() },
 	}
@@ -96,7 +106,7 @@ func newImportKindCommand(i do.Injector, k importKind) *cobra.Command {
 	fl.BoolVar(&f.force, "force", false, "overwrite files that already exist")
 	fl.BoolVar(&f.skip, "skip-existing", false, "write only files that do not exist yet")
 	fl.BoolVar(&f.partial, "partial", false, "import what can be imported when some items cannot")
-	if k.kind == flowi.ImportOpenAPI || k.kind == flowi.ImportAsyncAPI {
+	if k.kind == flowi.ImportOpenAPI || k.kind == flowi.ImportAsyncAPI || k.kind == flowi.ImportArazzo {
 		fl.StringArrayVar(&f.overlays, "overlay", nil, "an OpenAPI Overlay file (or URL) applied to the document before import; repeat for several, applied in order")
 	}
 	return cmd
@@ -156,7 +166,9 @@ func importSource(cmd *cobra.Command, kind flowi.ImportKind, arg, cwd string) (f
 		src.Data, name, err = flowi.FetchImportSource(cmd.Context(), arg)
 		src.Name = name
 	default:
-		src.Data, err = os.ReadFile(absPath(cwd, arg))
+		path := absPath(cwd, arg)
+		src.Data, err = os.ReadFile(path)
+		src.RefDir = filepath.Dir(path) // a local file may refer to files beside it
 	}
 	if err != nil {
 		return src, fmt.Errorf("reading %s: %w", arg, err)
@@ -338,7 +350,7 @@ func newExportMermaidCommand(i do.Injector) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "mermaid <flow>",
 		Short: "Export a flow as a Mermaid flowchart",
-		Long: "Write a flow as a Mermaid flowchart. Nodes are labelled with Flow-I's conventions\n" +
+		Long: "Write a flow as a Mermaid flowchart. Nodes are labelled with Flowi's conventions\n" +
 			"(req: auth/login@2, delay: 2s, …), so `flowi import mermaid` reads them back;\n" +
 			"containers are drawn as subgraphs.",
 		Args: cobra.ExactArgs(1),

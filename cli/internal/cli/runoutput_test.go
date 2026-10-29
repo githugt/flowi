@@ -21,6 +21,8 @@ func TestParseReportFlags(t *testing.T) {
 	}{
 		{in: []string{"junit=out.xml", "json=r.json", "markdown=r.md", "text=r.txt"},
 			want: []reportSpec{{"junit", "out.xml"}, {"json", "r.json"}, {"markdown", "r.md"}, {"text", "r.txt"}}},
+		{in: []string{"har=run.har"}, want: []reportSpec{{"har", "run.har"}}},
+		{in: []string{"mermaid=run.mmd"}, want: []reportSpec{{"mermaid", "run.mmd"}}},
 		{in: []string{"pdf=r.pdf"}, wantErr: true},
 		{in: []string{"junit"}, wantErr: true},
 		{in: []string{"junit="}, wantErr: true},

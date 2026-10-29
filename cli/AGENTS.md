@@ -1,7 +1,7 @@
 # AGENTS.md: flowi-cli
 
 Instructions for AI coding agents (and a useful checklist for people) working in this repository.
-`flowi-cli` is the command-line tool of Flow-I. It only wires `flowi-lib` into commands: the logic lives there.
+`flowi-cli` is the command-line tool of Flowi. It only wires `flowi-lib` into commands: the logic lives there.
 Read `README.md` for the commands and `../flowi-lib/docs/development.md` for how the repositories fit together.
 
 ## Musts

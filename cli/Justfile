@@ -1,10 +1,10 @@
-# Flow-I command-line tool. Run `just` to list recipes.
+# Flowi command-line tool. Run `just` to list recipes.
 
 set shell := ["bash", "-euo", "pipefail", "-c"]
 
 bin := justfile_directory() / "bin" / "flowi"
 
-# Scratch area for trying commands: its own config dir, so your real Flow-I
+# Scratch area for trying commands: its own config dir, so your real Flowi
 # settings and workspaces are never touched.
 sandbox := justfile_directory() / ".sandbox"
 lib := justfile_directory() / ".." / "flowi-lib"
@@ -45,8 +45,8 @@ sandbox: build sandbox-reset
     @mkdir -p {{sandbox}}
     @cp -R {{example}} {{sandbox}}/user-creation
     @cd {{sandbox}} && {{sandbox_env}} {{bin}} --config-dir {{sandbox}}/config workspace mount ./user-creation
-    @mkdir -p {{sandbox}}/config/workspaces/default/environments
-    @cp {{sandbox}}/user-creation/environments/*.yaml {{sandbox}}/config/workspaces/default/environments/
+    @mkdir -p {{sandbox}}/config/workspaces/default-workspace/environments
+    @cp {{sandbox}}/user-creation/environments/*.yaml {{sandbox}}/config/workspaces/default-workspace/environments/
 
 # Walk through the main commands on a fresh sandbox, sending requests to the demo API.
 demo: build sandbox-reset
@@ -57,8 +57,8 @@ demo: build sandbox-reset
     sed -i.bak 's#http://localhost:8080#http://127.0.0.1:{{demo_port}}#' {{sandbox}}/user-creation/environments/local.yaml
     rm {{sandbox}}/user-creation/environments/local.yaml.bak
     # Environments belong to the workspace, not to the collection: put the example's where the workspace reads them.
-    mkdir -p {{sandbox}}/config/workspaces/default/environments
-    cp {{sandbox}}/user-creation/environments/*.yaml {{sandbox}}/config/workspaces/default/environments/
+    mkdir -p {{sandbox}}/config/workspaces/default-workspace/environments
+    cp {{sandbox}}/user-creation/environments/*.yaml {{sandbox}}/config/workspaces/default-workspace/environments/
     (cd {{lib}} && go build -o {{sandbox}}/demo-server ./examples/demoserver/cmd/flowi-demo-server) || exit 1
     {{sandbox}}/demo-server -addr 127.0.0.1:{{demo_port}} 2>{{sandbox}}/demo-server.log &
     server=$!
@@ -108,8 +108,8 @@ demo-run: build sandbox-reset
     sed -i.bak 's#http://localhost:8080#http://127.0.0.1:{{demo_port}}#' {{sandbox}}/user-creation/environments/local.yaml
     rm {{sandbox}}/user-creation/environments/local.yaml.bak
     # Environments belong to the workspace, not to the collection: put the example's where the workspace reads them.
-    mkdir -p {{sandbox}}/config/workspaces/default/environments
-    cp {{sandbox}}/user-creation/environments/*.yaml {{sandbox}}/config/workspaces/default/environments/
+    mkdir -p {{sandbox}}/config/workspaces/default-workspace/environments
+    cp {{sandbox}}/user-creation/environments/*.yaml {{sandbox}}/config/workspaces/default-workspace/environments/
     (cd {{lib}} && go build -o {{sandbox}}/demo-server ./examples/demoserver/cmd/flowi-demo-server) || exit 1
     {{sandbox}}/demo-server -addr 127.0.0.1:{{demo_port}} 2>{{sandbox}}/demo-server.log &
     server=$!

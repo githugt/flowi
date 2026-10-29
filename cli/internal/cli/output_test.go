@@ -123,7 +123,7 @@ func TestWriteImportReport_should_list_items_and_their_problems(t *testing.T) {
 
 	for _, want := range []string{
 		"  ✓ auth/login\n",
-		"  ⚠ users/create\n      warning FLW-IMPORT-001: pre-request script has no Flow-I equivalent",
+		"  ⚠ users/create\n      warning FLW-IMPORT-001: pre-request script has no Flowi equivalent",
 		"  ✗ broken (skipped)\n      c.json:3:2: error FLW-IMPORT-005: broken was skipped: the request has no URL\n",
 		"2 imported, 1 skipped\n",
 	} {

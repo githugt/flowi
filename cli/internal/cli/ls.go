@@ -20,7 +20,8 @@ import (
 func listSections() []string { return []string{"requests", "flows", "blueprints", "envs"} }
 
 func newLsCommand(i do.Injector) *cobra.Command {
-	return &cobra.Command{
+	var tag string
+	cmd := &cobra.Command{
 		Use:       "ls [requests|flows|blueprints|envs]",
 		Short:     "List the contents of mounted collections",
 		Args:      cobra.MaximumNArgs(1),
@@ -38,7 +39,7 @@ func newLsCommand(i do.Injector) *cobra.Command {
 				return err
 			}
 			for _, c := range s.Workspace.Collections() {
-				printCollection(cmd.OutOrStdout(), c, sections)
+				printCollection(cmd.OutOrStdout(), c, sections, tag)
 			}
 			if slices.Contains(sections, "envs") {
 				printEnvironments(cmd.OutOrStdout(), s.Workspace.Environments())
@@ -46,20 +47,25 @@ func newLsCommand(i do.Injector) *cobra.Command {
 			return nil
 		},
 	}
+	cmd.Flags().StringVar(&tag, "tag", "", "list only the requests and flows that carry this tag (their own or their folder's)")
+	return cmd
 }
 
-func printCollection(w io.Writer, c model.Collection, sections []string) {
+func printCollection(w io.Writer, c model.Collection, sections []string, tag string) {
+	if tag != "" {
+		c = onlyTagged(c, tag)
+	}
 	fmt.Fprintf(w, "%s (%s)\n", c.Manifest.Name, c.Manifest.ID)
 	if slices.Contains(sections, "requests") && len(c.Requests) > 0 {
 		fmt.Fprintln(w, "  Requests")
 		printTree(w, entriesOf(c.Requests, func(r model.Request) (string, string) {
-			return r.Path, fmt.Sprintf("%s  (%s)  [%s]", r.Name, r.Path, versionList(r))
+			return r.Path, fmt.Sprintf("%s  (%s)  [%s]%s", r.Name, r.Path, versionList(r), tagSuffix(c.RequestTags(r)))
 		}))
 	}
 	if slices.Contains(sections, "flows") && len(c.Flows) > 0 {
 		fmt.Fprintln(w, "  Flows")
 		printTree(w, entriesOf(c.Flows, func(f model.Flow) (string, string) {
-			return f.Path, fmt.Sprintf("%s  (%s)", f.Name, f.Path)
+			return f.Path, fmt.Sprintf("%s  (%s)%s", f.Name, f.Path, tagSuffix(c.FlowTags(f)))
 		}))
 	}
 	if slices.Contains(sections, "blueprints") && len(c.Blueprints) > 0 {
@@ -68,6 +74,23 @@ func printCollection(w io.Writer, c model.Collection, sections []string) {
 			return b.Path, fmt.Sprintf("%s  (%s)", b.Name, b.Path)
 		}))
 	}
+}
+
+// onlyTagged keeps the requests and flows that carry tag. Blueprints have no tags, so none are listed.
+func onlyTagged(c model.Collection, tag string) model.Collection {
+	out := c
+	out.Requests = slices.DeleteFunc(slices.Clone(c.Requests), func(r model.Request) bool { return !slices.Contains(c.RequestTags(r), tag) })
+	out.Flows = c.FlowsTagged(tag)
+	out.Blueprints = nil
+	return out
+}
+
+// tagSuffix is "  #a #b" for a list of tags, or nothing.
+func tagSuffix(tags []string) string {
+	if len(tags) == 0 {
+		return ""
+	}
+	return "  #" + strings.Join(tags, " #")
 }
 
 // printEnvironments lists the workspace's environments, which belong to

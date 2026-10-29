@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-// Command flowi is the Flow-I command-line tool.
+// Command flowi is the Flowi command-line tool.
 package main
 
 import (

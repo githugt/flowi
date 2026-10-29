@@ -60,6 +60,7 @@ type runModel struct {
 	hooks    map[string][]*hookLine // running request node → its hook steps
 	stopped  string                 // "", "cancelled" or "aborted"
 	finished bool                   // the stream closed: the live area is cleared
+	prompt   string                 // what a request waits for the person to do, until it goes on
 }
 
 func newRunModel(o Options, height int) runModel {
@@ -104,6 +105,10 @@ func (m *runModel) apply(ev engine.Event) {
 				h.status, h.duration = e.Status, e.Duration
 			}
 		}
+	case engine.AuthPrompted:
+		m.prompt = PromptText(e)
+	case engine.RequestSent:
+		m.prompt = ""
 	case engine.RunCancelled:
 		m.stopped = "cancelled"
 	case engine.RunAborted:
@@ -127,6 +132,9 @@ func (m runModel) View() tea.View {
 		}
 	}
 	lines = truncate(lines, m.height-4)
+	if m.prompt != "" {
+		lines = append(lines, m.spin.View()+" "+m.prompt)
+	}
 	if m.stopped != "" {
 		lines = append(lines, m.styles.fail.Render(m.stopped))
 	}

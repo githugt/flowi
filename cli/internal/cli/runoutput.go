@@ -23,7 +23,7 @@ type runText struct {
 }
 
 func (p runText) render(run *engine.Run) engine.RunResult {
-	for ev := range run.Events() {
+	for ev := range watchPrompts(run.Events(), openBrowser) {
 		if !p.quiet {
 			p.event(ev)
 		}
@@ -36,7 +36,7 @@ func (p runText) render(run *engine.Run) engine.RunResult {
 // live shows the Bubble Tea tree, then prints the plain record of what it
 // showed, so the scrollback matches non-terminal output.
 func (p runText) live(run *engine.Run, console Console) engine.RunResult {
-	seen, err := tui.RunFlow(run.Events(), p.out, tui.Options{Color: !console.NoColor})
+	seen, err := tui.RunFlow(watchPrompts(run.Events(), openBrowser), p.out, tui.Options{Color: !console.NoColor})
 	if err != nil {
 		drainRun(run) // the live view failed; the run still has to finish
 		p.line(p.err, "warning: %v", err)
@@ -61,6 +61,8 @@ func (p runText) event(ev engine.Event) {
 		p.line(p.out, "  ! %s %s", e.Diag.Code, msg)
 	case engine.Digest:
 		_, _ = io.WriteString(p.out, ensureNewline(e.Text)) // stdout closed: nothing more to do
+	case engine.AuthPrompted:
+		p.line(p.err, "%s%s", indent(e.Path), tui.PromptText(e))
 	case engine.RunCancelled:
 		p.line(p.err, "cancelled — waiting for running nodes to stop")
 	case engine.RunAborted:
@@ -135,7 +137,7 @@ func ensureNewline(s string) string {
 // writeRunNDJSON writes each event as one JSON object, then a final
 // {"event":"RunResult", …} — a scripting interface: keep it stable.
 func writeRunNDJSON(w io.Writer, run *engine.Run) (engine.RunResult, error) {
-	for ev := range run.Events() {
+	for ev := range watchPrompts(run.Events(), openBrowser) {
 		if err := writeEvent(w, ev); err != nil {
 			drainRun(run)
 			return run.Wait(), err
@@ -158,6 +160,6 @@ func runResultJSON(res engine.RunResult) runResultOut {
 }
 
 func drainRun(run *engine.Run) {
-	for range run.Events() {
+	for range watchPrompts(run.Events(), openBrowser) {
 	}
 }

@@ -24,7 +24,7 @@ import (
 func newConfigCommand(i do.Injector) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "config",
-		Short: "Read and change Flow-I settings",
+		Short: "Read and change Flowi settings",
 		Long: "Read and change settings. Values resolve from, highest first: flags, FLOWI_* environment\n" +
 			"variables, node, request, folder, collection, workspace, user, built-in default.",
 		Args: cobra.NoArgs,
