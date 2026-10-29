@@ -3,6 +3,7 @@
 package vm
 
 import (
+	"context"
 	"slices"
 	"strings"
 
@@ -21,7 +22,7 @@ type CollectionRow struct {
 	Name    string
 	Path    string // as written in workspace.yaml
 	Missing bool   // its directory is gone: Relocate it
-	Draft   bool   // kept in Flow-I's own directory: SaveDraft or Discard it
+	Draft   bool   // kept in Flowi's own directory: SaveDraft or Discard it
 	Deps    []DepRow
 }
 
@@ -90,6 +91,18 @@ func (m *Manager) Mount(dir string) {
 	m.act(func() error { _, err := m.b.Mount(dir); return err })
 }
 
+// OpenBundle opens a run bundle (a .flowi-run file) as a collection. Its flows open on the canvas like any
+// other, and Run plays the recorded run back without sending anything.
+func (m *Manager) OpenBundle(path string) {
+	m.act(func() error { return m.b.OpenBundle(path) })
+}
+
+// OpenArazzo opens an Arazzo document as a collection. Its flows run against the server its description names when
+// no environment is chosen.
+func (m *Manager) OpenArazzo(ref string) {
+	m.act(func() error { return m.b.OpenArazzo(context.Background(), ref) })
+}
+
 // Unmount removes a collection from the workspace (its files stay).
 func (m *Manager) Unmount(id model.ID) { m.act(func() error { return m.b.Unmount(id) }) }
 
@@ -104,7 +117,7 @@ func (m *Manager) Init(dir, name string) {
 }
 
 // NewCollection creates a collection named name: in location when given
-// (the folder is created or must be empty), else in Flow-I's own folder.
+// (the folder is created or must be empty), else in Flowi's own folder.
 func (m *Manager) NewCollection(name, location string) {
 	if location == "" {
 		m.NewDraft(name)
@@ -113,7 +126,7 @@ func (m *Manager) NewCollection(name, location string) {
 	m.Init(location, name)
 }
 
-// NewDraft creates a collection named name in Flow-I's own folder.
+// NewDraft creates a collection named name in Flowi's own folder.
 func (m *Manager) NewDraft(name string) {
 	m.act(func() error { _, err := m.b.NewDraft(name); return err })
 }

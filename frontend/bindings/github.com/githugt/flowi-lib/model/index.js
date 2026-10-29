@@ -6,6 +6,7 @@ export {
     Async,
     AsyncReceive,
     AsyncSend,
+    Auth,
     Body,
     Branch,
     Case,
@@ -20,6 +21,7 @@ export {
     Ref,
     RequestCall,
     RequestVersion,
+    SetValue,
     SubflowCall
 } from "./models.js";
 

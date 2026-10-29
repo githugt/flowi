@@ -3,7 +3,11 @@
 package bridge
 
 import (
+	"encoding/json"
 	"fmt"
+	"maps"
+	"slices"
+	"strings"
 	"time"
 
 	"github.com/githugt/flowi/internal/vm"
@@ -23,6 +27,44 @@ type VarsView struct {
 	Set     []string `json:"set"`
 	Secrets []string `json:"secrets"`
 	Unset   []string `json:"unset"`
+	// Values are the variables as the last run ended, masked and shortened to one line each;
+	// empty before a run.
+	Values []VarValue `json:"values"`
+}
+
+// VarValue is one variable and what it held when the run ended.
+type VarValue struct {
+	Name  string `json:"name"`
+	Value string `json:"value"`
+}
+
+// varValueWidth bounds a value shown in the variables bar.
+const varValueWidth = 120
+
+func varValuesOf(vars map[string]any) []VarValue {
+	out := []VarValue{}
+	for _, name := range slices.Sorted(maps.Keys(vars)) {
+		out = append(out, VarValue{Name: name, Value: oneLine(vars[name], varValueWidth)})
+	}
+	return out
+}
+
+// oneLine shows a value as text on one line, cut to width runes.
+func oneLine(v any, width int) string {
+	text, ok := v.(string)
+	if !ok {
+		data, err := json.Marshal(v)
+		if err != nil {
+			text = fmt.Sprint(v)
+		} else {
+			text = string(data)
+		}
+	}
+	text = strings.Join(strings.Fields(text), " ")
+	if r := []rune(text); len(r) > width {
+		return string(r[:width-1]) + "…"
+	}
+	return text
 }
 
 // PartView is one block of a step's input or output.
@@ -53,6 +95,18 @@ type NodeData struct {
 	Output    []PartView `json:"output"`
 	Tests     []TestView `json:"tests"`
 	Diags     []string   `json:"diags"`
+	// Kind tells the dock which tabs to offer: "request" (Input, Output, Checks), "messages"
+	// (Messages, Checks) or "step" (Output).
+	Kind     string        `json:"kind"`
+	Size     string        `json:"size,omitempty"` // how big the response (or the messages) were
+	Messages []StepMessage `json:"messages"`
+}
+
+// StepMessage is one message of a message request in a step, with the way it went.
+type StepMessage struct {
+	Direction string `json:"direction"` // sent or received
+	Text      string `json:"text"`
+	Lang      string `json:"lang,omitempty"`
 }
 
 // HistoryRow is a saved run in the Runs tab.
@@ -133,7 +187,7 @@ func (s *FlowService) NodeData(node, step, format string) (NodeData, error) {
 		}
 		d, ran := o.run.Detail(step)
 		if !ran {
-			data = NodeData{Step: step, Input: []PartView{}, Output: []PartView{}, Tests: []TestView{}, Diags: []string{}}
+			data = NodeData{Step: step, Input: []PartView{}, Output: []PartView{}, Tests: []TestView{}, Diags: []string{}, Messages: []StepMessage{}}
 			return nil
 		}
 		f := map[string]vm.ViewFormat{"json": vm.ViewJSON, "text": vm.ViewText, "raw": vm.ViewRaw}[format]
@@ -141,6 +195,7 @@ func (s *FlowService) NodeData(node, step, format string) (NodeData, error) {
 			Step: step, Status: d.Status, Instances: d.Instances, Duration: d.Duration.Round(time.Millisecond).String(),
 			Input: partsOf(vm.InputParts(n, d)), Output: partsOf(vm.OutputParts(n, d, f)),
 			Tests: testsOf(vm.TestRows(n, d)), Diags: append([]string{}, d.Diags...),
+			Kind: dataKind(d), Size: vm.RecordSize(d), Messages: stepMessagesOf(vm.MessageRows(d)),
 		}
 		return nil
 	})
@@ -152,15 +207,70 @@ func (s *FlowService) LoadHistory(node string) {
 	_ = s.edit(node, func(o *openFlow) error { o.history.Load(); return nil })
 }
 
-// CompareRun compares saved run i (newest first) with the newest.
-func (s *FlowService) CompareRun(node string, i int) []DiffView {
+// CompareRuns compares saved run from with saved run to (indexes, newest
+// first): the status and time of each top-level step.
+func (s *FlowService) CompareRuns(node string, from, to int) []DiffView {
 	out := []DiffView{}
 	_ = s.edit(node, func(o *openFlow) error {
-		for _, r := range o.history.CompareWithLatest(i) {
+		for _, r := range o.history.Between(from, to) {
 			out = append(out, DiffView{Step: r.Node, Name: r.Name, Before: r.Before, After: r.After, Gap: r.DurationGap, Changed: r.Changed})
 		}
 		return nil
 	})
+	return out
+}
+
+// BodyLineView is one line of a step's outputs in a comparison.
+type BodyLineView struct {
+	Kind string `json:"kind"` // same, add (only in the later run) or del (only in the earlier)
+	Text string `json:"text"`
+}
+
+// VarChangeView is a variable that ended differently in two runs.
+type VarChangeView struct {
+	Name   string `json:"name"`
+	Before string `json:"before"`
+	After  string `json:"after"`
+	// Had says which runs had the variable at all.
+	HadBefore bool `json:"hadBefore"`
+	HadAfter  bool `json:"hadAfter"`
+}
+
+// RunComparisonView is what two runs output at each step, line by line, and
+// which variables ended differently.
+type RunComparisonView struct {
+	Steps map[string][]BodyLineView `json:"steps"` // only steps whose outputs differ
+	Vars  []VarChangeView           `json:"vars"`
+}
+
+// CompareRunDetail reads two saved runs and compares what each step output
+// and the variables the flow ended with. The earlier run is from.
+func (s *FlowService) CompareRunDetail(node string, from, to int) (RunComparisonView, error) {
+	type result struct {
+		v   RunComparisonView
+		err error
+	}
+	done := make(chan result, 1)
+	if err := s.edit(node, func(o *openFlow) error {
+		o.history.CompareInDepth(from, to, func(c vm.RunComparison, err error) { done <- result{runComparisonViewOf(c), err} })
+		return nil
+	}); err != nil {
+		return RunComparisonView{}, err
+	}
+	r := <-done
+	return r.v, r.err
+}
+
+func runComparisonViewOf(c vm.RunComparison) RunComparisonView {
+	out := RunComparisonView{Steps: map[string][]BodyLineView{}, Vars: []VarChangeView{}}
+	for id, lines := range c.Nodes {
+		for _, l := range lines {
+			out.Steps[id] = append(out.Steps[id], BodyLineView{Kind: l.Kind, Text: l.Text})
+		}
+	}
+	for _, v := range c.Vars {
+		out.Vars = append(out.Vars, VarChangeView{Name: v.Name, Before: v.Before, After: v.After, HadBefore: v.HadBefore, HadAfter: v.HadAfter})
+	}
 	return out
 }
 
@@ -186,7 +296,7 @@ func runViewOf(o *openFlow) RunView {
 
 func varsOf(o *openFlow) VarsView {
 	f := vm.ScanFlow(o.doc.Draft())
-	return VarsView{Set: nonNil(f.Set), Secrets: nonNil(f.Secrets), Unset: nonNil(f.Unset)}
+	return VarsView{Set: nonNil(f.Set), Secrets: nonNil(f.Secrets), Unset: nonNil(f.Unset), Values: varValuesOf(o.run.Vars())}
 }
 
 func nonNil(s []string) []string {
@@ -225,6 +335,25 @@ func historyOf(h *vm.RunHistory) []HistoryRow {
 	out := []HistoryRow{}
 	for _, r := range h.Runs() {
 		out = append(out, HistoryRow{Label: vm.RunLabel(r), Status: r.Status, ID: r.ID})
+	}
+	return out
+}
+
+// dataKind says which tabs the output dock offers for a step.
+func dataKind(d vm.NodeDetail) string {
+	switch {
+	case d.Record != nil && d.Record.HasMessages():
+		return "messages"
+	case d.Record != nil:
+		return "request"
+	}
+	return "step"
+}
+
+func stepMessagesOf(rows []vm.MessageRow) []StepMessage {
+	out := make([]StepMessage, 0, len(rows))
+	for _, r := range rows {
+		out = append(out, StepMessage{Direction: r.Direction, Text: r.Text, Lang: r.Lang})
 	}
 	return out
 }

@@ -78,6 +78,12 @@ type Request struct {
 	queue        []writeJob
 	autosaveProb string
 
+	// The flowi overlay laid over the selected version (see overlay.go).
+	overlay      string
+	overlays     []model.Overlay // the collection's, as last loaded
+	overlayNotes []string
+	overlaySeq   int
+
 	// What the Body section's pickers were set to while the body is empty:
 	// an empty body cannot tell JSON from none.
 	chosenKind      BodyKind
@@ -103,8 +109,8 @@ func NewRequest(b Backend, w *Worker, c model.Collection, r model.Request) *Requ
 
 func (r *Request) load(disk model.Request) {
 	label := r.SelectedLabel()
-	edit, base := disk.Edit, disk.EditBase
-	disk.Edit, disk.EditBase = nil, ""
+	edit, base, editOverlay := disk.Edit, disk.EditBase, disk.EditOverlay
+	disk.Edit, disk.EditBase, disk.EditOverlay = nil, "", ""
 	r.disk, r.draft = disk, cloneRequest(disk)
 	r.selected = max(0, slices.IndexFunc(r.draft.Versions, func(v model.RequestVersion) bool { return v.Label == label }))
 	if label == "" {
@@ -114,6 +120,10 @@ func (r *Request) load(disk model.Request) {
 	r.slot, r.autosaveProb, r.orphan = edit != nil, "", ""
 	r.chosenKind, r.chosenFormat, r.chosenMultipart = "", "", false
 	r.applyEdit(edit, base)
+	if r.dirty {
+		r.overlay = editOverlay // the edit shows the overlay it was made with; it is chosen again with the edit
+	}
+	r.applyOverlay() // a reload keeps the chosen overlay laid over the version
 }
 
 func orphanText(base string) string {
@@ -181,7 +191,7 @@ func cloneHooks(h model.Hooks) model.Hooks {
 		}
 		return out
 	}
-	return model.Hooks{Pre: steps(h.Pre), Post: steps(h.Post)}
+	return model.Hooks{Pre: steps(h.Pre), Post: steps(h.Post), Message: steps(h.Message)}
 }
 
 // IsDropsComments reports whether err is a save stopped because it would drop
@@ -326,7 +336,7 @@ func (r *Request) CanDiscardEdit() bool {
 func isBlankVersion(v model.RequestVersion) bool {
 	return v.URL == "" && len(v.Query) == 0 && len(v.Headers) == 0 && !bodyHasContent(v.Body) && len(v.Extract) == 0 &&
 		len(v.Assert) == 0 && len(v.Variables) == 0 && v.Docs == "" && len(v.Settings) == 0 &&
-		len(v.Hooks.Pre) == 0 && len(v.Hooks.Post) == 0
+		len(v.Hooks.Pre) == 0 && len(v.Hooks.Post) == 0 && len(v.Hooks.Message) == 0
 }
 
 // ChangedOnDisk reports that the file changed on disk while there were
@@ -350,6 +360,7 @@ func (r *Request) SelectVersion(label string) {
 	if i := slices.Index(r.Labels(), label); i >= 0 {
 		r.selected, r.rawRows, r.problems = i, nil, nil
 		r.chosenKind, r.chosenFormat, r.chosenMultipart = "", "", false
+		r.applyOverlay() // the chosen overlay goes with the user to the other version
 		r.changed()
 	}
 }
@@ -490,9 +501,47 @@ func (r *Request) Auth() (AuthKind, string) {
 	return AuthOther, value
 }
 
+// AuthScheme is the scheme of the version's auth block ("" when it has none)
+// and its parameters in file order.
+func (r *Request) AuthScheme() (string, []model.KeyValue) {
+	a := r.Current().Auth
+	if a == nil {
+		return "", nil
+	}
+	return a.Type, a.Params
+}
+
+// SetAuthScheme chooses the auth block's scheme; "" removes the block. A
+// different scheme starts with no parameters, since they do not carry over.
+func (r *Request) SetAuthScheme(scheme string) {
+	r.Edit(func(v *model.RequestVersion) {
+		switch {
+		case scheme == "":
+			v.Auth = nil
+		case v.Auth == nil || v.Auth.Type != scheme:
+			v.Auth = &model.Auth{Type: scheme}
+		}
+	})
+}
+
+// SetAuthParam sets a parameter of the auth block; an empty value removes it.
+func (r *Request) SetAuthParam(name, value string) {
+	r.Edit(func(v *model.RequestVersion) {
+		if v.Auth == nil {
+			return
+		}
+		params := slices.DeleteFunc(slices.Clone(v.Auth.Params), func(kv model.KeyValue) bool { return kv.Key == name })
+		if value != "" {
+			params = append(params, model.KeyValue{Key: name, Value: value})
+		}
+		v.Auth = &model.Auth{Type: v.Auth.Type, Params: params}
+	})
+}
+
 // SetAuth writes (or, for AuthNone, removes) the Authorization header.
 func (r *Request) SetAuth(kind AuthKind, value string) {
 	r.Edit(func(v *model.RequestVersion) {
+		v.Auth = nil // the simple forms replace an auth block
 		// On a copy: callers may still hold the old slice from Current.
 		v.Headers = slices.DeleteFunc(slices.Clone(v.Headers), func(kv model.KeyValue) bool { return strings.EqualFold(kv.Key, authHeader) })
 		switch kind {
@@ -682,7 +731,7 @@ func (r *Request) Reloaded(c model.Collection, disk model.Request, found bool) {
 // sameSaved reports whether two loads of a request hold the same saved
 // content, whatever their edit slots hold.
 func sameSaved(a, b model.Request) bool {
-	a.Edit, a.EditBase, b.Edit, b.EditBase = nil, "", nil, ""
+	a.Edit, a.EditBase, a.EditOverlay, b.Edit, b.EditBase, b.EditOverlay = nil, "", "", nil, "", ""
 	return reflect.DeepEqual(a, b)
 }
 
@@ -787,7 +836,8 @@ func (r *Request) FlushResult(done func(stored bool)) {
 		done(false)
 	default:
 		base, edit := r.SelectedLabel(), cloneRequest(model.Request{Versions: []model.RequestVersion{r.Current()}}).Versions[0]
-		r.write(func() error { return r.b.StoreEdit(r.target, base, edit) }, func(err error) {
+		overlay := r.overlay
+		r.write(func() error { return r.b.StoreEdit(r.target, base, overlay, edit) }, func(err error) {
 			r.autosaved(err)
 			done(err == nil)
 		})

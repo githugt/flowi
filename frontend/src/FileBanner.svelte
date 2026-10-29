@@ -15,7 +15,7 @@
 {/if}
 {#if needsDrop}
   <p class="bar warn">
-    Saving rewrites this file in Flow-I's own format, which drops its comments.
+    Saving rewrites this file in Flowi's own format, which drops its comments.
     <button onclick={saveDropping}>Save and drop comments</button>
     <button onclick={declineDrop}>Cancel</button>
   </p>

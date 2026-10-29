@@ -5,8 +5,8 @@ version: '3'
 
 # This information is used to generate the build assets.
 info:
-  companyName: "Flow-I" # The name of the company
-  productName: "Flow-I" # The name of the application
+  companyName: "Flowi" # The name of the company
+  productName: "Flowi" # The name of the application
   productIdentifier: "io.github.githugt.flowi" # The unique product identifier
   description: "Compose API requests into flows" # The application description
   copyright: "AGPL-3.0-or-later" # Copyright text

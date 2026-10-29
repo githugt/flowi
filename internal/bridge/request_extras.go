@@ -3,6 +3,10 @@
 package bridge
 
 import (
+	"errors"
+	"fmt"
+	"os"
+	"strings"
 	"time"
 
 	flowi "github.com/githugt/flowi-lib"
@@ -226,4 +230,67 @@ func (s *RequestService) PinStored(node, version, name, example string) (string,
 		file, err = s.app.backend.PinExample(rec, example)
 	})
 	return file, err
+}
+
+// SaveBody writes the body of the response shown to a file the user picks in the
+// system's save dialog, and returns the file ("" when the user cancelled).
+func (s *RequestService) SaveBody(node string) (string, error) {
+	var rec *engine.Record
+	s.with(node, func(o *openRequest) {
+		if o.shown != nil {
+			rec = o.shown.Result.Record
+		} else if ex, ok := s.app.send.LastFor(o.req.Target()); ok {
+			rec = ex.Result.Record
+		}
+	})
+	if rec == nil {
+		return "", errors.New("send the request first")
+	}
+	body, err := vm.ResponseBodyFile(*rec)
+	if err != nil {
+		return "", err
+	}
+	if s.app.pickers.Save == nil {
+		return "", errNoDialogs
+	}
+	file, err := s.app.pickers.Save("Save the response body", body.Name)
+	if err != nil || file == "" {
+		return "", err
+	}
+	if err := os.WriteFile(file, body.Data, 0o600); err != nil {
+		return "", fmt.Errorf("saving the body: %w", err)
+	}
+	return file, nil
+}
+
+// PinWarning says what is worth knowing before the response shown is pinned:
+// a pinned example is committed with the collection, response headers
+// included. It names the headers that look like credentials and is "" when
+// there is none (or nothing to pin).
+func (s *RequestService) PinWarning(node string) string {
+	var names []string
+	s.with(node, func(o *openRequest) {
+		if ex, ok := s.app.send.LastFor(o.req.Target()); ok && ex.Result.Record != nil {
+			names = engine.CredentialHeaders(*ex.Result.Record)
+		}
+	})
+	return pinWarningText(names)
+}
+
+// PinStoredWarning is PinWarning for a saved response of the request.
+func (s *RequestService) PinStoredWarning(node, version, name string) string {
+	var names []string
+	s.with(node, func(o *openRequest) {
+		if rec, err := s.app.backend.StoredRecord(o.req.Target(), version, name); err == nil {
+			names = engine.CredentialHeaders(rec)
+		}
+	})
+	return pinWarningText(names)
+}
+
+func pinWarningText(names []string) string {
+	if len(names) == 0 {
+		return ""
+	}
+	return "This response has " + strings.Join(names, ", ") + ". A pinned example is committed with the collection, headers included: check that no real credential is in it."
 }

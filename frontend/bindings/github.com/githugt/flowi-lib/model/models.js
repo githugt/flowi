@@ -188,6 +188,50 @@ export class AsyncSend {
 }
 
 /**
+ * Auth is a version's authentication scheme and its parameters, in file
+ * order. Every value is a template, so credentials come from the vault
+ * ({{secret.client_secret}}) and never sit in the file.
+ */
+export class Auth {
+    /**
+     * Creates a new Auth instance.
+     * @param {Partial<Auth>} [$$source = {}] - The source object to create the Auth.
+     */
+    constructor($$source = {}) {
+        if (!("Type" in $$source)) {
+            /**
+             * @member
+             * @type {string}
+             */
+            this["Type"] = "";
+        }
+        if (!("Params" in $$source)) {
+            /**
+             * @member
+             * @type {KeyValue[]}
+             */
+            this["Params"] = [];
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new Auth instance from a string or object.
+     * @param {any} [$$source = {}]
+     * @returns {Auth}
+     */
+    static createFrom($$source = {}) {
+        const $$createField1_0 = $$createType5;
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        if ("Params" in $$parsedSource) {
+            $$parsedSource["Params"] = $$createField1_0($$parsedSource["Params"]);
+        }
+        return new Auth(/** @type {Partial<Auth>} */($$parsedSource));
+    }
+}
+
+/**
  * Body is a request body. At most one field is set.
  */
 export class Body {
@@ -506,6 +550,17 @@ export class GRPC {
              */
             this["Receive"] = null;
         }
+        if (!("Web" in $$source)) {
+            /**
+             * Web makes the call over gRPC-Web: an HTTP POST to Server, which is then
+             * an http:// or https:// address, for a proxy or gateway that speaks it.
+             * It needs Proto files (such a proxy has no reflection) and a method that
+             * does not stream from the client.
+             * @member
+             * @type {boolean}
+             */
+            this["Web"] = false;
+        }
 
         Object.assign(this, $$source);
     }
@@ -539,7 +594,7 @@ export class GRPC {
 
 /**
  * HookControl decides which API hooks a request node runs. Mode is "all"
- * (default) or "none"; Skip lists "pre" and/or "post".
+ * (default) or "none"; Skip lists "pre", "post" and/or "message".
  */
 export class HookControl {
     /**
@@ -628,7 +683,10 @@ export class HookStep {
 }
 
 /**
- * Hooks are the pre and post steps attached to an API at some scope.
+ * Hooks are the steps attached to an API at some scope: Pre runs before the
+ * request is sent and Post after its response. Message runs for each message
+ * a message request keeps, as it arrives, in the order Pre does; requests that
+ * receive no messages never run it.
  */
 export class Hooks {
     /**
@@ -650,6 +708,13 @@ export class Hooks {
              */
             this["Post"] = [];
         }
+        if (!("Message" in $$source)) {
+            /**
+             * @member
+             * @type {HookStep[]}
+             */
+            this["Message"] = [];
+        }
 
         Object.assign(this, $$source);
     }
@@ -662,12 +727,16 @@ export class Hooks {
     static createFrom($$source = {}) {
         const $$createField0_0 = $$createType15;
         const $$createField1_0 = $$createType15;
+        const $$createField2_0 = $$createType15;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("Pre" in $$parsedSource) {
             $$parsedSource["Pre"] = $$createField0_0($$parsedSource["Pre"]);
         }
         if ("Post" in $$parsedSource) {
             $$parsedSource["Post"] = $$createField1_0($$parsedSource["Post"]);
+        }
+        if ("Message" in $$parsedSource) {
+            $$parsedSource["Message"] = $$createField2_0($$parsedSource["Message"]);
         }
         return new Hooks(/** @type {Partial<Hooks>} */($$parsedSource));
     }
@@ -819,6 +888,15 @@ export class Node {
              */
             this["AttachAt"] = "";
         }
+        if (!("Color" in $$source)) {
+            /**
+             * Color is a colour from NodeColors the canvas draws the step in; "" for
+             * the category's own. It is cosmetic: a run never reads it.
+             * @member
+             * @type {string}
+             */
+            this["Color"] = "";
+        }
         if (!("Request" in $$source)) {
             /**
              * @member
@@ -868,6 +946,16 @@ export class Node {
              */
             this["Cases"] = [];
         }
+        if (!("Values" in $$source)) {
+            /**
+             * Values are what a set node writes, in order; a later one may read an
+             * earlier one. A set node with a target (and no values) writes one
+             * variable or request field instead.
+             * @member
+             * @type {SetValue[]}
+             */
+            this["Values"] = [];
+        }
         if (!("Params" in $$source)) {
             /**
              * @member
@@ -886,41 +974,45 @@ export class Node {
      */
     static createFrom($$source = {}) {
         const $$createField4_0 = $$createType11;
-        const $$createField11_0 = $$createType17;
-        const $$createField12_0 = $$createType19;
-        const $$createField13_0 = $$createType10;
-        const $$createField14_0 = $$createType21;
-        const $$createField15_0 = $$createType10;
+        const $$createField12_0 = $$createType17;
+        const $$createField13_0 = $$createType19;
+        const $$createField14_0 = $$createType10;
+        const $$createField15_0 = $$createType21;
         const $$createField16_0 = $$createType10;
-        const $$createField17_0 = $$createType23;
-        const $$createField18_0 = $$createType8;
+        const $$createField17_0 = $$createType10;
+        const $$createField18_0 = $$createType23;
+        const $$createField19_0 = $$createType25;
+        const $$createField20_0 = $$createType8;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("Needs" in $$parsedSource) {
             $$parsedSource["Needs"] = $$createField4_0($$parsedSource["Needs"]);
         }
         if ("Request" in $$parsedSource) {
-            $$parsedSource["Request"] = $$createField11_0($$parsedSource["Request"]);
+            $$parsedSource["Request"] = $$createField12_0($$parsedSource["Request"]);
         }
         if ("Subflow" in $$parsedSource) {
-            $$parsedSource["Subflow"] = $$createField12_0($$parsedSource["Subflow"]);
+            $$parsedSource["Subflow"] = $$createField13_0($$parsedSource["Subflow"]);
         }
         if ("Body" in $$parsedSource) {
-            $$parsedSource["Body"] = $$createField13_0($$parsedSource["Body"]);
+            $$parsedSource["Body"] = $$createField14_0($$parsedSource["Body"]);
         }
         if ("Branches" in $$parsedSource) {
-            $$parsedSource["Branches"] = $$createField14_0($$parsedSource["Branches"]);
+            $$parsedSource["Branches"] = $$createField15_0($$parsedSource["Branches"]);
         }
         if ("Then" in $$parsedSource) {
-            $$parsedSource["Then"] = $$createField15_0($$parsedSource["Then"]);
+            $$parsedSource["Then"] = $$createField16_0($$parsedSource["Then"]);
         }
         if ("Else" in $$parsedSource) {
-            $$parsedSource["Else"] = $$createField16_0($$parsedSource["Else"]);
+            $$parsedSource["Else"] = $$createField17_0($$parsedSource["Else"]);
         }
         if ("Cases" in $$parsedSource) {
-            $$parsedSource["Cases"] = $$createField17_0($$parsedSource["Cases"]);
+            $$parsedSource["Cases"] = $$createField18_0($$parsedSource["Cases"]);
+        }
+        if ("Values" in $$parsedSource) {
+            $$parsedSource["Values"] = $$createField19_0($$parsedSource["Values"]);
         }
         if ("Params" in $$parsedSource) {
-            $$parsedSource["Params"] = $$createField18_0($$parsedSource["Params"]);
+            $$parsedSource["Params"] = $$createField20_0($$parsedSource["Params"]);
         }
         return new Node(/** @type {Partial<Node>} */($$parsedSource));
     }
@@ -1011,6 +1103,43 @@ export class RequestCall {
              */
             this["Version"] = "";
         }
+        if (!("Overlay" in $$source)) {
+            /**
+             * Overlay names a flowi overlay of the request's collection laid over the
+             * version, "" for none.
+             * @member
+             * @type {string}
+             */
+            this["Overlay"] = "";
+        }
+        if (!("Open" in $$source)) {
+            /**
+             * Open names a connection this step opens and leaves open for later steps
+             * (an async request that can be kept open: WebSocket, MQTT 5, NATS); ""
+             * for none. The step's own send and receive run on it.
+             * @member
+             * @type {string}
+             */
+            this["Open"] = "";
+        }
+        if (!("Over" in $$source)) {
+            /**
+             * Over names a connection an earlier step opened: this step sends and
+             * receives over it instead of connecting.
+             * @member
+             * @type {string}
+             */
+            this["Over"] = "";
+        }
+        if (!("Close" in $$source)) {
+            /**
+             * Close ends the connection Over names once this step has run. A
+             * connection still open when the run ends is closed then.
+             * @member
+             * @type {boolean}
+             */
+            this["Close"] = false;
+        }
         if (!("Hooks" in $$source)) {
             /**
              * @member
@@ -1043,21 +1172,21 @@ export class RequestCall {
      */
     static createFrom($$source = {}) {
         const $$createField0_0 = $$createType12;
-        const $$createField2_0 = $$createType24;
-        const $$createField3_0 = $$createType5;
-        const $$createField4_0 = $$createType5;
+        const $$createField6_0 = $$createType26;
+        const $$createField7_0 = $$createType5;
+        const $$createField8_0 = $$createType5;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("Request" in $$parsedSource) {
             $$parsedSource["Request"] = $$createField0_0($$parsedSource["Request"]);
         }
         if ("Hooks" in $$parsedSource) {
-            $$parsedSource["Hooks"] = $$createField2_0($$parsedSource["Hooks"]);
+            $$parsedSource["Hooks"] = $$createField6_0($$parsedSource["Hooks"]);
         }
         if ("With" in $$parsedSource) {
-            $$parsedSource["With"] = $$createField3_0($$parsedSource["With"]);
+            $$parsedSource["With"] = $$createField7_0($$parsedSource["With"]);
         }
         if ("Headers" in $$parsedSource) {
-            $$parsedSource["Headers"] = $$createField4_0($$parsedSource["Headers"]);
+            $$parsedSource["Headers"] = $$createField8_0($$parsedSource["Headers"]);
         }
         return new RequestCall(/** @type {Partial<RequestCall>} */($$parsedSource));
     }
@@ -1168,6 +1297,17 @@ export class RequestVersion {
              */
             this["Docs"] = "";
         }
+        if (!("Auth" in $$source)) {
+            /**
+             * Auth, when set, signs or authenticates the request when it is sent: an
+             * API key, Digest, OAuth 2.0 or 1.0a, AWS Signature v4, a signed JWT, Hawk
+             * or a client certificate. The Authorization header of Headers is the
+             * simple form of the same thing.
+             * @member
+             * @type {Auth | null}
+             */
+            this["Auth"] = null;
+        }
         if (!("Async" in $$source)) {
             /**
              * Async, when set, makes this an async (message) request instead of an
@@ -1200,13 +1340,14 @@ export class RequestVersion {
         const $$createField4_0 = $$createType5;
         const $$createField5_0 = $$createType5;
         const $$createField6_0 = $$createType6;
-        const $$createField7_0 = $$createType26;
+        const $$createField7_0 = $$createType28;
         const $$createField8_0 = $$createType11;
-        const $$createField9_0 = $$createType27;
-        const $$createField10_0 = $$createType29;
+        const $$createField9_0 = $$createType29;
+        const $$createField10_0 = $$createType31;
         const $$createField11_0 = $$createType5;
-        const $$createField13_0 = $$createType31;
-        const $$createField14_0 = $$createType33;
+        const $$createField13_0 = $$createType33;
+        const $$createField14_0 = $$createType35;
+        const $$createField15_0 = $$createType37;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("Query" in $$parsedSource) {
             $$parsedSource["Query"] = $$createField4_0($$parsedSource["Query"]);
@@ -1232,13 +1373,112 @@ export class RequestVersion {
         if ("Variables" in $$parsedSource) {
             $$parsedSource["Variables"] = $$createField11_0($$parsedSource["Variables"]);
         }
+        if ("Auth" in $$parsedSource) {
+            $$parsedSource["Auth"] = $$createField13_0($$parsedSource["Auth"]);
+        }
         if ("Async" in $$parsedSource) {
-            $$parsedSource["Async"] = $$createField13_0($$parsedSource["Async"]);
+            $$parsedSource["Async"] = $$createField14_0($$parsedSource["Async"]);
         }
         if ("GRPC" in $$parsedSource) {
-            $$parsedSource["GRPC"] = $$createField14_0($$parsedSource["GRPC"]);
+            $$parsedSource["GRPC"] = $$createField15_0($$parsedSource["GRPC"]);
         }
         return new RequestVersion(/** @type {Partial<RequestVersion>} */($$parsedSource));
+    }
+}
+
+/**
+ * SetValue is one value a set node writes into the variable Name.
+ * 
+ * From says where the value comes from: "expr" (the default; Value is a
+ * template or expression), "literal" (Value as written, never evaluated),
+ * "response" (a part of the last response, named by Where) or "generate"
+ * (Value is a template using generators such as {{$uuid-v4}}; Seed makes it
+ * repeatable on its own).
+ */
+export class SetValue {
+    /**
+     * Creates a new SetValue instance.
+     * @param {Partial<SetValue>} [$$source = {}] - The source object to create the SetValue.
+     */
+    constructor($$source = {}) {
+        if (!("Name" in $$source)) {
+            /**
+             * @member
+             * @type {string}
+             */
+            this["Name"] = "";
+        }
+        if (!("From" in $$source)) {
+            /**
+             * @member
+             * @type {string}
+             */
+            this["From"] = "";
+        }
+        if (!("Value" in $$source)) {
+            /**
+             * @member
+             * @type {any}
+             */
+            this["Value"] = null;
+        }
+        if (!("Where" in $$source)) {
+            /**
+             * Where, for From "response", is "body", "header", "cookie" or "status";
+             * Path, Header, Cookie and Regex then say which part (a body regex wins
+             * over the path).
+             * @member
+             * @type {string}
+             */
+            this["Where"] = "";
+        }
+        if (!("Path" in $$source)) {
+            /**
+             * @member
+             * @type {string}
+             */
+            this["Path"] = "";
+        }
+        if (!("Header" in $$source)) {
+            /**
+             * @member
+             * @type {string}
+             */
+            this["Header"] = "";
+        }
+        if (!("Cookie" in $$source)) {
+            /**
+             * @member
+             * @type {string}
+             */
+            this["Cookie"] = "";
+        }
+        if (!("Regex" in $$source)) {
+            /**
+             * @member
+             * @type {string}
+             */
+            this["Regex"] = "";
+        }
+        if (!("Seed" in $$source)) {
+            /**
+             * @member
+             * @type {number}
+             */
+            this["Seed"] = 0;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new SetValue instance from a string or object.
+     * @param {any} [$$source = {}]
+     * @returns {SetValue}
+     */
+    static createFrom($$source = {}) {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new SetValue(/** @type {Partial<SetValue>} */($$parsedSource));
     }
 }
 
@@ -1319,18 +1559,22 @@ const $$createType20 = Branch.createFrom;
 const $$createType21 = $Create.Array($$createType20);
 const $$createType22 = Case.createFrom;
 const $$createType23 = $Create.Array($$createType22);
-const $$createType24 = HookControl.createFrom;
-const $$createType25 = Extraction.createFrom;
-const $$createType26 = $Create.Array($$createType25);
-var $$createType27 = /** @type {(...args: any[]) => any} */(function $$initCreateType27(...args) {
-    if ($$createType27 === $$initCreateType27) {
-        $$createType27 = $$createType28;
+const $$createType24 = SetValue.createFrom;
+const $$createType25 = $Create.Array($$createType24);
+const $$createType26 = HookControl.createFrom;
+const $$createType27 = Extraction.createFrom;
+const $$createType28 = $Create.Array($$createType27);
+var $$createType29 = /** @type {(...args: any[]) => any} */(function $$initCreateType29(...args) {
+    if ($$createType29 === $$initCreateType29) {
+        $$createType29 = $$createType30;
     }
-    return $$createType27(...args);
+    return $$createType29(...args);
 });
-const $$createType28 = $Create.Map($Create.Any, $Create.Any);
-const $$createType29 = Hooks.createFrom;
-const $$createType30 = Async.createFrom;
-const $$createType31 = $Create.Nullable($$createType30);
-const $$createType32 = GRPC.createFrom;
+const $$createType30 = $Create.Map($Create.Any, $Create.Any);
+const $$createType31 = Hooks.createFrom;
+const $$createType32 = Auth.createFrom;
 const $$createType33 = $Create.Nullable($$createType32);
+const $$createType34 = Async.createFrom;
+const $$createType35 = $Create.Nullable($$createType34);
+const $$createType36 = GRPC.createFrom;
+const $$createType37 = $Create.Nullable($$createType36);

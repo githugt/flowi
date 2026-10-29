@@ -20,7 +20,7 @@
     <div class="card">
       <div class="top"><strong>{b.name}</strong><span class="tag">{kindLabel[b.kind]}</span>{#if b.builtIn}<span class="tag builtin">Built in</span>{:else}<span class="muted">{b.collectionName}</span>{/if}<span class="spacer"></span>
         {#if b.builtIn}
-          <!-- Shipped with Flow-I: nothing to delete, and new requests use it unless told otherwise. -->
+          <!-- Shipped with Flowi: nothing to delete, and new requests use it unless told otherwise. -->
         {:else if b.kind === 'flow'}<button onclick={() => (ui.blueprint = { collection: b.collection, folder: '', blueprint: b.key })}>New flow from this…</button>
         {:else}<button onclick={() => BlueprintsService.UseAsDefault(b.key)}>Use for new requests</button>{/if}
         {#if !b.builtIn}<button onclick={() => ui.confirm('Delete blueprint', `Delete the blueprint ${b.name}? Flows made from it are not affected.`, () => BlueprintsService.Delete(b.key))}>Delete…</button>{/if}

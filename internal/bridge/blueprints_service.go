@@ -31,7 +31,7 @@ type BlueprintView struct {
 	Kind        string           `json:"kind"` // flow, post-hooks or pre-hooks
 	Params      []BlueprintParam `json:"params"`
 	Nodes       int              `json:"nodes"`
-	// BuiltIn marks a blueprint Flow-I ships, which new requests start with
+	// BuiltIn marks a blueprint Flowi ships, which new requests start with
 	// unless requests.seed_blueprint names others. It has no file and cannot
 	// be deleted.
 	BuiltIn bool `json:"builtIn,omitempty"`

@@ -34,6 +34,7 @@ func TestApp_should_hand_out_one_instance_of_each_service(t *testing.T) {
 		"Replayer":     func(a *bridge.App) any { return a.Replayer() },
 		"Blueprints":   func(a *bridge.App) any { return a.Blueprints() },
 		"Trash":        func(a *bridge.App) any { return a.Trash() },
+		"Checks":       func(a *bridge.App) any { return a.Checks() },
 		"Hooks":        func(a *bridge.App) any { return a.Hooks() },
 		"Session":      func(a *bridge.App) any { return a.Session() },
 		"Welcome":      func(a *bridge.App) any { return a.Welcome() },

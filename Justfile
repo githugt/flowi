@@ -1,4 +1,4 @@
-# Flow-I web-view GUI (Wails 3 + Svelte). Run `just` to list recipes.
+# Flowi web-view GUI (Wails 3 + Svelte). Run `just` to list recipes.
 
 set shell := ["bash", "-euo", "pipefail", "-c"]
 set positional-arguments

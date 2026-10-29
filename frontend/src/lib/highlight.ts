@@ -12,7 +12,7 @@ export interface Segment {
   cls: string
 }
 
-/** Templates are coloured in any language: they are Flow-I's own, inside JSON strings as much as in text. */
+/** Templates are coloured in any language: they are Flowi's own, inside JSON strings as much as in text. */
 export const templatePattern = /\{\{[^{}]*\}\}/g
 
 /** The language of text shown without one: JSON when it starts like JSON, else plain text. */

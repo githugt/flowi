@@ -3,9 +3,11 @@
 package vm
 
 import (
+	"fmt"
 	"slices"
 	"strings"
 
+	"github.com/githugt/flowi-lib/jsonrpc"
 	"github.com/githugt/flowi-lib/model"
 )
 
@@ -102,9 +104,115 @@ func headerOf(hs []model.KeyValue, name string) string {
 	return ""
 }
 
+// JSONRPC reads the selected version's JSON body as a JSON-RPC 2.0 call. ok
+// is false for any other body (or one that has a {{template}} where JSON
+// needs a value, which is not JSON until it is rendered).
+func (r *Request) JSONRPC() (call jsonrpc.Call, ok bool) {
+	body := r.Current().Body
+	if body.JSON == "" {
+		return jsonrpc.Call{}, false
+	}
+	return jsonrpc.Parse(body.JSON)
+}
+
+// SetJSONRPCField changes the method or the id of the JSON-RPC call the JSON body holds.
+// An empty id makes it a notification. The parameters are kept as they are.
+func (r *Request) SetJSONRPCField(field, value string) {
+	call, ok := r.JSONRPC()
+	if !ok {
+		return
+	}
+	switch field {
+	case "method":
+		call.Method = value
+	case "id":
+		call.ID = value
+	default:
+		return
+	}
+	r.Edit(func(v *model.RequestVersion) { v.Body.JSON = jsonrpc.Envelope(call) })
+}
+
+// MakeJSONRPC turns the JSON body into a JSON-RPC call: an empty body becomes
+// a blank call, and a body that holds JSON becomes the call's parameters.
+func (r *Request) MakeJSONRPC() {
+	if _, already := r.JSONRPC(); already {
+		return
+	}
+	r.Edit(func(v *model.RequestVersion) {
+		call := jsonrpc.Call{Method: "method", ID: "1", Params: strings.TrimSpace(v.Body.JSON)}
+		v.Body = model.Body{JSON: jsonrpc.Envelope(call)}
+	})
+}
+
 // Multipart reports whether a form body is sent as multipart/form-data.
 func (r *Request) Multipart() bool {
 	return len(r.Current().Body.Multipart) > 0 || (r.chosenMultipart && r.BodyKind() == BodyForm)
+}
+
+// MultipartPart is one part of a multipart body as the editor shows it: text, or a
+// file (its path, relative to the collection, and an optional content type).
+type MultipartPart struct {
+	Name        string
+	File        bool
+	Value       string // the text, or the file's path
+	ContentType string // of a file; empty lets the engine pick one
+}
+
+// Parts lists the parts of the selected version's multipart body. A part whose
+// shape is neither text nor a file mapping is shown as its text.
+func (r *Request) Parts() []MultipartPart {
+	out := []MultipartPart{}
+	for _, f := range r.Current().Body.Multipart {
+		switch v := f.Value.(type) {
+		case string:
+			out = append(out, MultipartPart{Name: f.Key, Value: v})
+		case map[string]any:
+			path, _ := v["file"].(string)
+			ctype, _ := v["content_type"].(string)
+			out = append(out, MultipartPart{Name: f.Key, File: true, Value: path, ContentType: ctype})
+		case []model.Field: // how a request file decodes a mapping
+			part := MultipartPart{Name: f.Key, File: true}
+			for _, field := range v {
+				text, _ := field.Value.(string)
+				switch field.Key {
+				case "file":
+					part.Value = text
+				case "content_type":
+					part.ContentType = text
+				}
+			}
+			out = append(out, part)
+		default:
+			out = append(out, MultipartPart{Name: f.Key, Value: fmt.Sprint(f.Value)})
+		}
+	}
+	return out
+}
+
+// SetParts replaces the parts of the multipart body. A part with no name is
+// not kept; the body stays multipart however many parts it has.
+func (r *Request) SetParts(parts []MultipartPart) {
+	r.chosenMultipart = true
+	r.Edit(func(v *model.RequestVersion) {
+		fields := make([]model.Field, 0, len(parts))
+		for _, p := range parts {
+			if p.Name == "" {
+				continue
+			}
+			if !p.File {
+				fields = append(fields, model.Field{Key: p.Name, Value: p.Value})
+				continue
+			}
+			// Ordered fields, as a request file decodes them, so the file is written the same way every time.
+			file := []model.Field{{Key: "file", Value: p.Value}}
+			if p.ContentType != "" {
+				file = append(file, model.Field{Key: "content_type", Value: p.ContentType})
+			}
+			fields = append(fields, model.Field{Key: p.Name, Value: file})
+		}
+		v.Body.Form, v.Body.Multipart = nil, fields
+	})
 }
 
 // SetBodyKind picks the body kind. Typed text is kept when moving to text;

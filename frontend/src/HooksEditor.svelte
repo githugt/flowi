@@ -1,5 +1,5 @@
 <script lang="ts">
-  // A request's own hooks: pre and post steps, each a small flow canvas.
+  // A request's own hooks: pre and post steps, and for message requests a step run for each message, each a small flow canvas.
   import { HooksService } from '../bindings/github.com/githugt/flowi/internal/bridge'
   import { app } from './lib/app.svelte'
   import { ui } from './lib/ui.svelte'
@@ -14,7 +14,7 @@
     problem = ''
     const r = (dropping ? await HooksService.SaveDroppingComments(view.request) : await HooksService.Save(view.request)) as string
     if (r === 'drops-comments') {
-      ui.confirm('Save and drop comments', 'Saving rewrites the request file in Flow-I’s own format, which drops its comments.', () => save(true))
+      ui.confirm('Save and drop comments', 'Saving rewrites the request file in Flowi’s own format, which drops its comments.', () => save(true))
     } else {
       problem = r
     }
@@ -54,7 +54,7 @@
   </header>
   {#if problem}<p class="err">{problem}</p>{/if}
   <div class="phases">
-    {#each [[view.pre, 'Before sending', view.othersPre], [view.post, 'After the response', view.othersPost]] as [row, title, others]}
+    {#each [[view.pre, 'Before sending', view.othersPre], [view.post, 'After the response', view.othersPost], ...(view.showMessage ? [[view.message, 'For each message received', view.othersMessage]] : [])] as [row, title, others]}
       <section>
         <h4>{title}{#if others}<span class="muted"> · {others} more step(s) from other levels run too</span>{/if}</h4>
         <div class="canvas">{#if app.flows[row as string]}<FlowEditor view={app.flows[row as string]} embedded />{/if}</div>
@@ -69,7 +69,7 @@
   .dirty { color: var(--accent); font-size: var(--fs-xs); }
   .spacer { flex: 1; }
   .err { margin: 0; padding: 6px 12px; color: var(--fail); }
-  .phases { flex: 1; min-height: 0; display: grid; grid-template-rows: 1fr 1fr; }
+  .phases { flex: 1; min-height: 0; display: grid; grid-auto-rows: 1fr; }
   section { display: flex; flex-direction: column; min-height: 0; border-bottom: 1px solid var(--line); }
   h4 { margin: 0; padding: 6px 12px; font-size: var(--fs-sm); }
   .muted { color: var(--muted); font-weight: 400; }

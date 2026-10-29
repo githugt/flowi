@@ -61,7 +61,7 @@ func TestImportWizard_preview_lists_files_existing_and_lossy_reports(t *testing.
 	if len(rows) != 3 || !rows[0].Exists || rows[1].Exists || iw.Existing() != 1 {
 		t.Fatalf("rows %+v", rows)
 	}
-	if lossy := iw.Lossy(); len(lossy) != 1 || !strings.Contains(lossy[0], "step x has no Flow-I equivalent") {
+	if lossy := iw.Lossy(); len(lossy) != 1 || !strings.Contains(lossy[0], "step x has no Flowi equivalent") {
 		t.Fatalf("lossy %v", lossy)
 	}
 	if got := iw.Summary(); got != "1 request, 1 flow, 3 files; 1 already exists" {
@@ -137,7 +137,7 @@ func TestImportWizard_unreadable_file_and_preview_errors_are_shown(t *testing.T)
 	iw.Preview()
 	w.Wait()
 	missing := iw.Err()
-	b.PreviewErr = errors.New("not a document Flow-I can import")
+	b.PreviewErr = errors.New("not a document Flowi can import")
 	iw.SetFile(file)
 	iw.Preview()
 	w.Wait()

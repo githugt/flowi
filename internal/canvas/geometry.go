@@ -17,7 +17,7 @@ const curveSteps = 24
 func EdgePath(d Diagram, e Edge) []Point {
 	from, _ := d.Unit(e.From)
 	to, _ := d.Unit(e.To)
-	p0 := Point{X: from.X + from.W, Y: from.PortY()}
+	p0 := Point{X: from.X + from.W, Y: from.PortYOf(e.FromPort)}
 	if to.Parent == from.ID {
 		p0.X = from.X + lanePad/2 // into a lane: from the container's left, not back across it
 	}

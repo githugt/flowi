@@ -21,6 +21,8 @@ import (
 type ResponseView struct {
 	Title    string        `json:"title"`
 	At       string        `json:"at"`
+	Took     string        `json:"took"` // how long the send took, "" when not measured
+	Size     string        `json:"size"` // the body's size, "" when unknown
 	Passed   bool          `json:"passed"`
 	Status   string        `json:"status"` // the engine's status: passed, failed, error…
 	Code     string        `json:"code"`   // what the Response tab shows after its name: the HTTP status, the gRPC code, or the engine's status
@@ -65,6 +67,17 @@ type RequestView struct {
 	InScratch      bool                 `json:"inScratch"`      // a try-out request in the Scratch draft: saving it asks where to keep it
 	Async          *AsyncInfo           `json:"async,omitempty"`
 	GRPC           *GRPCInfo            `json:"grpc,omitempty"`
+
+	// Parts are the parts of a multipart form body, for its editor.
+	Parts []MultipartPartView `json:"parts"`
+
+	// JSONRPC is set when the JSON body is a JSON-RPC 2.0 call: the editor then offers its method and id.
+	JSONRPC *JSONRPCView `json:"jsonrpc,omitempty"`
+
+	FlowiOverlay      string             `json:"flowiOverlay"`      // the flowi overlay laid over the version ("" for none)
+	FlowiOverlays     []FlowiOverlayView `json:"flowiOverlays"`     // those of the collection
+	FlowiOverlayNotes []string           `json:"flowiOverlayNotes"` // what the chosen one does not fit or has drifted from
+	FlowiOverlayMarks []FlowiOverlayMark `json:"flowiOverlayMarks"` // the header and query rows the chosen overlays set
 }
 
 type openRequest struct {
@@ -116,6 +129,10 @@ func (s *RequestService) open(node string) (RequestView, error) {
 	o.snip.OnChange(func() { s.app.emit("request", s.view(node, o)) })
 	o.snip.Refresh()
 	s.reqs[node] = o
+	// The tab's first view lists the overlays: an event sent after it could be lost while the window is still starting.
+	if list, err := s.app.backend.Overlays(c.Manifest.ID); err == nil {
+		req.SetOverlays(list)
+	}
 	s.app.send.LoadSaved(req)
 	return s.view(node, o), nil
 }
@@ -236,6 +253,12 @@ func (s *RequestService) view(node string, o *openRequest) RequestView {
 		Dirty: r.Dirty(), OnDisk: r.ChangedOnDisk(), NeedsDrop: r.NeedsDropConfirm(), Error: r.Err(), Current: r.Current(), FullURL: vm.URLWithQuery(r.Current().URL, r.Current().Query), HookChain: nonNil(r.HookChain()),
 		InScratch: s.app.workspace.InScratch(node), Snippet: snippetViewOf(o.snip), Pipeline: pipelineOf(r, s.app.send.TraceFor(t)), Live: liveOf(s.app.send.TraceFor(t)), Async: asyncInfoOf(r), GRPC: grpcInfoOf(r), Sending: s.app.send.RunningFor(t), SendError: s.app.send.ErrFor(t),
 	}
+	v.FlowiOverlay, v.FlowiOverlays, v.FlowiOverlayNotes = r.OverlayName(), flowiOverlaysOf(r), nonNil(r.OverlayNotes())
+	v.FlowiOverlayMarks = flowiOverlayMarksOf(r)
+	v.Parts = multipartPartsOf(r)
+	if call, ok := r.JSONRPC(); ok {
+		v.JSONRPC = &JSONRPCView{Method: call.Method, ID: call.ID}
+	}
 	if kind == "http" {
 		v.ReplayPath = replay.PathOf(r.Current().URL)
 	}
@@ -273,6 +296,8 @@ func responseOf(ex vm.Exchange, f vm.ViewFormat) *ResponseView {
 			rv.BodyJSON = rec.Body.JSON
 		}
 		rv.Phases = phasesOf(rec.Timings)
+		rv.Took = vm.TookText(rec.Timings.Total)
+		rv.Size = sizeOf(rec)
 		rv.Messages = messagesOf(rec.Messages)
 		rv.Sent = partsOf(vm.InputParts(model.Node{}, detail))
 		rv.Received = partsOf(vm.OutputParts(model.Node{}, detail, f))
@@ -384,6 +409,14 @@ func untitledName(ws *vm.Workspace, node string, req *vm.Request) string {
 	return url
 }
 
+// sizeOf is the size of the body a send got back. Messages and gRPC calls have no single body, so they show none.
+func sizeOf(rec *engine.Record) string {
+	if rec.HasMessages() || rec.Kind == engine.KindGRPC {
+		return ""
+	}
+	return vm.SizeText(rec.Body.Size)
+}
+
 // codeOf is the short status of a record: a gRPC code, an HTTP status, or the fallback (messages: the outcome).
 func codeOf(rec *engine.Record, fallback string) string {
 	switch {
@@ -402,6 +435,31 @@ func versionNamesOf(r model.Request) []string {
 	out := make([]string, len(r.Versions))
 	for i, v := range r.Versions {
 		out[i] = v.Name
+	}
+	return out
+}
+
+// JSONRPCView is the method and id of the JSON-RPC call a JSON body holds.
+type JSONRPCView struct {
+	Method string `json:"method"`
+	ID     string `json:"id"` // "" for a notification
+}
+
+// MultipartPartView is one part of a multipart body: text, or a file by its path.
+type MultipartPartView struct {
+	Name        string `json:"name"`
+	File        bool   `json:"file"`
+	Value       string `json:"value"` // the text, or the file's path
+	ContentType string `json:"contentType"`
+}
+
+func multipartPartsOf(r *vm.Request) []MultipartPartView {
+	out := []MultipartPartView{}
+	if !r.Multipart() {
+		return out
+	}
+	for _, p := range r.Parts() {
+		out = append(out, MultipartPartView{Name: p.Name, File: p.File, Value: p.Value, ContentType: p.ContentType})
 	}
 	return out
 }

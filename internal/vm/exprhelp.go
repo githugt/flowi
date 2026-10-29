@@ -165,13 +165,18 @@ func helpByContext() map[ExprContext]ExprHelp {
 		},
 		ExprMessageFilter: {
 			Title: "Which messages to keep",
-			Intro: "A test written without braces, asked about each message on its own. A message that lacks a field the test reads is skipped, not an error.",
+			Intro: "One test written without braces, asked about each message on its own, in the same language as the checks of Assert. A message that lacks a field the test reads is skipped, not an error: a mistyped field name shows as a timeout with “received 0 of N”. The test cannot depend on several messages.",
 			Names: []HelpItem{
 				{"body.<field>", "A field of the message body.", `body.type == "order"`},
 				{"headers.<name>", "A header or property of the message; names are in lower case.", `headers.event == "created"`},
 			},
 			Examples: []string{`body.type == "order" and body.total > 10`, `body.status in ["new", "paid"]`},
-			Tools:    []HelpItem{{"received, outcome", "Not available here: they are known only once the run has ended.", ""}},
+			Tools: []HelpItem{
+				{"and, &&   or, ||   not, !", "Combine tests; parentheses group them.", `(body.a == 1 or body.b == 2) and not body.skip`},
+				{"==  !=  <  <=  >  >=", "Compare a field with a value.", "body.total >= 10"},
+				{"in [ … ]", "True when the field is one of the listed values.", `body.status in ["new", "paid"]`},
+				{"received, outcome", "Not available here: they are known only once the run has ended.", ""},
+			},
 		},
 	}
 }

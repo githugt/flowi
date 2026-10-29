@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-// Command flowi is the web-view front end of Flow-I.
+// Command flowi is the web-view front end of Flowi.
 package main
 
 import (
@@ -11,6 +11,7 @@ import (
 	"log/slog"
 	"os"
 	"os/signal"
+	"runtime"
 	"sync/atomic"
 	"syscall"
 
@@ -29,6 +30,11 @@ import (
 
 //go:embed all:frontend/dist
 var assets embed.FS
+
+// appIcon is the window icon on Linux. macOS and Windows take theirs from the app bundle and the executable.
+//
+//go:embed build/appicon.png
+var appIcon []byte
 
 // changelog is what the welcome screen shows the latest entry of.
 //
@@ -65,11 +71,11 @@ func run() error {
 	}
 	emit := func(name string, data any) { wails.Event.Emit(name, data) }
 	app = bridge.NewApp(backend.New(ws, uithread.NewGuard(false)), bridge.NewActor(ctx), emit,
-		bridge.WithLogger(slog.Default()), bridge.WithChangelog(changelog), bridge.WithOpenProblems(openProblems), bridge.WithWorkspaceFile(ws), bridge.WithSpecOverlays(ws))
+		bridge.WithLogger(slog.Default()), bridge.WithChangelog(changelog), bridge.WithOpenProblems(openProblems), bridge.WithWorkspaceFile(ws), bridge.WithSpecOverlays(ws), bridge.WithCollectionVariables(ws))
 
 	wails = application.New(application.Options{
-		Name:        "Flow-I",
-		Description: "Flow-I",
+		Name:        "Flowi",
+		Description: "Flowi",
 		OnShutdown:  app.Shutdown,
 		// Cmd+Q and the Quit menu item do not close the window first, so the
 		// guard sits here too.
@@ -89,6 +95,7 @@ func run() error {
 			application.NewService(app.Replayer()),
 			application.NewService(app.Blueprints()),
 			application.NewService(app.Trash()),
+			application.NewService(app.Checks()),
 			application.NewService(app.Hooks()),
 			application.NewService(app.Session()),
 			application.NewService(app.Passphrase()),
@@ -105,10 +112,13 @@ func run() error {
 		File: func(title string) (string, error) {
 			return wails.Dialog.OpenFile().SetTitle(title).PromptForSingleSelection()
 		},
+		Save: func(title, name string) (string, error) {
+			return wails.Dialog.SaveFile().SetMessage(title).SetFilename(name).CanCreateDirectories(true).PromptForSingleSelection()
+		},
 		Reveal: func(folder string) error { return wails.Env.OpenFileManager(folder, false) },
 	})
 	window := wails.Window.NewWithOptions(application.WebviewWindowOptions{
-		Title:  "Flow-I",
+		Title:  "Flowi",
 		Width:  1360,
 		Height: 860,
 		// The page says where the window can be dragged from (--wails-draggable: the sidebar's
@@ -119,10 +129,14 @@ func run() error {
 			TitleBar: application.MacTitleBarHiddenInset,
 		},
 		// On Linux the menus sit behind a button in the title bar instead of taking a row of their own.
-		Linux:            application.LinuxWindow{MenuStyle: application.LinuxMenuStylePrimaryMenu},
+		Linux:            application.LinuxWindow{MenuStyle: application.LinuxMenuStylePrimaryMenu, Icon: appIcon},
 		BackgroundColour: application.NewRGB(15, 17, 22),
 		URL:              "/",
 	})
+
+	if runtime.GOOS == "windows" {
+		hideMenuBarUntilAlt(wails, window)
+	}
 
 	app.SetQuit(func() {
 		quitting.Store(true)

@@ -20,6 +20,7 @@ type SuggestSource struct {
 	Env        []string // variables of the selected environment
 	Secrets    []string
 	Vars       []string // the request's own variables ({{var.x}})
+	Collection []string // the collection's variables ({{collection_var.x}})
 	Generators []Generator
 }
 
@@ -82,7 +83,7 @@ func candidates(typed string, src SuggestSource) []Suggestion {
 		prefix string
 		names  []string
 		detail string
-	}{{"env.", src.Env, "environment"}, {"var.", src.Vars, "request variable"}, {"secret.", src.Secrets, "secret"}} {
+	}{{"env.", src.Env, "environment"}, {"var.", src.Vars, "request variable"}, {"collection_var.", src.Collection, "collection variable"}, {"secret.", src.Secrets, "secret"}} {
 		for _, n := range slices.Sorted(slices.Values(ns.names)) {
 			out = append(out, Suggestion{Insert: ns.prefix + n, Detail: ns.detail})
 		}
@@ -100,8 +101,8 @@ func BuiltinGenerators() []Generator {
 }
 
 // RequestSource is the suggestion source for a request of a collection:
-// the environment's variables and secrets, the request's own variables and
-// the built-in functions.
-func RequestSource(envVars, secrets []string, v []string) SuggestSource {
-	return SuggestSource{Env: envVars, Secrets: secrets, Vars: v, Generators: BuiltinGenerators()}
+// the environment's variables and secrets, the request's own variables, the
+// collection's variables and the built-in functions.
+func RequestSource(envVars, secrets, v, collection []string) SuggestSource {
+	return SuggestSource{Env: envVars, Secrets: secrets, Vars: v, Collection: collection, Generators: BuiltinGenerators()}
 }

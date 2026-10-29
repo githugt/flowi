@@ -11,6 +11,7 @@ import (
 	"github.com/githugt/flowi-lib/announce"
 	"github.com/githugt/flowi-lib/diag"
 	"github.com/githugt/flowi-lib/engine"
+	"github.com/githugt/flowi-lib/flowioverlay"
 	"github.com/githugt/flowi-lib/grpcx"
 	"github.com/githugt/flowi-lib/model"
 	"github.com/githugt/flowi-lib/schemainfer"
@@ -34,7 +35,8 @@ type Backend interface {
 	ResetUserSetting(key string) error
 
 	SaveRequest(t flowi.RequestTarget, r model.Request, dropComments bool) error
-	StoreEdit(t flowi.RequestTarget, base string, v model.RequestVersion) error
+	// StoreEdit keeps v as the request's dirty edit of version base; overlay names the flowi overlay it was made with ("" for none).
+	StoreEdit(t flowi.RequestTarget, base, overlay string, v model.RequestVersion) error
 	DiscardEdit(t flowi.RequestTarget) error
 	PreviewRequest(t flowi.RequestTarget, v model.RequestVersion, o flowi.SendOptions, includeSecrets bool) (engine.Preview, error)
 	NewRequest(collection model.ID, path string) (flowi.RequestTarget, error)
@@ -67,6 +69,8 @@ type Backend interface {
 	// FlowSource shows f (flow t with unsaved edits) as text; ParseFlowSource reads such text back.
 	FlowSource(t flowi.FlowTarget, f model.Flow) (flowi.FlowText, error)
 	ParseFlowSource(t flowi.FlowTarget, text string) (model.Flow, diag.List, error)
+	// CheckFlowDraft validates f in place of flow t and returns the problems in that flow.
+	CheckFlowDraft(t flowi.FlowTarget, f model.Flow) diag.List
 	// KeepFlowEdits stores a flow's unsaved edits for the next start; KeptFlowEdits returns them as source text and forgets them.
 	KeepFlowEdits(t flowi.FlowTarget, f model.Flow) error
 	KeptFlowEdits(t flowi.FlowTarget) (string, bool, error)
@@ -79,7 +83,9 @@ type Backend interface {
 	LastResponse(t flowi.RequestTarget, version string) (engine.Record, bool)
 	// FlowRuns lists the saved runs of a flow, newest first.
 	FlowRuns(t flowi.FlowTarget, limit int) []flowi.RunSummary
-	// FlowCompatibility lists the steps of a flow only Flow-I can run (FLW-ARAZZO-002).
+	// FlowRunDetail reads what one saved run did at each node and the variables it ended with.
+	FlowRunDetail(t flowi.FlowTarget, id string) (flowi.RunDetail, error)
+	// FlowCompatibility lists the steps of a flow only Flowi can run (FLW-ARAZZO-002).
 	FlowCompatibility(t flowi.FlowTarget) diag.List
 	// ListSchemas, SchemaFor and DeleteSchema are the schemas learned from
 	// (or imported for) a request version.
@@ -94,6 +100,17 @@ type Backend interface {
 	RestoreFromTrash(id string) (string, error)
 	DeleteFromTrash(id string) error
 	EmptyTrash() error
+	// Overlays lists the flowi overlays of a collection; ApplyOverlay lays one over a version
+	// as a send would; DiffForOverlay and SaveAsOverlay store an edit as one; OverlayText and
+	// WriteOverlayText read and write an overlay's file for the overlay editor.
+	Overlays(collection model.ID) ([]model.Overlay, error)
+	ApplyOverlay(t flowi.RequestTarget, name string, v model.RequestVersion) (model.RequestVersion, []flowioverlay.Problem, error)
+	DiffForOverlay(t flowi.RequestTarget, base string, edited model.RequestVersion) (flowi.OverlayDiff, error)
+	SaveAsOverlay(t flowi.RequestTarget, in flowi.SaveOverlayInput, dropComments bool) error
+	DeleteOverlay(collection model.ID, name string) error
+	OverlayText(collection model.ID, name string) (string, error)
+	ExportOverlayAsSpec(collection model.ID, name string) (flowi.OverlayExport, error)
+	WriteOverlayText(collection model.ID, name, text string) error
 	// StoredResponses lists what is kept for a request: pinned examples and saved responses.
 	StoredResponses(t flowi.RequestTarget) ([]flowi.StoredResponse, error)
 	DeleteStoredResponse(t flowi.RequestTarget, kind, version, name string) error
@@ -111,6 +128,20 @@ type Backend interface {
 	UnsetSecret(env, name string) error
 
 	Mount(dir string) (model.Manifest, error)
+	// OpenBundle opens a run bundle file as a collection whose runs play the recording back. It lasts until
+	// the app quits.
+	OpenBundle(path string) error
+	// OpenArazzo opens an Arazzo document (a file or URL) as a collection whose flows run against its own server.
+	OpenArazzo(ctx context.Context, ref string) error
+	// Coverage measures how much of the imported API descriptions the flows use ("" measures every collection).
+	Coverage(collection model.ID) (analysis.Coverage, error)
+	// ImpactAgainst says what a changed OpenAPI description would break; name picks a kept description ("" when
+	// there is one).
+	ImpactAgainst(collection model.ID, name string, spec []byte) (flowi.SpecImpact, error)
+	// SpecNames are the OpenAPI descriptions a collection kept at import.
+	SpecNames(collection model.ID) []string
+	CheckAccess(ctx context.Context, t flowi.FlowTarget, o flowi.AccessOptions) (flowi.AccessReport, error)
+	CheckDrift(ctx context.Context, t flowi.FlowTarget, o flowi.DriftOptions) (flowi.DriftReport, error)
 	Unmount(id model.ID) error
 	Relocate(id model.ID, dir string) error
 	InitCollection(dir, name string) (model.Manifest, error)

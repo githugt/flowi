@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <title>Flow-I, Windows</title>
+  <!-- Source of appicon-windows.png, which makes windows/icon.ico. The same art as appicon.svg, but the tile fills
+       the whole canvas: Windows icons do not carry the transparent margin macOS wants, so the margin would only make
+       the icon look small in the taskbar. Keep the colours in step with appicon.svg. -->
+  <defs>
+    <clipPath id="tile"><rect width="100" height="100" rx="22.4"/></clipPath>
+  </defs>
+  <g transform="scale(10.24)">
+    <g clip-path="url(#tile)">
+      <rect width="100" height="100" fill="#e11d48"/>
+      <path d="M0 68C30 52 55 82 100 40V100H0Z" fill="#c8153f"/>
+      <path d="M0 84C30 70 58 96 100 62V100H0Z" fill="#9f1239"/>
+      <g fill="none" stroke="#ffffff" stroke-width="10" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M26 78V26"/>
+        <path d="M26 26Q40 12 54 26T76 26"/>
+        <path d="M26 52H50"/>
+        <path d="M78 52V76"/>
+      </g>
+      <circle cx="78" cy="34" r="7" fill="#ffe600"/>
+    </g>
+  </g>
+</svg>

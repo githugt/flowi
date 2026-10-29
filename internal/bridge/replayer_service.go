@@ -16,6 +16,13 @@ type ReplayerForm struct {
 	CORS     bool   `json:"cors"`
 	Record   string `json:"record"`
 	RecordTo string `json:"recordTo"` // collection id; "" is the Scratch draft
+	// RecordHAR is a file the recorded calls are also written to, in order.
+	RecordHAR string `json:"recordHar"`
+	// Faults: percentages 0 to 100, the status of an injected error, and up to how much extra delay.
+	FaultErrorPercent string `json:"faultErrorPercent"`
+	FaultStatus       string `json:"faultStatus"`
+	FaultDropPercent  string `json:"faultDropPercent"`
+	FaultJitter       string `json:"faultJitter"`
 }
 
 // TrafficRow is one call the replayer answered.
@@ -80,7 +87,7 @@ func (s *ReplayerService) State() ReplayerView {
 // Start starts the replayer with the form's values.
 func (s *ReplayerService) Start(f ReplayerForm) {
 	s.app.actor.Do(func() {
-		s.vm.Start(vm.ReplayerForm{Addr: f.Addr, Latency: f.Latency, Sequence: f.Sequence, CORS: f.CORS, Record: f.Record, RecordTo: f.RecordTo})
+		s.vm.Start(vm.ReplayerForm(f))
 	})
 }
 
@@ -98,7 +105,7 @@ func (s *ReplayerService) view() ReplayerView {
 	f := s.vm.Form()
 	v := ReplayerView{
 		State: replayerStates()[s.vm.State()], Addr: s.vm.Addr(), Error: s.vm.Err(), Notes: nonNil(s.vm.Notes()),
-		Form: ReplayerForm{Addr: f.Addr, Latency: f.Latency, Sequence: f.Sequence, CORS: f.CORS, Record: f.Record, RecordTo: f.RecordTo}, Targets: s.targets(), Traffic: []TrafficRow{},
+		Form: ReplayerForm(f), Targets: s.targets(), Traffic: []TrafficRow{},
 	}
 	entries := s.vm.Entries()
 	for i := len(entries) - 1; i >= 0 && len(v.Traffic) < maxTrafficShown; i-- {

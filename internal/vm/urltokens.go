@@ -261,7 +261,7 @@ func (t *urlTokenizer) spans() []URLSpan {
 // runtimeNamespaces are the names only a run can know: never reported as
 // unknown while editing.
 func runtimeNamespaces() []string {
-	return []string{"vars", "with", "inputs", "nodes", "response", "request", "status"}
+	return []string{"vars", "with", "inputs", "nodes", "response", "request", "status", "collection_var"}
 }
 
 // NewNameChecker returns the "is this variable defined" test for

@@ -1,29 +1,49 @@
 <script lang="ts">
   import { confirmDeleteSteps } from './lib/flowDelete'
   import { FlowService } from '../bindings/github.com/githugt/flowi/internal/bridge'
-  import type { FlowView, Slot } from './lib/types'
+  import type { FlowView, Slot, StepChoice, WireChoices } from './lib/types'
   import Canvas, { type DragInfo } from './Canvas.svelte'
   import SidePanel from './SidePanel.svelte'
   import RunMenu from './RunMenu.svelte'
   import CodeView from './CodeView.svelte'
   import FileBanner from './FileBanner.svelte'
   import Chips from './Chips.svelte'
+  import SkipChip from './SkipChip.svelte'
+  import DebugBar from './DebugBar.svelte'
+  import FlowTools from './FlowTools.svelte'
   import Problem from './Problem.svelte'
   import { Clipboard } from '@wailsio/runtime'
   import { ui } from './lib/ui.svelte'
   import { app } from './lib/app.svelte'
   import VarsBar from './VarsBar.svelte'
-  import Palette from './Palette.svelte'
+  import StepPopup from './StepPopup.svelte'
+  import IOEditor from './IOEditor.svelte'
+  import { withRouteByStatus } from './lib/popup'
+  import CaseEditor from './CaseEditor.svelte'
+  import RowEditor from './RowEditor.svelte'
+  import WirePanel from './WirePanel.svelte'
+  import OutputDock from './OutputDock.svelte'
+  import { errorText } from './lib/errors'
 
   let { view, embedded = false }: { view: FlowView; embedded?: boolean } = $props()
   let canvas = $state<Canvas>()
   let code = $state<CodeView>()
   let mode = $state<'canvas' | 'code'>('canvas')
   let slot = $state<Slot | null>(null)
-  // A step type dragged out of the palette.
-  let fromPalette = $state<{ type: string; x: number; y: number; moved: boolean } | null>(null)
 
   const node = $derived(view.node)
+
+  // A value wire dropped from one step onto another: the choices of what to take and where to put it, or why not.
+  let wire = $state<{ from: string; to: string; x: number; y: number; choices: WireChoices } | null>(null)
+  async function onData(from: string, to: string, x: number, y: number) {
+    try {
+      const choices = (await FlowService.WireChoices(node, from, to)) as unknown as WireChoices
+      if (choices.reason) ui.toast(choices.reason)
+      else wire = { from, to, x, y, choices }
+    } catch (e) {
+      ui.toast(errorText(e))
+    }
+  }
 
   // Viewing leaves the whole window to the graph; Edit brings the palette and lets steps be moved and linked.
   // A flow without steps starts in Edit, the hook editors (embedded) are always editing.
@@ -100,7 +120,10 @@
     const mod = e.metaKey || e.ctrlKey
     const target = e.target as HTMLElement
     const typing = target?.matches?.('input, textarea, select') || target?.isContentEditable
-    if (mod && e.key.toLowerCase() === 'z' && !typing) {
+    if (e.key === '/' && !mod && !typing && editing && !popup) {
+      e.preventDefault()
+      openPopup(window.innerWidth / 2 - 180, 120, null)
+    } else if (mod && e.key.toLowerCase() === 'z' && !typing) {
       e.preventDefault()
       e.shiftKey ? FlowService.Redo(node) : FlowService.Undo(node)
     } else if (mod && e.key.toLowerCase() === 's' && !embedded) {
@@ -144,37 +167,6 @@
     await FlowService.Drop(node, i.unit, i.step, i.lift, Math.round(i.x), Math.round(i.y), i.snap, i.atX, i.atY)
   }
 
-  function startPaletteDrag(type: string, e: PointerEvent) {
-    fromPalette = { type, x: e.clientX, y: e.clientY, moved: false }
-  }
-
-  function movePaletteDrag(e: PointerEvent) {
-    const d = fromPalette
-    if (!d) return
-    d.x = e.clientX
-    d.y = e.clientY
-    d.moved ||= Math.hypot(e.movementX, e.movementY) > 0
-    const c = canvas!.toCanvas(e.clientX, e.clientY)
-    if (!c) {
-      slot = null
-      return
-    }
-    preview(() => FlowService.Preview(node, '', '', false, Math.round(c.x), Math.round(c.y), c.snap) as Promise<Slot>)
-  }
-
-  async function endPaletteDrag(e: PointerEvent) {
-    const d = fromPalette
-    fromPalette = null
-    slot = null
-    queued = null
-    // A press without a move is a click: the button's own click adds the step at the end.
-    if (!d?.moved) return
-    const c = canvas!.toCanvas(e.clientX, e.clientY)
-    if (c) await FlowService.AddStep(node, d.type, Math.round(c.x), Math.round(c.y), c.snap, true)
-    suppressClick = true
-    setTimeout(() => (suppressClick = false))
-  }
-
   // Done in the code view applies what was typed first; with problems, Edit stays on to fix them.
   async function toggleEdit() {
     if (editMode && mode === 'code' && !(await code!.settle())) return
@@ -188,33 +180,94 @@
     mode = next
   }
 
-  let suppressClick = false
-  const add = (type: string) => !suppressClick && FlowService.AddStep(node, type, 0, 0, 0, false)
+  // The popup that adds a step: opened by the + on either side of a card (near that card), the Add step button
+  // and the / key (at the end, or after the selected step). It shows only in Edit.
+  let popup = $state<{ x: number; y: number; near: { step: string; before: boolean } | null } | null>(null)
+  function openPopup(x: number, y: number, near: { step: string; before: boolean } | null) {
+    popup = { x, y, near }
+  }
+  function openPopupAtButton(e: MouseEvent) {
+    const r = (e.currentTarget as HTMLElement).getBoundingClientRect()
+    openPopup(r.left, r.bottom, null)
+  }
+  // A Route's case port label opened for editing: select the Route (the edit applies to the selected step), then show the test.
+  let caseAt = $state<{ index: number; x: number; y: number } | null>(null)
+  async function openCase(step: string, index: number, e: MouseEvent) {
+    const at = { index, x: e.clientX, y: e.clientY }
+    await FlowService.Select(node, step)
+    caseAt = at
+  }
 
-  // The canvas's + on either side of a card: every step type by group, picked from a menu where it was
-  // clicked, added right before or after that card. It shows only in Edit, with the palette, which offers
-  // the same steps for dragging into place: shown while viewing, it offered an edit the view did not allow.
-  function addMenu(x: number, y: number, near: { step: string; before: boolean } | null) {
-    const items: { label: string; run: () => void; disabled?: boolean; separator?: boolean }[] = []
-    let group = ''
-    for (const p of view.palette) {
-      if (p.group !== group) {
-        if (group) items.push({ separator: true, label: '', run: () => {} })
-        group = p.group
-        items.push({ label: group.toUpperCase(), run: () => {}, disabled: true })
-      }
-      items.push({ label: p.type, run: () => (near ? FlowService.AddStepNear(node, p.type, near.step, near.before) : add(p.type)) })
+  // A Start or End row opened for editing: the input or output behind it, and where it was clicked.
+  let io = $state<{ role: 'start' | 'end'; index: number; x: number; y: number } | null>(null)
+  function openIO(role: 'start' | 'end', key: string, e: MouseEvent) {
+    if (!editing) return
+    const list = role === 'start' ? view.inputs : view.outputs
+    const index = list.findIndex((i) => key === (role === 'start' ? 'input:' : 'output:') + i.name)
+    if (index >= 0) io = { role, index, x: e.clientX, y: e.clientY }
+  }
+  async function addInput() {
+    try {
+      const name = await FlowService.AddInput(node, '')
+      const index = view.inputs.findIndex((i) => i.name === name)
+      io = { role: 'start', index: index >= 0 ? index : view.inputs.length, x: window.innerWidth / 3, y: 140 }
+    } catch (e) {
+      ui.toast(errorText(e))
     }
-    ui.openMenu(x, y + 8, items)
+  }
+  async function addOutput() {
+    try {
+      const name = await FlowService.AddOutput(node, '')
+      const index = view.outputs.findIndex((i) => i.name === name)
+      io = { role: 'end', index: index >= 0 ? index : view.outputs.length, x: window.innerWidth / 2, y: 140 }
+    } catch (e) {
+      ui.toast(errorText(e))
+    }
+  }
+
+  // The selected card's toolbar: add opens the popup after the step; the rest act on it at once.
+  function onTool(tool: 'add' | 'skip' | 'break' | 'duplicate' | 'delete', step: string, e: MouseEvent) {
+    if (tool === 'add') openPopup(e.clientX, e.clientY, { step, before: false })
+    else if (tool === 'skip') FlowService.ToggleSkip(node, step)
+    else if (tool === 'break') FlowService.ToggleBreak(node, step)
+    else if (tool === 'duplicate') FlowService.Duplicate(node, step)
+    else confirmDeleteSteps(node, [step])
+  }
+  const onColour = (step: string, colour: string) => FlowService.SetColor(node, step, colour).catch((e) => ui.toast(errorText(e)))
+  // The step a new one would follow, when it gives a status to route by: a request, a URL call or a webhook.
+  const routeAfter = $derived.by(() => {
+    if (!popup) return ''
+    const after = popup.near ? (popup.near.before ? '' : popup.near.step) : view.selected
+    const u = view.diagram.units.find((x) => x.nodes.includes(after))
+    const type = u?.types[u.nodes.indexOf(after)]
+    return type && ['request', 'fetch', 'webhook'].includes(type) ? after : ''
+  })
+  // The popup's list: the ten kinds, and after Route the shortcut that routes by the status of the step before.
+  const popupSteps = $derived(withRouteByStatus(view.steps, routeAfter))
+  function addPicked(s: StepChoice) {
+    const near = popup?.near
+    const after = routeAfter
+    popup = null
+    if (s.mode === 'status' && after) FlowService.AddRouteByStatus(node, after).catch((e) => ui.toast(errorText(e)))
+    else if (near) FlowService.AddStepNear(node, s.type, near.step, near.before)
+    else FlowService.AddStep(node, s.type, 0, 0, 0, false)
   }
 </script>
 
-<svelte:window {onkeydown} onpointermove={movePaletteDrag} onpointerup={endPaletteDrag} />
+{#snippet outputDock(step: string, pinned: boolean, pin: () => void)}
+  <OutputDock {view} {step} {pinned} onpin={pin} />
+{/snippet}
+
+{#snippet rowPanel(row: string, close: () => void)}
+  <RowEditor {view} {row} onclose={close} />
+{/snippet}
+
+<svelte:window {onkeydown} />
 
 <div class="editor" bind:this={root}>
   <header>
     <strong>{view.name}</strong>
-    {#if !embedded}<Chips {view} />{/if}
+    {#if !embedded}<Chips {view} /><SkipChip {view} />{/if}
     {#if failedSteps.length && !view.run.running}
       <button class="failed" title="Show the step the run failed at" onclick={showFailure}>Failed: {failedSteps[0]}{failedSteps.length > 1 ? ` +${failedSteps.length - 1}` : ''}</button>
     {/if}
@@ -229,8 +282,10 @@
       {#if view.run.running}<span class="status">Running…</span>
       {:else if view.run.summary && !view.run.error}<span class="status">{view.run.summary}</span>{/if}
       <RunMenu {view} />
+      <FlowTools {view} />
     {/if}
     {#if editing}
+      <button title="Add a step (/)" onclick={openPopupAtButton}>+ Add step</button>
       <button disabled={!view.canUndo} onclick={() => FlowService.Undo(node)}>Undo</button>
       <button disabled={!view.canRedo} onclick={() => FlowService.Redo(node)}>Redo</button>
     {/if}
@@ -240,6 +295,7 @@
     {#if !embedded}<button class="primary" disabled={!view.dirty} onclick={() => FlowService.Save(node)}>Save</button>{/if}
     {#if !embedded}<button class="more" aria-label="More" title="More" onpointerdown={(e) => e.stopPropagation()} onclick={moreMenu}>⋯</button>{/if}
   </header>
+  <DebugBar {view} />
   <!-- A run's error gets its own line: in the header it was cut to a few words. -->
   {#if !embedded && view.run.error && !view.run.running && dismissedError !== view.run.error}
     <div class="runerr" role="alert">
@@ -253,7 +309,6 @@
   {/if}
   <FileBanner onDisk={view.onDisk} needsDrop={view.needsDrop} revert={() => FlowService.Revert(node)} saveDropping={() => FlowService.SaveDroppingComments(node)} declineDrop={() => FlowService.DeclineDrop(node)} />
   <div class="work" hidden={mode === 'code'}>
-    {#if editing}<Palette entries={view.palette} onadd={add} ondragstart={startPaletteDrag} />{/if}
     <div class="center">
     <div class="canvas">
       <Canvas
@@ -270,12 +325,24 @@
         onconnect={(from, to) => FlowService.Connect(node, from, to)}
         oncollapse={(unit, on) => FlowService.Collapse(node, unit, on)}
         onaddcase={(id) => FlowService.AddCaseTo(node, id)}
-        onadd={editing ? addMenu : undefined}
+        onadd={editing ? openPopup : undefined}
+        ontoolbar={editing ? onTool : undefined}
+        oncolour={editing ? onColour : undefined}
+        oncase={editing ? openCase : undefined}
+        start={view.start}
+        end={view.end}
+        onedgerow={openIO}
+        onmoveinput={editing ? (from, to) => FlowService.MoveInput(node, from, to).catch((e) => ui.toast(errorText(e))) : undefined}
+        onaddinput={editing ? addInput : undefined}
+        onaddoutput={editing ? addOutput : undefined}
         ondrag={onDrag}
         ondrop={onDrop}
         oncancel={() => (slot = null)}
         initialView={app.canvasViews[node] ?? null}
         onviewchange={(v) => (app.canvasViews[node] = v)}
+        panel={editing ? rowPanel : undefined}
+        ondata={editing ? onData : undefined}
+        dock={outputDock}
       />
     </div>
     <VarsBar vars={view.vars} />
@@ -284,8 +351,21 @@
   </div>
 </div>
 
-{#if fromPalette && fromPalette.moved}
-  <div class="ghost" style:left={`${fromPalette.x + 8}px`} style:top={`${fromPalette.y + 8}px`}>{fromPalette.type}</div>
+{#if wire}
+  <WirePanel {node} from={wire.from} to={wire.to} x={wire.x} y={wire.y} choices={wire.choices} onclose={() => (wire = null)} />
+{/if}
+
+{#if caseAt}
+  <CaseEditor {view} index={caseAt.index} x={caseAt.x} y={caseAt.y} onclose={() => (caseAt = null)} />
+{/if}
+
+{#if io}
+  {@const item = (io.role === 'start' ? view.inputs : view.outputs)[io.index]}
+  {#if item}<IOEditor {node} role={io.role} index={io.index} {item} x={io.x} y={io.y} onclose={() => (io = null)} />{/if}
+{/if}
+
+{#if popup}
+  <StepPopup steps={popupSteps} x={popup.x} y={popup.y} onpick={addPicked} onclose={() => (popup = null)} />
 {/if}
 
 <style>
@@ -318,16 +398,6 @@
   .center { flex: 1; min-width: 0; display: flex; flex-direction: column; position: relative; }
   .canvas { flex: 1; min-height: 0; position: relative; }
   .status { color: var(--muted); font-size: var(--fs-sm); max-width: 360px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .ghost {
-    position: fixed;
-    pointer-events: none;
-    background: var(--accent);
-    color: var(--on-accent);
-    padding: 4px 10px;
-    border-radius: var(--r-md);
-    font-weight: 600;
-    z-index: 10;
-  }
   button {
     background: transparent;
     color: var(--text);

@@ -12,7 +12,7 @@ import (
 	"github.com/githugt/flowi-lib/model"
 )
 
-// Drafts are collections kept in Flow-I's own directory until the user
+// Drafts are collections kept in Flowi's own directory until the user
 // saves them to a folder (flowi-lib drafts_api.go). Requests and flows made
 // without choosing a collection go to the "Scratch" draft.
 

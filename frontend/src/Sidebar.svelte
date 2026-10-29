@@ -8,7 +8,8 @@
   import { screens } from './lib/screens'
   import type { TreeNode } from './lib/types'
 
-  let { width }: { width: number } = $props()
+  // peek: shown floating from the rail, with a Pin open button; otherwise it has the fold button.
+  let { width, peek = false, onpin, onfold }: { width: number; peek?: boolean; onpin?: () => void; onfold?: () => void } = $props()
 
   // Drafts go last, after the collections and environments: they come and go,
   // and showing them first pushed everything else down the moment one was made.
@@ -29,7 +30,19 @@
     e.preventDefault()
   }
 
-  const tools = screens.filter((s) => s.rail)
+  // Nine icons did not fit the narrowest sidebar and pushed Settings past its edge, out of reach. The tools used most
+  // stay as icons, Settings stays last, and the rest are named in a menu, where there is room for the words too.
+  const railScreens = screens.filter((s) => s.rail)
+  const pinned = ['screen:import', 'screen:manager', 'screen:secrets', 'screen:replayer', 'screen:checks']
+  const tools = railScreens.filter((s) => pinned.includes(s.id))
+  const more = railScreens.filter((s) => !pinned.includes(s.id) && s.id !== 'screen:settings')
+  const settings = railScreens.find((s) => s.id === 'screen:settings')
+  let moreOpen = $state(false)
+  const moreActive = $derived(more.some((s) => s.id === app.active))
+  function openMore(id: string, title: string) {
+    moreOpen = false
+    app.openScreen(id, title)
+  }
 
   // Marked rows get a bar saying how many, with what applies to all of them: marking was invisible beyond
   // the highlight, so it was not clear it had worked or what to do next.
@@ -54,10 +67,10 @@
   const openSettings = () => app.openScreen('screen:settings', 'Settings')
 </script>
 
-<svelte:window onpointerdown={() => (wsOpen = false)} />
+<svelte:window onpointerdown={() => ((wsOpen = false), (moreOpen = false))} />
 
 <aside style:width={`${width}px`}>
-  <div class="head">
+  <div class="head" class:peeking={peek}>
     <button class="ws" aria-haspopup="menu" aria-expanded={wsOpen} title="Workspace" onpointerdown={(e) => e.stopPropagation()} onclick={() => (wsOpen = !wsOpen)}>
       <span class="wsname">{app.tree?.name ?? ''}</span><span class="caret" aria-hidden="true">▾</span>
     </button>
@@ -69,15 +82,31 @@
         <button role="menuitem" onclick={() => wsDo(openSettings)}>Settings</button>
       </div>
     {/if}
+    {#if peek}
+      <button class="pin" title="Keep the sidebar open for this kind of tab" onclick={(e) => { e.stopPropagation(); onpin?.() }}>Pin open</button>
+    {:else if onfold}
+      <button class="pin" title="Fold the sidebar to a rail" aria-label="Fold the sidebar" onclick={onfold}>«</button>
+    {/if}
   </div>
   <nav class="rail" aria-label="Tools">
     {#each tools as t}
       <button title={t.title} aria-label={t.title} class:on={app.active === t.id} onclick={() => app.openScreen(t.id, t.title)}><Icon name={t.icon} /></button>
     {/each}
+    <button class="morebtn" class:on={moreActive || moreOpen} title="More tools" aria-label="More tools" aria-haspopup="menu" aria-expanded={moreOpen} onpointerdown={(e) => e.stopPropagation()} onclick={() => (moreOpen = !moreOpen)}>⋯</button>
+    {#if settings}
+      <button class="end" title={settings.title} aria-label={settings.title} class:on={app.active === settings.id} onclick={() => app.openScreen(settings.id, settings.title)}><Icon name={settings.icon} /></button>
+    {/if}
+    {#if moreOpen}
+      <div class="moremenu" role="menu" tabindex="-1" onpointerdown={(e) => e.stopPropagation()}>
+        {#each more as t}
+          <button role="menuitem" class:on={app.active === t.id} onclick={() => openMore(t.id, t.title)}><Icon name={t.icon} size={15} />{t.title}</button>
+        {/each}
+      </div>
+    {/if}
   </nav>
   <div class="tree" role="tree" tabindex="-1" onkeydown={treeKeys}>
-    {#each roots as node (node.id)}
-      <TreeItem {node} depth={0} />
+    {#each roots as node, i (node.id)}
+      <TreeItem {node} depth={0} tint={app.rainbow.length ? app.rainbow[i % app.rainbow.length] : ''} />
     {/each}
   </div>
   {#if app.marked.length > 1}
@@ -102,6 +131,7 @@
     min-height: 0;
   }
   .head { position: relative; height: 44px; display: flex; align-items: center; gap: 8px; padding: 0 12px 0 84px; --wails-draggable: drag; }
+  .head.peeking { padding-left: 52px; }
   .ws {
     --wails-draggable: no-drag; min-width: 0; display: flex; align-items: center; gap: 4px; padding: 3px 6px; margin-left: -6px;
     background: none; border: 0; border-radius: var(--r-md); color: var(--text); font: inherit; font-weight: 600;
@@ -118,7 +148,18 @@
   .wsmenu button:hover:not(:disabled) { background: var(--tint-sel); }
   .wsmenu button:disabled { opacity: 0.4; }
   .wsmenu hr { width: 100%; border: 0; border-top: 1px solid var(--line); margin: 4px 0; }
-  .rail { display: flex; gap: 2px; padding: 0 8px 6px; }
+  .pin { --wails-draggable: no-drag; margin-left: auto; white-space: nowrap; flex: none; background: none; border: 1px solid var(--line); border-radius: var(--r-md); color: var(--muted); font: inherit; font-size: var(--fs-sm); padding: 1px 8px; }
+  .pin:hover { color: var(--text); border-color: var(--accent); }
+  .rail { position: relative; display: flex; gap: 2px; padding: 0 8px 6px; }
+  .rail .end { margin-left: auto; }
+  .rail .morebtn { font-size: var(--fs-md, 15px); line-height: 1; min-width: 28px; }
+  .moremenu {
+    position: absolute; top: calc(100% - 4px); right: 8px; z-index: 40; min-width: 170px; display: flex; flex-direction: column; padding: 4px;
+    background: var(--panel); border: 1px solid var(--line); border-radius: var(--r-lg); box-shadow: var(--shadow);
+  }
+  .rail .moremenu button { display: flex; justify-content: flex-start; align-items: center; gap: 8px; color: var(--text); font: inherit; text-align: left; padding: 5px 10px; border-radius: var(--r-sm); }
+  .rail .moremenu button:hover { background: var(--tint-sel); }
+  .rail .moremenu button.on { color: var(--accent); }
   .rail button { background: none; border: 0; border-radius: var(--r-md); color: var(--muted); padding: 5px 7px; display: grid; place-items: center; }
   .rail button:hover { color: var(--text); background: var(--tint-hover); }
   .rail button.on { color: var(--accent); background: var(--tint-sel); }

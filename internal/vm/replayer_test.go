@@ -239,3 +239,58 @@ func TestReplayer_Start_Given_CORS_and_an_upstream_Then_refuses_before_starting(
 		t.Fatalf("state %v err %q", r.State(), r.Err())
 	}
 }
+
+func TestReplayer_Start_Given_fault_fields_Then_the_percentages_become_rates_and_the_jitter_a_duration(t *testing.T) {
+	// Arrange
+	b := &vmtest.Backend{}
+	r, q := startReplayer(t, b)
+
+	// Act
+	r.Start(vm.ReplayerForm{FaultErrorPercent: "20", FaultStatus: "502", FaultDropPercent: "5", FaultJitter: "300ms"})
+	q.run(1)
+
+	// Assert
+	f := b.ServedWith[0].Faults
+	if f.ErrorRate != 0.2 || f.ErrorStatus != 502 || f.DropRate != 0.05 || f.Jitter.String() != "300ms" {
+		t.Fatalf("faults %+v", f)
+	}
+}
+
+func TestReplayer_Start_Given_a_bad_fault_value_Then_it_says_which_field_and_does_not_start(t *testing.T) {
+	for name, form := range map[string]vm.ReplayerForm{
+		"error percent text":      {FaultErrorPercent: "lots"},
+		"error percent over 100":  {FaultErrorPercent: "120"},
+		"drop percent negative":   {FaultDropPercent: "-1"},
+		"status not a number":     {FaultErrorPercent: "10", FaultStatus: "oops"},
+		"jitter not a duration":   {FaultJitter: "soon"},
+		"rates over 100 together": {FaultErrorPercent: "70", FaultDropPercent: "40"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			b := &vmtest.Backend{}
+			r, _ := startReplayer(t, b)
+
+			r.Start(form)
+
+			if r.State() != vm.ReplayerStopped || r.Err() == "" || len(b.ServedWith) != 0 {
+				t.Fatalf("state %v err %q served %d", r.State(), r.Err(), len(b.ServedWith))
+			}
+		})
+	}
+}
+
+func TestReplayer_Start_Given_a_har_file_Then_it_goes_with_the_recording_and_is_refused_without_one(t *testing.T) {
+	// Arrange
+	b := &vmtest.Backend{}
+	r, q := startReplayer(t, b)
+
+	// Act
+	r.Start(vm.ReplayerForm{RecordHAR: "/tmp/s.har"})
+	refused := r.Err()
+	r.Start(vm.ReplayerForm{Record: "https://api.example.test", RecordHAR: "/tmp/s.har"})
+	q.run(1)
+
+	// Assert
+	if refused == "" || len(b.ServedWith) != 1 || b.ServedWith[0].RecordHAR != "/tmp/s.har" {
+		t.Fatalf("refused %q served %+v", refused, b.ServedWith)
+	}
+}

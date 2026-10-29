@@ -49,6 +49,7 @@ func buildMenu(wails *application.App, emit func(name string, data any)) *applic
 		menuAction{"Secrets…", "", "secrets"},
 		menuAction{"Schedules…", "", "schedules"},
 		menuAction{"Replayer…", "", "replayer"},
+		menuAction{"Checks…", "", "checks"},
 		menuAction{"Blueprints…", "", "blueprints"},
 		menuAction{"", "", ""},
 		menuAction{"Settings…", "CmdOrCtrl+,", "settings"},

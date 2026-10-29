@@ -293,3 +293,29 @@ func TestRequestVM_DeleteVersion_of_a_version_never_saved_should_leave_nothing_t
 		t.Fatalf("err %v dirty %v labels %v", got, r.Dirty(), r.Labels())
 	}
 }
+
+func TestRequestVM_auth_scheme_should_be_chosen_filled_and_replaced_by_a_simple_kind(t *testing.T) {
+	// Arrange
+	r, _ := newRequestVM(t, sampleBackend())
+
+	// Act
+	r.SetAuthScheme("apikey")
+	r.SetAuthParam("name", "X-Key")
+	r.SetAuthParam("value", "{{secret.key}}")
+	scheme, params := r.AuthScheme()
+	r.SetAuthParam("value", "") // an empty value removes the parameter
+	_, afterRemove := r.AuthScheme()
+	r.SetAuth(vm.AuthBearer, "tok")
+	schemeAfterSimple, _ := r.AuthScheme()
+
+	// Assert
+	if scheme != "apikey" || len(params) != 2 || params[1].Value != "{{secret.key}}" {
+		t.Errorf("scheme %q params %+v", scheme, params)
+	}
+	if len(afterRemove) != 1 || afterRemove[0].Key != "name" {
+		t.Errorf("after removing: %+v", afterRemove)
+	}
+	if schemeAfterSimple != "" {
+		t.Errorf("a simple Authorization header replaces the auth block, got %q", schemeAfterSimple)
+	}
+}

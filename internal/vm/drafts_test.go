@@ -13,7 +13,7 @@ import (
 	"github.com/githugt/flowi/internal/vm/vmtest"
 )
 
-// Behaviour change: a collection stored in Flow-I's own folder is an
+// Behaviour change: a collection stored in Flowi's own folder is an
 // ordinary collection (the user's wording); only its Draft flag tells the
 // manager where it lives. It used to be labelled "(draft)".
 func TestWorkspaceVM_should_mark_collections_in_flowis_folder_without_a_draft_label(t *testing.T) {

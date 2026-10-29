@@ -161,6 +161,10 @@
   <AreaField label=".proto files, relative to the collection (one per line)" rows={4} value={lines(g.block.Proto)} oninput={(t) => putGRPC((b) => (b.Proto = splitLines(t)))}
     empty={{ icon: 'proto', title: 'Using reflection', hint: 'Click to list .proto files instead of asking the server.' }} />
   <AreaField label="Import roots (one per line)" rows={3} value={lines(g.block.Import)} oninput={(t) => putGRPC((b) => (b.Import = splitLines(t)))} />
+  <label class="check" title="Send the call as an HTTP POST to a gRPC-Web proxy (Envoy, a gateway) at the http(s) address of the server. Needs the .proto files; a method that streams from the client cannot be called.">
+    <input type="checkbox" checked={g.block.Web ?? false} onchange={(e) => putGRPC((b) => (b.Web = e.currentTarget.checked))} />
+    <span>Call through gRPC-Web (an http:// or https:// server)</span>
+  </label>
 {/if}
 
 <style>

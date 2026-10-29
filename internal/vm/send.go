@@ -63,6 +63,7 @@ type Send struct {
 	errFor   flowi.RequestTarget // the request err belongs to
 	onChange []func()
 	onResult []func(flowi.RequestTarget, diag.List)
+	onPrompt []func(engine.AuthPrompted)
 }
 
 // NewSend returns the send view-model. Sends use ws's selected
@@ -77,6 +78,18 @@ func (s *Send) OnChange(f func()) { s.onChange = append(s.onChange, f) }
 // OnResult registers f to run with the diagnostics of every finished send
 // (empty when it passed): the Problems panel lists them.
 func (s *Send) OnResult(f func(flowi.RequestTarget, diag.List)) { s.onResult = append(s.onResult, f) }
+
+// OnPrompt registers f to run when a request waits for the person to sign in
+// (an OAuth 2.0 grant that needs a browser, or a device code). It runs on the
+// UI goroutine, from a send or a flow run.
+func (s *Send) OnPrompt(f func(engine.AuthPrompted)) { s.onPrompt = append(s.onPrompt, f) }
+
+// Prompted tells the listeners a request waits for the person.
+func (s *Send) Prompted(p engine.AuthPrompted) {
+	for _, f := range s.onPrompt {
+		f(p)
+	}
+}
 
 func (s *Send) changed() {
 	for _, f := range s.onChange {
@@ -123,7 +136,7 @@ func (s *Send) LastFor(t flowi.RequestTarget) (Exchange, bool) {
 // so a restarted app does not claim nothing was sent. A response sent this
 // session is not replaced. It is not added to the history or the run log.
 func (s *Send) LoadSaved(req *Request) {
-	t, version := req.Target(), req.SelectedLabel() // read here: the worker must not touch req
+	t, version := req.Target(), engine.ResponseKey(req.SelectedLabel(), req.OverlayName()) // read here: the worker must not touch req
 	Run(s.w, func() savedLookup {
 		rec, ok := s.b.LastResponse(t, version)
 		return savedLookup{rec, ok}
@@ -131,7 +144,7 @@ func (s *Send) LoadSaved(req *Request) {
 		if _, sent := s.shown[t]; sent || !l.ok {
 			return
 		}
-		ex := Exchange{At: l.rec.At, Target: t, Version: l.rec.Version, Title: fmt.Sprintf("%s v%s · %d · saved", l.rec.RequestPath, l.rec.Version, l.rec.Status),
+		ex := Exchange{At: l.rec.At, Target: t, Version: l.rec.Version, Title: fmt.Sprintf("%s %s · %d · saved", l.rec.RequestPath, versionTitle(l.rec.Version, l.rec.Overlay), l.rec.Status),
 			Result: engine.SendResult{Status: engine.StatusPassed, Record: &l.rec}}
 		s.shown[t] = &ex
 		s.changed()
@@ -155,8 +168,16 @@ func (s *Send) Send(req *Request, o SendOptions) {
 	}
 	s.err = ""
 	trace := newTraceFor(req)
+	overlay := req.OverlayName()
 	req.PrepareSend(func(useEdit bool) {
 		opts.UseEdit = useEdit
+		// A stored edit already shows the overlay (the working copy is the effective request), so it is
+		// only named, for the response's folder; otherwise the saved version is sent with the overlay applied.
+		if useEdit {
+			opts.OverlayLabel = overlay
+		} else {
+			opts.Overlay = overlay
+		}
 		s.start(req.Target(), opts, trace)
 	})
 }
@@ -222,6 +243,9 @@ func (s *Send) run(ctx context.Context, t flowi.RequestTarget, opts flowi.SendOp
 	for e := range sending.Events() {
 		if line := EventLine(e); line != "" {
 			s.w.Post(func() { s.log.Add(line) })
+		}
+		if p, ok := e.(engine.AuthPrompted); ok {
+			s.w.Post(func() { s.Prompted(p) })
 		}
 		s.w.Post(func() { trace.Apply(e); s.changed() })
 	}
@@ -307,6 +331,8 @@ func EventLine(e engine.Event) string {
 		return "log: " + ev.Message
 	case engine.Warning:
 		return "⚠ " + ErrorText(diag.List{ev.Diag}.Err())
+	case engine.AuthPrompted:
+		return "waiting for you: " + promptLine(ev)
 	case engine.RunCancelled:
 		return "cancelled"
 	case engine.RunFinished:
@@ -475,7 +501,7 @@ func (h *History) Add(t flowi.RequestTarget, version string, r engine.SendResult
 	h.nextID++
 	title := fmt.Sprintf("v%s · %s", version, r.Status)
 	if r.Record != nil {
-		title = fmt.Sprintf("%s v%s · %d · %s", historyName(r.Record), version, r.Record.Status, r.Status)
+		title = fmt.Sprintf("%s %s · %d · %s", historyName(r.Record), versionTitle(version, r.Record.Overlay), r.Record.Status, r.Status)
 	}
 	ex := Exchange{ID: h.nextID, At: time.Now(), Title: title, Target: t, Version: version, Result: r}
 	h.items = append([]Exchange{ex}, h.items...)
@@ -533,4 +559,20 @@ func historyName(rec *engine.Record) string {
 	}
 	url := strings.TrimPrefix(strings.TrimPrefix(rec.Request.URL, "https://"), "http://")
 	return strings.TrimSpace(rec.Request.Method + " " + url)
+}
+
+// versionTitle is "v2", or "v2 + vip" for a send with the flowi overlay vip.
+func versionTitle(version, overlay string) string {
+	if overlay == "" {
+		return "v" + version
+	}
+	return "v" + version + " + " + overlay
+}
+
+// promptLine says what a waiting request asks of the person.
+func promptLine(p engine.AuthPrompted) string {
+	if p.Kind == "device" {
+		return "open " + p.URL + " and enter the code " + p.Code
+	}
+	return "open " + p.URL + " to sign in"
 }

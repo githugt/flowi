@@ -12,6 +12,8 @@ import (
 	"strings"
 
 	"github.com/githugt/flowi-lib/model"
+
+	"github.com/githugt/flowi/internal/card"
 )
 
 // key and index build YAML paths the way flowi-lib writes them
@@ -79,6 +81,9 @@ type Unit struct {
 	Cells      []Cell   `json:"cells,omitempty"` // a request block with attached actions: where each of Nodes is drawn, relative to the block's top-left corner
 	Above      int64    `json:"above,omitempty"` // a request block: how far its request sits below its top (the height of the stack above it)
 	HeadW      int64    `json:"headW,omitempty"` // branch layout: the container is a card this wide with its lanes to the right, not a box around them
+	Card       bool     `json:"card,omitempty"`  // drawn as a card (see WithCards): its ports are in Ports
+	HeadH      int64    `json:"headH,omitempty"` // a container drawn as a card: the card's own height (H covers its lanes too)
+	Ports      []string `json:"ports,omitempty"` // a card's control ports, top to bottom
 }
 
 // Cell is where one node of a request block is drawn, relative to the block.
@@ -91,6 +96,9 @@ type Cell struct {
 
 // PortY is the y of the unit's in and out ports.
 func (u Unit) PortY() int64 {
+	if u.Card {
+		return u.Y + cardInPort
+	}
 	switch u.Kind {
 	case KindContainer:
 		if u.HeadW > 0 {
@@ -111,6 +119,9 @@ type Edge struct {
 	Needs bool   `json:"needs,omitempty"` // an explicit needs, not list order
 	Into  bool   `json:"into,omitempty"`  // from a container to the first step of one of its lanes: not drawn, the lane box says it
 	Fail  bool   `json:"fail,omitempty"`  // the on_error goto route of a step, taken when it fails
+	// FromPort is the card port the edge leaves from (done, fail, case-i, else);
+	// "" for units that are not cards.
+	FromPort string `json:"fromPort,omitempty"`
 }
 
 // Lane is one list inside a container (a branch, then/else/case, a
@@ -125,6 +136,9 @@ type Lane struct {
 	H         int64  `json:"h"`
 	PortY     int64  `json:"portY"` // the line the steps in the lane have their ports on
 	Label     string `json:"label"` // what takes the lane: then, else, "if <when>", a branch's name, body
+	// Port is the card port that feeds the lane (case-i or else for a route's
+	// lanes), "" when the container has no port per lane.
+	Port string `json:"port,omitempty"`
 }
 
 // Diagram is a laid-out flow.
@@ -166,6 +180,7 @@ func Layout(f model.Flow, manual map[string]Point, collapsed map[string]bool, op
 	l.list(f.Nodes, key("$", "nodes"), 0, 0, "", 0)
 	l.failEdges(f.Nodes)
 	d := Diagram{Units: l.units, Edges: l.edges, Lanes: l.lanes}
+	portEdges(&d)
 	applyManual(&d, manual)
 	markCurves(&d)
 	return d
@@ -187,6 +202,7 @@ func WithBranches() Option { return func(l *layouter) { l.branches = true } }
 func WithAttached() Option { return func(l *layouter) { l.attached = true } }
 
 type layouter struct {
+	cards     map[string]card.Card // set by WithCards: every step is a card sized by its summary
 	attached  bool
 	branches  bool
 	collapsed map[string]bool
@@ -234,6 +250,9 @@ type listResult struct {
 func (l *layouter) list(nodes []model.Node, path string, x, y int64, parent string, lane int) listResult {
 	nodes = withoutRedundantNeeds(nodes)
 	groups := group(nodes, l.attached)
+	if l.cards != nil {
+		groups = cardGroups(nodes)
+	}
 	top := y
 	for _, g := range groups {
 		if g.kind == KindRequest && g.end-g.start > 1 {
@@ -285,6 +304,10 @@ func (l *layouter) place(u Unit, n model.Node, x, y int64) (Unit, []string) {
 			u.W, u.H = requestW, requestH
 		}
 		u.Y = y + baseline - portRequest - u.Above
+	case KindCard:
+		c := l.cards[n.ID]
+		u.W, u.H, u.Card, u.Ports = cardW, cardHeight(c), true, cardPorts(c)
+		u.Y = y + baseline - cardInPort
 	case KindStrip, KindAction:
 		u.W, u.H = stripPad+int64(len(u.Nodes))*actionW, stripH
 		if l.collapsed[u.ID] && u.Kind == KindStrip {
@@ -337,11 +360,23 @@ func (l *layouter) container(u Unit, n model.Node, x, y int64) (Unit, []string) 
 // into the card and the arrow to the first lane are straight.
 func (l *layouter) branchContainer(u Unit, n model.Node, x, y int64) (Unit, []string) {
 	u.Y, u.HeadW = y, decisionW
+	head := int64(decisionW)
+	var own card.Card
+	if l.cards != nil {
+		own = l.cards[n.ID]
+		head, u.HeadW = cardW, cardW
+		u.Y = y + baseline - cardInPort
+		u.Card, u.Ports, u.HeadH = true, cardPorts(own), cardHeight(own)
+	}
 	idx := len(l.units)
 	l.units = append(l.units, u) // placeholder; size is known after the lanes
-	laneX := x + decisionW + branchGapX
+	laneX := x + head + branchGapX
 	laneY := y
-	var w int64 = decisionW + branchGapX + minLaneW
+	emptyW, emptyH := int64(minLaneW), int64(baseline-portStrip+stripH+laneInset) // an empty lane is as big as one with a step in it
+	if l.cards != nil {
+		emptyW, emptyH = cardW+2*laneInset, int64(baseline-cardInPort)+cardHeight(card.Card{})+laneInset
+	}
+	w := head + branchGapX + emptyW
 	var lasts []string
 	first := len(l.lanes)
 	for i, lane := range lanes(n, u.Path, true) {
@@ -350,15 +385,18 @@ func (l *layouter) branchContainer(u Unit, n model.Node, x, y int64) (Unit, []st
 			l.edges = append(l.edges, Edge{From: u.ID, To: res.first, Into: true})
 			lasts = append(lasts, res.lasts...)
 		}
-		h := max(res.h+laneInset, baseline-portStrip+stripH+laneInset) // an empty lane is as tall as one with a step in it
-		l.lanes = append(l.lanes, Lane{Container: u.ID, Index: i, Path: lane.path, X: laneX, Y: laneY, H: h, PortY: laneY + baseline, Label: lane.label})
-		w = max(w, decisionW+branchGapX+res.w+2*laneInset)
+		h := max(res.h+laneInset, emptyH)
+		l.lanes = append(l.lanes, Lane{Container: u.ID, Index: i, Path: lane.path, X: laneX, Y: laneY, H: h, PortY: laneY + baseline, Label: lane.label, Port: lane.port})
+		w = max(w, head+branchGapX+res.w+2*laneInset)
 		laneY += h + laneGap
 	}
 	for i := first; i < len(l.lanes); i++ {
-		l.lanes[i].W = w - decisionW - branchGapX
+		l.lanes[i].W = w - head - branchGapX
 	}
-	u.W, u.H = w, max(laneY-laneGap-y, headerH+(baseline-portContainer))
+	u.W, u.H = w, max(laneY-laneGap-u.Y, headerH+(baseline-portContainer))
+	if l.cards != nil {
+		u.H = max(u.H, cardHeight(own))
+	}
 	l.units[idx] = u
 	if len(lasts) == 0 {
 		lasts = []string{u.ID}
@@ -370,6 +408,7 @@ type laneSpec struct {
 	nodes []model.Node
 	path  string
 	label string
+	port  string // the card port that takes the lane
 }
 
 // lanes are a container's child lists with their YAML paths. chain says a condition
@@ -378,7 +417,7 @@ type laneSpec struct {
 func lanes(n model.Node, p string, chain bool) []laneSpec {
 	var out []laneSpec
 	add := func(path, label string, nodes []model.Node) {
-		out = append(out, laneSpec{nodes: nodes, path: path, label: label})
+		out = append(out, laneSpec{nodes: nodes, path: path, label: label, port: laneFeed(n, label, len(out))})
 	}
 	switch n.Type {
 	case "parallel":
@@ -594,7 +633,7 @@ func markCurves(d *Diagram) {
 	for i, e := range d.Edges {
 		from, _ := d.Unit(e.From)
 		to, _ := d.Unit(e.To)
-		d.Edges[i].Curve = from.PortY() != to.PortY()
+		d.Edges[i].Curve = from.PortYOf(e.FromPort) != to.PortY()
 	}
 }
 

@@ -1,28 +1,24 @@
 <script lang="ts">
   import { confirmDeleteSteps } from './lib/flowDelete'
   import { errorText } from './lib/errors'
-  import { FlowService, SystemService } from '../bindings/github.com/githugt/flowi/internal/bridge'
-  import type { FlowView, Pair } from './lib/types'
+  import { FlowService } from '../bindings/github.com/githugt/flowi/internal/bridge'
+  import type { FlowView, Pair, ValueRow } from './lib/types'
+  import ValuesEditor from './ValuesEditor.svelte'
   import TextField from './TextField.svelte'
-  import type { Item } from './lib/exprcomplete'
+  import ParamFields from './ParamFields.svelte'
+  import { completeFor, vocabularyFor } from './lib/flowfields'
   import Hint from './Hint.svelte'
   import TemplateField from './TemplateField.svelte'
   import ExprHelp from './ExprHelp.svelte'
   import PairsEditor from './PairsEditor.svelte'
   import { ui } from './lib/ui.svelte'
+  import { lostText, modesOf } from './lib/modes'
 
   // editing: the flow editor is in Edit, where steps can be deleted.
   let { view, editing = true }: { view: FlowView; editing?: boolean } = $props()
   const node = $derived(view.node)
   const step = $derived(view.form.step)
 
-  // What a step's field can read depends on what the field is.
-  function helpFor(type: string, p: { name: string; kind: string }): string {
-    if (p.kind === 'expr') return 'flow.check'
-    if (type === 'batch' && p.name === 'over') return 'flow.collection'
-    if (type === 'transform' || type === 'calc') return 'flow.transform'
-    return 'flow.template'
-  }
   // The steps before it that it could wait for besides the one it follows anyway.
   const waitChoices = $derived(step ? step.needChoices.filter((id) => id !== step.previous && !step.needs.includes(id)) : [])
   const flow = $derived(view.form.flow)
@@ -47,27 +43,31 @@
     }
   }
 
-  // Examples of the expressions a step's check, until and when take: true or false, no braces.
-  const exprHint = 'Examples: nodes.login.status == 200 · vars.count > 3 · response.body.token != empty.'
-
   // Steps that make sense to draw with a request: not requests themselves, and not containers.
   const attachable = $derived((view.palette ?? []).filter((p) => !['request', 'subflow', 'parallel', 'condition', 'batch', 'run_till'].includes(p.type)))
   function addAttached(e: MouseEvent, after: boolean, side = '') {
     const r = (e.currentTarget as HTMLElement).getBoundingClientRect()
     ui.openMenu(r.left, r.bottom + 4, attachable.map((p) => ({ label: p.type, run: () => (side ? FlowService.AddAttachedAt(node, p.type, side) : FlowService.AddAttached(node, p.type, after)) })))
   }
-  const complete = (t: string, c: number) => FlowService.Complete(node, t, c) as unknown as Promise<any>
-  // What a bare expression (a test, a "run when") can name: the context's roots, functions and keywords,
-  // then the real names of this step's surroundings, such as nodes.login.body.token.
-  const vocabularyFor = (context: string) => async (): Promise<Item[]> => {
-    const [roots, names] = await Promise.all([SystemService.ExpressionVocabulary(context), FlowService.ExpressionNames(node)])
-    return [...(names as Item[]), ...(roots as Item[])]
-  }
+  const complete = $derived(completeFor(node))
+  const vocabulary = (context: string) => vocabularyFor(node, context)
 
   const failLabels: Record<string, string> = {
     fail: 'Stop the run',
     continue: 'Carry on with the next step',
     goto: 'Go to another step',
+  }
+
+  const modes = $derived(step ? modesOf(step.type) : [])
+
+  // Changing how a step does its job converts it. What cannot carry over is asked about first; Undo brings it back.
+  async function changeMode(node_: string) {
+    const to = modes.find((m) => m.node === node_)
+    if (!step || !to) return
+    const lost = await FlowService.ConvertStep(node, step.id, to.type, to.mode, false)
+    const apply = () => FlowService.ConvertStep(node, step.id, to.type, to.mode, true)
+    if (lost.length) ui.confirm(`Change to ${to.label.toLowerCase()}?`, lostText(lost), apply, 'Change')
+    else await apply()
   }
 </script>
 
@@ -75,8 +75,14 @@
   {#if step}
     <div class="head">
       <h3>{step.type} <span class="id">{step.id}</span></h3>
+      {#if editing && modes.length > 1}
+        <select class="mode" aria-label="How this step does its job" value={step.type} onchange={(e) => changeMode(e.currentTarget.value)}>
+          {#each modes as m (m.node)}<option value={m.node}>{m.label}</option>{/each}
+        </select>
+      {/if}
+      <button class="skip" class:on={view.skips.steps.includes(step.id)} aria-pressed={view.skips.steps.includes(step.id)} title="Leave this step out of the next runs (not saved in the flow)" onclick={() => FlowService.ToggleSkip(node, step.id)}>{view.skips.steps.includes(step.id) ? 'Skipped' : 'Skip'}</button>
       {#if editing}
-        <button class="del" title="Delete this step" onclick={() => confirmDeleteSteps(node, view.selection.length ? view.selection : [step.id])}>Delete step…</button>
+        <button class="del" title="Delete this step" onclick={() => confirmDeleteSteps(node, view.selection.length ? view.selection : [step.id])}>Delete…</button>
       {/if}
     </div>
     <p class="summary">{step.summary}</p>
@@ -91,6 +97,37 @@
       </label>
       {#if step.call.kind === 'request'}
         <TextField label="Version (empty: resolved)" value={step.call.version ?? ''} oninput={(v) => text('version', v)} />
+        {@const stack = step.call.overlay ? step.call.overlay.split('+') : []}
+        {@const spare = (step.call.overlays ?? []).filter((o) => !stack.includes(o))}
+        <label class="field">
+          <span class="label">Flowi overlay</span>
+          <select value={stack[0] ?? ''} onchange={(e) => text('overlay', [e.currentTarget.value, ...stack.slice(1)].filter(Boolean).join('+'))} title="Changes laid over the version when this step sends: the request as a VIP customer, a slow one…">
+            <option value="">None</option>
+            {#each step.call.overlays ?? [] as o}<option value={o}>{o}</option>{/each}
+            {#if stack[0] && !(step.call.overlays ?? []).includes(stack[0])}<option value={stack[0]}>{stack[0]} (not found)</option>{/if}
+          </select>
+        </label>
+        {#each stack.slice(1) as n}
+          <div class="field inline">
+            <span class="label">then</span>
+            <span class="grow">{n}{#if !(step.call.overlays ?? []).includes(n)} (not found){/if}</span>
+            <button class="add" aria-label={`Take ${n} off`} title={`Take ${n} off`} onclick={() => text('overlay', stack.filter((x) => x !== n).join('+'))}>×</button>
+          </div>
+        {/each}
+        {#if stack.length && spare.length}
+          <label class="field">
+            <span class="label"></span>
+            <select value="" onchange={(e) => { const x = e.currentTarget.value; e.currentTarget.value = ''; if (x) text('overlay', [...stack, x].join('+')) }} aria-label="Stack another flowi overlay" title="Lay another overlay over this one; the later one wins where both set a field">
+              <option value="">+ stack another</option>
+              {#each spare as o}<option value={o}>{o}</option>{/each}
+            </select>
+          </label>
+        {/if}
+        <TextField label="Open connection" value={step.call.open ?? ''} oninput={(v) => text('open', v)} placeholder="name (WebSocket, MQTT 5, NATS)" />
+        <TextField label="Run over connection" value={step.call.over ?? ''} oninput={(v) => text('over', v)} placeholder="a name opened by an earlier step" />
+        {#if step.call.over}
+          <label class="check"><input type="checkbox" checked={step.call.close ?? false} onchange={(e) => FlowService.SetClose(node, e.currentTarget.checked)} /> Close it after this step</label>
+        {/if}
       {/if}
       <span class="label">With</span>
       <PairsEditor rows={step.call.with} onchange={pairs('with')} valueLabel="value (template)" />
@@ -145,43 +182,14 @@
       {/if}
     {/if}
 
-    {#if step.intro === 'extract'}<h4>Read a value from the response</h4>{/if}
-    {#each step.params as p (p.name)}
-      {#if p.complex}
-        <div class="field">
-          <span class="label">{p.name}</span>
-          <em class="muted">(a list or mapping: edit it in the file)</em>
-        </div>
-      {:else if p.kind === 'bool'}
-        <label class="check">
-          <input type="checkbox" checked={p.value === 'true'} onchange={(e) => FlowService.SetParam(node, p.name, String(e.currentTarget.checked))} />
-          <span>{p.name}{p.required ? ' *' : ''}</span>
-        </label>
-      {:else if p.kind === 'enum'}
-        <label class="field">
-          <span class="label">{p.name}{p.required ? ' *' : ''}</span>
-          <select value={p.value} onchange={(e) => FlowService.SetParam(node, p.name, e.currentTarget.value)}>
-            <option value=""></option>
-            {#each p.enum ?? [] as o}<option value={o}>{o}</option>{/each}
-          </select>
-        </label>
-      {:else}
-        <TemplateField
-          label={p.name + (p.required ? ' *' : '')}
-          help={helpFor(step.type, p)}
-          placeholder={p.kind === 'expr' ? 'nodes.login.status == 200' : p.doc}
-          value={p.value}
-          mono={p.kind === 'text' || p.kind === 'expr'}
-          oninput={(v) => FlowService.SetParam(node, p.name, v)}
-          suggest={complete}
-          vocabulary={p.kind === 'expr' ? vocabularyFor('flow.check') : undefined}
-        />
-        {#if p.kind === 'expr'}<p class="hint">{p.doc || 'True or false, written without braces.'} {exprHint}</p>{/if}
-      {/if}
-    {/each}
+    {#if step.type === 'set'}
+      <h4>Values<Hint>Each row writes a variable: from an expression, text as written, a part of the last response, or a generator. Later steps read it as {'{{vars.name}}'}.</Hint></h4>
+      <ValuesEditor rows={step.values ?? []} onchange={(rows: ValueRow[]) => FlowService.SetValues(node, rows)} />
+    {/if}
+    <ParamFields {view} />
 
     {#if step.variables}
-      <h4>{step.varsHeading === 'extract' ? 'Or set variables from templates' : 'Variables'}<ExprHelp context={step.type === 'calc' ? 'flow.transform' : 'flow.template'} /><Hint>Each row sets a variable to a template, for example token = {'{{nodes.login.body.token}}'}. Later steps read it as {'{{vars.token}}'}.</Hint></h4>
+      <h4>Variables<ExprHelp context="flow.template" /><Hint>Each row sets a variable to a template, for example token = {'{{nodes.login.body.token}}'}. Later steps read it as {'{{vars.token}}'}.</Hint></h4>
       <PairsEditor rows={step.variables} onchange={pairs('variables')} keyLabel="variable" valueLabel="value (template)" />
     {/if}
 
@@ -190,7 +198,7 @@
         <h4>If … else if … else<Hint>Tried from the top: the first test that is true runs its steps. When none is, the else lane runs. Drop steps into a lane on the canvas.</Hint></h4>
         {#each step.cases as c, i}
           <div class="lane">
-            <TemplateField label={`${c.label} (a test, no braces)`} help="flow.check" placeholder="nodes.login.status == 404" value={c.when ?? ''} oninput={(v) => FlowService.SetCaseWhen(node, i, v)} vocabulary={vocabularyFor('flow.check')} />
+            <TemplateField label={`${c.label} (a test, no braces)`} help="flow.check" placeholder="nodes.login.status == 404" value={c.when ?? ''} oninput={(v) => FlowService.SetCaseWhen(node, i, v)} vocabulary={vocabulary('flow.check')} />
             <button disabled={!c.empty} title={c.empty ? 'Remove this case' : 'Move its steps out first'} onclick={() => FlowService.RemoveLane(node, i)}>×</button>
           </div>
         {/each}
@@ -234,10 +242,10 @@
     {#if step.uses.length || step.usedBy.length}
       <h4>Values<Hint>Where this step takes values from, and who takes values from it. The canvas draws these as dotted lines under the cards.</Hint></h4>
       {#each step.uses as u}
-        <button class="lane named" onclick={() => FlowService.Select(node, u.from)}><span>← <code>{u.name}</code></span><span class="muted">from {u.from}</span></button>
+        <button class="lane named" onclick={() => FlowService.Select(node, u.from)}><span>← <code>{u.name}</code>{#if u.type} <span class="type" title="What the value is">{u.type}</span>{/if}</span><span class="muted">from {u.from}</span></button>
       {/each}
       {#each step.usedBy as u}
-        <button class="lane named" onclick={() => FlowService.Select(node, u.to)}><span>→ <code>{u.name}</code></span><span class="muted">used by {u.to}</span></button>
+        <button class="lane named" onclick={() => FlowService.Select(node, u.to)}><span>→ <code>{u.name}</code>{#if u.type} <span class="type" title="What the value is">{u.type}</span>{/if}</span><span class="muted">used by {u.to}</span></button>
       {/each}
     {/if}
 
@@ -246,7 +254,7 @@
       <TextField label="Id (Enter to rename)" value={step.id} onenter={rename} />
       <TextField label="Name" value={step.name} oninput={(v) => text('name', v)} />
       <TextField label="Description" value={step.description} oninput={(v) => text('description', v)} />
-      <TemplateField label="Run when (expression)" help="flow.when" placeholder="vars.count > 3" value={step.when} oninput={(v) => text('when', v)} suggest={complete} vocabulary={vocabularyFor('flow.when')} />
+      <TemplateField label="Run when (expression)" help="flow.when" placeholder="vars.count > 3" value={step.when} oninput={(v) => text('when', v)} suggest={complete} vocabulary={vocabulary('flow.when')} />
       <TextField label="Timeout (e.g. 5s)" value={step.timeout} oninput={(v) => text('timeout', v)} />
       <label class="check">
         <input type="checkbox" checked={step.concurrent} onchange={(e) => FlowService.SetConcurrent(node, e.currentTarget.checked)} />
@@ -298,15 +306,24 @@
     gap: 8px;
   }
   h3 { margin: 0; font-size: var(--fs-md); }
-  .head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  /* The side panel is narrow: the title, the mode and the buttons wrap onto lines of their own instead of squeezing. */
+  .head { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; }
+  .head h3 { flex: 1 1 100%; }
+  .head button { white-space: nowrap; }
   .del { background: none; border: 1px solid var(--line); border-radius: var(--r-md); color: var(--muted); font: inherit; font-size: var(--fs-sm); padding: 2px 8px; }
+  .skip { background: none; border: 1px solid var(--line); border-radius: var(--r-md); color: var(--muted); font: inherit; font-size: var(--fs-sm); padding: 2px 8px; }
+  .skip.on { color: var(--text); border-color: var(--muted); background: var(--tint-hover); }
   .del:hover { color: var(--fail); border-color: var(--fail); }
   h4 { margin: 8px 0 0; font-size: var(--fs-sm); }
   .id { color: var(--muted); font-weight: 400; margin-left: 6px; }
   .summary, .hint, .muted { color: var(--muted); font-size: var(--fs-sm); margin: 0; }
   .field { display: flex; flex-direction: column; gap: 3px; }
   .label { color: var(--muted); font-size: var(--fs-xs); }
+  .field.inline { flex-direction: row; align-items: center; }
+  .field.inline .grow { flex: 1; }
   .check { display: flex; align-items: center; gap: 6px; }
+  .mode { background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); padding: 3px 6px; font: inherit; font-size: var(--fs-sm); }
+  .type { color: var(--muted); font-size: var(--fs-xs); border: 1px solid var(--line); border-radius: var(--r-pill); padding: 0 6px; }
   select {
     background: var(--bg);
     color: var(--text);

@@ -50,6 +50,18 @@ export function DeleteHistory(id) {
 }
 
 /**
+ * Details is the Details pane for tree node `node`: empty when no request or
+ * flow is open under it.
+ * @param {string} node
+ * @returns {$CancellablePromise<$models.DetailsView>}
+ */
+export function Details(node) {
+    return $Call.ByID(1032559330, node).then(/** @type {($result: any) => any} */(($result) => {
+        return $$createType0($result);
+    }));
+}
+
+/**
  * RefreshProblems validates the workspace again.
  * @returns {$CancellablePromise<void>}
  */
@@ -63,9 +75,10 @@ export function RefreshProblems() {
  */
 export function State() {
     return $Call.ByID(841345993).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType0($result);
+        return $$createType1($result);
     }));
 }
 
 // Private type creation functions
-const $$createType0 = $models.Panels.createFrom;
+const $$createType0 = $models.DetailsView.createFrom;
+const $$createType1 = $models.Panels.createFrom;

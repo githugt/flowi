@@ -45,3 +45,6 @@ frontend/coverage/
 *.prof
 *.pprof
 *.log
+
+# Throw-away Mac output of the Windows icon step in build/Taskfile.yml
+build/windows/icon-unused.icns

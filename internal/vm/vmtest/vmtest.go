@@ -19,6 +19,7 @@ import (
 	"github.com/githugt/flowi-lib/announce"
 	"github.com/githugt/flowi-lib/diag"
 	"github.com/githugt/flowi-lib/engine"
+	"github.com/githugt/flowi-lib/flowioverlay"
 	"github.com/githugt/flowi-lib/grpcx"
 	"github.com/githugt/flowi-lib/model"
 	"github.com/githugt/flowi-lib/schemainfer"
@@ -33,6 +34,7 @@ import (
 type StoredEdit struct {
 	Target  flowi.RequestTarget
 	Base    string
+	Overlay string
 	Version model.RequestVersion
 }
 
@@ -42,7 +44,7 @@ type StoredEdit struct {
 type Backend struct {
 	Mu          sync.Mutex         // guards every field; tests lock it to change state mid-test
 	FieldList   []flowi.Completion // what ResponseFields returns
-	Name        string             // the workspace name; "default" when empty
+	Name        string             // the workspace name; "default-workspace" when empty
 	Cols        []model.Collection
 	MissingIDs  []model.ID
 	Paths       map[model.ID]string
@@ -58,16 +60,25 @@ type Backend struct {
 	Changes     chan flowi.Change
 	Calls       []string
 	Saved       []model.Request
-	SavedRecord *engine.Record         // what LastResponse and StoredRecord return
-	Stored      []flowi.StoredResponse // what StoredResponses returns
-	Trash       []flowi.TrashedItem    // what ListTrash returns
-	StaleDrafts []flowi.TrashedItem    // what the next TrashStaleDrafts moves (an item's Name is the id open is asked about)
-	RunList     []flowi.RunSummary     // what FlowRuns returns
-	Compat      diag.List              // what FlowCompatibility returns
-	SchemaStore Schemas                // what the schema calls work on
+	SavedRecord *engine.Record             // what LastResponse and StoredRecord return
+	Stored      []flowi.StoredResponse     // what StoredResponses returns
+	Trash       []flowi.TrashedItem        // what ListTrash returns
+	StaleDrafts []flowi.TrashedItem        // what the next TrashStaleDrafts moves (an item's Name is the id open is asked about)
+	RunList     []flowi.RunSummary         // what FlowRuns returns
+	RunDetails  map[string]flowi.RunDetail // what FlowRunDetail returns, by run id
+	Compat      diag.List                  // what FlowCompatibility returns
+	SchemaStore Schemas                    // what the schema calls work on
 	SavedEnvs   []model.Environment
 	CollEnvs    map[model.ID][]model.Environment // what CollectionEnvironments returns, by collection
 	SendOpts    []flowi.SendOptions
+	// Flowi overlays: OverlayList is what Overlays returns, SavedOverlays what SaveAsOverlay was
+	// given, OverlayFiles the text OverlayText returns and WriteOverlayText keeps, and OverlayErr
+	// makes the writes fail.
+	OverlayList    []model.Overlay
+	SavedOverlays  []flowi.SaveOverlayInput
+	OverlayFiles   map[string]string
+	OverlayErr     error
+	OverlayExports map[string]flowi.OverlayExport // what ExportOverlayAsSpec returns, by overlay name
 	// SecretsGate, when set, makes Secrets wait for a receive: tests use it
 	// to change state while a call is in flight.
 	SecretsGate    chan struct{}
@@ -75,7 +86,11 @@ type Backend struct {
 	Layout         model.Layout
 	CompletionList []flowi.Completion
 	NextRun        *Running
-	LastRunOptions flowi.RunOptions // the options of the latest RunFlow
+	Check          Checks // canned answers for coverage, spec impact, access and drift
+	// RunFor, when set, answers each RunFlow from its options (a matrix needs a different outcome per cell).
+	RunFor         func(flowi.RunOptions) (*Running, error)
+	LastRunOptions flowi.RunOptions   // the options of the latest RunFlow
+	RunOptionsLog  []flowi.RunOptions // the options of every RunFlow, in order
 	ImpactReport   analysis.Report
 	// SaveGate, when set, makes SaveFlow wait for it to close.
 	SaveGate chan struct{}
@@ -126,6 +141,7 @@ type Backend struct {
 	Kept         map[model.ID]model.Flow // KeepFlowEdits stores here, by flow
 	ParsedFlow   *model.Flow             // ParseFlowSource returns this flow (else the stored flow, unchanged)
 	SourceDiags  diag.List               // ParseFlowSource reports these
+	DraftDiags   diag.List               // CheckFlowDraft reports these
 	SecretErr    error                   // SetSecret and UnsetSecret fail with it
 	SecretValues map[string]string       // RevealSecret answers from these, by "env/name"; others are FLW-SEC-001
 	CookieJar    []flowi.CookieInfo      // Cookies lists these; DeleteCookie removes from them
@@ -153,12 +169,12 @@ func (f *Backend) Called(call string) bool {
 // SessionDir is empty unless a test sets Session.
 func (f *Backend) SessionDir() string { return f.Session }
 
-// WorkspaceName is "default" unless the test sets Name.
+// WorkspaceName is "default-workspace" unless the test sets Name.
 func (f *Backend) WorkspaceName() string {
 	f.Mu.Lock()
 	defer f.Mu.Unlock()
 	if f.Name == "" {
-		return "default"
+		return "default-workspace"
 	}
 	return f.Name
 }
@@ -242,15 +258,16 @@ func (f *Backend) SaveRequest(t flowi.RequestTarget, r model.Request, drop bool)
 	return nil
 }
 
-func (f *Backend) StoreEdit(t flowi.RequestTarget, base string, v model.RequestVersion) error {
+func (f *Backend) StoreEdit(t flowi.RequestTarget, base, overlay string, v model.RequestVersion) error {
 	f.record("StoreEdit")
 	f.Mu.Lock()
 	defer f.Mu.Unlock()
 	if f.EditErr != nil {
 		return f.EditErr
 	}
-	f.Edits = append(f.Edits, StoredEdit{Target: t, Base: base, Version: v})
+	f.Edits = append(f.Edits, StoredEdit{Target: t, Base: base, Overlay: overlay, Version: v})
 	f.setEdit(t, &v, base)
+	f.setEditOverlay(t, overlay)
 	return nil
 }
 
@@ -259,7 +276,19 @@ func (f *Backend) DiscardEdit(t flowi.RequestTarget) error {
 	f.Mu.Lock()
 	defer f.Mu.Unlock()
 	f.setEdit(t, nil, "")
+	f.setEditOverlay(t, "")
 	return nil
+}
+
+// setEditOverlay sets the overlay name of the edit slot of the request t; callers hold Mu.
+func (f *Backend) setEditOverlay(t flowi.RequestTarget, overlay string) {
+	for ci := range f.Cols {
+		for ri := range f.Cols[ci].Requests {
+			if f.Cols[ci].Requests[ri].ID == t.Request {
+				f.Cols[ci].Requests[ri].EditOverlay = overlay
+			}
+		}
+	}
 }
 
 // setEdit sets the edit slot of the request t; callers hold Mu.
@@ -511,6 +540,18 @@ func (f *Backend) FlowCompatibility(flowi.FlowTarget) diag.List {
 	return f.Compat
 }
 
+// FlowRunDetail returns the entry of RunDetails for the run id.
+func (f *Backend) FlowRunDetail(_ flowi.FlowTarget, id string) (flowi.RunDetail, error) {
+	f.record("FlowRunDetail " + id)
+	f.Mu.Lock()
+	defer f.Mu.Unlock()
+	d, ok := f.RunDetails[id]
+	if !ok {
+		return flowi.RunDetail{}, errors.New("no run " + id)
+	}
+	return d, nil
+}
+
 // FlowRuns returns RunList.
 func (f *Backend) FlowRuns(flowi.FlowTarget, int) []flowi.RunSummary {
 	f.Mu.Lock()
@@ -658,6 +699,12 @@ func (f *Backend) FlowSource(t flowi.FlowTarget, fl model.Flow) (flowi.FlowText,
 	return flowi.FlowText{Flow: fmt.Sprintf("nodes: %d\n", len(fl.Nodes)), File: "arazzo: 1.1.0\n"}, nil
 }
 
+// CheckFlowDraft reports DraftDiags.
+func (f *Backend) CheckFlowDraft(t flowi.FlowTarget, _ model.Flow) diag.List {
+	f.record("CheckFlowDraft " + string(t.Flow))
+	return f.DraftDiags
+}
+
 // ParseFlowSource returns ParsedFlow, with SourceDiags as what is wrong with the text.
 func (f *Backend) ParseFlowSource(t flowi.FlowTarget, _ string) (model.Flow, diag.List, error) {
 	f.record("ParseFlowSource " + string(t.Flow))
@@ -751,6 +798,89 @@ func (f *Backend) Send(_ context.Context, _ flowi.RequestTarget, o flowi.SendOpt
 func (f *Backend) PinExample(_ engine.Record, name string) (string, error) {
 	f.record("PinExample " + name)
 	return "/c/requests/x.examples/" + name + ".json", nil
+}
+
+// Overlays returns the flowi overlays the test set up (OverlayList).
+func (f *Backend) Overlays(model.ID) ([]model.Overlay, error) {
+	f.record("Overlays")
+	f.Mu.Lock()
+	defer f.Mu.Unlock()
+	return slices.Clone(f.OverlayList), nil
+}
+
+// ApplyOverlay lays an overlay of OverlayList over v with the real rules.
+func (f *Backend) ApplyOverlay(t flowi.RequestTarget, name string, v model.RequestVersion) (model.RequestVersion, []flowioverlay.Problem, error) {
+	f.record("ApplyOverlay " + name)
+	f.Mu.Lock()
+	defer f.Mu.Unlock()
+	ops, missing := flowioverlay.Resolve(f.OverlayList, name, t.Request)
+	if missing != "" {
+		return v, nil, errors.New("no flowi overlay named " + missing)
+	}
+	out, problems := flowioverlay.Apply(v, ops)
+	return out, problems, nil
+}
+
+// DiffForOverlay diffs against the saved version of the request the test set up.
+func (f *Backend) DiffForOverlay(_ flowi.RequestTarget, base string, edited model.RequestVersion) (flowi.OverlayDiff, error) {
+	f.record("DiffForOverlay " + base)
+	f.Mu.Lock()
+	defer f.Mu.Unlock()
+	for _, c := range f.Cols {
+		for _, r := range c.Requests {
+			for _, v := range r.Versions {
+				if v.Label == base {
+					ops, unsupported := flowioverlay.Diff(v, edited)
+					return flowi.OverlayDiff{Ops: ops, Unsupported: unsupported}, nil
+				}
+			}
+		}
+	}
+	return flowi.OverlayDiff{}, errors.New("no version " + base)
+}
+
+// SaveAsOverlay records the call.
+func (f *Backend) SaveAsOverlay(_ flowi.RequestTarget, in flowi.SaveOverlayInput, _ bool) error {
+	f.record("SaveAsOverlay " + in.Name)
+	f.Mu.Lock()
+	defer f.Mu.Unlock()
+	f.SavedOverlays = append(f.SavedOverlays, in)
+	return f.OverlayErr
+}
+
+// DeleteOverlay records the call.
+func (f *Backend) DeleteOverlay(_ model.ID, name string) error {
+	f.record("DeleteOverlay " + name)
+	return nil
+}
+
+// OverlayText returns the overlay's file as OverlayFiles holds it.
+func (f *Backend) OverlayText(_ model.ID, name string) (string, error) {
+	f.record("OverlayText " + name)
+	f.Mu.Lock()
+	defer f.Mu.Unlock()
+	return f.OverlayFiles[name], nil
+}
+
+// ExportOverlayAsSpec returns the export in OverlayExports under the overlay's name.
+func (f *Backend) ExportOverlayAsSpec(_ model.ID, name string) (flowi.OverlayExport, error) {
+	f.record("ExportOverlayAsSpec " + name)
+	return f.OverlayExports[name], f.OverlayErr
+}
+
+// WriteOverlayText keeps the text in OverlayFiles.
+func (f *Backend) WriteOverlayText(_ model.ID, name, text string) error {
+	f.record("WriteOverlayText " + name)
+	f.Mu.Lock()
+	defer f.Mu.Unlock()
+	if f.OverlayErr != nil {
+		return f.OverlayErr
+	}
+	if f.OverlayFiles == nil {
+		f.OverlayFiles = map[string]string{}
+	}
+	f.OverlayFiles[name] = text
+	return nil
 }
 
 func (f *Backend) ClearCookies(collection string) error {
@@ -895,6 +1025,48 @@ func (f *Backend) markSecret(env, name string, set bool) error {
 func (f *Backend) Mount(dir string) (model.Manifest, error) {
 	f.record("Mount " + dir)
 	return model.Manifest{}, nil
+}
+
+// Checks are the canned answers the fake gives for coverage, spec impact, access and drift.
+type Checks struct {
+	Coverage analysis.Coverage
+	Impact   flowi.SpecImpact
+	Specs    []string
+	Access   flowi.AccessReport
+	Drift    flowi.DriftReport
+	Err      error
+}
+
+func (f *Backend) OpenArazzo(_ context.Context, ref string) error {
+	f.record("OpenArazzo " + ref)
+	return f.Check.Err
+}
+
+func (f *Backend) Coverage(collection model.ID) (analysis.Coverage, error) {
+	f.record("Coverage " + string(collection))
+	return f.Check.Coverage, f.Check.Err
+}
+
+func (f *Backend) ImpactAgainst(collection model.ID, name string, spec []byte) (flowi.SpecImpact, error) {
+	f.record("ImpactAgainst " + string(collection) + " " + name + " " + string(spec))
+	return f.Check.Impact, f.Check.Err
+}
+
+func (f *Backend) SpecNames(model.ID) []string { return f.Check.Specs }
+
+func (f *Backend) CheckAccess(_ context.Context, _ flowi.FlowTarget, o flowi.AccessOptions) (flowi.AccessReport, error) {
+	f.record("CheckAccess " + o.Owner)
+	return f.Check.Access, f.Check.Err
+}
+
+func (f *Backend) CheckDrift(_ context.Context, _ flowi.FlowTarget, o flowi.DriftOptions) (flowi.DriftReport, error) {
+	f.record("CheckDrift " + o.Env)
+	return f.Check.Drift, f.Check.Err
+}
+
+func (f *Backend) OpenBundle(path string) error {
+	f.record("OpenBundle " + path)
+	return nil
 }
 
 func (f *Backend) Unmount(id model.ID) error {
@@ -1161,6 +1333,14 @@ func (f *Backend) RunFlow(_ context.Context, _ flowi.FlowTarget, o flowi.RunOpti
 	f.Mu.Lock()
 	defer f.Mu.Unlock()
 	f.LastRunOptions = o
+	f.RunOptionsLog = append(f.RunOptionsLog, o)
+	if f.RunFor != nil {
+		r, err := f.RunFor(o)
+		if err != nil {
+			return nil, err
+		}
+		return r, nil
+	}
 	if f.NextRun == nil {
 		return nil, errors.New("no run prepared")
 	}

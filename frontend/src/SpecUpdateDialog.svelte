@@ -55,7 +55,7 @@
   <div class="dialog" role="dialog" aria-label="Update from spec" tabindex="-1" onpointerdown={(e) => e.stopPropagation()}>
     <h3>Update from spec</h3>
     <p class="muted">
-      Imports <code>{spec.spec}</code> again{spec.overlays.length ? `, with ${spec.overlays.join(', ')}` : ''}. Requests keep what you changed and what only Flow-I has (checks, extractions, hooks, settings).
+      Imports <code>{spec.spec}</code> again{spec.overlays.length ? `, with ${spec.overlays.join(', ')}` : ''}. Requests keep what you changed and what only Flowi has (checks, extractions, hooks, settings).
     </p>
     <fieldset>
       <label><input type="radio" bind:group={from} value="kept" onchange={() => (preview = null)} /> The kept copy</label>

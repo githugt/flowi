@@ -3,6 +3,7 @@
 package vm_test
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -131,5 +132,51 @@ func TestFlowRun_should_remember_how_each_hook_of_a_request_step_went(t *testing
 	r.ClearResults()
 	if got := r.HookState("a", vm.HookKey("pre", "collection", 0)); got != "" {
 		t.Fatalf("after clearing: %q", got)
+	}
+}
+
+func TestFlowRun_RunPart_should_carry_the_variables_the_last_run_ended_with(t *testing.T) {
+	// Arrange
+	first := engine.RunResult{Status: engine.StatusPassed}
+	first.Report.Vars = map[string]any{"token": "abc"}
+	r, b, w, _ := runFixture(t, []engine.Event{engine.RunFinished{Status: engine.StatusPassed}})
+	b.NextRun = &vmtest.Running{Result: first}
+	r.Run("staging", nil)
+	w.Wait()
+	b.NextRun = &vmtest.Running{Result: engine.RunResult{Status: engine.StatusPassed}}
+
+	// Act
+	ok := r.RunPart("staging", nil, "sub", vm.ScopeOnly)
+	w.Wait()
+
+	// Assert
+	if !ok || b.LastRunOptions.PriorVars["token"] != "abc" {
+		t.Fatalf("ok %v options %+v: the steps that ran must start with the variables the others set", ok, b.LastRunOptions)
+	}
+}
+
+func TestFlowRun_should_tell_the_listeners_when_a_step_waits_for_the_person_to_sign_in(t *testing.T) {
+	// Arrange
+	prompt := engine.AuthPrompted{Kind: "device", URL: "https://idp.example/verify", Code: "ABCD"}
+	r, _, w, _ := runFixture(t, []engine.Event{prompt, engine.RunFinished{Status: engine.StatusPassed}})
+	var got []engine.AuthPrompted
+	r.OnPrompt(func(p engine.AuthPrompted) { got = append(got, p) })
+
+	// Act
+	r.Run("staging", nil)
+	w.Wait()
+
+	// Assert
+	if len(got) != 1 || got[0].Code != "ABCD" {
+		t.Fatalf("listeners heard %+v", got)
+	}
+}
+
+func TestEventLine_should_say_what_the_person_is_asked_to_do(t *testing.T) {
+	device := vm.EventLine(engine.AuthPrompted{Kind: "device", URL: "https://idp.example/verify", Code: "ABCD"})
+	open := vm.EventLine(engine.AuthPrompted{Kind: "open", URL: "https://idp.example/authorize"})
+
+	if !strings.Contains(device, "ABCD") || !strings.Contains(device, "https://idp.example/verify") || !strings.Contains(open, "sign in") {
+		t.Fatalf("device %q open %q", device, open)
 	}
 }

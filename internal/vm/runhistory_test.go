@@ -64,3 +64,51 @@ func TestRunHistory_should_load_newest_first_and_compare_older_runs_with_the_new
 		t.Fatal("the newest run has nothing to compare with")
 	}
 }
+
+func TestRunHistory_should_compare_any_two_runs_in_depth(t *testing.T) {
+	// Arrange
+	b, f := flowFixture()
+	b.Cols[0].Flows = []model.Flow{f}
+	b.RunList = []flowi.RunSummary{
+		{ID: "c", Nodes: []flowi.RunNodeSummary{node("a", "passed", 0)}},
+		{ID: "b", Nodes: []flowi.RunNodeSummary{node("a", "passed", 0)}},
+		{ID: "a", Nodes: []flowi.RunNodeSummary{node("a", "failed", 0)}},
+	}
+	b.RunDetails = map[string]flowi.RunDetail{
+		"a": {Outputs: map[string]map[string]any{"a": {"body": "one"}}, Vars: map[string]any{"n": 1}},
+		"b": {Outputs: map[string]map[string]any{"a": {"body": "two"}}, Vars: map[string]any{"n": 2}},
+	}
+	w := vmtest.SyncWorker()
+	h := vm.NewRunHistory(b, w, vm.NewFlowDoc(b, w, b.Cols[0], f))
+	h.Load()
+
+	// Act
+	rows := h.Between(2, 1)
+	var got vm.RunComparison
+	var gotErr error
+	h.CompareInDepth(2, 1, func(c vm.RunComparison, err error) { got, gotErr = c, err })
+
+	// Assert
+	if len(rows) != 1 || rows[0].Before != "failed" || rows[0].After != "passed" {
+		t.Fatalf("rows %+v: the earlier run is the one compared from", rows)
+	}
+	if gotErr != nil || len(got.Nodes["a"]) == 0 || len(got.Vars) != 1 || got.Vars[0].Name != "n" {
+		t.Fatalf("comparison %+v err %v", got, gotErr)
+	}
+}
+
+func TestRunHistory_Given_a_report_that_cannot_be_read_Then_the_comparison_says_so(t *testing.T) {
+	b, f := flowFixture()
+	b.Cols[0].Flows = []model.Flow{f}
+	b.RunList = []flowi.RunSummary{{ID: "x"}, {ID: "y"}}
+	w := vmtest.SyncWorker()
+	h := vm.NewRunHistory(b, w, vm.NewFlowDoc(b, w, b.Cols[0], f))
+	h.Load()
+	var gotErr error
+
+	h.CompareInDepth(0, 1, func(_ vm.RunComparison, err error) { gotErr = err })
+
+	if gotErr == nil {
+		t.Fatal("a run whose report is gone must be reported, not shown as no difference")
+	}
+}

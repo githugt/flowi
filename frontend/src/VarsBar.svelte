@@ -4,6 +4,7 @@
   let { vars }: { vars: VarsView } = $props()
   let open = $state<string | null>(null)
 
+  const valueOf = $derived(new Map((vars.values ?? []).map((v) => [v.name, v.value])))
   const groups = $derived(
     [
       { title: 'Variables', names: vars.set, warn: false },
@@ -24,7 +25,15 @@
         </button>
         {#if open === g.title}
           <div class="pop" role="dialog" tabindex="-1" onpointerdown={(e) => e.stopPropagation()}>
-            {#each g.names as n}<div>{n}</div>{/each}
+            {#each g.names as n}
+              <div>{n}{#if g.title === 'Variables' && valueOf.has(n)}<span class="val" title="What it held when the last run ended"> = {valueOf.get(n)}</span>{/if}</div>
+            {/each}
+            {#if g.title === 'Variables'}
+              {@const known = new Set(vars.set)}
+              {#each (vars.values ?? []).filter((v) => !known.has(v.name)) as v}
+                <div>{v.name}<span class="val" title="Set while the flow ran"> = {v.value}</span></div>
+              {/each}
+            {/if}
           </div>
         {/if}
       </div>
@@ -46,6 +55,7 @@
   }
   button:hover { border-color: var(--accent); color: var(--text); }
   .warn { color: var(--warn); border-color: color-mix(in srgb, var(--warn) 50%, var(--line)); }
+  .val { color: var(--muted); word-break: break-all; }
   .pop {
     position: absolute;
     bottom: 100%;

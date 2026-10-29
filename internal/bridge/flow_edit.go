@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"slices"
 	"strconv"
+	"strings"
 	"time"
 
 	flowi "github.com/githugt/flowi-lib"
@@ -110,14 +111,14 @@ func (s *FlowService) edit(node string, f func(o *openFlow) error) error {
 }
 
 // SetText sets a text field of the selected step, or of the flow when none
-// is selected. Fields: name, description, when, timeout, version,
+// is selected. Fields: name, description, when, timeout, version, overlay, open, over,
 // preferVersion, maxConcurrency, rateLimit.
 func (s *FlowService) SetText(node, field, value string) error {
 	return s.edit(node, func(o *openFlow) error {
 		d, id := o.doc, o.selected
 		merge := id + "/" + field
 		switch field {
-		case "name", "description", "when", "version":
+		case "name", "description", "when", "version", "overlay", "open", "over":
 			d.EditNodeMerged(merge, id, func(n *model.Node) { setNodeText(n, field, value) })
 		case "timeout":
 			dur, err := time.ParseDuration(value)
@@ -152,6 +153,18 @@ func setNodeText(n *model.Node, field, value string) {
 		if n.Request != nil {
 			n.Request.Version = value
 		}
+	case "overlay":
+		if n.Request != nil {
+			n.Request.Overlay = value
+		}
+	case "open":
+		if n.Request != nil {
+			n.Request.Open = value
+		}
+	case "over":
+		if n.Request != nil {
+			n.Request.Over = value
+		}
 	}
 }
 
@@ -172,6 +185,18 @@ func setFlowText(f *model.Flow, field, value string) {
 func (s *FlowService) SetConcurrent(node string, on bool) {
 	_ = s.edit(node, func(o *openFlow) error {
 		o.doc.EditNode(o.selected, func(n *model.Node) { n.Concurrent = on })
+		return nil
+	})
+}
+
+// SetClose says whether the selected request step closes the connection it runs over.
+func (s *FlowService) SetClose(node string, on bool) {
+	_ = s.edit(node, func(o *openFlow) error {
+		o.doc.EditNode(o.selected, func(n *model.Node) {
+			if n.Request != nil {
+				n.Request.Close = on
+			}
+		})
 		return nil
 	})
 }
@@ -221,19 +246,42 @@ func (s *FlowService) SetPairs(node, field string, rows []Pair) error {
 			spec := catalog().byType[nodeType(d, id)]
 			d.EditNodeMerged(id+"/vars", id, func(n *model.Node) { n.Params = withVariables(n.Params, spec, kv) })
 		case "inputs":
-			d.EditFlowMerged("flow/inputs", func(f *model.Flow) {
-				f.Inputs = nil
-				for _, x := range kv {
-					f.Inputs = append(f.Inputs, model.Input{Name: x.Key, Default: x.Value})
-				}
-			})
+			d.EditFlowMerged("flow/inputs", func(f *model.Flow) { f.Inputs = inputsKeepingTypes(f.Inputs, kv) })
 		case "outputs":
-			d.EditFlowMerged("flow/outputs", func(f *model.Flow) { f.Outputs = kv })
+			d.EditFlowMerged("flow/outputs", func(f *model.Flow) { f.Outputs = outputsKeepingTypes(f.Outputs, kv) })
 		default:
 			return fmt.Errorf("unknown field %q", field)
 		}
 		return nil
 	})
+}
+
+// inputsKeepingTypes is the inputs a key/value editor wrote, each with the
+// type the input of that name had (the editor does not show types).
+func inputsKeepingTypes(old []model.Input, rows []model.KeyValue) []model.Input {
+	out := make([]model.Input, 0, len(rows))
+	for _, x := range rows {
+		in := model.Input{Name: x.Key, Default: x.Value}
+		if i := slices.IndexFunc(old, func(o model.Input) bool { return o.Name == x.Key }); i >= 0 {
+			in.Type = old[i].Type
+		}
+		out = append(out, in)
+	}
+	return out
+}
+
+// outputsKeepingTypes is the outputs a key/value editor wrote, each with the
+// type the output of that name had.
+func outputsKeepingTypes(old []model.Output, rows []model.KeyValue) []model.Output {
+	out := make([]model.Output, 0, len(rows))
+	for _, x := range rows {
+		o := model.Output{Name: x.Key, Value: x.Value}
+		if i := slices.IndexFunc(old, func(p model.Output) bool { return p.Name == x.Key }); i >= 0 {
+			o.Type = old[i].Type
+		}
+		out = append(out, o)
+	}
+	return out
 }
 
 func nodeType(d *vm.FlowDoc, id string) string {
@@ -295,6 +343,69 @@ func (s *FlowService) SetHooks(node, mode string) {
 		})
 		return nil
 	})
+}
+
+// ValueRow is one value of a set step as the card editor shows it: where the
+// value comes from (expr, literal, response, generate), and the parts that
+// source needs. Seed is text so a half-typed number does not get lost.
+type ValueRow struct {
+	Name   string `json:"name"`
+	From   string `json:"from"`
+	Value  string `json:"value"`
+	In     string `json:"in"`
+	Path   string `json:"path"`
+	Header string `json:"header"`
+	Cookie string `json:"cookie"`
+	Regex  string `json:"regex"`
+	Seed   string `json:"seed"`
+}
+
+// SetValues replaces the values of the selected set step. A step that is not a
+// set is refused; a seed that is not a whole number is dropped, as the editor
+// shows it as typing in progress.
+func (s *FlowService) SetValues(node string, rows []ValueRow) error {
+	return s.edit(node, func(o *openFlow) error {
+		n, ok := o.doc.Node(o.selected)
+		if !ok || n.Type != "set" {
+			return fmt.Errorf("only a set step has values")
+		}
+		o.doc.EditNodeMerged(o.selected+"/values", o.selected, func(n *model.Node) {
+			n.Values = valuesOf(rows)
+			n.Params = vm.DropParam(vm.DropParam(n.Params, "target"), "value") // the older single form is replaced
+		})
+		return nil
+	})
+}
+
+func valuesOf(rows []ValueRow) []model.SetValue {
+	out := make([]model.SetValue, 0, len(rows))
+	for _, r := range rows {
+		v := model.SetValue{Name: r.Name, From: r.From, Where: r.In, Path: r.Path, Header: r.Header, Cookie: r.Cookie, Regex: r.Regex}
+		if r.From != "response" {
+			v.Value = r.Value
+		}
+		v.Seed, _ = strconv.ParseInt(strings.TrimSpace(r.Seed), 10, 64)
+		out = append(out, v)
+	}
+	return out
+}
+
+// valueRowsOf are the rows the editor shows for a set step: its values, or the
+// single target and value of the older form as one row.
+func valueRowsOf(n model.Node) []ValueRow {
+	rows := make([]ValueRow, 0, len(n.Values))
+	for _, v := range n.Values {
+		text, _ := v.Value.(string)
+		row := ValueRow{Name: v.Name, From: v.From, Value: text, In: v.Where, Path: v.Path, Header: v.Header, Cookie: v.Cookie, Regex: v.Regex}
+		if v.Seed != 0 {
+			row.Seed = strconv.FormatInt(v.Seed, 10)
+		}
+		rows = append(rows, row)
+	}
+	if target := vm.ParamText(n, "target"); len(rows) == 0 && target != "" {
+		rows = append(rows, ValueRow{Name: strings.TrimPrefix(target, "vars."), Value: vm.ParamText(n, "value")})
+	}
+	return rows
 }
 
 // SetFailRoute sets what the selected step does when it fails.

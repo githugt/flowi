@@ -72,7 +72,7 @@
               {#if o.tone}<Verb verb={o.tone} text={o.label} pill={false} />{:else}{o.label}{/if}
               {#if o.detail}<small>{o.detail}</small>{/if}
             </span>
-            {#if o.dot}<span class="dot"></span>{/if}
+            {#if o.count}<span class="count">{o.count}</span>{:else if o.dot}<span class="dot"></span>{/if}
           </button>
         {/if}
       {/each}

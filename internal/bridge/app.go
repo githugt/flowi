@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/githugt/flowi-lib/diag"
+	"github.com/githugt/flowi-lib/engine"
 
 	"github.com/githugt/flowi/internal/vm"
 )
@@ -30,8 +31,9 @@ type App struct {
 	problems  *vm.Problems
 	scheduler vm.Scheduler // autosave timers
 	pickers   Pickers
-	wsFile    WorkspaceFile // nil when the app was built without one (tests)
-	specs     SpecOverlays  // nil when the app was built without them (tests)
+	wsFile    WorkspaceFile       // nil when the app was built without one (tests)
+	specs     SpecOverlays        // nil when the app was built without them (tests)
+	variables CollectionVariables // nil when the app was built without them (tests)
 	quit      func()
 	treeReady *firstLoad // the workspace tree has loaded once
 	emit      Emit
@@ -55,6 +57,7 @@ type App struct {
 	replayer   *ReplayerService
 	blueprints *BlueprintsService
 	trash      *TrashService
+	checks     *ChecksService
 	hooks      *HooksService
 	session    *SessionService
 	welcome    *WelcomeService
@@ -69,6 +72,7 @@ type appOptions struct {
 	openProblems diag.List
 	wsFile       WorkspaceFile
 	specs        SpecOverlays
+	variables    CollectionVariables
 	changelog    string
 }
 
@@ -102,8 +106,9 @@ func NewApp(b vm.Backend, actor *Actor, emit Emit, opts ...Option) *App {
 	ws := vm.NewWorkspace(b, w)
 	log, history := vm.NewRunLog(), vm.NewHistory()
 	a := &App{actor: actor, backend: b, worker: w, workspace: ws, emit: emit, log: log, history: history,
-		send: vm.NewSend(b, w, ws, log, history), problems: vm.NewProblems(b, w, ws), openProblems: o.openProblems, logger: o.logger, changelog: o.changelog, wsFile: o.wsFile, specs: o.specs}
+		send: vm.NewSend(b, w, ws, log, history), problems: vm.NewProblems(b, w, ws), openProblems: o.openProblems, logger: o.logger, changelog: o.changelog, wsFile: o.wsFile, specs: o.specs, variables: o.variables}
 	a.send.OnResult(a.problems.SetRun)
+	a.send.OnPrompt(a.promptPerson)
 	a.scheduler = vm.NewTimerScheduler(actor.Post)
 	a.treeReady = newFirstLoad()
 	a.buildServices(o.logger)
@@ -127,6 +132,7 @@ func (a *App) buildServices(logger *slog.Logger) {
 	a.replayer = newReplayerService(a)
 	a.blueprints = newBlueprintsService(a)
 	a.trash = &TrashService{app: a}
+	a.checks = &ChecksService{app: a}
 	a.hooks = newHooksService(a)
 	a.session = newSessionService(a, logger)
 	a.welcome = newWelcomeService(a)
@@ -190,6 +196,9 @@ func (a *App) Blueprints() *BlueprintsService { return a.blueprints }
 
 // Trash is the service for the trash.
 func (a *App) Trash() *TrashService { return a.trash }
+
+// Checks is the service for the Checks screen.
+func (a *App) Checks() *ChecksService { return a.checks }
 
 // Hooks is the service for the hook editor.
 func (a *App) Hooks() *HooksService { return a.hooks }
@@ -326,4 +335,17 @@ func (a *App) flushRequests() []chan bool {
 		}
 	})
 	return pending
+}
+
+// PromptView is what a request waits for the person to do: the "authprompt" event.
+type PromptView struct {
+	Kind    string `json:"kind"` // "open": sign in at URL; "device": open URL and enter Code
+	URL     string `json:"url"`
+	Code    string `json:"code,omitempty"`
+	Expires string `json:"expires,omitempty"` // RFC 3339
+}
+
+// promptPerson publishes what a waiting request asks of the person, so the window can open the page or show the code.
+func (a *App) promptPerson(p engine.AuthPrompted) {
+	a.emit("authprompt", PromptView{Kind: p.Kind, URL: p.URL, Code: p.Code, Expires: p.Expires.Format(time.RFC3339)})
 }

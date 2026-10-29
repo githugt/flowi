@@ -198,6 +198,7 @@ func (r *Request) Pipeline(trace *Trace) []PipelineRow {
 	var rows []PipelineRow
 	rows = append(rows, r.phaseRows("Pre-hooks", "pre", chain.Pre, trace)...)
 	rows = append(rows, r.requestRow(trace))
+	rows = append(rows, r.phaseRows("Message hooks (each message)", "message", r.messageHooks(chain), trace)...)
 	return append(rows, r.phaseRows("Post-hooks", "post", chain.Post, trace)...)
 }
 
@@ -206,7 +207,7 @@ func (r *Request) Pipeline(trace *Trace) []PipelineRow {
 func (r *Request) pipelineShape() string {
 	chain := engine.ChainFor(r.coll, r.draft, r.Current())
 	var keys []string
-	for _, rows := range [][]PipelineRow{r.phaseRows("", "pre", chain.Pre, nil), r.phaseRows("", "post", chain.Post, nil)} {
+	for _, rows := range [][]PipelineRow{r.phaseRows("", "pre", chain.Pre, nil), r.phaseRows("", "message", r.messageHooks(chain), nil), r.phaseRows("", "post", chain.Post, nil)} {
 		for _, row := range rows {
 			keys = append(keys, row.Key)
 		}
@@ -274,4 +275,13 @@ func (r *Request) requestRow(trace *Trace) PipelineRow {
 		row.Tip = trace.apiURL
 	}
 	return row
+}
+
+// messageHooks are the hooks that run for each message: only a request that
+// receives messages runs them.
+func (r *Request) messageHooks(chain engine.HookChain) []engine.HookRef {
+	if r.IsAsync() || r.IsGRPC() {
+		return chain.Message
+	}
+	return nil
 }

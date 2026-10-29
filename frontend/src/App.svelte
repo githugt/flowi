@@ -6,6 +6,8 @@
   import { app } from './lib/app.svelte'
   import Sidebar from './Sidebar.svelte'
   import Splitter from './Splitter.svelte'
+  import Rail from './Rail.svelte'
+  import { collapsedOnOpen, loadPins, savePins, type TabKind } from './lib/sidebar'
   import Verb from './Verb.svelte'
   import Icon from './Icon.svelte'
   import { ui } from './lib/ui.svelte'
@@ -13,6 +15,42 @@
   import EnvOffers from './EnvOffers.svelte'
 
   let sidebarWidth = $state(260)
+
+  // The sidebar folds to a rail when a flow opens (the graph wants the room) unless pinned open; a request leaves it
+  // as it was. The pin is kept for each kind of tab.
+  const store = (() => {
+    try {
+      return localStorage
+    } catch {
+      return { getItem: () => null, setItem: () => {} }
+    }
+  })()
+  let pins = $state(loadPins(store))
+  let collapsed = $state(false)
+  const kindOf = (node: string): TabKind => {
+    const k = app.tabs.find((t) => t.node === node)?.kind
+    return k === 'flow' || k === 'request' ? k : 'other'
+  }
+  let lastActive = ''
+  $effect(() => {
+    const active = app.active
+    if (active === lastActive) return
+    lastActive = active
+    collapsed = collapsedOnOpen(kindOf(active), collapsed, pins)
+  })
+  // Pinning is for the kind of tab in front (a screen counts as a request tab).
+  function pinOpen() {
+    const kind = kindOf(app.active) === 'flow' ? 'flow' : 'request'
+    pins[kind] = true
+    savePins(store, pins)
+    collapsed = false
+  }
+  function fold() {
+    const kind = kindOf(app.active) === 'flow' ? 'flow' : 'request'
+    pins[kind] = false
+    savePins(store, pins)
+    collapsed = true
+  }
   import FlowEditor from './FlowEditor.svelte'
   import RequestEditor from './RequestEditor.svelte'
   import Overlays from './Overlays.svelte'
@@ -31,9 +69,31 @@
   import ReplayerScreen from './ReplayerScreen.svelte'
   import BlueprintsScreen from './BlueprintsScreen.svelte'
   import TrashScreen from './TrashScreen.svelte'
+  import ChecksScreen from './ChecksScreen.svelte'
   import { envSwatch } from './lib/envcolours'
+  import { createAltTap, isWindows } from './lib/altmenu'
+  import { Events } from '@wailsio/runtime'
 
   onMount(() => app.init())
+
+  // On Windows the menu bar stays hidden until Alt is tapped (the Go side hides it and answers this event).
+  onMount(() => {
+    if (!isWindows(navigator.userAgent)) return
+    const alt = createAltTap(() => Events.Emit('toggle-menu-bar'))
+    const down = (e: KeyboardEvent) => alt.keydown(e)
+    const up = (e: KeyboardEvent) => alt.keyup(e)
+    const cancel = () => alt.cancel()
+    window.addEventListener('keydown', down)
+    window.addEventListener('keyup', up)
+    window.addEventListener('pointerdown', cancel)
+    window.addEventListener('blur', cancel)
+    return () => {
+      window.removeEventListener('keydown', down)
+      window.removeEventListener('keyup', up)
+      window.removeEventListener('pointerdown', cancel)
+      window.removeEventListener('blur', cancel)
+    }
+  })
 
   // The open tabs are kept for the next session, once the last one's are back.
   $effect(() => {
@@ -110,9 +170,13 @@
 </script>
 
 <div class="shell">
-  <Sidebar width={sidebarWidth} />
-  <Splitter name="sidebar" side="left" min={200} max={520} bind:width={sidebarWidth} />
-  <section>
+  {#if collapsed}
+    <Rail width={sidebarWidth} onexpand={() => (collapsed = false)} onpin={pinOpen} />
+  {:else}
+    <Sidebar width={sidebarWidth} onfold={fold} />
+    <Splitter name="sidebar" side="left" min={200} max={520} bind:width={sidebarWidth} />
+  {/if}
+  <section class:folded={collapsed}>
     <Announcements />
     <nav class="tabs">
       <div class="strip" class:fade-left={overflow.left} class:fade-right={overflow.right} bind:this={strip} onscroll={measureOverflow} onwheel={stripWheel}>
@@ -195,6 +259,8 @@
         <BlueprintsScreen />
       {:else if tab && tab.node === 'screen:trash'}
         <TrashScreen />
+      {:else if tab && tab.node === 'screen:checks'}
+        <ChecksScreen />
       {:else if tab && tab.node === 'screen:replayer'}
         <ReplayerScreen />
       {:else if tab && tab.node === 'screen:schedules'}
@@ -219,6 +285,8 @@
 <style>
   .shell { display: flex; height: 100%; }
   section { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+  /* The window's buttons sit over the top-left corner, which the rail is too narrow to clear. */
+  .folded .tabs { padding-left: 48px; }
   .tabs {
     height: 44px;
     flex: none;

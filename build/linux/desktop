@@ -1,7 +1,7 @@
 [Desktop Entry]
 Version=1.0
 Type=Application
-Name=Flow-I
+Name=Flowi
 Comment=Compose API requests into flows
 Exec=flowi-app
 Icon=flowi

@@ -2,6 +2,7 @@
   import { errorText } from './lib/errors'
   import { FlowService } from '../bindings/github.com/githugt/flowi/internal/bridge'
   import type { FlowView } from './lib/types'
+  import { ui } from './lib/ui.svelte'
 
   let { view }: { view: FlowView } = $props()
   const node = $derived(view.node)
@@ -24,10 +25,21 @@
     await go(scope, {})
   }
 
+  // Skipped steps whose values a later step needs are listed before the run starts, not found out halfway.
   async function go(scope: string, given: Record<string, string>) {
+    const broken = view.skips.problems.filter((p) => p.required)
+    if (broken.length) {
+      ui.confirm('Run with skipped steps?', broken.map((p) => p.text).join('\n\n'), () => start(scope, given), 'Run anyway')
+      return
+    }
+    await start(scope, given)
+  }
+
+  async function start(scope: string, given: Record<string, string>) {
     const filled = Object.fromEntries(Object.entries(given).filter(([, v]) => v !== ''))
     try {
       if (scope === 'all') await FlowService.Run(node, filled)
+      else if (scope === 'debug') await FlowService.Debug(node, filled)
       else await FlowService.RunPart(node, scope, filled)
     } catch (e) {
       error = errorText(e)
@@ -46,6 +58,7 @@
     ['Run only the selected step', 'only', false],
     ['Run until the selected step', 'until', false],
     ['Run from the selected step', 'from', false],
+    ['Debug: pause at breakpoints', 'debug', false],
   ]
 </script>
 
@@ -61,7 +74,7 @@
   {#if open}
     <div class="menu" role="menu" tabindex="-1" onpointerdown={(e) => e.stopPropagation()}>
       {#each choices as [label, scope, force]}
-        <button role="menuitem" disabled={scope !== 'all' && !view.selected} onclick={() => launch(scope, force)}>{label}</button>
+        <button role="menuitem" disabled={(scope === 'only' || scope === 'until' || scope === 'from') && !view.selected} onclick={() => launch(scope, force)}>{label}</button>
       {/each}
       <hr />
       <button role="menuitem" onclick={() => { open = false; FlowService.ClearResults(node) }}>Clear results</button>
