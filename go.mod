@@ -3,7 +3,7 @@ module github.com/githugt/flowi
 go 1.27
 
 require (
-	github.com/githugt/flowi-lib v0.1.0-alpha.3
+	github.com/githugt/flowi-lib v0.1.0-alpha.4
 	github.com/wailsapp/wails/v3 v3.0.0-beta.30
 )
 
@@ -46,6 +46,7 @@ require (
 	github.com/coder/websocket v1.8.15 // indirect
 	github.com/danieljoos/wincred v1.2.3 // indirect
 	github.com/eclipse/paho.golang v0.23.0 // indirect
+	github.com/eclipse/paho.mqtt.golang v1.5.1 // indirect
 	github.com/expr-lang/expr v1.17.8 // indirect
 	github.com/felixge/httpsnoop v1.1.0 // indirect
 	github.com/fsnotify/fsnotify v1.10.1 // indirect
@@ -59,6 +60,7 @@ require (
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/googleapis/enterprise-certificate-proxy v0.3.17 // indirect
 	github.com/googleapis/gax-go/v2 v2.23.0 // indirect
+	github.com/gorilla/websocket v1.5.3 // indirect
 	github.com/klauspost/compress v1.20.3 // indirect
 	github.com/kylelemons/godebug v1.1.0 // indirect
 	github.com/mattn/go-colorable v0.1.14 // indirect
