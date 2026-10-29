@@ -111,7 +111,7 @@ func TestNameChecker_should_know_environment_names_runtime_namespaces_and_genera
 	tests := map[string]bool{
 		"env.base_url": true, "env.nope": false, "secret.password": true, "secret.nope": false,
 		"region": true, "email": false, " env.base_url ": true,
-		"vars.token": true, "with.x": true, "inputs.a": true, "nodes.n.out": true, "response.body.id": true, "request.url": true, "status": true,
+		"vars.token": true, "with.x": true, "inputs.a": true, "nodes.n.out": true, "response.body.id": true, "request.url": true, "status": true, "collection_var.region": true,
 		"$uuid-v4": true, "$no-such-generator": false, "$int(1, 5)": true,
 	}
 	for name, want := range tests {

@@ -17,6 +17,7 @@ import (
 	"github.com/githugt/flowi-lib/model"
 
 	"github.com/githugt/flowi/internal/canvas"
+	"github.com/githugt/flowi/internal/card"
 )
 
 // maxUndo bounds the undo history.
@@ -43,9 +44,10 @@ type FlowDoc struct {
 	layoutDue bool     // positions changed since the layout was last saved
 	lastMerge string   // merge key of the last command; see EditNodeMerged
 	rev       int      // bumped by every change to the draft
-	onlyFlowI []string // steps only Flow-I can run, as "id (type)"
+	onlyFlowI []string // steps only Flowi can run, as "id (type)"
 	layoutRev int      // bumped by every change to positions or collapsed strips
 	diagram   canvas.Diagram
+	cards     map[string]card.Card // what each step shows, by node id; nil unless the graph view is on
 	dirty     bool
 	onDisk    bool
 	confirm   bool
@@ -65,7 +67,7 @@ func NewFlowDoc(b Backend, w *Worker, c model.Collection, f model.Flow) *FlowDoc
 }
 
 // FlowIOnlySteps are the steps of the flow in its Arazzo file that only
-// Flow-I can run, as "id (type)": other Arazzo tools cannot run them.
+// Flowi can run, as "id (type)": other Arazzo tools cannot run them.
 func (d *FlowDoc) FlowIOnlySteps() []string { return d.onlyFlowI }
 
 // loadCompatibility reads them in the background, and shows them when read.
@@ -128,9 +130,9 @@ func (d *FlowDoc) changed() {
 	}
 }
 
-// UseGraphView makes the diagram draw a container's lanes as branches and
-// attached actions with their request (see canvas.WithBranches and
-// canvas.WithAttached) instead of as a box around the lanes and strips.
+// UseGraphView makes the diagram draw every step as a card with its lanes as
+// branches (see canvas.WithCards) instead of as a box around the lanes and
+// strips of actions.
 func (d *FlowDoc) UseGraphView() {
 	d.graphView = true
 	d.relayout()
@@ -138,11 +140,16 @@ func (d *FlowDoc) UseGraphView() {
 
 func (d *FlowDoc) relayout() {
 	var opts []canvas.Option
+	d.cards = nil
 	if d.graphView {
-		opts = append(opts, canvas.WithBranches(), canvas.WithAttached())
+		d.cards = CardsOf(d.coll, d.draft)
+		opts = append(opts, canvas.WithCards(d.cards))
 	}
 	d.diagram = canvas.Layout(d.draft, d.positions, d.collapsed, opts...)
 }
+
+// Cards is what each step's card shows, by node id.
+func (d *FlowDoc) Cards() map[string]card.Card { return d.cards }
 
 // Target identifies the flow.
 func (d *FlowDoc) Target() flowi.FlowTarget { return d.target }
@@ -849,7 +856,7 @@ func (d *FlowDoc) saved(draft model.Flow, flowDue, layoutDue bool, rev, layoutRe
 	}
 	d.changed()
 	if flowDue {
-		d.loadCompatibility() // a saved edit may add or remove a Flow-I-only step
+		d.loadCompatibility() // a saved edit may add or remove a Flowi-only step
 	}
 }
 
@@ -920,8 +927,11 @@ func (d *FlowDoc) Source(done func(flow, file string), fail func(error)) {
 
 // ApplySource makes the flow what text says, as one undoable edit. When the
 // text has problems, done gets one line for each ("line 3: …") and the draft
-// stays as it was; no problems means it was applied (or already matched).
-func (d *FlowDoc) ApplySource(text string, done func(problems []string), fail func(error)) {
+// stays as it was; no problems means it was applied (or already matched), and
+// notes then say what is wrong with the flow as applied (a step that calls a
+// request that does not exist): the flow is applied all the same, as saving
+// one with problems is allowed too.
+func (d *FlowDoc) ApplySource(text string, done func(problems, notes []string), fail func(error)) {
 	t := d.target
 	type result struct {
 		flow  model.Flow
@@ -938,12 +948,54 @@ func (d *FlowDoc) ApplySource(text string, done func(problems []string), fail fu
 				fail(r.err)
 			}
 		case len(r.diags) > 0:
-			done(problemLines(r.diags))
+			done(problemLines(r.diags), nil)
 		default:
 			d.replaceDraft(r.flow)
-			done(nil)
+			d.noteDraftProblems(r.flow, func(notes []string) { done(nil, notes) })
 		}
 	})
+}
+
+// noteDraftProblems checks f against the rest of the workspace, off the UI
+// goroutine, and hands done one line for each problem found.
+func (d *FlowDoc) noteDraftProblems(f model.Flow, done func(notes []string)) {
+	t := d.target
+	Run(d.w, func() diag.List { return d.b.CheckFlowDraft(t, f) }, func(diags diag.List) {
+		done(noteLines(f, diags))
+	})
+}
+
+// noteLines words diagnostics about an applied flow, each with the step it is
+// about when the path names a top-level step.
+func noteLines(f model.Flow, diags diag.List) []string {
+	var lines []string
+	for _, x := range diags {
+		msg, hint := diag.English().Message(x)
+		line := string(x.Code) + ": " + msg
+		if hint != "" {
+			line += " (" + hint + ")"
+		}
+		if id := stepOfPath(f, x.Path); id != "" {
+			line = "step " + id + ": " + line
+		}
+		lines = append(lines, line)
+	}
+	return lines
+}
+
+// stepOfPath is the id of the top-level step a path such as
+// "$.nodes[2].request.id" is inside, or "".
+func stepOfPath(f model.Flow, path string) string {
+	rest, ok := strings.CutPrefix(path, "$.nodes[")
+	if !ok {
+		return ""
+	}
+	index, _, _ := strings.Cut(rest, "]")
+	i, err := strconv.Atoi(index)
+	if err != nil || i < 0 || i >= len(f.Nodes) {
+		return ""
+	}
+	return f.Nodes[i].ID
 }
 
 // replaceDraft sets the draft to f, keeping the flow's identity; a flow equal
@@ -999,6 +1051,6 @@ func (d *FlowDoc) RestoreKept(done func(restored bool)) {
 			done(false)
 			return
 		}
-		d.ApplySource(k.text, func(problems []string) { done(len(problems) == 0) }, func(error) { done(false) })
+		d.ApplySource(k.text, func(problems, _ []string) { done(len(problems) == 0) }, func(error) { done(false) })
 	})
 }

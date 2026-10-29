@@ -388,7 +388,7 @@ func addCollection(add func(string, TreeNode), c model.Collection, draft bool) {
 	root := "c:" + string(cid)
 	label := c.Manifest.Name
 	if draft && label == scratchName {
-		label = "Drafts" // the scratch space; other collections in Flow-I's folder are ordinary collections
+		label = "Drafts" // the scratch space; other collections in Flowi's folder are ordinary collections
 	}
 	add("", TreeNode{ID: root, Label: label, Kind: NodeCollection, Collection: cid, Draft: draft})
 	reqs := root + "/requests"

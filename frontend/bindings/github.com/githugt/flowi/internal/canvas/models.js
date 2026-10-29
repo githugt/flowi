@@ -170,6 +170,15 @@ export class Edge {
              */
             this["fail"] = undefined;
         }
+        if (/** @type {any} */(false)) {
+            /**
+             * FromPort is the card port the edge leaves from (done, fail, case-i, else);
+             * "" for units that are not cards.
+             * @member
+             * @type {string | undefined}
+             */
+            this["fromPort"] = undefined;
+        }
 
         Object.assign(this, $$source);
     }
@@ -260,6 +269,15 @@ export class Lane {
              * @type {string}
              */
             this["label"] = "";
+        }
+        if (/** @type {any} */(false)) {
+            /**
+             * Port is the card port that feeds the lane (case-i or else for a route's
+             * lanes), "" when the container has no port per lane.
+             * @member
+             * @type {string | undefined}
+             */
+            this["port"] = undefined;
         }
 
         Object.assign(this, $$source);
@@ -514,6 +532,30 @@ export class Unit {
              */
             this["headW"] = undefined;
         }
+        if (/** @type {any} */(false)) {
+            /**
+             * drawn as a card (see WithCards): its ports are in Ports
+             * @member
+             * @type {boolean | undefined}
+             */
+            this["card"] = undefined;
+        }
+        if (/** @type {any} */(false)) {
+            /**
+             * a container drawn as a card: the card's own height (H covers its lanes too)
+             * @member
+             * @type {number | undefined}
+             */
+            this["headH"] = undefined;
+        }
+        if (/** @type {any} */(false)) {
+            /**
+             * a card's control ports, top to bottom
+             * @member
+             * @type {string[] | undefined}
+             */
+            this["ports"] = undefined;
+        }
 
         Object.assign(this, $$source);
     }
@@ -527,6 +569,7 @@ export class Unit {
         const $$createField2_0 = $$createType6;
         const $$createField3_0 = $$createType6;
         const $$createField14_0 = $$createType8;
+        const $$createField19_0 = $$createType6;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("nodes" in $$parsedSource) {
             $$parsedSource["nodes"] = $$createField2_0($$parsedSource["nodes"]);
@@ -536,6 +579,9 @@ export class Unit {
         }
         if ("cells" in $$parsedSource) {
             $$parsedSource["cells"] = $$createField14_0($$parsedSource["cells"]);
+        }
+        if ("ports" in $$parsedSource) {
+            $$parsedSource["ports"] = $$createField19_0($$parsedSource["ports"]);
         }
         return new Unit(/** @type {Partial<Unit>} */($$parsedSource));
     }

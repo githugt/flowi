@@ -6,9 +6,14 @@
   import type { KeptSpec, ManagerView } from './lib/types'
   import PathField from './PathField.svelte'
   import SpecUpdateDialog from './SpecUpdateDialog.svelte'
+  import KVRows from './KVRows.svelte'
+  import { errorText } from './lib/errors'
+  import type { KV } from './lib/types'
 
   let view = $state<ManagerView>({ collections: [] })
   let mountDir = $state('')
+  let bundleFile = $state('')
+  let arazzoRef = $state('')
   let newName = $state('')
   let newLocation = $state('')
   let relocate = $state<Record<string, string>>({})
@@ -17,6 +22,32 @@
   // value has a default, threw (props_invalid_value) and the screen showed no collections at all.
 
   onMount(() => live<ManagerView>('manager', () => ManagerService.State(), (v) => (view = v)))
+
+  // The variables of each collection: read in templates as {{collection_var.name}}; the selected
+  // environment overrides one of the same name.
+  let variables = $state<Record<string, KV[]>>({})
+  let variableError = $state<Record<string, string>>({})
+  $effect(() => {
+    for (const c of view.collections) {
+      if (c.missing || variables[c.id]) continue
+      ManagerService.Variables(c.id)
+        .then((rows) => (variables[c.id] = rows as unknown as KV[]))
+        .catch(() => (variables[c.id] = []))
+    }
+  })
+  async function saveVariables(id: string, rows: KV[], drop = false) {
+    variableError[id] = ''
+    try {
+      const needsConfirm = await ManagerService.SetVariables(id, rows.filter((r) => r.Key) as never, drop)
+      if (needsConfirm) {
+        ui.confirm('Comments will be lost', 'The collection file has comments; saving rewrites it without them. Save anyway?', () => saveVariables(id, rows, true), 'Save')
+        return
+      }
+      variables[id] = rows
+    } catch (e) {
+      variableError[id] = errorText(e)
+    }
+  }
 
   // The specs each collection keeps (imported OpenAPI documents), for Update from spec.
   let specs = $state<Record<string, KeptSpec[]>>({})
@@ -48,7 +79,7 @@
           <button onclick={() => ManagerService.Unmount(c.id)}>Unmount</button>
         {/if}
       </div>
-      <code class="path">{c.path || '(kept in Flow-I’s own folder)'}</code>
+      <code class="path">{c.path || '(kept in Flowi’s own folder)'}</code>
       {#each specs[c.id] ?? [] as k (k.name)}
         <div class="line spec">
           <span>Spec <code>{k.spec}</code>{#if k.overlays.length}<span class="muted">{` · overlays: ${k.overlays.join(', ')}`}</span>{/if}</span>
@@ -56,6 +87,15 @@
           <button onclick={() => (updating = { collection: c.id, spec: k })}>Update from spec…</button>
         </div>
       {/each}
+      {#if !c.missing}
+        <details class="vars">
+          <summary>Variables {#if (variables[c.id] ?? []).length}<span class="muted">({variables[c.id].length})</span>{/if}</summary>
+          <p class="muted">Values every request and flow of this collection can read as <code>{'{{collection_var.name}}'}</code>. An environment variable of the same name overrides one.</p>
+          <KVRows rows={variables[c.id] ?? []} keyLabel="name" onchange={(rows) => saveVariables(c.id, rows)}
+            empty={{ icon: 'list', title: 'No collection variables', hint: 'A base URL or a region that belongs to this collection, not to an environment.', add: 'Add variable' }} />
+          {#if variableError[c.id]}<p class="err">{variableError[c.id]}</p>{/if}
+        </details>
+      {/if}
       {#each c.deps as d}
         <div class="dep"><span class:ok={d.mounted} class:bad={!d.mounted}>{d.mounted ? '✓' : '✗'}</span> depends on {d.name} <span class="muted">{d.repo}</span></div>
       {/each}
@@ -80,10 +120,24 @@
     <button disabled={!mountDir} onclick={() => { ManagerService.Mount(mountDir); mountDir = '' }}>Mount</button>
   </div>
 
+  <h3>Open an Arazzo document</h3>
+  <p class="muted">An Arazzo file (or an address) with the OpenAPI description it names. It opens as a collection of its workflows, made in memory and gone when you quit; nothing is mounted or written. Press Run on a flow with <b>No environment</b> chosen to use the server the description names, or choose an environment that has a <code>base_url</code>.</p>
+  <div class="line">
+    <PathField bind:value={arazzoRef} label="An .arazzo.yaml file or an https:// address" kind="file" />
+    <button disabled={!arazzoRef} onclick={() => { ManagerService.OpenArazzo(arazzoRef); arazzoRef = '' }}>Open</button>
+  </div>
+
+  <h3>Open a run bundle</h3>
+  <p class="muted">A .flowi-run file is one run of a flow: the steps, the seed, the inputs and every call. It opens as a collection; press Run on its flow to see the run again, without sending anything.</p>
+  <div class="line">
+    <PathField bind:value={bundleFile} label="A .flowi-run file" kind="file" />
+    <button disabled={!bundleFile} onclick={() => { ManagerService.OpenBundle(bundleFile); bundleFile = '' }}>Open</button>
+  </div>
+
   <h3>New collection</h3>
   <label class="f"><span>Name</span><input bind:value={newName} spellcheck="false" /></label>
   <div class="line">
-    <PathField bind:value={newLocation} label="Folder (empty: Flow-I’s own folder)" />
+    <PathField bind:value={newLocation} label="Folder (empty: Flowi’s own folder)" />
     <button disabled={!newName} onclick={() => { ManagerService.NewCollection(newName, newLocation); newName = ''; newLocation = '' }}>Create</button>
   </div>
 </div>
@@ -102,6 +156,8 @@
   .ok { color: var(--ok); }
   .muted { color: var(--muted); }
   .dep { font-size: var(--fs-sm); }
+  .vars summary { cursor: default; font-size: var(--fs-sm); }
+  .vars p { margin: 4px 0; font-size: var(--fs-sm); }
   .line { display: flex; gap: 8px; align-items: flex-end; }
   .line :global(.f) { flex: 1; }
   .line.spec { align-items: center; font-size: var(--fs-sm); }

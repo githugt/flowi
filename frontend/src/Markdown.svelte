@@ -22,7 +22,8 @@
   .md { line-height: 1.5; -webkit-user-select: text; user-select: text; }
   .md :global(h2), .md :global(h3), .md :global(h4), .md :global(h5) { margin: 14px 0 4px; font-size: var(--fs-md); }
   .md :global(p) { margin: 4px 0; }
-  .md :global(ul) { margin: 4px 0; padding-left: 20px; }
+  .md :global(ul), .md :global(ol) { margin: 4px 0; padding-left: 20px; }
+  .md :global(blockquote) { margin: 4px 0; padding: 0 10px; border-left: 3px solid var(--line); color: var(--muted); }
   .md :global(code) { font: var(--fs-sm) var(--mono); background: var(--bg); padding: 0 4px; border-radius: var(--r-sm); }
   .md :global(pre) { background: var(--bg); border: 1px solid var(--line); border-radius: var(--r-md); padding: 8px; overflow: auto; font: var(--fs-sm) var(--mono); }
   .md :global(a) { color: var(--accent); }

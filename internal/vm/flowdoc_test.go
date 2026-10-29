@@ -422,7 +422,7 @@ func TestFlowDoc_ApplySource_should_replace_the_draft_and_be_undoable(t *testing
 	b.ParsedFlow = &edited
 	var problems []string
 
-	d.ApplySource("nodes: []\n", func(p []string) { problems = p }, func(err error) { t.Fatal(err) })
+	d.ApplySource("nodes: []\n", func(p, _ []string) { problems = p }, func(err error) { t.Fatal(err) })
 	w.Wait()
 	applied := len(d.Draft().Nodes)
 	dirty := d.Dirty()
@@ -438,7 +438,7 @@ func TestFlowDoc_ApplySource_Given_problems_Then_lists_them_with_lines_and_keeps
 	b.SourceDiags = diag.List{diag.New(diag.CodeServeSchedule, diag.Location{Pos: diag.Position{Line: 3, Column: 5}}, map[string]string{"name": "x", "detail": "bad"})}
 	var problems []string
 
-	d.ApplySource("nodes: [oops\n", func(p []string) { problems = p }, func(err error) { t.Fatal(err) })
+	d.ApplySource("nodes: [oops\n", func(p, _ []string) { problems = p }, func(err error) { t.Fatal(err) })
 	w.Wait()
 
 	if len(problems) != 1 || !strings.HasPrefix(problems[0], "line 3: ") || d.Dirty() || len(d.Draft().Nodes) != 3 {
@@ -451,7 +451,7 @@ func TestFlowDoc_ApplySource_Given_no_change_Then_the_flow_stays_unedited(t *tes
 	same := cloneOf(d.Draft())
 	b.ParsedFlow = &same
 
-	d.ApplySource("nodes: 3\n", func([]string) {}, func(err error) { t.Fatal(err) })
+	d.ApplySource("nodes: 3\n", func(_, _ []string) {}, func(err error) { t.Fatal(err) })
 	w.Wait()
 
 	if d.Dirty() || d.CanUndo() {
@@ -603,5 +603,21 @@ func TestFlowDoc_KeepEdits_Given_no_edits_Then_keeps_nothing(t *testing.T) {
 
 	if err != nil || b.Called("KeepFlowEdits F1") {
 		t.Fatalf("err %v calls %v", err, b.Calls)
+	}
+}
+
+func TestFlowDoc_ApplySource_should_apply_the_text_and_note_what_is_wrong_with_the_flow_now(t *testing.T) {
+	// Arrange
+	d, b, w := newFlowDoc(t)
+	b.DraftDiags = diag.List{diag.New(diag.CodeRefUnknownRequest, diag.Location{Path: "$.nodes[0].request.id"}, map[string]string{"id": "01X"})}
+	var problems, notes []string
+
+	// Act
+	d.ApplySource("nodes: []\n", func(p, n []string) { problems, notes = p, n }, func(err error) { t.Fatal(err) })
+	w.Wait()
+
+	// Assert
+	if len(problems) != 0 || len(notes) != 1 || !strings.Contains(notes[0], "FLW-REF") {
+		t.Fatalf("problems %v notes %v: the text is applied, and the flow's own problems are told", problems, notes)
 	}
 }

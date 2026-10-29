@@ -83,6 +83,16 @@ export function SetColour(node, colour) {
 }
 
 /**
+ * SetExtends chooses the environment this one builds on; "" builds on none.
+ * @param {string} node
+ * @param {string} base
+ * @returns {$CancellablePromise<void>}
+ */
+export function SetExtends(node, base) {
+    return $Call.ByID(3251715063, node, base);
+}
+
+/**
  * SetRows replaces the variables.
  * @param {string} node
  * @param {$models.EnvRow[]} rows

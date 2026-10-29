@@ -8,10 +8,10 @@
     !define INFO_PROJECTNAME "flowi-app"
 !endif
 !ifndef INFO_COMPANYNAME
-    !define INFO_COMPANYNAME "Flow-I"
+    !define INFO_COMPANYNAME "Flowi"
 !endif
 !ifndef INFO_PRODUCTNAME
-    !define INFO_PRODUCTNAME "Flow-I"
+    !define INFO_PRODUCTNAME "Flowi"
 !endif
 !ifndef INFO_PRODUCTVERSION
     !define INFO_PRODUCTVERSION "0.0.1"

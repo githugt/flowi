@@ -5,6 +5,7 @@ package bridge
 import (
 	"github.com/githugt/flowi-lib/settings"
 
+	"github.com/githugt/flowi/internal/palette"
 	"github.com/githugt/flowi/internal/vm"
 )
 
@@ -40,6 +41,19 @@ type Appearance struct {
 	Accent   string `json:"accent"`
 	Font     string `json:"font"`
 	FontSize int    `json:"fontSize"`
+	// Custom is the palette of the "custom" theme when its file is read; CustomProblem says why it
+	// is not (the window then keeps the theme it has).
+	Custom        *CustomPalette `json:"custom,omitempty"`
+	CustomProblem string         `json:"customProblem,omitempty"`
+
+	paletteFile string
+}
+
+// CustomPalette is the palette file of the custom theme, checked.
+type CustomPalette struct {
+	Base    string            `json:"base"` // dark or light: the theme the colours not named come from
+	Vars    map[string]string `json:"vars"` // CSS variable → #rrggbb
+	Rainbow []string          `json:"rainbow"`
 }
 
 func kindNamesOfSetting() map[settings.Kind]string {
@@ -99,13 +113,33 @@ func (s *SettingsService) view() SettingsView {
 		}
 		v.Groups = append(v.Groups, group)
 	}
+	loadCustom(&v.Appearance)
 	return v
+}
+
+// loadCustom reads the palette file when the custom theme is chosen.
+func loadCustom(a *Appearance) {
+	if a.Theme != "custom" {
+		return
+	}
+	if a.paletteFile == "" {
+		a.CustomProblem = "The custom theme needs a palette file: set appearance.palette_file."
+		return
+	}
+	p, err := palette.Load(a.paletteFile)
+	if err != nil {
+		a.CustomProblem = err.Error()
+		return
+	}
+	a.Custom = &CustomPalette{Base: p.Base, Vars: p.Vars, Rainbow: nonNil(p.Rainbow)}
 }
 
 func (s *SettingsService) fillAppearance(a *Appearance, f vm.SettingField) {
 	switch f.Key.Name {
 	case "appearance.theme":
 		a.Theme = f.Value
+	case "appearance.palette_file":
+		a.paletteFile = f.Value
 	case "appearance.accent":
 		a.Accent = f.Value
 	case "appearance.font":

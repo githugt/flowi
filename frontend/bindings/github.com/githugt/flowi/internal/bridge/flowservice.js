@@ -55,6 +55,17 @@ export function AddCaseTo(node, id) {
 }
 
 /**
+ * AddInput adds an input at the end and returns its name; name "" or one
+ * already in use makes a free one ("input", "input-2"…).
+ * @param {string} node
+ * @param {string} name
+ * @returns {$CancellablePromise<string>}
+ */
+export function AddInput(node, name) {
+    return $Call.ByID(479843462, node, name);
+}
+
+/**
  * AddLane adds a case to the selected condition or a branch to the selected parallel.
  * @param {string} node
  * @returns {$CancellablePromise<void>}
@@ -72,6 +83,29 @@ export function AddLane(node) {
  */
 export function AddNeed(node, id) {
     return $Call.ByID(2716567122, node, id);
+}
+
+/**
+ * AddOutput adds an output at the end and returns its name; the End card
+ * appears with the first one. A name that is "" or in use makes a free one.
+ * @param {string} node
+ * @param {string} name
+ * @returns {$CancellablePromise<string>}
+ */
+export function AddOutput(node, name) {
+    return $Call.ByID(4286126339, node, name);
+}
+
+/**
+ * AddRouteByStatus puts a Route that takes a path by the response status of
+ * step right after it (cases for 200, 404 and 5xx, and an else), selects it
+ * and returns its id.
+ * @param {string} node
+ * @param {string} step
+ * @returns {$CancellablePromise<string>}
+ */
+export function AddRouteByStatus(node, step) {
+    return $Call.ByID(357022080, node, step);
 }
 
 /**
@@ -107,11 +141,10 @@ export function AddStepNear(node, typ, step, before) {
 
 /**
  * ApplySource replaces the flow with the edited text, as one undoable edit.
- * It returns the problems found (the flow is then left as it was); an empty
- * list means the text was applied.
+ * An empty Problems means the text was applied.
  * @param {string} node
  * @param {string} text
- * @returns {$CancellablePromise<string[]>}
+ * @returns {$CancellablePromise<$models.SourceApplied>}
  */
 export function ApplySource(node, text) {
     return $Call.ByID(1484863972, node, text).then(/** @type {($result: any) => any} */(($result) => {
@@ -126,6 +159,47 @@ export function ApplySource(node, text) {
  */
 export function Cancel(node) {
     return $Call.ByID(1221899153, node);
+}
+
+/**
+ * CheckAccess runs the flow as the owner identity (an overlay), then tries the steps (or the ones that read what an
+ * earlier step made) as each other identity.
+ * @param {string} node
+ * @param {string} owner
+ * @param {string[]} others
+ * @param {string[]} steps
+ * @param {{ [_ in string]?: string }} inputs
+ * @returns {$CancellablePromise<$models.AccessView>}
+ */
+export function CheckAccess(node, owner, others, steps, inputs) {
+    return $Call.ByID(1033696327, node, owner, others, steps, inputs).then(/** @type {($result: any) => any} */(($result) => {
+        return $$createType1($result);
+    }));
+}
+
+/**
+ * CheckChoices lists what the dialogs offer: environments, the collection's overlays, the flow's inputs and steps.
+ * @param {string} node
+ * @returns {$CancellablePromise<$models.ChecksChoices>}
+ */
+export function CheckChoices(node) {
+    return $Call.ByID(3446639259, node).then(/** @type {($result: any) => any} */(($result) => {
+        return $$createType2($result);
+    }));
+}
+
+/**
+ * CheckDrift runs the flow without learning and compares each response with its stored schema. failOn lists the
+ * kinds that fail the check: new, missing, changed.
+ * @param {string} node
+ * @param {string} env
+ * @param {string[]} failOn
+ * @returns {$CancellablePromise<$models.DriftView>}
+ */
+export function CheckDrift(node, env, failOn) {
+    return $Call.ByID(1418197880, node, env, failOn).then(/** @type {($result: any) => any} */(($result) => {
+        return $$createType3($result);
+    }));
 }
 
 /**
@@ -158,14 +232,30 @@ export function Collapse(node, unit, collapsed) {
 }
 
 /**
- * CompareRun compares saved run i (newest first) with the newest.
+ * CompareRunDetail reads two saved runs and compares what each step output
+ * and the variables the flow ended with. The earlier run is from.
  * @param {string} node
- * @param {number} i
+ * @param {number} $from
+ * @param {number} to
+ * @returns {$CancellablePromise<$models.RunComparisonView>}
+ */
+export function CompareRunDetail(node, $from, to) {
+    return $Call.ByID(1241647998, node, $from, to).then(/** @type {($result: any) => any} */(($result) => {
+        return $$createType4($result);
+    }));
+}
+
+/**
+ * CompareRuns compares saved run from with saved run to (indexes, newest
+ * first): the status and time of each top-level step.
+ * @param {string} node
+ * @param {number} $from
+ * @param {number} to
  * @returns {$CancellablePromise<$models.DiffView[]>}
  */
-export function CompareRun(node, i) {
-    return $Call.ByID(1306649727, node, i).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType2($result);
+export function CompareRuns(node, $from, to) {
+    return $Call.ByID(2795110116, node, $from, to).then(/** @type {($result: any) => any} */(($result) => {
+        return $$createType6($result);
     }));
 }
 
@@ -180,7 +270,7 @@ export function CompareRun(node, i) {
  */
 export function Complete(node, text, caret) {
     return $Call.ByID(1516962196, node, text, caret).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType3($result);
+        return $$createType7($result);
     }));
 }
 
@@ -194,6 +284,64 @@ export function Complete(node, text, caret) {
  */
 export function Connect(node, $from, to) {
     return $Call.ByID(1979125019, node, $from, to);
+}
+
+/**
+ * ConnectData makes step toStep read a value that step fromStep makes: it writes
+ * the template that reads it into a field of toStep, as one change that Undo
+ * takes back. outPath is what to read of the step's outputs (status, body.token);
+ * an empty fromStep means the flow's own input outPath, as the Start card
+ * offers it. field says where it goes: "with.<name>" or "headers.<name>" of a
+ * request or flow step, "param.<name>" of any step, "values.<n>" for the value
+ * row n of a set step. It is refused, with the reason, when toStep cannot read
+ * what fromStep makes (it runs before it, or in another lane); nothing changes
+ * then.
+ * @param {string} node
+ * @param {string} fromStep
+ * @param {string} outPath
+ * @param {string} toStep
+ * @param {string} field
+ * @returns {$CancellablePromise<void>}
+ */
+export function ConnectData(node, fromStep, outPath, toStep, field) {
+    return $Call.ByID(3752738979, node, fromStep, outPath, toStep, field);
+}
+
+/**
+ * Continue runs from the paused step to the next breakpoint, or to the end.
+ * @param {string} node
+ * @returns {$CancellablePromise<void>}
+ */
+export function Continue(node) {
+    return $Call.ByID(766941870, node);
+}
+
+/**
+ * ConvertStep turns step into the kind typ (with mode, "" for the kind's own)
+ * and returns the fields that do not carry over, so the panel can say so
+ * before the person agrees. With apply false nothing changes; with apply
+ * true the change is one undo step.
+ * @param {string} node
+ * @param {string} step
+ * @param {string} typ
+ * @param {string} mode
+ * @param {boolean} apply
+ * @returns {$CancellablePromise<string[]>}
+ */
+export function ConvertStep(node, step, typ, mode, apply) {
+    return $Call.ByID(2418617408, node, step, typ, mode, apply).then(/** @type {($result: any) => any} */(($result) => {
+        return $$createType8($result);
+    }));
+}
+
+/**
+ * Debug runs the flow and pauses before the first breakpoint.
+ * @param {string} node
+ * @param {{ [_ in string]?: string }} inputs
+ * @returns {$CancellablePromise<void>}
+ */
+export function Debug(node, inputs) {
+    return $Call.ByID(3088772518, node, inputs);
 }
 
 /**
@@ -245,6 +393,17 @@ export function Drop(node, unit, step, lift, x, y, snap, atX, atY) {
 }
 
 /**
+ * Duplicate puts a copy of step right after it, selects the copy and returns
+ * its id.
+ * @param {string} node
+ * @param {string} step
+ * @returns {$CancellablePromise<string>}
+ */
+export function Duplicate(node, step) {
+    return $Call.ByID(1129444776, node, step);
+}
+
+/**
  * ExpressionNames lists the names an expression in the selected step can read, written out in
  * full: flow inputs, environment keys, secrets, and the outputs of earlier steps, including body
  * fields known from their pinned examples or last saved responses.
@@ -253,7 +412,7 @@ export function Drop(node, unit, step, lift, x, y, snap, atX, atY) {
  */
 export function ExpressionNames(node) {
     return $Call.ByID(2066550995, node).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType5($result);
+        return $$createType10($result);
     }));
 }
 
@@ -303,6 +462,18 @@ export function MoveAttachedBy(node, id, delta) {
 }
 
 /**
+ * MoveInput moves the input at index from to index to. The file's order
+ * changes with it, so the Start card and a subflow's caller see the new one.
+ * @param {string} node
+ * @param {number} $from
+ * @param {number} to
+ * @returns {$CancellablePromise<void>}
+ */
+export function MoveInput(node, $from, to) {
+    return $Call.ByID(47740306, node, $from, to);
+}
+
+/**
  * NodeData is what the last run did at a step; format is json, text or raw.
  * @param {string} node
  * @param {string} step
@@ -311,7 +482,7 @@ export function MoveAttachedBy(node, id, delta) {
  */
 export function NodeData(node, step, format) {
     return $Call.ByID(1628224575, node, step, format).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType6($result);
+        return $$createType11($result);
     }));
 }
 
@@ -323,7 +494,7 @@ export function NodeData(node, step, format) {
  */
 export function Open(node) {
     return $Call.ByID(1260168827, node).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType7($result);
+        return $$createType12($result);
     }));
 }
 
@@ -344,7 +515,7 @@ export function Open(node) {
  */
 export function Preview(node, unit, step, lift, x, y, snap) {
     return $Call.ByID(1816426113, node, unit, step, lift, x, y, snap).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType8($result);
+        return $$createType13($result);
     }));
 }
 
@@ -368,6 +539,16 @@ export function Relayout(node) {
 }
 
 /**
+ * RemoveInput removes the input at index.
+ * @param {string} node
+ * @param {number} index
+ * @returns {$CancellablePromise<void>}
+ */
+export function RemoveInput(node, index) {
+    return $Call.ByID(1575652617, node, index);
+}
+
+/**
  * RemoveLane removes an empty case or branch of the selected step.
  * @param {string} node
  * @param {number} i
@@ -385,6 +566,16 @@ export function RemoveLane(node, i) {
  */
 export function RemoveNeed(node, id) {
     return $Call.ByID(2625567647, node, id);
+}
+
+/**
+ * RemoveOutput removes the output at index; the End card goes with the last.
+ * @param {string} node
+ * @param {number} index
+ * @returns {$CancellablePromise<void>}
+ */
+export function RemoveOutput(node, index) {
+    return $Call.ByID(3498667046, node, index);
 }
 
 /**
@@ -424,6 +615,20 @@ export function Revert(node) {
  */
 export function Run(node, inputs) {
     return $Call.ByID(67710000, node, inputs);
+}
+
+/**
+ * RunMatrix runs the saved flow once for every combination of the dimensions' values and returns the grid. inputs are
+ * values for the flow's inputs that stay the same in every cell.
+ * @param {string} node
+ * @param {$models.MatrixDimView[]} dims
+ * @param {{ [_ in string]?: string }} inputs
+ * @returns {$CancellablePromise<$models.MatrixView>}
+ */
+export function RunMatrix(node, dims, inputs) {
+    return $Call.ByID(2840095273, node, dims, inputs).then(/** @type {($result: any) => any} */(($result) => {
+        return $$createType14($result);
+    }));
 }
 
 /**
@@ -468,6 +673,16 @@ export function SaveDroppingComments(node) {
 }
 
 /**
+ * SaveStandaloneArazzo asks where to save the standalone document and writes
+ * it there. It returns the file, "" when the user cancelled.
+ * @param {string} node
+ * @returns {$CancellablePromise<string>}
+ */
+export function SaveStandaloneArazzo(node) {
+    return $Call.ByID(1319319990, node);
+}
+
+/**
  * Select chooses the step shown in the inspector ("" for the flow itself).
  * @param {string} node
  * @param {string} step
@@ -475,6 +690,18 @@ export function SaveDroppingComments(node) {
  */
 export function Select(node, step) {
     return $Call.ByID(724884087, node, step);
+}
+
+/**
+ * Sequence draws the last run of the open flow as a sequence diagram: the hosts it called, each attempt with its
+ * status and time, and a note for a step that failed. Mermaid is the same picture as text.
+ * @param {string} node
+ * @returns {$CancellablePromise<$models.SequenceView>}
+ */
+export function Sequence(node) {
+    return $Call.ByID(2056355470, node).then(/** @type {($result: any) => any} */(($result) => {
+        return $$createType15($result);
+    }));
 }
 
 /**
@@ -531,6 +758,28 @@ export function SetCaseWhen(node, i, when) {
 }
 
 /**
+ * SetClose says whether the selected request step closes the connection it runs over.
+ * @param {string} node
+ * @param {boolean} on
+ * @returns {$CancellablePromise<void>}
+ */
+export function SetClose(node, on) {
+    return $Call.ByID(663860923, node, on);
+}
+
+/**
+ * SetColor gives step the colour (one of the library's names, "" for its
+ * category's own). One undo step.
+ * @param {string} node
+ * @param {string} step
+ * @param {string} color
+ * @returns {$CancellablePromise<void>}
+ */
+export function SetColor(node, step, color) {
+    return $Call.ByID(3554551424, node, step, color);
+}
+
+/**
  * SetConcurrent says whether the selected step may run alongside earlier ones.
  * @param {string} node
  * @param {boolean} on
@@ -538,6 +787,29 @@ export function SetCaseWhen(node, i, when) {
  */
 export function SetConcurrent(node, on) {
     return $Call.ByID(268285516, node, on);
+}
+
+/**
+ * SetDebugOutput changes one value of a finished step's outputs, which the steps after it read.
+ * @param {string} node
+ * @param {string} step
+ * @param {string} key
+ * @param {string} text
+ * @returns {$CancellablePromise<void>}
+ */
+export function SetDebugOutput(node, step, key, text) {
+    return $Call.ByID(2869341789, node, step, key, text);
+}
+
+/**
+ * SetDebugVar changes a variable the next part starts with. text is read as JSON, or kept as text.
+ * @param {string} node
+ * @param {string} name
+ * @param {string} text
+ * @returns {$CancellablePromise<void>}
+ */
+export function SetDebugVar(node, name, text) {
+    return $Call.ByID(59679137, node, name, text);
 }
 
 /**
@@ -552,6 +824,16 @@ export function SetFailRoute(node, mode, target) {
 }
 
 /**
+ * SetHold says whether skipped steps keep what the last run gave them.
+ * @param {string} node
+ * @param {boolean} on
+ * @returns {$CancellablePromise<void>}
+ */
+export function SetHold(node, on) {
+    return $Call.ByID(384336496, node, on);
+}
+
+/**
  * SetHooks sets which API hooks the selected request step runs.
  * @param {string} node
  * @param {string} mode
@@ -559,6 +841,44 @@ export function SetFailRoute(node, mode, target) {
  */
 export function SetHooks(node, mode) {
     return $Call.ByID(1484003987, node, mode);
+}
+
+/**
+ * SetInput changes the input at index. A name must be free, a type one of the
+ * flow input types or "".
+ * @param {string} node
+ * @param {number} index
+ * @param {string} name
+ * @param {string} typ
+ * @param {string} def
+ * @returns {$CancellablePromise<void>}
+ */
+export function SetInput(node, index, name, typ, def) {
+    return $Call.ByID(1198909619, node, index, name, typ, def);
+}
+
+/**
+ * SetOutput changes the output at index: its name, type and value template.
+ * @param {string} node
+ * @param {number} index
+ * @param {string} name
+ * @param {string} typ
+ * @param {string} value
+ * @returns {$CancellablePromise<void>}
+ */
+export function SetOutput(node, index, name, typ, value) {
+    return $Call.ByID(3399254620, node, index, name, typ, value);
+}
+
+/**
+ * SetOutputValue sets the template the output called name is worked out from.
+ * @param {string} node
+ * @param {string} name
+ * @param {string} value
+ * @returns {$CancellablePromise<void>}
+ */
+export function SetOutputValue(node, name, value) {
+    return $Call.ByID(1046747509, node, name, value);
 }
 
 /**
@@ -600,7 +920,7 @@ export function SetPosition(node, unit, x, y) {
 
 /**
  * SetText sets a text field of the selected step, or of the flow when none
- * is selected. Fields: name, description, when, timeout, version,
+ * is selected. Fields: name, description, when, timeout, version, overlay, open, over,
  * preferVersion, maxConcurrency, rateLimit.
  * @param {string} node
  * @param {string} field
@@ -612,14 +932,65 @@ export function SetText(node, field, value) {
 }
 
 /**
+ * SetValues replaces the values of the selected set step. A step that is not a
+ * set is refused; a seed that is not a whole number is dropped, as the editor
+ * shows it as typing in progress.
+ * @param {string} node
+ * @param {$models.ValueRow[]} rows
+ * @returns {$CancellablePromise<void>}
+ */
+export function SetValues(node, rows) {
+    return $Call.ByID(3704353843, node, rows);
+}
+
+/**
  * Source is the flow's text as it stands now, unsaved edits included.
  * @param {string} node
  * @returns {$CancellablePromise<$models.FlowSourceView>}
  */
 export function Source(node) {
     return $Call.ByID(3798280834, node).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType9($result);
+        return $$createType16($result);
     }));
+}
+
+/**
+ * StandaloneArazzo writes the saved flow as a standalone Arazzo document.
+ * @param {string} node
+ * @returns {$CancellablePromise<$models.StandaloneView>}
+ */
+export function StandaloneArazzo(node) {
+    return $Call.ByID(2094266487, node).then(/** @type {($result: any) => any} */(($result) => {
+        return $$createType17($result);
+    }));
+}
+
+/**
+ * Step runs the paused step and pauses before the next.
+ * @param {string} node
+ * @returns {$CancellablePromise<void>}
+ */
+export function Step(node) {
+    return $Call.ByID(4195143589, node);
+}
+
+/**
+ * StopDebugging ends the session.
+ * @param {string} node
+ * @returns {$CancellablePromise<void>}
+ */
+export function StopDebugging(node) {
+    return $Call.ByID(4289798189, node);
+}
+
+/**
+ * ToggleBreak sets or clears a breakpoint before a step. The list is kept with the open flow, not in the file.
+ * @param {string} node
+ * @param {string} step
+ * @returns {$CancellablePromise<void>}
+ */
+export function ToggleBreak(node, step) {
+    return $Call.ByID(3923390558, node, step);
 }
 
 /**
@@ -633,6 +1004,17 @@ export function ToggleSelect(node, step) {
 }
 
 /**
+ * ToggleSkip skips step in the next runs, or stops skipping it. The list is
+ * kept with the open flow, not in the file.
+ * @param {string} node
+ * @param {string} step
+ * @returns {$CancellablePromise<void>}
+ */
+export function ToggleSkip(node, step) {
+    return $Call.ByID(4025088384, node, step);
+}
+
+/**
  * Undo undoes the last structural edit.
  * @param {string} node
  * @returns {$CancellablePromise<void>}
@@ -641,14 +1023,36 @@ export function Undo(node) {
     return $Call.ByID(2394712417, node);
 }
 
+/**
+ * WireChoices lists the choices for a wire from `from` to `to`.
+ * @param {string} node
+ * @param {string} $from
+ * @param {string} to
+ * @returns {$CancellablePromise<$models.WireChoices>}
+ */
+export function WireChoices(node, $from, to) {
+    return $Call.ByID(235735230, node, $from, to).then(/** @type {($result: any) => any} */(($result) => {
+        return $$createType18($result);
+    }));
+}
+
 // Private type creation functions
-const $$createType0 = $Create.Array($Create.Any);
-const $$createType1 = $models.DiffView.createFrom;
-const $$createType2 = $Create.Array($$createType1);
-const $$createType3 = $models.SuggestView.createFrom;
-const $$createType4 = $models.SuggestionView.createFrom;
-const $$createType5 = $Create.Array($$createType4);
-const $$createType6 = $models.NodeData.createFrom;
-const $$createType7 = $models.FlowView.createFrom;
-const $$createType8 = canvas$0.Slot.createFrom;
-const $$createType9 = $models.FlowSourceView.createFrom;
+const $$createType0 = $models.SourceApplied.createFrom;
+const $$createType1 = $models.AccessView.createFrom;
+const $$createType2 = $models.ChecksChoices.createFrom;
+const $$createType3 = $models.DriftView.createFrom;
+const $$createType4 = $models.RunComparisonView.createFrom;
+const $$createType5 = $models.DiffView.createFrom;
+const $$createType6 = $Create.Array($$createType5);
+const $$createType7 = $models.SuggestView.createFrom;
+const $$createType8 = $Create.Array($Create.Any);
+const $$createType9 = $models.SuggestionView.createFrom;
+const $$createType10 = $Create.Array($$createType9);
+const $$createType11 = $models.NodeData.createFrom;
+const $$createType12 = $models.FlowView.createFrom;
+const $$createType13 = canvas$0.Slot.createFrom;
+const $$createType14 = $models.MatrixView.createFrom;
+const $$createType15 = $models.SequenceView.createFrom;
+const $$createType16 = $models.FlowSourceView.createFrom;
+const $$createType17 = $models.StandaloneView.createFrom;
+const $$createType18 = $models.WireChoices.createFrom;

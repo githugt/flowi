@@ -5,7 +5,7 @@
   import type { ReplayerView } from './lib/types'
 
   let view = $state<ReplayerView | null>(null)
-  let form = $state({ addr: '', latency: '', sequence: false, cors: false, record: '', recordTo: '' })
+  let form = $state({ addr: '', latency: '', sequence: false, cors: false, record: '', recordTo: '', recordHar: '', faultErrorPercent: '', faultStatus: '', faultDropPercent: '', faultJitter: '' })
   let seeded = false
 
   // The form starts from the defaults Go read; after that it is the user's.
@@ -35,9 +35,22 @@
         <label class="f wide"><span>Save requests of new calls in</span>
           <select bind:value={form.recordTo} disabled={running}>{#each view.targets as t}<option value={t.id}>{t.label}</option>{/each}</select>
         </label>
+        <label class="f wide"><span>Also write the calls to a HAR file (in order, credentials masked; Import → HAR turns it into a flow)</span>
+          <input bind:value={form.recordHar} disabled={running} placeholder="/path/to/session.har" spellcheck="false" />
+        </label>
         <p class="note wide">Point your app or client at the listen address instead of the real API. Each call is forwarded to the upstream API and its answer returned. A call that matches no request yet becomes one (ids in the path become <code>{'{{id}}'}</code>, credentials become <code>{'{{secret.…}}'}</code> placeholders), and every response is saved so the replayer can answer it later.</p>
       {/if}
     </div>
+    {#if !form.record.trim()}
+      <fieldset class="faults" disabled={running}>
+        <legend>Make it misbehave on purpose (to try retries, timeouts and error handling)</legend>
+        <label class="f"><span>Answer with an error (% of calls)</span><input bind:value={form.faultErrorPercent} placeholder="0" inputmode="decimal" spellcheck="false" /></label>
+        <label class="f"><span>Error status (default 503)</span><input bind:value={form.faultStatus} placeholder="503" inputmode="numeric" spellcheck="false" /></label>
+        <label class="f"><span>Drop the connection (% of calls)</span><input bind:value={form.faultDropPercent} placeholder="0" inputmode="decimal" spellcheck="false" /></label>
+        <label class="f"><span>Extra random delay up to</span><input bind:value={form.faultJitter} placeholder="e.g. 300ms" spellcheck="false" /></label>
+        <p class="note wide">A request can override this for one call with the header <code>X-Flowi-Fault</code>: <code>none</code>, <code>drop</code>, <code>error</code> or <code>error:418</code>. Answers made this way show <code>fault</code> in the Matched column. Faults apply only to calls that match a saved request, and not while recording.</p>
+      </fieldset>
+    {/if}
     <div class="checks">
       <label><input type="checkbox" bind:checked={form.sequence} disabled={running} /> Answer repeated calls in sequence</label>
       <label><input type="checkbox" bind:checked={form.cors} disabled={running} /> Allow browsers (CORS)</label>
@@ -81,6 +94,9 @@
   .f { display: flex; flex-direction: column; gap: 3px; color: var(--muted); font-size: var(--fs-xs); }
   select { background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); padding: 5px 8px; font: inherit; }
   input:not([type]) { background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); padding: 5px 8px; font: var(--fs-sm) var(--mono); -webkit-user-select: text; user-select: text; }
+  .faults { border: 1px solid var(--line); border-radius: var(--r-lg); padding: var(--sp-2) var(--sp-3); margin: var(--sp-2) 0; display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-2) var(--sp-3); }
+  .faults legend { color: var(--muted); font-size: var(--fs-sm); padding: 0 6px; }
+  .faults .wide { grid-column: 1 / -1; }
   .checks { display: flex; gap: 20px; }
   .actions { display: flex; gap: 10px; align-items: center; }
   .spacer { flex: 1; }

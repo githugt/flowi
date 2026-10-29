@@ -15,7 +15,7 @@ interface Rule extends PastedKind {
   matches: (text: string, json: Record<string, any> | null) => boolean
 }
 
-const METHOD_LINE = /^(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS)\s+(https?:\/\/|\{\{)\S*(\s+HTTP\/[\d.]+)?\s*$/m
+const METHOD_LINE = /^(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS|QUERY)\s+(https?:\/\/|\{\{)\S*(\s+HTTP\/[\d.]+)?\s*$/m
 const yamlKey = (key: string) => new RegExp(`^${key}\\s*:`, 'm')
 
 // In order: the first rule that matches wins. A plain address (https://…) matches none, so it pastes as before.

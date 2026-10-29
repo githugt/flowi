@@ -41,11 +41,12 @@
   function leave(e: FocusEvent) {
     if (!box?.contains(e.relatedTarget as Node | null)) within = false
   }
-  // A row added from the empty state takes the focus, so typing can start at once.
-  async function addFirst() {
+  // A row added takes the focus, so typing can start at once: the new row is the last key box.
+  async function addRow() {
     local.push({ Key: '', Value: '', Description: '' })
     await tick()
-    box?.querySelector<HTMLInputElement>('.k')?.focus()
+    const keys = box?.querySelectorAll<HTMLInputElement>('.k')
+    keys?.[keys.length - 1]?.focus()
   }
 
   function commit() {
@@ -72,7 +73,7 @@
 
 {#if empty && !local.length && !bulk}
   <EmptyState icon={empty.icon} title={empty.title} hint={empty.hint} compact>
-    <button onclick={addFirst}>{empty.add}</button><button onclick={startBulk}>Bulk edit</button>
+    <button onclick={addRow}>{empty.add}</button><button onclick={startBulk}>Bulk edit</button>
   </EmptyState>
 {/if}
 <div class="rows" bind:this={box} hidden={!!empty && !local.length && !bulk} onfocusin={() => (within = true)} onfocusout={leave}>
@@ -102,10 +103,9 @@
       <button class="x" aria-label="Remove row" onclick={() => { local.splice(i, 1); commit() }}>×</button>
     </div>
   {/each}
-  <div class="tools">
-    <button class="add" onclick={() => local.push({ Key: '', Value: '', Description: '' })}>+ Add</button>
-    <button class="add" onclick={startBulk}>Bulk edit</button>
-  </div>
+  <!-- A ghost row where the next one goes: one click and the cursor is in its key box. -->
+  <button class="ghost" onclick={addRow}>+ {empty?.add ?? 'Add row'}</button>
+  <div class="tools end"><button class="add" onclick={startBulk}>Bulk edit</button></div>
   {/if}
 </div>
 
@@ -133,7 +133,10 @@
   .k { flex: 0 0 30%; }
   button { background: none; border: 0; color: var(--muted); font: inherit; }
   .add { color: var(--accent); padding: 2px 0; }
+  .ghost { min-height: 30px; padding: 4px 10px; border: 1px dashed var(--line); border-radius: var(--r-md); text-align: left; color: var(--muted); }
+  .ghost:hover, .ghost:focus-visible { border-color: var(--accent); color: var(--accent); background: var(--tint-hover); }
   .tools { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .tools.end { justify-content: flex-end; }
   .hint { color: var(--muted); font-size: var(--fs-xs); }
   .bulk {
     resize: vertical; background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md);

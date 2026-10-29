@@ -3,9 +3,11 @@
 package bridge
 
 import (
+	"encoding/json"
 	"fmt"
 	"slices"
 	"strconv"
+	"strings"
 	"time"
 
 	flowi "github.com/githugt/flowi-lib"
@@ -47,9 +49,17 @@ type Call struct {
 	Ref     string   `json:"ref"`
 	Choices []Choice `json:"choices"`
 	Version string   `json:"version,omitempty"`
-	With    []Pair   `json:"with"`
-	Headers []Pair   `json:"headers,omitempty"`
-	Hooks   string   `json:"hooks,omitempty"`
+	// Overlay is the flowi overlay laid over the request's version ("" for none); Overlays are the
+	// collection's, to choose from.
+	Overlay  string   `json:"overlay,omitempty"`
+	Overlays []string `json:"overlays,omitempty"`
+	// Open, Over and Close are the step's use of a connection kept open between steps.
+	Open    string `json:"open,omitempty"`
+	Over    string `json:"over,omitempty"`
+	Close   bool   `json:"close,omitempty"`
+	With    []Pair `json:"with"`
+	Headers []Pair `json:"headers,omitempty"`
+	Hooks   string `json:"hooks,omitempty"`
 }
 
 // Lane is a case of a condition or a branch of a parallel.
@@ -61,34 +71,35 @@ type Lane struct {
 
 // StepForm is the inspector of one step.
 type StepForm struct {
-	ID          string   `json:"id"`
-	Type        string   `json:"type"`
-	Group       string   `json:"group"`
-	Summary     string   `json:"summary"`
-	Name        string   `json:"name"`
-	Description string   `json:"description"`
-	Needs       []string `json:"needs"`       // the steps it waits for besides the one before it
-	Previous    string   `json:"previous"`    // the step before it, which it follows without a needs
-	NeedChoices []string `json:"needChoices"` // the steps before it it could also wait for
-	Uses        []Use    `json:"uses"`        // values it reads from other steps
-	UsedBy      []Use    `json:"usedBy"`      // steps that read values it makes
-	When        string   `json:"when"`
-	Timeout     string   `json:"timeout"`
-	Concurrent  bool     `json:"concurrent"`
-	FailMode    string   `json:"failMode"` // fail, continue, goto
-	FailTarget  string   `json:"failTarget"`
-	Steps       []string `json:"steps"`    // the other steps, for a goto
-	Attach      string   `json:"attach"`   // the request or subflow step this one is drawn with
-	AttachAt    string   `json:"attachAt"` // where around it: above, below, or "" beside it
-	AttachTo    []string `json:"attachTo"` // the steps it could be drawn with
-	Attached    []string `json:"attached"` // for a request or subflow step: the steps drawn in one block with it
-	Call        *Call    `json:"call,omitempty"`
-	Params      []Param  `json:"params"`
-	Variables   *[]Pair  `json:"variables,omitempty"`
-	VarsHeading string   `json:"varsHeading,omitempty"` // "variables" or "extract"
-	Intro       string   `json:"intro,omitempty"`       // "extract" for the read-one-value form
-	Cases       []Lane   `json:"cases,omitempty"`
-	Branches    []Lane   `json:"branches,omitempty"`
+	ID          string     `json:"id"`
+	Type        string     `json:"type"`
+	Group       string     `json:"group"`
+	Summary     string     `json:"summary"`
+	Name        string     `json:"name"`
+	Description string     `json:"description"`
+	Needs       []string   `json:"needs"`       // the steps it waits for besides the one before it
+	Previous    string     `json:"previous"`    // the step before it, which it follows without a needs
+	NeedChoices []string   `json:"needChoices"` // the steps before it it could also wait for
+	Uses        []Use      `json:"uses"`        // values it reads from other steps
+	UsedBy      []Use      `json:"usedBy"`      // steps that read values it makes
+	When        string     `json:"when"`
+	Timeout     string     `json:"timeout"`
+	Concurrent  bool       `json:"concurrent"`
+	FailMode    string     `json:"failMode"` // fail, continue, goto
+	FailTarget  string     `json:"failTarget"`
+	Steps       []string   `json:"steps"`    // the other steps, for a goto
+	Attach      string     `json:"attach"`   // the request or subflow step this one is drawn with
+	AttachAt    string     `json:"attachAt"` // where around it: above, below, or "" beside it
+	AttachTo    []string   `json:"attachTo"` // the steps it could be drawn with
+	Attached    []string   `json:"attached"` // for a request or subflow step: the steps drawn in one block with it
+	Call        *Call      `json:"call,omitempty"`
+	Params      []Param    `json:"params"`
+	Variables   *[]Pair    `json:"variables,omitempty"`
+	Values      []ValueRow `json:"values,omitempty"`      // a set step: what it writes, one row each
+	VarsHeading string     `json:"varsHeading,omitempty"` // "variables" or "extract"
+	Intro       string     `json:"intro,omitempty"`       // "extract" for the read-one-value form
+	Cases       []Lane     `json:"cases,omitempty"`
+	Branches    []Lane     `json:"branches,omitempty"`
 }
 
 // Use is one value that passes from one step to another: From made it, To
@@ -97,6 +108,9 @@ type Use struct {
 	From string `json:"from"`
 	To   string `json:"to"`
 	Name string `json:"name"`
+	// Type is what the value is: from the last run when there is one, else what that kind of
+	// output always is (a status is a number); empty when neither says.
+	Type string `json:"type,omitempty"`
 }
 
 // FlowForm is the inspector of the flow itself, shown when no step is selected.
@@ -150,10 +164,10 @@ func paletteOf() []PaletteEntry {
 }
 
 // formOf builds the inspector for target ("" for the flow); call it on the actor.
-func (s *FlowService) formOf(d *vm.FlowDoc, target string) Form {
+func (s *FlowService) formOf(d *vm.FlowDoc, run *vm.FlowRun, target string) Form {
 	f := Form{Flow: flowFormOf(d.Draft())}
 	if n, ok := d.Node(target); ok && target != "" {
-		step := s.stepFormOf(d, n)
+		step := s.stepFormOf(d, run, n)
 		f.Step = &step
 	}
 	return f
@@ -166,12 +180,12 @@ func flowFormOf(f model.Flow) FlowForm {
 	}
 	return FlowForm{
 		Name: f.Name, Description: f.Description, PreferVersion: f.PreferVersion,
-		Inputs: inputs, Outputs: pairsOf(f.Outputs),
+		Inputs: inputs, Outputs: outputPairs(f.Outputs),
 		MaxConcurrency: intText(f.Execution.MaxConcurrency), RateLimit: f.Execution.RateLimit, OnBranchError: f.Execution.OnBranchError,
 	}
 }
 
-func (s *FlowService) stepFormOf(d *vm.FlowDoc, n model.Node) StepForm {
+func (s *FlowService) stepFormOf(d *vm.FlowDoc, run *vm.FlowRun, n model.Node) StepForm {
 	spec := catalog().byType[string(n.Type)]
 	mode, target := vm.ParseFailRoute(n.OnError)
 	others := slices.DeleteFunc(d.NodeIDs(), func(id string) bool { return id == n.ID })
@@ -182,17 +196,14 @@ func (s *FlowService) stepFormOf(d *vm.FlowDoc, n model.Node) StepForm {
 		FailMode: string(mode), FailTarget: target, Steps: others, Attach: n.Attach, AttachAt: n.AttachAt, AttachTo: attachChoices(d, n), Attached: attachedTo(d, n),
 		Call: s.callOf(d, n), Params: paramsOf(n, spec),
 	}
-	st.Uses, st.UsedBy = usesOf(d, n.ID)
-	if n.Type == "extract" {
-		st.Intro = "extract"
+	st.Uses, st.UsedBy = usesOf(d, run, n.ID)
+	if n.Type == "set" {
+		st.Values = valueRowsOf(n)
 	}
-	if spec.MapForm && vm.VariablesShown(n) {
+	if spec.MapForm {
 		rows := variableRows(n, spec)
 		st.Variables = &rows
 		st.VarsHeading = "variables"
-		if n.Type == "extract" {
-			st.VarsHeading = "extract"
-		}
 	}
 	for i, c := range n.Cases {
 		st.Cases = append(st.Cases, Lane{Label: caseLabel(i), When: c.When, Empty: len(c.Nodes) == 0})
@@ -206,8 +217,8 @@ func (s *FlowService) stepFormOf(d *vm.FlowDoc, n model.Node) StepForm {
 func paramsOf(n model.Node, spec flowi.NodeSpec) []Param {
 	out := []Param{}
 	for _, p := range spec.Params {
-		if !vm.ParamShown(n, p.Name) {
-			continue
+		if !vm.ParamShown(n, p.Name) || (n.Type == "set" && len(n.Values) > 0 && (p.Name == "target" || p.Name == "value")) {
+			continue // a set step with values has no single target and value to show
 		}
 		v := vm.ParamValue(n, p.Name)
 		_, text := v.(string)
@@ -241,7 +252,7 @@ func (s *FlowService) callOf(d *vm.FlowDoc, n model.Node) *Call {
 	case n.Request != nil:
 		return &Call{
 			Kind: "request", Ref: string(n.Request.Request.ID), Choices: s.requestChoices(d.Collection()),
-			Version: n.Request.Version, With: pairsOf(n.Request.With), Headers: pairsOf(n.Request.Headers), Hooks: hookMode(n.Request.Hooks),
+			Version: n.Request.Version, Overlay: n.Request.Overlay, Overlays: overlayNames(d.Collection()), Open: n.Request.Open, Over: n.Request.Over, Close: n.Request.Close, With: pairsOf(n.Request.With), Headers: pairsOf(n.Request.Headers), Hooks: hookMode(n.Request.Hooks),
 		}
 	case n.Subflow != nil:
 		return &Call{Kind: "subflow", Ref: string(n.Subflow.Flow.ID), Choices: flowChoices(d.Collection()), With: pairsOf(n.Subflow.With)}
@@ -279,6 +290,14 @@ func pairsOf(kv []model.KeyValue) []Pair {
 	out := make([]Pair, 0, len(kv))
 	for _, x := range kv {
 		out = append(out, Pair{Key: x.Key, Value: x.Value})
+	}
+	return out
+}
+
+func outputPairs(outs []model.Output) []Pair {
+	out := make([]Pair, 0, len(outs))
+	for _, o := range outs {
+		out = append(out, Pair{Key: o.Name, Value: o.Value})
 	}
 	return out
 }
@@ -346,10 +365,10 @@ func attachedTo(d *vm.FlowDoc, n model.Node) []string {
 
 // usesOf splits the data links of the flow into what node id reads and what
 // reads node id.
-func usesOf(d *vm.FlowDoc, id string) (reads, readBy []Use) {
+func usesOf(d *vm.FlowDoc, run *vm.FlowRun, id string) (reads, readBy []Use) {
 	reads, readBy = []Use{}, []Use{}
 	for _, l := range analysis.DataLinks(d.Draft()) {
-		use := Use{From: l.From, To: l.To, Name: l.Via}
+		use := Use{From: l.From, To: l.To, Name: l.Via, Type: outputType(run, l.From, l.Via)}
 		if l.To == id {
 			reads = append(reads, use)
 		}
@@ -366,4 +385,50 @@ func caseLabel(i int) string {
 		return "If"
 	}
 	return "Else if"
+}
+
+// overlayNames lists the flowi overlays of a collection, by name.
+func overlayNames(c model.Collection) []string {
+	names := make([]string, 0, len(c.Overlays))
+	for _, o := range c.Overlays {
+		names = append(names, o.Name)
+	}
+	slices.Sort(names)
+	return names
+}
+
+// outputType names the type of the value a step makes, said as `via` ("login.token": the output
+// "token" of step login): by the last run's value when the step ran, else by what the output always is.
+func outputType(run *vm.FlowRun, from, via string) string {
+	_, name, _ := strings.Cut(via, ".")
+	name, _, _ = strings.Cut(name, ".")
+	if run != nil {
+		if d, ok := run.Detail(from); ok && d.Outputs != nil {
+			if v, present := d.Outputs[name]; present {
+				return valueType(v)
+			}
+		}
+	}
+	return map[string]string{"status": "number", "time": "duration", "headers": "object", "vars": "object", "received": "number"}[name]
+}
+
+// valueType is the type of a JSON-shaped value, in the words the expressions use.
+func valueType(v any) string {
+	switch v.(type) {
+	case nil:
+		return "null"
+	case string:
+		return "text"
+	case bool:
+		return "true/false"
+	case time.Duration:
+		return "duration"
+	case int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64, float32, float64, json.Number:
+		return "number"
+	case []any:
+		return "list"
+	case map[string]any:
+		return "object"
+	}
+	return ""
 }

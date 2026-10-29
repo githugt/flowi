@@ -20,6 +20,8 @@ type EnvVarRow struct {
 	Secret    bool
 	SecretSet bool // the vault holds a value
 	Override  bool // FLOWI_SECRET_<ENV>_<NAME> overrides it
+	// Kind is how Value is read: text (""), number, boolean or json (an object or list as JSON text).
+	Kind model.VarKind
 }
 
 // Environment edits one environment file and its secrets (design §10.4).
@@ -31,6 +33,7 @@ type Environment struct {
 	disk     model.Environment
 	rows     []EnvVarRow
 	colour   string
+	extends  string
 	dirty    bool
 	onDisk   bool
 	confirm  bool
@@ -58,9 +61,10 @@ func (e *Environment) load(envs []model.Environment) {
 	}
 	e.disk = envs[i]
 	e.colour = e.disk.Colour
+	e.extends = e.disk.Extends
 	e.rows = make([]EnvVarRow, len(e.disk.Vars))
 	for j, v := range e.disk.Vars {
-		e.rows[j] = EnvVarRow{Name: v.Name, Value: v.Value, Secret: v.Secret}
+		e.rows[j] = EnvVarRow{Name: v.Name, Value: v.Value, Secret: v.Secret, Kind: v.Kind}
 	}
 	e.dirty, e.onDisk, e.confirm = false, false, false
 }
@@ -146,6 +150,44 @@ func (e *Environment) SetColour(colour string) {
 	e.changed()
 }
 
+// Extends is the name of the environment this one builds on, or "".
+func (e *Environment) Extends() string { return e.extends }
+
+// SetExtends chooses the environment this one builds on; "" builds on none. A name that is not in Bases is
+// ignored, because the file would hold a base that does not exist or that loops back to this one.
+func (e *Environment) SetExtends(name string) {
+	if name != "" && !slices.Contains(e.Bases(), name) {
+		return
+	}
+	e.extends = name
+	e.dirty = true
+	e.changed()
+}
+
+// Bases lists the environments this one may build on, sorted: every other environment except those that
+// already extend this one, directly or through others.
+func (e *Environment) Bases() []string {
+	self := e.Name()
+	var out []string
+	for _, c := range e.envs {
+		if c.Name == self || c.Name == "" || extendsEnvironment(e.envs, c.Name, self) {
+			continue
+		}
+		out = append(out, c.Name)
+	}
+	slices.Sort(out)
+	return out
+}
+
+// extendsEnvironment says whether the environment called name builds on base somewhere along its chain.
+func extendsEnvironment(envs []model.Environment, name, base string) bool {
+	chain, err := model.EnvironmentChain(envs, name)
+	if err != nil {
+		return false
+	}
+	return slices.ContainsFunc(chain[:len(chain)-1], func(e model.Environment) bool { return e.Name == base })
+}
+
 // SetRows replaces the variables.
 func (e *Environment) SetRows(rows []EnvVarRow) {
 	e.rows = slices.Clone(rows)
@@ -159,13 +201,19 @@ func (e *Environment) SetRows(rows []EnvVarRow) {
 func (e *Environment) Save(dropComments bool) {
 	env := e.disk
 	env.Colour = e.colour
+	env.Extends = e.extends
 	env.Vars = make([]model.EnvVar, 0, len(e.rows))
 	for _, r := range e.rows {
-		v := model.EnvVar{Name: r.Name, Value: r.Value, Secret: r.Secret}
+		v := model.EnvVar{Name: r.Name, Value: r.Value, Secret: r.Secret, Kind: r.Kind}
 		if r.Secret {
-			v.Value = ""
+			v.Value, v.Kind = "", model.VarString
 		}
 		env.Vars = append(env.Vars, v)
+	}
+	if err := checkKinds(env.Vars); err != nil {
+		e.err = err.Error()
+		e.changed()
+		return
 	}
 	rows, wasSecret := slices.Clone(e.rows), e.secretNames()
 	Run(e.w, func() error { return e.write(env, rows, wasSecret, dropComments) }, func(err error) { e.saved(env, err) })
@@ -261,4 +309,15 @@ func (e *Environment) Revert() {
 	e.load(e.envs)
 	e.changed()
 	e.loadSecrets()
+}
+
+// checkKinds refuses to save a variable whose value does not fit its kind, naming the first one. The file
+// would otherwise keep it as text and a number would go out as a string, the thing the kind is for.
+func checkKinds(vars []model.EnvVar) error {
+	for _, v := range vars {
+		if _, err := v.Typed(); err != nil {
+			return err
+		}
+	}
+	return nil
 }

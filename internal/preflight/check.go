@@ -54,7 +54,7 @@ func (r Report) OK() bool { return len(r.Missing) == 0 }
 // Message is what to tell the user: what is missing, and how to install it.
 func (r Report) Message() string {
 	var b strings.Builder
-	b.WriteString("Flow-I cannot start its window: this system is missing\n")
+	b.WriteString("Flowi cannot start its window: this system is missing\n")
 	for _, m := range r.Missing {
 		fmt.Fprintf(&b, "  - %s\n", m)
 	}

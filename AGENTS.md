@@ -1,7 +1,7 @@
 # AGENTS.md: flowi
 
 Instructions for AI coding agents (and a useful checklist for people) working in this repository.
-`flowi` is the Flow-I desktop app: Go and Wails 3 for the window, Svelte 5 and TypeScript for the screens, built on
+`flowi` is the Flowi desktop app: Go and Wails 3 for the window, Svelte 5 and TypeScript for the screens, built on
 `flowi-lib`. Read `README.md` for what the app does.
 
 ## Musts

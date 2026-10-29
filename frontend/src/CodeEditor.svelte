@@ -18,6 +18,7 @@
     lang = 'yaml',
     holdWhileFocused = false,
     onchange,
+    oncursor,
   }: {
     value: string
     readonly?: boolean
@@ -25,6 +26,8 @@
     /** Ignore outside changes while the editor has focus: the window echoes each edit back late. */
     holdWhileFocused?: boolean
     onchange?: (text: string) => void
+    /** Called with the 1-based line the caret is on, when the user moves it. */
+    oncursor?: (line: number) => void
   } = $props()
 
   let host: HTMLDivElement
@@ -32,10 +35,11 @@
   const language = new Compartment()
   // Read-only can change while the editor is open (a flow's code view follows Edit).
   const access = new Compartment()
-  const accessFor = (ro: boolean) => [EditorState.readOnly.of(ro), EditorView.editable.of(!ro)]
+  // Read-only text stays focusable, so its caret can be placed (the flow's code view selects the step under it) and its text copied.
+  const accessFor = (ro: boolean) => [EditorState.readOnly.of(ro)]
   const languageFor = (l: CodeLang) => (l === 'yaml' ? yaml() : l === 'json' ? json() : [])
 
-  // {{templates}} are Flow-I's own, so they are marked in every language.
+  // {{templates}} are Flowi's own, so they are marked in every language.
   const templates = new MatchDecorator({ regexp: new RegExp(templatePattern.source, 'g'), decoration: Decoration.mark({ class: 'tok-template' }) })
   const templateMarks = ViewPlugin.fromClass(
     class {
@@ -81,6 +85,7 @@
           access.of(accessFor(readonly)),
           EditorView.updateListener.of((u) => {
             if (u.docChanged) onchange?.(u.state.doc.toString())
+            if (u.selectionSet && u.transactions.some((tr) => tr.isUserEvent('select') || tr.isUserEvent('input'))) oncursor?.(u.state.doc.lineAt(u.state.selection.main.head).number)
           }),
         ],
       }),

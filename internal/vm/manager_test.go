@@ -101,3 +101,25 @@ func TestManagerVM_SaveDraftOr_Given_a_failure_Then_hands_the_error_to_the_calle
 		t.Fatal("the error must reach the caller, not only the manager screen")
 	}
 }
+
+func TestManagerVM_open_bundle_calls_the_backend_and_reloads_so_the_replay_collection_shows(t *testing.T) {
+	m, b, w := newManager(t)
+
+	m.OpenBundle("/runs/login.flowi-run")
+	w.Wait()
+
+	if !b.Called("OpenBundle /runs/login.flowi-run") {
+		t.Fatalf("calls %v", b.Calls)
+	}
+}
+
+func TestManagerVM_open_arazzo_calls_the_backend_with_the_reference_and_reloads(t *testing.T) {
+	m, b, w := newManager(t)
+
+	m.OpenArazzo("/docs/check.arazzo.yaml")
+	w.Wait()
+
+	if !b.Called("OpenArazzo /docs/check.arazzo.yaml") {
+		t.Fatalf("calls %v", b.Calls)
+	}
+}

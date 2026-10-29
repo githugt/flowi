@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -39,6 +40,13 @@ type ReplayerForm struct {
 	// RecordTo is the collection (name or id) that calls matching no saved
 	// request are saved in as new requests; blank is the Scratch draft.
 	RecordTo string
+	// RecordHAR is a file the recorded calls are also written to, in order (needs Record).
+	RecordHAR string
+	// Faults make a share of the replayed calls fail on purpose. Percent fields are 0 to 100; blank is none.
+	FaultErrorPercent string
+	FaultStatus       string // the status of an injected error; blank is 503
+	FaultDropPercent  string
+	FaultJitter       string // up to this much extra delay, as a duration such as 300ms
 }
 
 // Replayer starts and stops the replayer of flowi serve inside the app and
@@ -133,6 +141,12 @@ func (r *Replayer) Start(form ReplayerForm) {
 		r.changed()
 		return
 	}
+	faults, err := parseFaults(form)
+	if err != nil {
+		r.err = err.Error()
+		r.changed()
+		return
+	}
 	r.state = ReplayerStarting
 	r.changed()
 	ctx, cancel := context.WithCancel(context.Background())
@@ -149,6 +163,7 @@ func (r *Replayer) Start(form ReplayerForm) {
 			o.Latency = latency
 		}
 		o.Sequence, o.CORS, o.Record, o.RecordTo, o.NoTriggers, o.NoSchedules = form.Sequence, form.CORS, form.Record, form.RecordTo, true, true
+		o.RecordHAR, o.Faults = strings.TrimSpace(form.RecordHAR), faults
 		srv, err := r.b.Serve(ctx, o)
 		return started{srv, err}
 	}, func(s started) {
@@ -167,6 +182,9 @@ func (r *Replayer) Start(form ReplayerForm) {
 // through the user's network position (the library refuses it too; saying so
 // before starting gives a plainer message).
 func checkUpstream(form ReplayerForm) error {
+	if form.Record == "" && strings.TrimSpace(form.RecordHAR) != "" {
+		return errors.New("a HAR file needs an address to record from: there is nothing to put in it")
+	}
 	if form.Record == "" {
 		return nil
 	}
@@ -242,4 +260,41 @@ func (r *Replayer) Close() {
 		c()
 	}
 	r.wg.Wait()
+}
+
+// parseFaults reads the fault fields. A blank field is none; a field that is not a number in range is an error that
+// names it, so the person sees which box to fix.
+func parseFaults(form ReplayerForm) (replay.Faults, error) {
+	var f replay.Faults
+	var err error
+	if f.ErrorRate, err = percent("error rate", form.FaultErrorPercent); err != nil {
+		return f, err
+	}
+	if f.DropRate, err = percent("drop rate", form.FaultDropPercent); err != nil {
+		return f, err
+	}
+	if s := strings.TrimSpace(form.FaultStatus); s != "" {
+		if f.ErrorStatus, err = strconv.Atoi(s); err != nil {
+			return f, fmt.Errorf("the error status must be a number such as 503, not %q", s)
+		}
+	}
+	if s := strings.TrimSpace(form.FaultJitter); s != "" {
+		if f.Jitter, err = time.ParseDuration(s); err != nil || f.Jitter < 0 {
+			return f, fmt.Errorf("the jitter must be a duration such as 300ms, not %q", s)
+		}
+	}
+	return f, f.Validate()
+}
+
+// percent reads "20" as 0.2; blank is zero.
+func percent(what, text string) (float64, error) {
+	text = strings.TrimSpace(text)
+	if text == "" {
+		return 0, nil
+	}
+	v, err := strconv.ParseFloat(text, 64)
+	if err != nil || v < 0 || v > 100 {
+		return 0, fmt.Errorf("the %s must be a percent from 0 to 100, not %q", what, text)
+	}
+	return v / 100, nil
 }

@@ -16,6 +16,8 @@ type Pickers struct {
 	Folder func(title string) (string, error)
 	// File asks for a file; "" means the user cancelled.
 	File func(title string) (string, error)
+	// Save asks where to save a file, offering name; "" means the user cancelled.
+	Save func(title, name string) (string, error)
 	// Reveal shows a folder in the system's file manager (Finder).
 	Reveal func(folder string) error
 }

@@ -15,8 +15,12 @@
   // The canvas renders a laid-out Diagram as SVG. Pan, pinch-zoom and drag
   // happen here, locally; the Go side hears of a drop once, on release, and
   // answers every pointer move of a drag with the slot to mark.
-  import { untrack } from 'svelte'
-  import type { Card, DataEdge, Diagram, Edge, Slot, Unit } from './lib/types'
+  import { untrack, type Snippet } from 'svelte'
+  import type { Card, DataEdge, Diagram, Edge, Face, Slot, Unit } from './lib/types'
+  import StepCard from './StepCard.svelte'
+  import EdgeCard from './EdgeCard.svelte'
+  import { edgeCards } from './lib/edgecards'
+  import { CARD, openAfterClick, portLine, type OpenRow } from './lib/card'
 
   export interface CanvasView {
     x: number
@@ -38,11 +42,23 @@
     oncollapse,
     onaddcase,
     onadd,
+    ontoolbar,
+    oncolour,
+    oncase,
     ondrag,
     ondrop,
     oncancel,
     initialView = null,
     onviewchange,
+    panel,
+    ondata,
+    dock,
+    start = null,
+    end = null,
+    onedgerow,
+    onmoveinput,
+    onaddinput,
+    onaddoutput,
   }: {
     diagram: Diagram
     cards: Record<string, Card>
@@ -58,11 +74,27 @@
     onaddcase?: (condition: string) => void // the "+ else if" under a condition (editing only)
     /** A + was clicked: a new step goes right before or after `near.step`; near is null for the + of an empty flow. */
     onadd?: (clientX: number, clientY: number, near: { step: string; before: boolean } | null) => void
+    ontoolbar?: (tool: 'add' | 'skip' | 'break' | 'duplicate' | 'delete', step: string, e: MouseEvent) => void // the selected card's toolbar
+    oncolour?: (step: string, colour: string) => void
+    oncase?: (step: string, index: number, e: MouseEvent) => void // a Route's case port label (Edit only)
     ondrag: (info: DragInfo) => void
     ondrop: (info: DragInfo) => void
     oncancel: () => void
     initialView?: CanvasView | null // where the canvas was the last time this flow was shown
     onviewchange?: (v: CanvasView) => void
+    /** What opens under a card when one of its rows is clicked (Edit only); given the row and how to close it. */
+    panel?: Snippet<[string, () => void]>
+    /** A value wire was dropped from one step onto another (Edit only); where it was released, in client points. */
+    ondata?: (from: string, to: string, clientX: number, clientY: number) => void
+    /** What a step did in the last run, shown under its card while it is selected or pinned; given the step and its pin. */
+    dock?: Snippet<[string, boolean, () => void]>
+    /** The Start card (the flow's inputs) and the End card (its outputs; null without outputs). */
+    start?: Face | null
+    end?: Face | null
+    onedgerow?: (role: 'start' | 'end', key: string, e: MouseEvent) => void
+    onmoveinput?: (from: number, to: number) => void
+    onaddinput?: () => void
+    onaddoutput?: () => void
   } = $props()
 
   const MIN_K = 0.15
@@ -90,8 +122,8 @@
   let moving = $state<{ id: string; dx: number; dy: number } | null>(null)
   // A lifted card follows the pointer as a ghost.
   let ghost = $state<{ step: string; x: number; y: number } | null>(null)
-  // A needs link being drawn from a unit's port to the pointer.
-  let link = $state<{ from: string; x: number; y: number } | null>(null)
+  // A needs link being drawn from a unit's port to the pointer; a value wire (kind data) is drawn the same way.
+  let link = $state<{ from: string; x: number; y: number; data?: boolean } | null>(null)
   // Where a unit was dropped, until Go's new layout arrives. The layout may put the unit somewhere else (a drop
   // that reorders, or into a lane, is placed by the layout, not by the pointer), so any newer layout replaces it.
   let pending = $state<Record<string, { x: number; y: number }>>({})
@@ -112,6 +144,12 @@
   })
 
   const units = $derived(diagram.units)
+  // Start and End are views of the flow, placed beside its first and last card.
+  const edge = $derived(edgeCards(units, start?.rows.length ?? 0, end?.rows.length ?? 0, editable && !!onaddinput))
+  const curve = (x1: number, y1: number, x2: number, y2: number) => {
+    const mid = (x1 + x2) / 2
+    return `M${x1},${y1} C${mid},${y1} ${mid},${y2} ${x2},${y2}`
+  }
   const byId = $derived(new Map(units.map((u) => [u.id, u])))
 
   function at(u: Unit) {
@@ -121,7 +159,13 @@
   }
 
   function portY(u: Unit): number {
+    if (u.card) return at(u).y + CARD.inPort
     return at(u).y + (u.kind === 'container' ? (u.headW ? 32 : 20) : u.kind === 'request' ? (u.above ?? 0) + 32 : 24)
+  }
+
+  /** The y of a card's port `id` (the in port's line for a unit that is not a card or has no such port). */
+  function portYOf(u: Unit, id?: string): number {
+    return u.card && id ? portLine(at(u).y, u.ports, id) : portY(u)
   }
 
   // A container drawn as a card has an arrow to each of its lanes, labelled with what takes it.
@@ -131,11 +175,11 @@
       const c = byId.get(l.container)
       if (!c?.headW) continue
       const x1 = at(c).x + c.headW
-      const y1 = portY(c)
+      const y1 = portYOf(c, l.port)
       const x2 = l.x
       const y2 = l.portY
       const mid = Math.max(20, Math.abs(x2 - x1) / 2)
-      out.push({ d: `M${x1},${y1} C${x1 + mid},${y1} ${x2 - mid},${y2} ${x2},${y2}`, label: l.label.length > 22 ? l.label.slice(0, 21) + '…' : l.label, lx: x1 + 8, ly: y2 - 8 })
+      out.push({ d: `M${x1},${y1} C${x1 + mid},${y1} ${x2 - mid},${y2} ${x2},${y2}`, label: c.card ? '' : l.label.length > 22 ? l.label.slice(0, 21) + '…' : l.label, lx: x1 + 8, ly: y2 - 8 })
     }
     return out
   })
@@ -168,12 +212,30 @@
     return { x: (at(a).x + a.w + at(b).x) / 2, y: (portY(a) + portY(b)) / 2 - 7 }
   }
 
+  // Cards with a failure route show a port at the bottom edge; the route leaves from it, so it is not
+  // taken for a step that follows.
+  const failSources = $derived(new Set(diagram.edges.filter((e) => e.fail && !byId.get(e.from)?.card).map((e) => e.from)))
+
+  function failPath(e: Edge): string {
+    const a = byId.get(e.from)
+    const b = byId.get(e.to)
+    if (!a || !b) return ''
+    const x1 = at(a).x + a.w / 2
+    const y1 = at(a).y + a.h
+    const x2 = at(b).x
+    const y2 = portY(b)
+    const drop = Math.max(36, Math.abs(y2 - y1) / 2)
+    const lead = Math.max(30, Math.abs(x2 - x1) / 3)
+    return `M${x1},${y1} C${x1},${y1 + drop} ${x2 - lead},${y2} ${x2},${y2}`
+  }
+
   function edgePath(e: Edge): string {
     const a = byId.get(e.from)
     const b = byId.get(e.to)
     if (!a || !b) return ''
+    if (e.fail && !a.card) return failPath(e)
     const x1 = at(a).x + a.w
-    const y1 = portY(a)
+    const y1 = portYOf(a, e.fromPort)
     const x2 = at(b).x
     const y2 = portY(b)
     const mid = Math.max(30, Math.abs(x2 - x1) / 2)
@@ -235,7 +297,43 @@
   }
   let press: Press | null = null
 
+  // The row of a card that is open, and so the card it opens under: one at a time.
+  let open = $state<OpenRow | null>(null)
+  function rowClicked(u: Unit, key: string) {
+    onselect(u.nodes[0], false)
+    open = openAfterClick(open, u.id, key, !!panel)
+  }
+  // Steps whose dock stays open although another step is selected.
+  let pins = $state<string[]>([])
+  const togglePin = (step: string) => (pins = pins.includes(step) ? pins.filter((s) => s !== step) : [...pins, step])
+  // The docks to show: for each card that has run and is selected or pinned (not the one a row editor is open under).
+  const docked = $derived(
+    !dock
+      ? []
+      : units.filter((u) => u.card && !!statuses[u.nodes[0]] && (selectedUnits.has(u.id) || pins.includes(u.nodes[0])) && open?.unit !== u.id),
+  )
+  const openUnit = $derived(open ? byId.get(open.unit) : undefined)
+  // The panel sits right under its card, as wide as the card is (at least 300 points), and follows it as the view moves.
+  function boxUnder(u: Unit) {
+    const p = at(u)
+    return { left: Math.max(8, view.x + p.x * view.k), top: view.y + (p.y + (u.headH || u.h)) * view.k + 8, width: Math.max(300, (u.headW || u.w) * view.k) }
+  }
+  const panelBox = $derived(openUnit ? boxUnder(openUnit) : null)
+  // The panel belongs to the card's step: it closes when the selection moves to another step (not before the
+  // selection has arrived: a click selects and opens at once, and the selection comes back from Go).
+  let openSeen = false
+  $effect(() => {
+    if (!open) {
+      openSeen = false
+      return
+    }
+    if (!openUnit) open = null // the card went away (deleted, undone)
+    else if (selectedUnits.has(open.unit)) openSeen = true
+    else if (openSeen) open = null
+  })
+
   function onbackground(e: PointerEvent) {
+    open = null
     if (!e.shiftKey) onselect('', false)
     press = { kind: 'pan', sx: e.clientX, sy: e.clientY, vx: view.x, vy: view.y, dragging: true }
     svg.setPointerCapture(e.pointerId)
@@ -273,6 +371,7 @@
 
   function onunit(e: PointerEvent, u: Unit) {
     e.stopPropagation()
+    if (open && open.unit !== u.id) open = null
     const c = toCanvas(e.clientX, e.clientY)!
     const step = stepAt(u, c.x, c.y)
     if (e.shiftKey) {
@@ -311,6 +410,14 @@
     svg.setPointerCapture(e.pointerId)
   }
 
+  function ondataport(e: PointerEvent, u: Unit) {
+    e.stopPropagation()
+    if (!editable || !ondata) return
+    const c = toCanvas(e.clientX, e.clientY)!
+    link = { from: u.id, x: c.x, y: c.y, data: true }
+    svg.setPointerCapture(e.pointerId)
+  }
+
   function unitAt(x: number, y: number): Unit | undefined {
     return units.find((u) => x >= u.x && x <= u.x + u.w && y >= u.y && y <= u.y + u.h)
   }
@@ -340,8 +447,13 @@
   function onrelease(e: PointerEvent) {
     if (link) {
       const target = unitAt(link.x, link.y)
-      if (target && target.id !== link.from) onconnect(link.from, target.id)
+      const wire = link.data
+      const from = link.from
       link = null
+      if (target && target.id !== from) {
+        if (wire) ondata?.(byId.get(from)!.nodes[0], target.nodes[0], e.clientX, e.clientY)
+        else onconnect(from, target.id)
+      }
       return
     }
     const p = press
@@ -368,9 +480,9 @@
     if (!units.length) return
     const r = svg.getBoundingClientRect()
     // The + on each side of the flow is part of the picture: room for them on the left and right.
-    const minX = Math.min(...units.map((u) => u.x)) - (onadd ? ADD_GAP + 14 : 0)
+    const minX = Math.min(...units.map((u) => u.x), start ? edge.start.x : Infinity) - (onadd ? ADD_GAP + 14 : 0)
     const minY = Math.min(...units.map((u) => u.y))
-    const maxX = Math.max(...units.map((u) => u.x + u.w)) + (onadd ? ADD_GAP + 14 : 0)
+    const maxX = Math.max(...units.map((u) => u.x + u.w), edge.end ? edge.end.x + edge.end.w : -Infinity) + (onadd ? ADD_GAP + 14 : 0)
     const maxY = Math.max(...units.map((u) => u.y + u.h))
     const whole = Math.min((r.width - 80) / (maxX - minX), (r.height - 80) / (maxY - minY))
     const k = Math.min(MAX_K, Math.max(minK, whole))
@@ -520,6 +632,10 @@
       patternTransform={`translate(${view.x} ${view.y}) scale(${view.k})`}>
       <circle cx="1" cy="1" r="1" fill="var(--line)" />
     </pattern>
+    <!-- the header of a skipped step -->
+    <pattern id="skiphatch" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+      <rect width="4" height="8" fill="var(--muted)" opacity="0.28" />
+    </pattern>
     <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
       <path d="M0,0 L10,5 L0,10 z" fill="var(--muted)" />
     </marker>
@@ -558,10 +674,24 @@
       {#if b.label}<text class="branchlabel" x={b.lx} y={b.ly}>{b.label}</text>{/if}
     {/each}
 
+    {#if start && edge.first}
+      <path class="edge" d={curve(edge.start.x + edge.start.w, edge.start.y + CARD.inPort, edge.first.x, edge.first.y + CARD.inPort)} marker-end="url(#arrow)" />
+    {/if}
+    {#if edge.end && !edge.end.ghost && edge.last}
+      <path class="edge" d={curve(edge.last.x + edge.last.w, edge.last.y + CARD.inPort, edge.end.x, edge.end.y + CARD.inPort)} marker-end="url(#arrow)" />
+    {/if}
+    {#if start}
+      <EdgeCard role="start" face={start} place={edge.start} {editable} k={view.k} onrow={(key, e) => onedgerow?.('start', key, e)} onmove={onmoveinput} onadd={onaddinput} />
+    {/if}
+    {#if edge.end && (end || edge.end.ghost)}
+      <EdgeCard role="end" face={end} place={edge.end} {editable} k={view.k} onrow={(key, e) => onedgerow?.('end', key, e)} onadd={onaddoutput} />
+    {/if}
+
     {#each diagram.edges as e}
       {#if !e.into}
         <path class="edge" class:fail={e.fail} class:needs={e.needs} d={edgePath(e)} marker-end="url(#arrow)" />
         <path class="flow" class:fail={e.fail} class:live={live(e)} d={edgePath(e)} />
+        {#if e.fail && edgeMid(e)}{@const m = edgeMid(e)!}<text class="edgelabel fail" x={m.x} y={m.y + 16} text-anchor="middle">if it fails</text>{/if}
         {#if e.needs && edgeMid(e)}{@const m = edgeMid(e)!}<text class="edgelabel" x={m.x} y={m.y} text-anchor="middle">waits for</text>{/if}
       {/if}
     {/each}
@@ -572,7 +702,13 @@
       {@const status = statusOf(u)}
       <g class="unit {u.kind} {status}" class:selected={selectedUnits.has(u.id)} class:pulse={pulse === u.id} class:dragging={moving?.id === u.id}
         transform={`translate(${p.x} ${p.y})`} onpointerdown={(e) => onunit(e, u)} ondblclick={() => u.kind === 'strip' && (u.nodes.length > 1 || u.collapsed) && oncollapse(u.id, !u.collapsed)} role="button" tabindex="-1">
-        {#if u.headW}
+        {#if u.card && card?.face}
+          <StepCard {u} face={card.face} title={card.title} selected={selectedUnits.has(u.id)} {status} result={resultOf(u)} skipped={card.skipped} breakpoint={card.break} note={card.skipNote} colour={card.color || undefined}
+            toolbar={!!ontoolbar && editable && selection.length === 1 && selectedUnits.has(u.id) && !moving && !link}
+            ontool={(tool, e) => ontoolbar?.(tool, u.nodes[u.core ?? 0], e)} oncolour={(c) => oncolour?.(u.nodes[u.core ?? 0], c)}
+            oncase={oncase ? (i, e) => oncase(u.nodes[u.core ?? 0], i, e) : undefined}
+            onrow={(key) => rowClicked(u, key)} onport={(e) => onport(e, u)} ondataport={ondata ? (e) => ondataport(e, u) : undefined} />
+        {:else if u.headW}
           <rect width={u.headW} height="40" y="12" rx="10" />
         {:else if u.above || u.nodes.some((_, i) => stacked(u, i))}
           <!-- a request row, with its stacked actions as cards above and below it -->
@@ -580,7 +716,9 @@
         {:else}
           <rect width={u.w} height={u.h} rx="10" />
         {/if}
-        {#if u.kind === 'container' && u.headW}
+        {#if u.card}
+          <!-- a card draws itself -->
+        {:else if u.kind === 'container' && u.headW}
           <text x={u.headW / 2} y="30" class="id" text-anchor="middle">{u.types[0]}</text>
           <text x={u.headW / 2} y="45" class="kind" text-anchor="middle">{fitText(card?.title ?? '', u.headW)}</text>
         {:else if u.kind === 'container'}
@@ -620,7 +758,7 @@
           <text x={u.w / 2} y={u.h / 2 - 4} class="id" text-anchor="middle">{fitText(card?.title ?? '', u.w)}</text>
           <text x={u.w / 2} y={u.h / 2 + 14} class="kind" text-anchor="middle">{fitText(card?.subtitle ?? '', u.w)}</text>
         {/if}
-        {#if u.kind === 'request' && card?.hooks?.length}
+        {#if u.kind === 'request' && !u.card && card?.hooks?.length}
           {@const core = isBlock(u) ? cell(u, u.core ?? 0) : { x: 0, y: 0, w: u.w, h: u.h }}
           {@const shownHooks = card.hooks.slice(0, 12)}
           {@const pre = shownHooks.filter((t) => t.phase === 'pre').length}
@@ -636,10 +774,18 @@
             {#if card.hooks.length > 12}<text x={HOOK_X + 12 * 10 + 12} y="3" class="kind">+{card.hooks.length - 12}</text>{/if}
           </g>
         {/if}
-        {#if status}<circle class="dot {status}" cx={u.w - 14} cy={(u.above ?? 0) + 14} r="5" />{/if}
-        {#if !u.headW}<circle class="port" cx={u.w} cy={portY(u) - at(u).y} r="6" role="button" tabindex="-1" aria-label="Drag to make another step wait for this one" onpointerdown={(e) => onport(e, u)}><title>Drag onto another step to make it wait for this one</title></circle>{/if}
-        {#if resultOf(u)}<text class="result {status}" x={u.w - 10} y={(u.above ?? 0) + (isBlock(u) ? cell(u, u.core ?? 0).h : u.h) - 8} text-anchor="end">{resultOf(u)}</text>{/if}
+        {#if status && !u.card}<circle class="dot {status}" cx={u.w - 14} cy={(u.above ?? 0) + 14} r="5" />{/if}
+        {#if !u.headW && !u.card}<circle class="port" cx={u.w} cy={portY(u) - at(u).y} r="6" role="button" tabindex="-1" aria-label="Drag to make another step wait for this one" onpointerdown={(e) => onport(e, u)}><title>Drag onto another step to make it wait for this one</title></circle>{/if}
+        {#if resultOf(u) && !u.card}<text class="result {status}" x={u.w - 10} y={(u.above ?? 0) + (isBlock(u) ? cell(u, u.core ?? 0).h : u.h) - 8} text-anchor="end">{resultOf(u)}</text>{/if}
       </g>
+    {/each}
+
+    <!-- The port of a failure route sits on the card's bottom edge, over the card. -->
+    {#each units as u (u.id)}
+      {#if failSources.has(u.id)}
+        {@const p = at(u)}
+        <circle class="failport" cx={p.x + u.w / 2} cy={p.y + u.h} r="5"><title>Where the failure route leaves this step</title></circle>
+      {/if}
     {/each}
 
     {#if onadd && !moving && !link}
@@ -661,8 +807,8 @@
     {#if link}
       {@const from = byId.get(link.from)}
       {#if from}
-        <path class="linking" d={`M${at(from).x + from.w},${portY(from)} L${link.x},${link.y}`} />
-        <text class="slotlabel" x={link.x + 10} y={link.y - 8}>Release on a step to make it wait for {from.nodes[from.core ?? 0]}</text>
+        <path class="linking" class:wire={link.data} d={link.data ? `M${at(from).x + from.w / 2},${at(from).y + (from.headH || from.h)} L${link.x},${link.y}` : `M${at(from).x + from.w},${portY(from)} L${link.x},${link.y}`} />
+        <text class="slotlabel" x={link.x + 10} y={link.y - 8}>{link.data ? `Release on a step to pass it a value from ${from.nodes[0]}` : `Release on a step to make it wait for ${from.nodes[from.core ?? 0]}`}</text>
       {/if}
     {/if}
     {#if slot?.ok}
@@ -682,6 +828,22 @@
     {/if}
   </g>
 </svg>
+
+{#if panel && open && panelBox}
+  <div class="rowpanel" style:left={`${panelBox.left}px`} style:top={`${panelBox.top}px`} style:width={`${panelBox.width}px`}
+    onpointerdown={(e) => e.stopPropagation()} onwheel={(e) => e.stopPropagation()} onkeydown={(e) => e.key === 'Escape' && (open = null)} role="presentation">
+    {@render panel(open.key, () => (open = null))}
+  </div>
+{/if}
+
+{#if dock}
+  {#each docked as u (u.id)}
+    {@const b = boxUnder(u)}
+    <div class="dockbox" style:left={`${b.left}px`} style:top={`${b.top}px`} style:width={`${b.width}px`} onpointerdown={(e) => e.stopPropagation()} onwheel={(e) => e.stopPropagation()} role="presentation">
+      {@render dock(u.nodes[0], pins.includes(u.nodes[0]), () => togglePin(u.nodes[0]))}
+    </div>
+  {/each}
+{/if}
 
 {#if units.length > 1 && clipped}
   <svg class="minimap" viewBox={`${bounds.x - 40} ${bounds.y - 40} ${bounds.w + 80} ${bounds.h + 80}`} role="presentation" onpointerdown={minimapPan}>
@@ -733,6 +895,9 @@
   .edge { fill: none; stroke: var(--muted); stroke-width: 1.6; }
   .edge.needs { stroke-dasharray: 4 4; }
   .edge.fail, .flow.fail { stroke: var(--fail); }
+  .edge.fail { stroke-dasharray: 5 4; }
+  .edgelabel.fail { fill: var(--fail); }
+  .failport { fill: var(--bg); stroke: var(--fail); stroke-width: 2; pointer-events: none; }
   .flow {
     fill: none;
     stroke: var(--accent);
@@ -779,6 +944,7 @@
   .unit:hover .port, .unit.selected .port { opacity: 1; }
   .readonly .port { display: none; }
   .port:hover { fill: var(--accent); stroke: var(--accent); }
+  .linking.wire { stroke: var(--data); }
   .linking { stroke: var(--accent); stroke-width: 2; stroke-dasharray: 5 4; fill: none; pointer-events: none; }
   .kind { fill: var(--muted); font-size: 11px; }
   .id { fill: var(--text); font-size: 13px; font-weight: 600; }
@@ -787,6 +953,19 @@
   .ghost { pointer-events: none; opacity: 0.85; }
   .ghost rect { fill: var(--accent); }
   .ghost text { fill: var(--on-accent); font-size: 11px; font-weight: 600; }
+  .rowpanel {
+    position: absolute;
+    z-index: 5;
+    box-sizing: border-box;
+    max-height: 60%;
+    overflow: auto;
+    padding: 12px;
+    background: var(--panel);
+    border: 1px solid var(--accent);
+    border-radius: 14px;
+    box-shadow: var(--shadow);
+  }
+  .dockbox { position: absolute; z-index: 4; box-sizing: border-box; }
   .minimap {
     position: absolute;
     left: 16px;

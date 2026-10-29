@@ -50,10 +50,10 @@ func openExample(t *testing.T) vm.Backend {
 		t.Fatal(err)
 	}
 	// Environments are global: the example's become the workspace's.
-	if err := os.MkdirAll(filepath.Join(dir, "config", "workspaces", "default"), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Join(dir, "config", "workspaces", "default-workspace"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.Rename(filepath.Join(dir, "example", "environments"), filepath.Join(dir, "config", "workspaces", "default", "environments")); err != nil {
+	if err := os.Rename(filepath.Join(dir, "example", "environments"), filepath.Join(dir, "config", "workspaces", "default-workspace", "environments")); err != nil {
 		t.Fatal(err)
 	}
 	environ := []string{"FLOWI_CONFIG_DIR=" + filepath.Join(dir, "config"), "FLOWI_VAULT_KEY=test-only", "FLOWI_SECRET_LOCAL_PASSWORD=demo"}

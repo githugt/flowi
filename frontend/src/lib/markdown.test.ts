@@ -21,4 +21,18 @@ describe('renderMarkdown', () => {
     expect(html).not.toContain('javascript:alert(1)"')
     expect(html).toContain('href="#"')
   })
+
+  it('renders numbered lists and quotes, and keeps their text escaped', () => {
+    const html = renderMarkdown('1. first <b>\n2) second\n\n> quoted & **bold**')
+    expect(html).toContain('<ol>')
+    expect(html).toContain('<li>first &lt;b&gt;</li>')
+    expect(html).toContain('<li>second</li>')
+    expect(html).toContain('<blockquote>quoted &amp; <strong>bold</strong></blockquote>')
+    expect(html.match(/<ol>/g)).toHaveLength(1)
+  })
+
+  it('closes a list before another kind of list starts', () => {
+    const html = renderMarkdown('- a\n1. b')
+    expect(html).toBe('<ul>\n<li>a</li>\n</ul>\n<ol>\n<li>b</li>\n</ol>')
+  })
 })

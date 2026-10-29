@@ -130,7 +130,7 @@ func menuLabel(item vm.MenuItem) string {
 func protocolLabels() map[string]string {
 	return map[string]string{
 		model.ProtocolWS: "WebSocket", model.ProtocolSSE: "Server-Sent Event", model.ProtocolMQTT: "MQTT", model.ProtocolKafka: "Kafka",
-		model.ProtocolAMQP: "AMQP (RabbitMQ)", model.ProtocolNATS: "NATS", model.ProtocolRedis: "Redis", model.ProtocolSQS: "AWS SQS",
+		model.ProtocolAMQP: "AMQP (RabbitMQ)", model.ProtocolAMQP10: "AMQP 1.0 (Artemis, Qpid…)", model.ProtocolNATS: "NATS", model.ProtocolRedis: "Redis", model.ProtocolSQS: "AWS SQS",
 		model.ProtocolSNS: "AWS SNS", model.ProtocolServiceBus: "Azure Service Bus", model.ProtocolPubSub: "Google Pub/Sub",
 	}
 }

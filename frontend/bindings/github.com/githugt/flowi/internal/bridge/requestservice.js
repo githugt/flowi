@@ -88,6 +88,16 @@ export function DeleteCookie(node, key) {
 }
 
 /**
+ * DeleteFlowiOverlay removes the flowi overlay name. Responses kept for it stay.
+ * @param {string} node
+ * @param {string} name
+ * @returns {$CancellablePromise<void>}
+ */
+export function DeleteFlowiOverlay(node, name) {
+    return $Call.ByID(3034296612, node, name);
+}
+
+/**
  * DeleteSchema removes a schema; the next send learns it again.
  * @param {string} node
  * @param {string} kind
@@ -143,6 +153,19 @@ export function Edit(node, v) {
 }
 
 /**
+ * ExportFlowiOverlay writes the flowi overlay name as OpenAPI Overlays for the
+ * specs the collection keeps (nothing is saved; see SaveSpecExport).
+ * @param {string} node
+ * @param {string} name
+ * @returns {$CancellablePromise<$models.SpecExportView>}
+ */
+export function ExportFlowiOverlay(node, name) {
+    return $Call.ByID(4082207041, node, name).then(/** @type {($result: any) => any} */(($result) => {
+        return $$createType1($result);
+    }));
+}
+
+/**
  * ExpressionNames lists the environment variables and the request's own variables an expression
  * can read, written out in full ("env.base_url", "var.page").
  * @param {string} node
@@ -150,7 +173,7 @@ export function Edit(node, v) {
  */
 export function ExpressionNames(node) {
     return $Call.ByID(1263971440, node).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType2($result);
+        return $$createType3($result);
     }));
 }
 
@@ -181,6 +204,30 @@ export function FillFromPaste(node, kind, text) {
 }
 
 /**
+ * FlowiOverlayDiff lists what saving the working copy as a flowi overlay
+ * would store, for the save dialog.
+ * @param {string} node
+ * @returns {$CancellablePromise<$models.FlowiOverlayDiffView>}
+ */
+export function FlowiOverlayDiff(node) {
+    return $Call.ByID(3483429824, node).then(/** @type {($result: any) => any} */(($result) => {
+        return $$createType4($result);
+    }));
+}
+
+/**
+ * FlowiOverlayText is the file of the flowi overlay name in the collection of
+ * the request node, for the overlay editor. An empty name gives the text a
+ * new overlay starts with.
+ * @param {string} node
+ * @param {string} name
+ * @returns {$CancellablePromise<string>}
+ */
+export function FlowiOverlayText(node, name) {
+    return $Call.ByID(589944420, node, name);
+}
+
+/**
  * GenerateRequests makes a gRPC request for each loaded method, in the
  * request's collection under grpc/, with its server and schema files.
  * @param {string} node
@@ -188,7 +235,7 @@ export function FillFromPaste(node, kind, text) {
  */
 export function GenerateRequests(node) {
     return $Call.ByID(3985437955, node).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType3($result);
+        return $$createType5($result);
     }));
 }
 
@@ -217,6 +264,15 @@ export function LoadMethods(node) {
 }
 
 /**
+ * MakeJSONRPC turns the JSON body into a JSON-RPC call (an existing JSON body becomes its parameters).
+ * @param {string} node
+ * @returns {$CancellablePromise<void>}
+ */
+export function MakeJSONRPC(node) {
+    return $Call.ByID(1964242193, node);
+}
+
+/**
  * Missing lists the variables the selected version of request node uses
  * that nothing defines yet. A secret counts as defined only once it has a
  * value (in the vault, or overridden from the process environment): a
@@ -226,7 +282,7 @@ export function LoadMethods(node) {
  */
 export function Missing(node) {
     return $Call.ByID(950141702, node).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType4($result);
+        return $$createType6($result);
     }));
 }
 
@@ -248,7 +304,7 @@ export function NewVersion(node, label) {
  */
 export function Open(node) {
     return $Call.ByID(1087292378, node).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType5($result);
+        return $$createType7($result);
     }));
 }
 
@@ -298,6 +354,29 @@ export function PinStored(node, version, name, example) {
 }
 
 /**
+ * PinStoredWarning is PinWarning for a saved response of the request.
+ * @param {string} node
+ * @param {string} version
+ * @param {string} name
+ * @returns {$CancellablePromise<string>}
+ */
+export function PinStoredWarning(node, version, name) {
+    return $Call.ByID(384669758, node, version, name);
+}
+
+/**
+ * PinWarning says what is worth knowing before the response shown is pinned:
+ * a pinned example is committed with the collection, response headers
+ * included. It names the headers that look like credentials and is "" when
+ * there is none (or nothing to pin).
+ * @param {string} node
+ * @returns {$CancellablePromise<string>}
+ */
+export function PinWarning(node) {
+    return $Call.ByID(3653235643, node);
+}
+
+/**
  * PrettyJSON indents a JSON message; ok is false for text that is not JSON.
  * @param {string} text
  * @returns {$CancellablePromise<[string, boolean]>}
@@ -314,7 +393,7 @@ export function PrettyJSON(text) {
  */
 export function PreviewOverlay(node) {
     return $Call.ByID(2934596182, node).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType6($result);
+        return $$createType8($result);
     }));
 }
 
@@ -337,12 +416,62 @@ export function Save(node) {
 }
 
 /**
+ * SaveAsFlowiOverlay stores the working copy as the flowi overlay name: the
+ * changes at the indexes in shared go to the part every request gets, the
+ * rest to this request's own. It reports true, saving nothing, when the
+ * overlay's file has comments the rewrite would lose: ask, then call it again
+ * with dropComments.
+ * @param {string} node
+ * @param {string} name
+ * @param {string} description
+ * @param {number[]} shared
+ * @param {boolean} dropComments
+ * @returns {$CancellablePromise<boolean>}
+ */
+export function SaveAsFlowiOverlay(node, name, description, shared, dropComments) {
+    return $Call.ByID(97118442, node, name, description, shared, dropComments);
+}
+
+/**
+ * SaveBody writes the body of the response shown to a file the user picks in the
+ * system's save dialog, and returns the file ("" when the user cancelled).
+ * @param {string} node
+ * @returns {$CancellablePromise<string>}
+ */
+export function SaveBody(node) {
+    return $Call.ByID(2937084919, node);
+}
+
+/**
  * SaveDroppingComments saves although the file's comments are lost.
  * @param {string} node
  * @returns {$CancellablePromise<void>}
  */
 export function SaveDroppingComments(node) {
     return $Call.ByID(533767712, node);
+}
+
+/**
+ * SaveFlowiOverlayText saves text as the flowi overlay name. It returns the
+ * problem to show (the file's own diagnostics), "" when saved.
+ * @param {string} node
+ * @param {string} name
+ * @param {string} text
+ * @returns {$CancellablePromise<string>}
+ */
+export function SaveFlowiOverlayText(node, name, text) {
+    return $Call.ByID(70623901, node, name, text);
+}
+
+/**
+ * SaveSpecExport asks where to save an exported OpenAPI Overlay and writes it
+ * there. It returns the file, "" when the user cancelled.
+ * @param {string} file
+ * @param {string} text
+ * @returns {$CancellablePromise<string>}
+ */
+export function SaveSpecExport(file, text) {
+    return $Call.ByID(4017815054, file, text);
 }
 
 /**
@@ -377,8 +506,19 @@ export function SaveToOverlay(node, chosen) {
  */
 export function Schemas(node) {
     return $Call.ByID(3608768970, node).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType8($result);
+        return $$createType10($result);
     }));
+}
+
+/**
+ * SelectFlowiOverlay lays the flowi overlay name over the open version; ""
+ * takes it off. The window shows the effective request.
+ * @param {string} node
+ * @param {string} name
+ * @returns {$CancellablePromise<void>}
+ */
+export function SelectFlowiOverlay(node, name) {
+    return $Call.ByID(315462811, node, name);
 }
 
 /**
@@ -431,6 +571,28 @@ export function SetAsync(node, a) {
  */
 export function SetAuth(node, kind, value) {
     return $Call.ByID(1061946664, node, kind, value);
+}
+
+/**
+ * SetAuthParam sets one parameter of the auth block; "" removes it.
+ * @param {string} node
+ * @param {string} name
+ * @param {string} value
+ * @returns {$CancellablePromise<void>}
+ */
+export function SetAuthParam(node, name, value) {
+    return $Call.ByID(2863215961, node, name, value);
+}
+
+/**
+ * SetAuthScheme chooses the scheme of the version's auth block ("" removes the
+ * block): apikey, digest, oauth2, oauth1, aws_sigv4, jwt, hawk or mtls.
+ * @param {string} node
+ * @param {string} scheme
+ * @returns {$CancellablePromise<void>}
+ */
+export function SetAuthScheme(node, scheme) {
+    return $Call.ByID(2761938703, node, scheme);
 }
 
 /**
@@ -533,6 +695,17 @@ export function SetGRPC(node, g) {
 }
 
 /**
+ * SetJSONRPC changes the method or the id of the JSON-RPC call the JSON body holds.
+ * @param {string} node
+ * @param {string} field
+ * @param {string} value
+ * @returns {$CancellablePromise<void>}
+ */
+export function SetJSONRPC(node, field, value) {
+    return $Call.ByID(3536408439, node, field, value);
+}
+
+/**
  * SetMethod sets the HTTP verb.
  * @param {string} node
  * @param {string} method
@@ -560,6 +733,16 @@ export function SetMode(node, mode) {
  */
 export function SetMultipart(node, on) {
     return $Call.ByID(176018366, node, on);
+}
+
+/**
+ * SetParts replaces the parts of a multipart body.
+ * @param {string} node
+ * @param {$models.MultipartPartView[]} parts
+ * @returns {$CancellablePromise<void>}
+ */
+export function SetParts(node, parts) {
+    return $Call.ByID(4255575728, node, parts);
 }
 
 /**
@@ -605,7 +788,7 @@ export function SetSchemasInfer(node, on) {
  */
 export function SetSettings(node, rows) {
     return $Call.ByID(1704834215, node, rows).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType9($result);
+        return $$createType11($result);
     }));
 }
 
@@ -659,7 +842,7 @@ export function SetVersionDetails(node, name, docs) {
  */
 export function Settings(node) {
     return $Call.ByID(2029961655, node).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType10($result);
+        return $$createType12($result);
     }));
 }
 
@@ -703,7 +886,7 @@ export function ShowStored(node, version, name) {
  */
 export function SpecOrigin(node) {
     return $Call.ByID(1104662111, node).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType11($result);
+        return $$createType13($result);
     }));
 }
 
@@ -715,7 +898,7 @@ export function SpecOrigin(node) {
  */
 export function StoredResponses(node) {
     return $Call.ByID(3817148967, node).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType13($result);
+        return $$createType15($result);
     }));
 }
 
@@ -730,7 +913,7 @@ export function StoredResponses(node) {
  */
 export function Suggest(node, text, caret) {
     return $Call.ByID(170145176, node, text, caret).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType14($result);
+        return $$createType16($result);
     }));
 }
 
@@ -753,7 +936,7 @@ export function SuggestSavePath(node) {
  */
 export function URLSpans(node, text) {
     return $Call.ByID(3722086932, node, text).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType16($result);
+        return $$createType18($result);
     }));
 }
 
@@ -764,26 +947,28 @@ export function URLSpans(node, text) {
  */
 export function UsedBy(node) {
     return $Call.ByID(1396383790, node).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType17($result);
+        return $$createType19($result);
     }));
 }
 
 // Private type creation functions
 const $$createType0 = $models.CookiesView.createFrom;
-const $$createType1 = $models.SuggestionView.createFrom;
-const $$createType2 = $Create.Array($$createType1);
-const $$createType3 = $models.GeneratedView.createFrom;
-const $$createType4 = $models.MissingView.createFrom;
-const $$createType5 = $models.RequestView.createFrom;
-const $$createType6 = $models.OverlayPreviewView.createFrom;
-const $$createType7 = $models.SchemaView.createFrom;
-const $$createType8 = $Create.Array($$createType7);
-const $$createType9 = $Create.Array($Create.Any);
-const $$createType10 = $models.RequestSettingsView.createFrom;
-const $$createType11 = $models.SpecOriginView.createFrom;
-const $$createType12 = $models.StoredView.createFrom;
-const $$createType13 = $Create.Array($$createType12);
-const $$createType14 = $models.SuggestView.createFrom;
-const $$createType15 = $models.SpanView.createFrom;
-const $$createType16 = $Create.Array($$createType15);
-const $$createType17 = $models.UsedByView.createFrom;
+const $$createType1 = $models.SpecExportView.createFrom;
+const $$createType2 = $models.SuggestionView.createFrom;
+const $$createType3 = $Create.Array($$createType2);
+const $$createType4 = $models.FlowiOverlayDiffView.createFrom;
+const $$createType5 = $models.GeneratedView.createFrom;
+const $$createType6 = $models.MissingView.createFrom;
+const $$createType7 = $models.RequestView.createFrom;
+const $$createType8 = $models.OverlayPreviewView.createFrom;
+const $$createType9 = $models.SchemaView.createFrom;
+const $$createType10 = $Create.Array($$createType9);
+const $$createType11 = $Create.Array($Create.Any);
+const $$createType12 = $models.RequestSettingsView.createFrom;
+const $$createType13 = $models.SpecOriginView.createFrom;
+const $$createType14 = $models.StoredView.createFrom;
+const $$createType15 = $Create.Array($$createType14);
+const $$createType16 = $models.SuggestView.createFrom;
+const $$createType17 = $models.SpanView.createFrom;
+const $$createType18 = $Create.Array($$createType17);
+const $$createType19 = $models.UsedByView.createFrom;

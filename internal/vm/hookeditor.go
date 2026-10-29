@@ -21,7 +21,12 @@ type HookPhase string
 const (
 	PhasePre  HookPhase = "pre"
 	PhasePost HookPhase = "post"
+	// PhaseMessage is the hooks that run for each message a message request keeps.
+	PhaseMessage HookPhase = "message"
 )
+
+// HookPhases lists the phases in the order the editor shows them.
+func HookPhases() []HookPhase { return []HookPhase{PhasePre, PhasePost, PhaseMessage} }
 
 // HookEditor edits the hooks a request declares itself: the nodes of its
 // inline hook steps, one flow document per phase, so the node commands, undo
@@ -56,7 +61,7 @@ func (hookBackend) FlowLayout(flowi.FlowTarget) (model.Layout, diag.List, error)
 func NewHookEditor(b Backend, w *Worker, req *Request) *HookEditor {
 	e := &HookEditor{req: req, docs: map[HookPhase]*FlowDoc{}, kept: map[HookPhase][]keptStep{}, firstInline: map[HookPhase]int{}}
 	hooks := req.Hooks()
-	for phase, steps := range map[HookPhase][]model.HookStep{PhasePre: hooks.Pre, PhasePost: hooks.Post} {
+	for phase, steps := range map[HookPhase][]model.HookStep{PhasePre: hooks.Pre, PhasePost: hooks.Post, PhaseMessage: hooks.Message} {
 		e.docs[phase] = NewFlowDoc(hookBackend{b}, w, req.Collection(), e.split(phase, steps))
 	}
 	return e
@@ -79,7 +84,7 @@ func (e *HookEditor) split(phase HookPhase, steps []model.HookStep) model.Flow {
 		// nodes) is renamed.
 		nodes = append(nodes, freshNodes(s.Inline, taken)...)
 	}
-	title := map[HookPhase]string{PhasePre: "Pre-hooks", PhasePost: "Post-hooks"}[phase]
+	title := map[HookPhase]string{PhasePre: "Pre-hooks", PhasePost: "Post-hooks", PhaseMessage: "Message hooks"}[phase]
 	return model.Flow{Meta: model.Meta{ID: model.ID("hooks-" + string(phase)), Name: title}, Nodes: nodes}
 }
 
@@ -87,7 +92,14 @@ func (e *HookEditor) split(phase HookPhase, steps []model.HookStep) model.Flow {
 func (e *HookEditor) Doc(p HookPhase) *FlowDoc { return e.docs[p] }
 
 // Dirty reports whether any phase has unsaved edits.
-func (e *HookEditor) Dirty() bool { return e.docs[PhasePre].Dirty() || e.docs[PhasePost].Dirty() }
+func (e *HookEditor) Dirty() bool {
+	for _, p := range HookPhases() {
+		if e.docs[p].Dirty() {
+			return true
+		}
+	}
+	return false
+}
 
 // Others counts the hook steps of a phase that run but are not edited here:
 // flow steps of the request and every step of the other levels.
@@ -95,11 +107,21 @@ func (e *HookEditor) Others(p HookPhase) int {
 	chain := engine.ChainFor(e.req.Collection(), e.req.Draft(), e.req.Current())
 	all := len(chain.Pre)
 	own := len(e.req.Hooks().Pre)
-	if p == PhasePost {
+	switch p {
+	case PhasePost:
 		all, own = len(chain.Post), len(e.req.Hooks().Post)
+	case PhaseMessage:
+		all, own = len(chain.Message), len(e.req.Hooks().Message)
 	}
 	inlineOwn := own - len(e.kept[p])
 	return all - inlineOwn
+}
+
+// ShowsMessages reports whether the message hooks section is worth showing: the
+// request receives messages, or already has message hooks (which must not be
+// hidden from the one who wrote them).
+func (e *HookEditor) ShowsMessages() bool {
+	return e.req.IsAsync() || e.req.IsGRPC() || len(e.docs[PhaseMessage].Draft().Nodes) > 0 || e.Others(PhaseMessage) > 0
 }
 
 // MoveNode moves a node to index of a phase's list, which may be the other
@@ -190,12 +212,21 @@ func (e *HookEditor) Save(dropComments bool, done func(error)) {
 		done(errors.New("this request changed on disk since the editor opened: exit, then edit it again"))
 		return
 	}
-	preDraft, preRev := e.docs[PhasePre].Snapshot()
-	postDraft, postRev := e.docs[PhasePost].Snapshot()
-	e.req.SaveHooks(model.Hooks{Pre: e.stepsOf(PhasePre, preDraft), Post: e.stepsOf(PhasePost, postDraft)}, dropComments, func(err error) {
+	type snapshot struct {
+		draft model.Flow
+		rev   int
+	}
+	snaps := map[HookPhase]snapshot{}
+	for _, p := range HookPhases() {
+		d, rev := e.docs[p].Snapshot()
+		snaps[p] = snapshot{d, rev}
+	}
+	hooks := model.Hooks{Pre: e.stepsOf(PhasePre, snaps[PhasePre].draft), Post: e.stepsOf(PhasePost, snaps[PhasePost].draft), Message: e.stepsOf(PhaseMessage, snaps[PhaseMessage].draft)}
+	e.req.SaveHooks(hooks, dropComments, func(err error) {
 		if err == nil {
-			e.docs[PhasePre].MarkSavedAt(preDraft, preRev)
-			e.docs[PhasePost].MarkSavedAt(postDraft, postRev)
+			for p, s := range snaps {
+				e.docs[p].MarkSavedAt(s.draft, s.rev)
+			}
 		}
 		done(err)
 	})

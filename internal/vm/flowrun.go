@@ -42,9 +42,16 @@ type FlowRun struct {
 	details  map[string]*NodeDetail
 	hooks    map[string]map[string]string // request node → "phase:level:index" → how that hook went
 	result   engine.RunResult
+	vars     map[string]any // the flow's variables when the last run ended (masked)
 	err      string
+	skip     []string // steps this open flow skips; not saved in the file
+	hold     bool     // skipped steps keep what the last run gave them
+	breaks   []string // steps to pause before when debugging; not saved in the file
+	dbg      *debugSession
+	paused   string // the step a debug session waits before
 	onStatus []func(node, status string)
 	onChange []func()
+	onPrompt []func(engine.AuthPrompted)
 }
 
 // NewFlowRun returns the run view-model of doc.
@@ -76,6 +83,9 @@ func (r *FlowRun) Err() string { return r.err }
 // Result is the last finished run's result.
 func (r *FlowRun) Result() engine.RunResult { return r.result }
 
+// Vars are the flow's variables as the last run ended, masked; nil before a run.
+func (r *FlowRun) Vars() map[string]any { return r.vars }
+
 // ClearResults forgets what the last run did at every node.
 func (r *FlowRun) ClearResults() {
 	for node := range r.details {
@@ -83,6 +93,7 @@ func (r *FlowRun) ClearResults() {
 	}
 	clear(r.details)
 	clear(r.hooks)
+	r.vars = nil
 	r.changed()
 }
 
@@ -133,8 +144,12 @@ func (r *FlowRun) start(env string, inputs map[string]string, only []string) {
 		return
 	}
 	opts := flowi.RunOptions{Env: env, Inputs: inputs, Only: only}
+	if r.dbg != nil {
+		opts.Seed = r.dbg.seed
+	}
+	r.applySkips(&opts) // before the results are cleared: a hold reads the last run's
 	if only != nil {
-		opts.Prior = r.priorOutputs(only)
+		opts.Prior, opts.PriorVars = r.priorOutputsWith(opts.Prior, only), r.vars
 		r.clearNodes(only)
 	} else {
 		r.ClearResults()
@@ -149,9 +164,13 @@ func (r *FlowRun) start(env string, inputs map[string]string, only []string) {
 	})
 }
 
-// priorOutputs are the last run's outputs of the top-level steps not in only.
-func (r *FlowRun) priorOutputs(only []string) map[string]map[string]any {
-	prior := map[string]map[string]any{}
+// priorOutputsWith adds to held (the skipped steps' last values, nil for none)
+// the last run's outputs of the top-level steps not in only.
+func (r *FlowRun) priorOutputsWith(held map[string]map[string]any, only []string) map[string]map[string]any {
+	prior := held
+	if prior == nil {
+		prior = map[string]map[string]any{}
+	}
 	for _, n := range r.doc.Draft().Nodes {
 		d, ran := r.details[n.ID]
 		if ran && d.Outputs != nil && !slices.Contains(only, n.ID) {
@@ -226,11 +245,12 @@ func (r *FlowRun) finish(o runOutcome) {
 	if o.err != nil {
 		r.err = ErrorText(o.err)
 	} else {
-		r.result = o.result
+		r.result, r.vars = o.result, o.result.Report.Vars
 		if len(o.result.Diags) > 0 {
 			r.err = ErrorText(o.result.Diags.Err())
 		}
 	}
+	r.debugAfter(o)
 	r.changed()
 }
 
@@ -238,6 +258,9 @@ func (r *FlowRun) finish(o runOutcome) {
 func statusRank(s string) int {
 	return slices.Index([]string{"", "skipped", "passed", "running", "cancelled", "failed", "error", "aborted"}, s)
 }
+
+// OnPrompt registers f to run when a step waits for the person to sign in.
+func (r *FlowRun) OnPrompt(f func(engine.AuthPrompted)) { r.onPrompt = append(r.onPrompt, f) }
 
 func (r *FlowRun) apply(events []engine.Event) {
 	hooked := false
@@ -252,6 +275,10 @@ func (r *FlowRun) apply(events []engine.Event) {
 			d := r.detail(ev.Node)
 			if d.Status == "" || d.Status == "passed" || d.Status == "skipped" {
 				r.setStatus(ev.Node, "running")
+			}
+		case engine.AuthPrompted:
+			for _, f := range r.onPrompt {
+				f(ev)
 			}
 		case engine.HookFinished:
 			hooked = true
@@ -346,6 +373,8 @@ func (o ownership) concerns(e engine.Event) bool {
 		node, path, depth = ev.Node, ev.Path, ev.Depth
 	case engine.HookFinished:
 		node, path, depth = nodeOfPath(ev.Path), ev.Path, ev.Depth // path is the request node's own
+	case engine.AuthPrompted:
+		return true // a person is waited for wherever in the flow (a hook flow's request too)
 	default:
 		return false
 	}

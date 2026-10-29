@@ -9,7 +9,7 @@
   import { moved } from './lib/reorder'
   import { moveRequests, movingWith } from './lib/move'
 
-  let { node, depth, parent }: { node: TreeNode; depth: number; parent?: TreeNode } = $props()
+  let { node, depth, parent, tint = '' }: { node: TreeNode; depth: number; parent?: TreeNode; tint?: string } = $props()
   let open = $state(true)
   const branch = $derived(!['request', 'environment', 'flow', 'missing'].includes(node.kind))
   const active = $derived(app.active === node.id)
@@ -117,7 +117,7 @@
     class:dropBefore={app.treeDrop?.id === node.id && !app.treeDrop.into && !app.treeDrop.after}
     class:dropAfter={app.treeDrop?.id === node.id && !app.treeDrop.into && app.treeDrop.after}
     class:dropInto={app.treeDrop?.id === node.id && app.treeDrop.into}
-    data-tree-row={node.id} data-markable={markable ? '' : undefined} data-drop={container ? '' : undefined} style:padding-left={`${8 + depth * 14}px`}
+    data-tree-row={node.id} style:--tint={tint || undefined} data-markable={markable ? '' : undefined} data-drop={container ? '' : undefined} style:padding-left={`${8 + depth * 14}px`}
     onclick={click} oncontextmenu={contextmenu} onpointerdown={down} onpointermove={move} onpointerup={up} onpointercancel={up}>
     <span class="twist" class:open aria-hidden="true">{#if branch}<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6" /></svg>{/if}</span>
     {#if node.kind === 'request' && node.method}<span class="method"><Verb verb={node.method} short /></span>{:else if node.kind === 'flow'}<span class="method"><Verb verb="FLOW" /></span>{/if}
@@ -131,6 +131,8 @@
 </div>
 
 <style>
+  /* A collection row tinted by the custom palette's rainbow (the colour is the palette's; the text stays the theme's). */
+  .row[style*="--tint"] { background: color-mix(in srgb, var(--tint) 22%, transparent); }
   .row {
     display: flex;
     align-items: center;

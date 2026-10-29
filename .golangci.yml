@@ -26,7 +26,7 @@ linters:
       # Tests may use fixed file modes and paths built from test data.
       - path: _test\.go
         linters: [gosec]
-      # Flow-I exists to read files the user points it at (collections,
+      # Flowi exists to read files the user points it at (collections,
       # workspace, settings), so variable file paths are expected.
       - linters: [gosec]
         text: G304

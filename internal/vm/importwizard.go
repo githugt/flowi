@@ -55,6 +55,7 @@ func SourceModeOf(kind flowi.ImportKind) SourceMode {
 // ImportKinds are the kinds the wizard offers, in menu order.
 func ImportKinds() []flowi.ImportKind {
 	return []flowi.ImportKind{flowi.ImportOpenAPI, flowi.ImportAsyncAPI, flowi.ImportProto, flowi.ImportArazzo, flowi.ImportPostman, flowi.ImportBruno,
+		flowi.ImportInsomnia, flowi.ImportThunderClient, flowi.ImportHoppscotch, flowi.ImportOpenRPC,
 		flowi.ImportHAR, flowi.ImportHTTP, flowi.ImportCurl, flowi.ImportMermaid}
 }
 
@@ -163,11 +164,11 @@ func (iw *ImportWizard) SetFile(path string) { iw.choose(func() { iw.file = path
 
 // SupportsOverlay reports whether a kind can take OpenAPI Overlay documents.
 func SupportsOverlay(kind flowi.ImportKind) bool {
-	return kind == flowi.ImportOpenAPI || kind == flowi.ImportAsyncAPI
+	return kind == flowi.ImportOpenAPI || kind == flowi.ImportAsyncAPI || kind == flowi.ImportArazzo
 }
 
 // SetOverlay sets the overlay files (or URLs), separated by ";", applied in order
-// to an OpenAPI or AsyncAPI document before it is imported; it discards the
+// to an OpenAPI, AsyncAPI or Arazzo document before it is imported; it discards the
 // preview.
 func (iw *ImportWizard) SetOverlay(refs string) { iw.choose(func() { iw.overlay = refs }) }
 
@@ -268,6 +269,7 @@ func readSource(kind flowi.ImportKind, file, paste string) (flowi.ImportSource, 
 			return src, fmt.Errorf("reading %s: %w", file, err)
 		}
 		src.Data = data
+		src.RefDir = filepath.Dir(file) // a local file may refer to files beside it
 	}
 	return src, nil
 }

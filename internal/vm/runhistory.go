@@ -49,6 +49,37 @@ func (h *RunHistory) CompareWithLatest(i int) []DiffRow {
 	return CompareRuns(h.runs[i], h.runs[0])
 }
 
+// Between compares run from with run to (indexes into Runs): the statuses and
+// times of their top-level nodes. nil for an index out of range.
+func (h *RunHistory) Between(from, to int) []DiffRow {
+	if from < 0 || to < 0 || from >= len(h.runs) || to >= len(h.runs) {
+		return nil
+	}
+	return CompareRuns(h.runs[from], h.runs[to])
+}
+
+// CompareInDepth reads both runs and compares what each node output and the
+// variables the flow ended with, off the UI goroutine.
+func (h *RunHistory) CompareInDepth(from, to int, done func(RunComparison, error)) {
+	if from < 0 || to < 0 || from >= len(h.runs) || to >= len(h.runs) {
+		done(RunComparison{}, nil)
+		return
+	}
+	a, b, t := h.runs[from].ID, h.runs[to].ID, h.target
+	type result struct {
+		c   RunComparison
+		err error
+	}
+	Run(h.w, func() result {
+		before, err := h.b.FlowRunDetail(t, a)
+		if err != nil {
+			return result{err: err}
+		}
+		after, err := h.b.FlowRunDetail(t, b)
+		return result{CompareDetails(before, after), err}
+	}, func(r result) { done(r.c, r.err) })
+}
+
 // RunLabel is one line for a run in the list: "passed · 14:03 · 3.2s · local".
 func RunLabel(s flowi.RunSummary) string {
 	label := s.Status

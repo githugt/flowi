@@ -6,6 +6,8 @@ package backend
 
 import (
 	"context"
+	"fmt"
+	"os"
 	"time"
 
 	flowi "github.com/githugt/flowi-lib"
@@ -13,6 +15,7 @@ import (
 	"github.com/githugt/flowi-lib/announce"
 	"github.com/githugt/flowi-lib/diag"
 	"github.com/githugt/flowi-lib/engine"
+	"github.com/githugt/flowi-lib/flowioverlay"
 	"github.com/githugt/flowi-lib/grpcx"
 	"github.com/githugt/flowi-lib/model"
 	"github.com/githugt/flowi-lib/schemainfer"
@@ -84,9 +87,9 @@ func (b *Workspace) SaveRequest(t flowi.RequestTarget, r model.Request, dropComm
 	return b.ws.SaveRequest(t, r, flowi.SaveOptions{DropComments: dropComments})
 }
 
-func (b *Workspace) StoreEdit(t flowi.RequestTarget, base string, v model.RequestVersion) error {
+func (b *Workspace) StoreEdit(t flowi.RequestTarget, base, overlay string, v model.RequestVersion) error {
 	b.guard.Check("StoreEdit")
-	return b.ws.StoreEdit(t, base, v, flowi.SaveOptions{}) // autosave never drops comments
+	return b.ws.StoreEditUnder(t, base, overlay, v, flowi.SaveOptions{}) // autosave never drops comments
 }
 
 func (b *Workspace) DiscardEdit(t flowi.RequestTarget) error {
@@ -197,6 +200,54 @@ func (b *Workspace) PinExample(rec engine.Record, name string) (string, error) {
 	return b.ws.PinExample(rec, name)
 }
 
+// Overlays lists the flowi overlays of a collection.
+func (b *Workspace) Overlays(collection model.ID) ([]model.Overlay, error) {
+	b.guard.Check("Overlays")
+	return b.ws.Overlays(collection)
+}
+
+// ApplyOverlay lays a flowi overlay over a version, as a send would.
+func (b *Workspace) ApplyOverlay(t flowi.RequestTarget, name string, v model.RequestVersion) (model.RequestVersion, []flowioverlay.Problem, error) {
+	b.guard.Check("ApplyOverlay")
+	return b.ws.ApplyOverlay(t, name, v)
+}
+
+// DiffForOverlay works out what saving an edit as an overlay would store.
+func (b *Workspace) DiffForOverlay(t flowi.RequestTarget, base string, edited model.RequestVersion) (flowi.OverlayDiff, error) {
+	b.guard.Check("DiffForOverlay")
+	return b.ws.DiffForOverlay(t, base, edited)
+}
+
+// SaveAsOverlay stores an edit as a flowi overlay.
+func (b *Workspace) SaveAsOverlay(t flowi.RequestTarget, in flowi.SaveOverlayInput, dropComments bool) error {
+	b.guard.Check("SaveAsOverlay")
+	return b.ws.SaveAsOverlay(t, in, flowi.SaveOptions{DropComments: dropComments})
+}
+
+// DeleteOverlay removes a flowi overlay's file.
+func (b *Workspace) DeleteOverlay(collection model.ID, name string) error {
+	b.guard.Check("DeleteOverlay")
+	return b.ws.DeleteOverlay(collection, name)
+}
+
+// OverlayText reads a flowi overlay's file.
+func (b *Workspace) OverlayText(collection model.ID, name string) (string, error) {
+	b.guard.Check("OverlayText")
+	return b.ws.OverlayText(collection, name)
+}
+
+// ExportOverlayAsSpec writes a flowi overlay as OpenAPI Overlays for the specs the collection keeps.
+func (b *Workspace) ExportOverlayAsSpec(collection model.ID, name string) (flowi.OverlayExport, error) {
+	b.guard.Check("ExportOverlayAsSpec")
+	return b.ws.ExportOverlayAsSpec(collection, name)
+}
+
+// WriteOverlayText saves text as the flowi overlay name.
+func (b *Workspace) WriteOverlayText(collection model.ID, name, text string) error {
+	b.guard.Check("WriteOverlayText")
+	return b.ws.WriteOverlayText(collection, name, text)
+}
+
 func (b *Workspace) ClearCookies(collection string) error {
 	b.guard.Check("ClearCookies")
 	return b.ws.ClearCookies(collection)
@@ -257,6 +308,11 @@ func (b *Workspace) FlowSource(t flowi.FlowTarget, f model.Flow) (flowi.FlowText
 	return b.ws.FlowSource(t, f)
 }
 
+func (b *Workspace) CheckFlowDraft(t flowi.FlowTarget, f model.Flow) diag.List {
+	b.guard.Check("CheckFlowDraft")
+	return b.ws.CheckFlowDraft(t, f)
+}
+
 func (b *Workspace) ParseFlowSource(t flowi.FlowTarget, text string) (model.Flow, diag.List, error) {
 	b.guard.Check("ParseFlowSource")
 	return b.ws.ParseFlowSource(t, text)
@@ -295,6 +351,59 @@ func (b *Workspace) UnsetSecret(env, name string) error {
 func (b *Workspace) Mount(dir string) (model.Manifest, error) {
 	b.guard.Check("Mount")
 	return b.ws.Mount(dir)
+}
+
+// OpenArazzo opens an Arazzo document as a collection of flows that lasts until the app quits.
+func (b *Workspace) OpenArazzo(ctx context.Context, ref string) error {
+	b.guard.Check("OpenArazzo")
+	_, err := b.ws.KeepArazzo(ctx, ref)
+	return err
+}
+
+func (b *Workspace) Coverage(collection model.ID) (analysis.Coverage, error) {
+	b.guard.Check("Coverage")
+	cov, _, err := b.ws.Coverage(collection)
+	return cov, err
+}
+
+func (b *Workspace) ImpactAgainst(collection model.ID, name string, spec []byte) (flowi.SpecImpact, error) {
+	b.guard.Check("ImpactAgainst")
+	res, _, err := b.ws.ImpactAgainst(collection, name, spec)
+	return res, err
+}
+
+func (b *Workspace) SpecNames(collection model.ID) []string {
+	b.guard.Check("SpecNames")
+	specs, err := b.ws.KeptSpecs(collection)
+	if err != nil {
+		return nil
+	}
+	out := make([]string, len(specs))
+	for i, s := range specs {
+		out[i] = s.Name
+	}
+	return out
+}
+
+func (b *Workspace) CheckAccess(ctx context.Context, t flowi.FlowTarget, o flowi.AccessOptions) (flowi.AccessReport, error) {
+	b.guard.Check("CheckAccess")
+	return b.ws.CheckAccess(ctx, t, o)
+}
+
+func (b *Workspace) CheckDrift(ctx context.Context, t flowi.FlowTarget, o flowi.DriftOptions) (flowi.DriftReport, error) {
+	b.guard.Check("CheckDrift")
+	return b.ws.CheckDrift(ctx, t, o)
+}
+
+// OpenBundle reads the run bundle at path and keeps it open as a collection of replays.
+func (b *Workspace) OpenBundle(path string) error {
+	b.guard.Check("OpenBundle")
+	data, err := os.ReadFile(path) //nolint:gosec // the person chose the file in the window
+	if err != nil {
+		return fmt.Errorf("reading %s: %w", path, err)
+	}
+	_, err = b.ws.KeepBundle(data)
+	return err
 }
 
 func (b *Workspace) Unmount(id model.ID) error {
@@ -360,6 +469,11 @@ func (b *Workspace) SaveFlow(t flowi.FlowTarget, f model.Flow, dropComments bool
 func (b *Workspace) NewEnvironment(name string) (string, error) {
 	b.guard.Check("NewEnvironment")
 	return b.ws.NewEnvironment(name)
+}
+
+func (b *Workspace) FlowRunDetail(t flowi.FlowTarget, id string) (flowi.RunDetail, error) {
+	b.guard.Check("FlowRunDetail")
+	return b.ws.FlowRunDetail(t, id)
 }
 
 func (b *Workspace) FlowRuns(t flowi.FlowTarget, limit int) []flowi.RunSummary {

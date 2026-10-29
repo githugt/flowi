@@ -107,9 +107,18 @@ func (r *Request) PickMethod(m grpcx.Method) {
 	r.EditGRPC(func(g *model.GRPC) {
 		g.Method = m.Full()
 		if !bodyHasContent(g.Body) && m.Example != "" {
-			g.Body = model.Body{JSON: m.Example}
+			g.Body = model.Body{JSON: exampleBody(m)}
 		}
 	})
+}
+
+// exampleBody is the starting message of a method. A method that streams from
+// the client takes an array, one element for each message to send.
+func exampleBody(m grpcx.Method) string {
+	if m.ClientStream {
+		return "[" + m.Example + "]"
+	}
+	return m.Example
 }
 
 // GenerateRequests creates a gRPC request for each method loaded for req, in

@@ -33,7 +33,7 @@
     })
   })
   function addRows(vars: MissingVar[]) {
-    for (const v of vars) rows.push({ name: v.name, value: '', secret: v.secret, secretSet: false, override: false })
+    for (const v of vars) rows.push({ name: v.name, value: '', secret: v.secret, secretSet: false, override: false, kind: '' })
     push()
   }
 
@@ -52,6 +52,13 @@
     <strong>{view.name}</strong>
     {#if view.dirty}<span class="dirty">unsaved</span>{/if}
     <span class="spacer"></span>
+    <label class="base" title="Variables of the base apply unless this environment sets the same name. Secrets are not inherited.">
+      <span>Builds on</span>
+      <select value={view.extends} onchange={(e) => EnvironmentService.SetExtends(node, e.currentTarget.value)}>
+        <option value="">nothing</option>
+        {#each view.bases as b}<option value={b}>{b}</option>{/each}
+      </select>
+    </label>
     <div class="swatches" role="radiogroup" aria-label="Colour">
       <button class="sw none" class:on={!view.colour} role="radio" aria-checked={!view.colour} title="Default colour" aria-label="Default colour" onclick={() => EnvironmentService.SetColour(node, '')}></button>
       {#each view.colours as c}
@@ -77,7 +84,7 @@
       </div>
     {/if}
     <p class="muted">Secrets (🔒) are kept in the encrypted workspace vault, never in the file, and are not shown again once saved. To change one, type a new value; leave the box blank to keep the saved one.<Hint>To see a stored secret again, open <b>Workspace → Secrets…</b> and choose <b>Show</b> on that secret, or run <code>flowi secret get &lt;env&gt; &lt;name&gt; --reveal</code> in a terminal. It shows one secret for a few seconds.</Hint></p>
-    <div class="head"><span>Name</span><span>Value</span><span>Secret</span><span></span></div>
+    <div class="head"><span>Name</span><span>Value</span><span>Type</span><span>Secret</span><span></span></div>
     {#each rows as r, i}
       <div class="row">
         <input placeholder="name" bind:value={r.name} oninput={push} spellcheck="false" />
@@ -91,18 +98,26 @@
           />
           <HiddenChars value={r.value} onclean={(t) => { r.value = t; push() }} />
         </span>
+        <select class="kind" aria-label="Type of {r.name || 'variable'}" bind:value={r.kind} onchange={push} disabled={r.secret} title="A number, true/false or an object keeps its type when used on its own, so a JSON body gets 5 and not &quot;5&quot;.">
+          <option value="">text</option>
+          <option value="number">number</option>
+          <option value="boolean">true/false</option>
+          <option value="json">object</option>
+        </select>
         <label class="secret" title={r.override ? 'Overridden by an environment variable' : ''}>
           <input type="checkbox" bind:checked={r.secret} onchange={push} />{r.override ? 'override' : ''}
         </label>
         <button class="x" aria-label="Remove variable" onclick={() => { rows.splice(i, 1); push() }}>×</button>
       </div>
     {/each}
-    <button class="add" onclick={() => rows.push({ name: '', value: '', secret: false, secretSet: false, override: false })}>+ Add variable</button>
+    <button class="add" onclick={() => rows.push({ name: '', value: '', secret: false, secretSet: false, override: false, kind: '' })}>+ Add variable</button>
   </div>
 </div>
 
 <style>
   .env { position: absolute; inset: 0; display: flex; flex-direction: column; }
+  .base { display: flex; align-items: center; gap: 6px; margin-right: 12px; font-size: 12px; color: var(--muted); }
+  .base select { height: 28px; }
   .swatches { display: flex; align-items: center; gap: 6px; margin-right: 8px; }
   .sw { width: 16px; height: 16px; padding: 0; border-radius: 50%; border: 2px solid transparent; box-sizing: border-box; background: var(--bg); }
   .sw.none { border: 1px dashed var(--muted); }
@@ -113,7 +128,7 @@
   .body { padding: 12px 16px; overflow: auto; display: flex; flex-direction: column; gap: 6px; max-width: 900px; }
   .muted { color: var(--muted); font-size: var(--fs-sm); margin: 0 0 6px; }
   .err { margin: 0; padding: 6px 12px; color: var(--fail); }
-  .head, .row { display: grid; grid-template-columns: 1fr 1.6fr 70px 24px; gap: 6px; align-items: center; }
+  .head, .row { display: grid; grid-template-columns: 1fr 1.6fr 96px 70px 24px; gap: 6px; align-items: center; }
   .head { color: var(--muted); font-size: var(--fs-xs); }
   input[type='text'], input[type='password'], input:not([type]) {
     min-width: 0; background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); padding: 5px 8px;
@@ -122,6 +137,7 @@
   input:focus { border-color: var(--accent); }
   .cell { position: relative; display: flex; min-width: 0; }
   .cell input { flex: 1; min-width: 0; }
+  .kind { height: 28px; min-width: 0; }
   .secret { display: flex; align-items: center; gap: 4px; font-size: var(--fs-xs); color: var(--muted); }
   button { background: transparent; color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); padding: 3px 12px; font: inherit; }
   button:disabled { opacity: 0.4; }

@@ -80,7 +80,13 @@ func (s *RequestService) Suggest(node, text string, caret int) SuggestView {
 				own = append(own, kv.Key)
 			}
 		}
-		c := vm.Suggest(text, byteOffsetOf(text, caret), vm.RequestSource(vars, secrets, own), s.suggestMax())
+		var shared []string
+		if coll, ok := s.app.workspace.Collection(o.req.Target().Collection); ok {
+			for _, kv := range coll.Manifest.Variables {
+				shared = append(shared, kv.Key)
+			}
+		}
+		c := vm.Suggest(text, byteOffsetOf(text, caret), vm.RequestSource(vars, secrets, own, shared), s.suggestMax())
 		v.From, v.To = utf16Index(text, c.From), utf16Index(text, c.To)
 		for _, it := range c.Items {
 			v.Items = append(v.Items, SuggestionView{Insert: it.Insert, Detail: it.Detail})

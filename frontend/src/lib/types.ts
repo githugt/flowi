@@ -25,7 +25,7 @@ export interface Tree {
 
 export interface Unit {
   id: string
-  kind: 'request' | 'strip' | 'action' | 'container'
+  kind: 'request' | 'strip' | 'action' | 'container' | 'card'
   nodes: string[]
   types: string[]
   path: string
@@ -40,6 +40,9 @@ export interface Unit {
   cells?: { x: number; y: number; w: number; h: number }[] // …and where each of nodes is drawn, relative to the block
   above?: number // …and how far down its request sits (the stack above it)
   headW?: number // a container drawn as a card with its lanes to the right
+  headH?: number // …and that card's own height (h covers its lanes too)
+  card?: boolean // drawn as a card: see Card.face and ports
+  ports?: string[] // a card's control ports, top to bottom
 }
 
 export interface Edge {
@@ -49,6 +52,7 @@ export interface Edge {
   needs?: boolean
   into?: boolean
   fail?: boolean
+  fromPort?: string // the card port it leaves from: done, fail, case-<n>, else
 }
 
 export interface Lane {
@@ -61,6 +65,7 @@ export interface Lane {
   h: number
   portY: number
   label: string
+  port?: string // the card port that feeds the lane (case-<n> or else)
 }
 
 export interface Diagram {
@@ -77,10 +82,51 @@ export interface HookTick {
   state: string
 }
 
+/** One summary row of a card: an icon and a short phrase; it opens its editor in place. */
+export interface FaceRow {
+  key: string
+  icon: string
+  summary: string
+  editor: string
+}
+
+/** A control port: where the flow goes on. tone is done, fail, case or else. */
+export interface FacePort {
+  id: string
+  label: string
+  tone: string
+}
+
+/** What a step's card shows (see internal/card). */
+export interface Face {
+  badge: string
+  subline: string
+  rows: FaceRow[]
+  more: FaceRow[]
+  ports: FacePort[]
+}
+
 export interface Card {
   title: string
   subtitle: string
   hooks?: HookTick[] // a request step: the hooks that run around it
+  face?: Face
+  color?: string // the colour the person gave the step
+  skipped?: boolean // this run leaves the step out
+  skipNote?: string // on a step that reads from a skipped one: why it has no value
+  break?: boolean // a debug session pauses before this step
+}
+
+/** What a value wire can say (see FlowService.WireChoices). */
+export interface WireField {
+  id: string
+  label: string
+  needsName?: boolean
+}
+export interface WireChoices {
+  reason?: string
+  outputs: string[]
+  fields: WireField[]
 }
 
 export interface Pair {
@@ -110,6 +156,13 @@ export interface Call {
   ref: string
   choices: Choice[]
   version?: string
+  /** The flowi overlay laid over the request's version, and the collection's to choose from. */
+  overlay?: string
+  overlays?: string[]
+  /** The connection this step opens and keeps, the one it runs over, and whether it closes that one. */
+  open?: string
+  over?: string
+  close?: boolean
   with: Pair[]
   headers?: Pair[]
   hooks?: string
@@ -126,12 +179,27 @@ export interface Use {
   from: string
   to: string
   name: string
+  /** What the value is: from the last run, else what that output always is; empty when neither says. */
+  type?: string
 }
 
 export interface DataEdge {
   from: string
   to: string
   label: string
+}
+
+/** One value of a set step: where it comes from (expr, literal, response, generate) and what that source needs. */
+export interface ValueRow {
+  name: string
+  from: string
+  value: string
+  in: string
+  path: string
+  header: string
+  cookie: string
+  regex: string
+  seed: string
 }
 
 export interface StepForm {
@@ -146,6 +214,7 @@ export interface StepForm {
   needChoices: string[]
   uses: Use[]
   usedBy: Use[]
+  values?: ValueRow[] // a set step: what it writes
   when: string
   timeout: string
   concurrent: boolean
@@ -174,6 +243,44 @@ export interface FlowForm {
   maxConcurrency: string
   rateLimit: string
   onBranchError: string
+}
+
+/** One thing the step popup offers; mode picks a sibling kind that does the same job another way. */
+export interface StepChoice {
+  group: string
+  name: string
+  description: string
+  type: string
+  mode?: string
+}
+
+/** One declared input or output: Value is an input's default and an output's template. */
+export interface IOItem {
+  name: string
+  type: string
+  value: string
+}
+
+/** A step that reads something a skipped step would have made. */
+export interface SkipProblem {
+  reader: string
+  skipped: string
+  text: string
+  required: boolean // false: the read has a default
+}
+
+/** What the open flow skips this time (kept with the open flow, not in the file). */
+export interface SkipView {
+  steps: string[]
+  hold: boolean // skipped steps keep what the last run gave them
+  problems: SkipProblem[]
+}
+
+/** The open flow's breakpoints and, while a debug session is paused, where (kept with the open flow, not in the file). */
+export interface DebugView {
+  breaks: string[]
+  paused: string
+  vars: { name: string; value: string }[]
 }
 
 export interface PaletteEntry {
@@ -207,6 +314,8 @@ export interface VarsView {
   set: string[]
   secrets: string[]
   unset: string[]
+  /** The variables as the last run ended (masked, one line each); empty before a run. */
+  values: { name: string; value: string }[]
 }
 
 export interface PartView {
@@ -234,12 +343,21 @@ export interface NodeData {
   output: PartView[]
   tests: TestView[]
   diags: string[]
+  kind: string // request, messages or step: which tabs the output dock offers
+  size?: string
+  messages: { direction: string; text: string; lang?: string }[]
 }
 
 export interface HistoryRow {
   label: string
   status: string
   id: string
+}
+
+/** Two saved runs compared in depth: the outputs of the steps that differ, line by line, and the variables that ended differently. */
+export interface RunComparison {
+  steps: Record<string, { kind: 'same' | 'add' | 'del'; text: string }[]>
+  vars: { name: string; before: string; after: string; hadBefore: boolean; hadAfter: boolean }[]
 }
 
 export interface DiffView {
@@ -264,10 +382,17 @@ export interface FlowView {
   needsDrop: boolean
   rev: number
   run: RunView
+  skips: SkipView
+  debug: DebugView
+  start: Face
+  end: Face | null
+  inputs: IOItem[]
+  outputs: IOItem[]
   vars: VarsView
   selected: string
   form: { step?: StepForm; flow: FlowForm }
   palette: PaletteEntry[]
+  steps: StepChoice[]
   node: string
   name: string
   dirty: boolean
@@ -314,6 +439,9 @@ export interface RequestVersion {
 export interface ResponseView {
   title: string
   at: string
+  /** How long the send took and how big the body was; "" when not known. */
+  took: string
+  size: string
   passed: boolean
   status: string
   code: string
@@ -325,8 +453,41 @@ export interface ResponseView {
   messages: { direction: string; at: string; body: string; key?: string }[]
 }
 
+/** A flowi overlay as the request screen lists it. */
+export interface FlowiOverlayInfo {
+  name: string
+  description: string
+  /** Changes every request using the overlay gets. */
+  shared: number
+  /** Changes only this request gets, on top. */
+  own: number
+  used: boolean
+}
+
+/** A flowi overlay written as OpenAPI Overlays, one per kept spec it changes. */
+export interface SpecExport {
+  documents: { spec: string; file: string; yaml: string; requests: string[] }[]
+  /** What the OpenAPI Overlays leave out, one sentence each. */
+  notCarried: string[]
+}
+
+/** What saving the working copy as a flowi overlay would store. */
+export interface FlowiOverlayDiff {
+  ops: { index: number; summary: string }[]
+  /** Parts of the edit an overlay cannot hold. */
+  unsupported: string[]
+  names: string[]
+  /** The overlay laid over the request now. */
+  open: string
+}
+
 export interface RequestView {
   needsDrop: boolean
+  flowiOverlay: string
+  flowiOverlays: FlowiOverlayInfo[]
+  flowiOverlayNotes: string[]
+  /** The header and query rows the chosen overlays set. */
+  flowiOverlayMarks: { section: 'header' | 'query'; key: string; overlay: string }[]
   node: string
   name: string
   path: string
@@ -345,8 +506,12 @@ export interface RequestView {
   hookChain: string[]
   bodyKind: 'none' | 'text' | 'form' | 'file'
   bodyFormat: 'json' | 'xml' | 'yaml' | 'raw'
+  /** The parts of a multipart form body: text, or a file by its path. */
+  parts: { name: string; file: boolean; value: string; contentType: string }[]
+  /** Set when the JSON body is a JSON-RPC 2.0 call: its method and id (empty for a notification). */
+  jsonrpc?: { method: string; id: string }
   multipart: boolean
-  auth: { kind: 'none' | 'bearer' | 'basic' | 'other'; value: string }
+  auth: { kind: string; value: string; fields: { name: string; value: string; secret: boolean; known: boolean }[]; schemes: { id: string; label: string }[] }
   sending: boolean
   sendError?: string
   response?: ResponseView
@@ -390,6 +555,8 @@ export interface EnvRow {
   secret: boolean
   secretSet: boolean
   override: boolean
+  /** How the value is read: "" text, number, boolean or json (an object or list). */
+  kind: '' | 'number' | 'boolean' | 'json'
 }
 
 export interface EnvView {
@@ -399,6 +566,10 @@ export interface EnvView {
   /** "" for the default. */
   colour: string
   colours: string[]
+  /** The environment this one builds on, or "". */
+  extends: string
+  /** The environments it may build on. */
+  bases: string[]
   dirty: boolean
   onDisk: boolean
   needsDrop: boolean
@@ -435,7 +606,15 @@ export interface SettingView {
 
 export interface SettingsView {
   groups: { name: string; fields: SettingView[] }[]
-  appearance: { theme: string; accent: string; font: string; fontSize: number }
+  appearance: {
+    theme: string
+    accent: string
+    font: string
+    fontSize: number
+    /** The palette of the custom theme, when its file reads; customProblem says why it does not. */
+    custom?: { base: 'dark' | 'light'; vars: Record<string, string>; rainbow: string[] }
+    customProblem?: string
+  }
 }
 
 export interface SecretsView {
@@ -494,7 +673,7 @@ export interface ReplayerView {
   addr: string
   error?: string
   notes: string[]
-  form: { addr: string; latency: string; sequence: boolean; cors: boolean; record: string; recordTo: string }
+  form: { addr: string; latency: string; sequence: boolean; cors: boolean; record: string; recordTo: string; recordHar: string; faultErrorPercent: string; faultStatus: string; faultDropPercent: string; faultJitter: string }
   targets: { id: string; label: string; path?: string }[]
   traffic: { seq: number; at: string; method: string; path: string; status: number; match: string; request: string; duration: string; remote: string }[]
 }
@@ -516,7 +695,7 @@ export interface BlueprintsView {
     kind: 'flow' | 'post-hooks' | 'pre-hooks'
     params: { name: string; description: string; type: string; default: string }[]
     nodes: number
-    /** Shipped with Flow-I: new requests start with it unless requests.seed_blueprint names others. */
+    /** Shipped with Flowi: new requests start with it unless requests.seed_blueprint names others. */
     builtIn?: boolean
   }[]
   collections: Choice[]
@@ -558,6 +737,8 @@ export interface GRPCBlock {
   Proto: string[] | null
   Import: string[] | null
   Receive: { Count: number; Timeout: number; Match: string } | null
+  /** Over gRPC-Web: an HTTP POST to a proxy at an http(s) address; needs .proto files. */
+  Web?: boolean
 }
 
 /** A method of a gRPC request's schema. */
@@ -584,8 +765,12 @@ export interface HooksView {
   request: string
   pre: string
   post: string
+  /** The message hooks run for each message a message request keeps; shown for requests that receive messages. */
+  message: string
   othersPre: number
   othersPost: number
+  othersMessage: number
+  showMessage: boolean
   dirty: boolean
   blueprints: Choice[]
 }
@@ -597,6 +782,7 @@ export interface DropOption {
   icon?: string // a name known to Icon
   tone?: string // a verb whose colour the label is drawn in
   dot?: boolean // the "configured" dot
+  count?: number // how many entries it holds: shown as a badge in place of the dot
   detail?: string
   separator?: boolean
   disabled?: boolean
@@ -613,6 +799,13 @@ export interface ExprHelpView {
 }
 
 /** Where the collection of a tab lives (the footer). */
+/** What the footer's Details tab shows for the tab in front. */
+export interface DetailsView {
+  kind: string // request, flow or ""
+  title: string
+  rows: { label: string; value: string }[]
+}
+
 export interface LocationView {
   name: string
   path: string
@@ -680,4 +873,92 @@ export interface SpecUpdate {
   changed: string[]
   removed: string[]
   notes: string[]
+}
+
+/** The flow and the flows it calls as one standalone Arazzo document. */
+export interface StandaloneView {
+  text: string
+  /** What had no Arazzo equivalent, one sentence each. */
+  notes: string[]
+  /** The flow has edits the document does not show: it is made from the saved flow. */
+  unsaved: boolean
+}
+
+// The checks: how much of the API descriptions the flows use, and what a changed description would break.
+export interface OperationView {
+  collection: string
+  request: string
+  version: string
+  used: string[]
+  statuses: { status: number; seen: boolean }[]
+  read: string[]
+  unread: string[]
+}
+
+export interface CoverageView {
+  operations: OperationView[]
+  operationsUsed: number
+  operationsTotal: number
+  statusesSeen: number
+  statusesTotal: number
+  fieldsRead: number
+  fieldsTotal: number
+}
+
+export interface BreakageView {
+  request: string
+  version: string
+  where: string
+  reason: string
+  reads: { expr: string; why: string }[]
+}
+
+export interface SpecChangeView {
+  spec: string
+  broken: boolean
+  breakages: BreakageView[]
+}
+
+// The tools of an open flow beyond Run.
+export interface ChecksChoices {
+  envs: string[]
+  overlays: string[]
+  inputs: string[]
+  steps: string[]
+}
+
+export interface MatrixDimView {
+  name: string
+  values: string[]
+}
+
+export interface MatrixView {
+  dims: MatrixDimView[]
+  cells: { labels: string[]; status: 'passed' | 'failed' | 'error' | 'cancelled'; why?: string }[]
+  passed: number
+}
+
+export interface AccessView {
+  owner: string
+  steps: { id: string; owner: number; attempts: { identity: string; status: number; verdict: 'denied' | 'allowed' | 'unclear' }[] }[]
+  exposed: boolean
+}
+
+export interface DriftView {
+  runStatus: string
+  failing: boolean
+  requests: {
+    request: string
+    version: string
+    status: number
+    noSchema: boolean
+    differences: { path: string; kind: 'new' | 'missing' | 'changed'; detail?: string; fails: boolean }[]
+  }[]
+}
+
+export interface SequenceView {
+  title: string
+  hosts: string[]
+  steps: { kind: 'call' | 'reply' | 'note'; host: number; text: string; failed: boolean }[]
+  mermaid: string
 }

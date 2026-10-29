@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 540 380" width="540" height="380">
+  <title>Flow-I disk image background</title>
+  <!-- Source of dmg-background.png: the dark-to-light wash the window always had, with the icon's two swells
+       along the bottom. Render at 540 x 380. -->
+  <defs>
+    <linearGradient id="wash" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#111827"/>
+      <stop offset="0.55" stop-color="#cfd3dc"/>
+      <stop offset="1" stop-color="#f7f8fc"/>
+    </linearGradient>
+  </defs>
+  <rect width="540" height="380" fill="url(#wash)"/>
+  <g transform="translate(0 232) scale(5.4 1.48)" opacity="0.9">
+    <path d="M0 68C30 52 55 82 100 40V100H0Z" fill="#e11d48" fill-opacity="0.35"/>
+    <path d="M0 84C30 70 58 96 100 62V100H0Z" fill="#9f1239" fill-opacity="0.45"/>
+  </g>
+</svg>

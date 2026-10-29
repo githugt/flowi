@@ -1,4 +1,4 @@
-# Flow-I
+# Flowi
 
 A desktop app for exploring APIs and stitching requests into **flows**: log in, take the token, verify, fill
 in a form, check the result, and run the whole journey with one click. Your work is plain YAML files in your own
@@ -8,13 +8,13 @@ git repository; secrets stay in an encrypted local vault.
 
 ![A flow with its run results and the inspector](docs/images/flow-editor.png)
 
-Flow-I is three repositories: this app, the [command-line tool](https://github.com/githugt/flowi-cli) that
+Flowi is three repositories: this app, the [command-line tool](https://github.com/githugt/flowi-cli) that
 runs the same collections in CI, and the [core library](https://github.com/githugt/flowi-lib) both are built on.
 
 ## Why
 
 Most API tools stop at the single request. Real work is a sequence, and the sequence is what breaks when an API
-changes. Flow-I keeps requests as reusable building blocks, draws the sequences, runs them, and tells you what a
+changes. Flowi keeps requests as reusable building blocks, draws the sequences, runs them, and tells you what a
 change to a request would break.
 
 ## What you can do
@@ -47,7 +47,7 @@ step turn green or red, then open its response, or run only part of it.
 ### Arazzo and the file view
 
 Every flow is a readable YAML file you can edit in the **Code** view. The same flow is also written as an
-[Arazzo](https://spec.openapis.org/arazzo/latest.html) workflow, so other tools can read it, and Flow-I can
+[Arazzo](https://spec.openapis.org/arazzo/latest.html) workflow, so other tools can read it, and Flowi can
 export flows as Arazzo or as a Mermaid diagram for docs.
 
 ![The Arazzo file view of a flow](docs/images/arazzo-code.png)

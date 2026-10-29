@@ -2,7 +2,7 @@
   // A verb (GET, MQTT …) in its colour. "pill" has the tinted, glowing outline of the tree and the pickers;
   // "text" is the bare coloured text (the tabs).
   let { verb, text: shown, pill = true, short = false }: { verb: string; text?: string; pill?: boolean; short?: boolean } = $props()
-  const known = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'WS', 'SSE', 'MQTT', 'KAFKA', 'AMQP', 'NATS', 'GRPC', 'REDIS', 'SQS', 'SNS', 'BUS', 'PUBSUB', 'FLOW']
+  const known = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'QUERY', 'WS', 'SSE', 'MQTT', 'KAFKA', 'AMQP', 'NATS', 'GRPC', 'REDIS', 'SQS', 'SNS', 'BUS', 'PUBSUB', 'FLOW']
   const key = $derived(known.includes(verb.toUpperCase()) ? verb.toUpperCase() : 'OTHER')
   // httpie-style short forms keep the tab narrow.
   const text = $derived(shown ?? (short ? (verb === 'DELETE' ? 'DEL' : verb.slice(0, 5)) : verb))

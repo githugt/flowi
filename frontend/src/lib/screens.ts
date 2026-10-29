@@ -19,6 +19,7 @@ export const screens: Screen[] = [
   { id: 'screen:secrets', title: 'Secrets', icon: 'key', menu: 'secrets', rail: true },
   { id: 'screen:schedules', title: 'Schedules', icon: 'clock', menu: 'schedules', rail: true },
   { id: 'screen:replayer', title: 'Replayer', icon: 'replay', menu: 'replayer', rail: true },
+  { id: 'screen:checks', title: 'Checks', icon: 'checks', menu: 'checks', rail: true },
   { id: 'screen:blueprints', title: 'Blueprints', icon: 'blueprint', menu: 'blueprints', rail: true },
   { id: 'screen:trash', title: 'Trash', icon: 'trash', menu: 'trash', rail: true },
   { id: 'screen:settings', title: 'Settings', icon: 'settings', menu: 'settings', rail: true },

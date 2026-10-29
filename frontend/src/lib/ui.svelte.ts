@@ -17,6 +17,8 @@ export interface PromptDialog {
   protocols?: { id: string; label: string }[]
   /** An extra choice asked with the text (a collection), answered as the third argument. */
   select?: { label: string; options: { id: string; label: string }[] }
+  /** A caution shown under the field (what the answer commits or reveals); "" or absent for none. */
+  warning?: string
   /** The text is a password: typed out of sight. */
   secret?: boolean
   /** Names a question that may be asked again while it shows (the vault's passphrase): see showing. */
@@ -53,6 +55,8 @@ class UIState {
   /** The Move dialog: the request rows to move. */
   moving = $state<string[] | null>(null)
   toasts = $state<{ id: number; level: string; text: string }[]>([])
+  /** A request is waiting for the person to sign in (an OAuth 2.0 grant that needs a browser or a device code). */
+  signIn = $state<{ kind: 'open' | 'device'; url: string; code?: string; expires?: string } | null>(null)
   private next = 1
 
   openMenu(x: number, y: number, items: MenuItem[]) {

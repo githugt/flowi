@@ -1,5 +1,5 @@
 <script lang="ts">
-  // What the flow has to tell: errors, steps out of order, Flow-I-only steps,
+  // What the flow has to tell: errors, steps out of order, Flowi-only steps,
   // a change on disk, unsaved edits. A chip opens its message under it.
   import { FlowService } from '../bindings/github.com/githugt/flowi/internal/bridge'
   import type { Chip, FlowView } from './lib/types'
@@ -12,7 +12,7 @@
     ({
       error: 'Error',
       needs: 'Steps out of order',
-      warning: `${c.steps?.length ?? 0} Flow-I steps`,
+      warning: `${c.steps?.length ?? 0} Flowi steps`,
       disk: 'Changed on disk',
       unsaved: 'Unsaved',
     })[c.kind]
@@ -32,7 +32,7 @@
             <p>These steps wait for a step that comes after them, so they can never start and a run fails: {c.steps?.join(', ')}</p>
             <button class="act" onclick={() => { open = null; FlowService.RepairNeeds(node) }}>Repair</button>
           {:else if c.kind === 'warning'}
-            <p>{c.steps?.length} steps are Flow-I steps that other Arazzo tools cannot run: {c.steps?.join(', ')}</p>
+            <p>{c.steps?.length} steps are Flowi steps that other Arazzo tools cannot run: {c.steps?.join(', ')}</p>
           {:else if c.kind === 'disk'}
             <p>This file changed on disk.</p>
             <button class="act" onclick={() => { open = null; FlowService.Revert(node) }}>Load from disk</button>

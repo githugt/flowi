@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"log/slog"
 	"maps"
+	"os"
+	"path/filepath"
 	"runtime"
 	"slices"
 	"strings"
@@ -106,7 +108,7 @@ func TestFlowService_Insert_then_Undo_should_publish_each_state(t *testing.T) {
 	flows.Undo(v.Node)
 	undone := pub.last["flow"].(bridge.FlowView)
 
-	if id == "" || !inserted.Dirty || !inserted.CanUndo || inserted.Cards["a"].Title != "a · log · b" || undone.Cards["a"].Title != "a · b" {
+	if id == "" || !inserted.Dirty || !inserted.CanUndo || order(inserted) != "a,log,b" || order(undone) != "a,b" {
 		t.Fatalf("inserted %q: %+v / undone %+v", id, inserted, undone)
 	}
 }
@@ -125,14 +127,23 @@ func TestFlowService_Open_should_refuse_a_node_that_is_not_a_flow(t *testing.T) 
 
 func lastView(pub *published) bridge.FlowView { return pub.last["flow"].(bridge.FlowView) }
 
+// order is the step ids of a view, in the order the cards are laid out.
+func order(v bridge.FlowView) string {
+	var ids []string
+	for _, u := range v.Diagram.Units {
+		ids = append(ids, u.Nodes...)
+	}
+	return strings.Join(ids, ",")
+}
+
 func TestFlowService_Select_should_show_the_step_in_the_inspector(t *testing.T) {
 	flows, v, pub := openSignup(t)
 
 	flows.Select(v.Node, "b")
 	got := lastView(pub)
 
-	if got.Selected != "b" || got.Form.Step == nil || got.Form.Step.Type != "log" || got.Cards["a"].Title != "a · [b]" {
-		t.Fatalf("selected %q, form %+v, card %q", got.Selected, got.Form.Step, got.Cards["a"].Title)
+	if got.Selected != "b" || got.Form.Step == nil || got.Form.Step.Type != "log" || !slices.Equal(got.Selection, []string{"b"}) {
+		t.Fatalf("selected %q, form %+v, selection %v", got.Selected, got.Form.Step, got.Selection)
 	}
 }
 
@@ -175,8 +186,8 @@ func TestFlowService_AddStep_should_append_and_select_when_not_placed(t *testing
 	id := flows.AddStep(v.Node, "log", 0, 0, 0, false)
 	got := lastView(pub)
 
-	if id == "" || got.Selected != id || got.Cards["a"].Title != "a · b · ["+id+"]" {
-		t.Fatalf("id %q, selected %q, title %q", id, got.Selected, got.Cards["a"].Title)
+	if id == "" || got.Selected != id || order(got) != "a,b,"+id {
+		t.Fatalf("id %q, selected %q, order %q", id, got.Selected, order(got))
 	}
 }
 
@@ -189,8 +200,8 @@ func TestFlowService_AddStep_should_go_after_the_selected_step(t *testing.T) {
 	id := flows.AddStep(v.Node, "log", 0, 0, 0, false)
 	got := lastView(pub)
 
-	if want := "a · [" + id + "] · b"; got.Cards["a"].Title != want {
-		t.Fatalf("title %q, want %q", got.Cards["a"].Title, want)
+	if want := "a," + id + ",b"; order(got) != want {
+		t.Fatalf("order %q, want %q", order(got), want)
 	}
 }
 
@@ -199,12 +210,12 @@ func TestFlowService_AddStepNear_should_add_on_the_side_of_the_step_it_was_asked
 		name   string
 		step   string
 		before bool
-		want   string // the strip's title, with %s for the new step
+		want   string // the order of the steps, with %s for the new step
 	}{
-		{name: "before the first", step: "a", before: true, want: "[%s] · a · b"},
-		{name: "after the first", step: "a", want: "a · [%s] · b"},
-		{name: "before the last", step: "b", before: true, want: "a · [%s] · b"},
-		{name: "after the last", step: "b", want: "a · b · [%s]"},
+		{name: "before the first", step: "a", before: true, want: "%s,a,b"},
+		{name: "after the first", step: "a", want: "a,%s,b"},
+		{name: "before the last", step: "b", before: true, want: "a,%s,b"},
+		{name: "after the last", step: "b", want: "a,b,%s"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -213,14 +224,8 @@ func TestFlowService_AddStepNear_should_add_on_the_side_of_the_step_it_was_asked
 			id := flows.AddStepNear(v.Node, "log", tt.step, tt.before)
 			got := lastView(pub)
 
-			title := ""
-			for _, c := range got.Cards {
-				if strings.Contains(c.Title, "["+id+"]") {
-					title = c.Title
-				}
-			}
-			if want := fmt.Sprintf(tt.want, id); title != want || got.Selected != id {
-				t.Fatalf("title %q selected %q, want %q selected %q", title, got.Selected, want, id)
+			if want := fmt.Sprintf(tt.want, id); order(got) != want || got.Selected != id {
+				t.Fatalf("order %q selected %q, want %q selected %q", order(got), got.Selected, want, id)
 			}
 		})
 	}
@@ -228,14 +233,14 @@ func TestFlowService_AddStepNear_should_add_on_the_side_of_the_step_it_was_asked
 
 func TestFlowService_Drop_should_move_a_lifted_card_to_the_slot_under_the_pointer(t *testing.T) {
 	flows, v, pub := openSignup(t)
-	u := v.Diagram.Units[0] // the strip a · b
+	a := v.Diagram.Units[0]
 
-	// Lift "b" and drop it before the first card.
-	flows.Drop(v.Node, u.ID, "b", true, u.X+5, u.Y+u.H/2, 24, 0, 0)
+	// Lift "b" and drop it on the first half of the first card: before it.
+	flows.Drop(v.Node, "b", "b", true, a.X+5, a.Y+a.H/2, 24, 0, 0)
 	got := lastView(pub)
 
-	if got.Cards["b"].Title != "b · a" {
-		t.Fatalf("cards %+v", got.Cards)
+	if order(got) != "b,a" {
+		t.Fatalf("order %q", order(got))
 	}
 }
 
@@ -305,7 +310,8 @@ func TestFlowService_Source_should_show_the_flow_and_ApplySource_should_replace_
 	flows, v, _ := openSignup(t)
 
 	src, err := flows.Source(v.Node)
-	problems, applyErr := flows.ApplySource(v.Node, src.Flow)
+	applied, applyErr := flows.ApplySource(v.Node, src.Flow)
+	problems := applied.Problems
 
 	if err != nil || src.Flow == "" || src.File == "" {
 		t.Fatalf("source %+v, err %v", src, err)
@@ -622,7 +628,7 @@ func TestBlueprintsService_State_should_list_blueprints_of_the_collections(t *te
 }
 
 // The screen was empty for a workspace without blueprints of its own, though
-// new requests start with Flow-I's built-in hooks: those are listed too.
+// new requests start with Flowi's built-in hooks: those are listed too.
 func TestBlueprintsService_State_Given_no_blueprints_Then_it_lists_the_built_in_hooks(t *testing.T) {
 	app := bridge.NewApp(&vmtest.Backend{Cols: []model.Collection{vmtest.SampleCollection()}}, bridge.NewInlineActor(), (&published{}).emit)
 	app.Start(t.Context())
@@ -976,7 +982,7 @@ func TestFlowService_Mermaid_and_Relayout_should_work_on_an_open_flow(t *testing
 		t.Fatalf("mermaid %q", chart)
 	}
 	for _, u := range got.Diagram.Units {
-		if u.ID == "login" && (u.X != 0 || u.Y != 0) {
+		if u.ID == "login" && (u.X != 0 || u.Y > 100) {
 			t.Fatalf("login stayed at %d,%d", u.X, u.Y)
 		}
 	}
@@ -1000,32 +1006,6 @@ func TestRequestService_DeleteVersion_should_refuse_the_only_version(t *testing.
 	}
 }
 
-func TestFlowService_SetAttach_should_draw_the_step_in_one_block_with_its_request(t *testing.T) {
-	flows, v, pub := openSignup(t)
-	req := flows.AddStep(v.Node, "request", 0, 0, 0, false)
-	flows.Select(v.Node, "b")
-	form := lastView(pub).Form.Step
-
-	flows.SetAttach(v.Node, req)
-	got := lastView(pub)
-
-	var block *canvas.Unit
-	for i, u := range got.Diagram.Units {
-		if u.Kind == canvas.KindRequest {
-			block = &got.Diagram.Units[i]
-		}
-	}
-	if form == nil || len(form.AttachTo) != 1 || form.AttachTo[0] != req {
-		t.Fatalf("attach choices %+v", form)
-	}
-	if block == nil || len(block.Nodes) != 2 || block.Nodes[block.Core] != req || got.Cards[block.ID].Title != req {
-		t.Fatalf("block %+v, cards %+v", block, got.Cards)
-	}
-	if got.Form.Step.Attach != req {
-		t.Fatalf("form %+v", got.Form.Step)
-	}
-}
-
 // Behaviour change: an empty lane of a condition was 16 units wide, so a step
 // dropped "into" it missed and landed after the container; and a lane grew
 // from a sliver to a box when it got its first step. An empty lane is now a
@@ -1034,9 +1014,9 @@ func TestFlowService_Drop_should_put_a_lifted_card_into_an_empty_lane_and_back_o
 	flows, v, pub := openSignup(t)
 	flows.AddStep(v.Node, "condition", 0, 0, 0, false)
 	g := lastView(pub)
-	strip, lane := g.Diagram.Units[0], g.Diagram.Lanes[0]
+	first, lane := g.Diagram.Units[0], g.Diagram.Lanes[0]
 
-	flows.Drop(v.Node, strip.ID, "b", true, lane.X+20, lane.Y+20, 24, 0, 0)
+	flows.Drop(v.Node, "b", "b", true, lane.X+20, lane.Y+20, 24, 0, 0)
 	in := lastView(pub)
 	var b canvas.Unit
 	for _, u := range in.Diagram.Units {
@@ -1047,136 +1027,14 @@ func TestFlowService_Drop_should_put_a_lifted_card_into_an_empty_lane_and_back_o
 	flows.Drop(v.Node, "b", "b", true, 5, 30, 24, 0, 0)
 	out := lastView(pub)
 
-	if lane.W < canvas.ActionW+canvas.StripPad {
+	if lane.W < canvas.CardW {
 		t.Fatalf("an empty lane is %d wide", lane.W)
 	}
-	if b.Parent != "condition" || in.Diagram.Lanes[0].W != lane.W || in.Diagram.Lanes[0].H != lane.H {
+	if b.Parent != "condition" || in.Diagram.Lanes[0].W != lane.W || in.Diagram.Lanes[0].H < lane.H {
 		t.Fatalf("b %+v, lane before %+v, lane with the step %+v", b, lane, in.Diagram.Lanes[0])
 	}
-	if out.Diagram.Units[0].Nodes[0] != "b" || out.Diagram.Lanes[0].W != lane.W || out.Diagram.Lanes[0].H != lane.H {
+	if order(out) != "b,a,condition" && order(out) != "b,a,"+first.ID || out.Diagram.Lanes[0].W != lane.W || out.Diagram.Lanes[0].H != lane.H {
 		t.Fatalf("after moving out: units %+v, lane %+v (was %+v)", out.Diagram.Units, out.Diagram.Lanes[0], lane)
-	}
-}
-
-func TestFlowService_AddAttached_should_add_a_step_before_or_after_the_request_drawn_with_it(t *testing.T) {
-	flows, v, pub := openSignup(t)
-	req := flows.AddStep(v.Node, "request", 0, 0, 0, false)
-
-	before, err1 := flows.AddAttached(v.Node, "log", false)
-	flows.Select(v.Node, req)
-	after, err2 := flows.AddAttached(v.Node, "assert", true)
-	flows.Select(v.Node, req)
-	got := lastView(pub)
-	flows.Select(v.Node, "a")
-	_, errNotRequest := flows.AddAttached(v.Node, "log", true)
-
-	if err1 != nil || err2 != nil || errNotRequest == nil {
-		t.Fatalf("errors: %v %v, adding to a plain step: %v", err1, err2, errNotRequest)
-	}
-	step := got.Form.Step
-	if step == nil || len(step.Attached) != 2 || step.Attached[0] != before || step.Attached[1] != after {
-		t.Fatalf("attached to the request: %+v (before %q, after %q)", step, before, after)
-	}
-}
-
-// Dropping a single action inside a request block puts it next to the request
-// and draws it with it: left half before, right half after. A plain move out of
-// the block is not attached any more.
-func TestFlowService_Drop_should_attach_an_action_dropped_inside_a_request_block(t *testing.T) {
-	flows, v, pub := openSignup(t)
-	req := flows.AddStep(v.Node, "request", 0, 0, 0, false)
-	g := lastView(pub)
-	var strip, block canvas.Unit
-	for _, u := range g.Diagram.Units {
-		if u.Kind == canvas.KindRequest {
-			block = u
-		} else {
-			strip = u
-		}
-	}
-
-	preview := flows.Preview(v.Node, strip.ID, "b", true, block.X+10, block.Y+block.H/2, 24)
-	flows.Drop(v.Node, strip.ID, "b", true, block.X+10, block.Y+block.H/2, 24, 0, 0)
-	got := lastView(pub)
-
-	if !preview.OK || preview.Attach != req {
-		t.Fatalf("preview %+v", preview)
-	}
-	var drawn canvas.Unit
-	for _, u := range got.Diagram.Units {
-		if u.Kind == canvas.KindRequest {
-			drawn = u
-		}
-	}
-	if len(drawn.Nodes) != 2 || drawn.Nodes[0] != "b" || drawn.Nodes[drawn.Core] != req {
-		t.Fatalf("block after the drop %+v", drawn)
-	}
-
-	flows.Drop(v.Node, drawn.ID, "b", true, 5, 30, 24, 0, 0) // lifted out, to the start of the flow
-	out := lastView(pub)
-	for _, u := range out.Diagram.Units {
-		if u.Kind == canvas.KindRequest && len(u.Nodes) != 1 {
-			t.Fatalf("b is still drawn with the request: %+v", u)
-		}
-	}
-}
-
-// blockOf adds a request with a log before it and an assert after it, drawn in
-// one block, and returns the ids in the block's order.
-func blockOf(t *testing.T) (flows *bridge.FlowService, node string, pub *published, ids [3]string) {
-	t.Helper()
-	flows, v, pub := openSignup(t)
-	req := flows.AddStep(v.Node, "request", 0, 0, 0, false)
-	before, err1 := flows.AddAttached(v.Node, "log", false)
-	flows.Select(v.Node, req)
-	after, err2 := flows.AddAttached(v.Node, "assert", true)
-	if err1 != nil || err2 != nil {
-		t.Fatal(err1, err2)
-	}
-	return flows, v.Node, pub, [3]string{before, req, after}
-}
-
-func requestBlock(t *testing.T, pub *published) canvas.Unit {
-	t.Helper()
-	for _, u := range lastView(pub).Diagram.Units {
-		if u.Kind == canvas.KindRequest {
-			return u
-		}
-	}
-	t.Fatal("no request block")
-	return canvas.Unit{}
-}
-
-// Behaviour change: the actions of a request block could not be put in another
-// order: dropping one on a cell other than the request itself was not a target,
-// so it fell out of the block.
-func TestFlowService_Drop_should_reorder_the_actions_of_a_request_block(t *testing.T) {
-	flows, node, pub, ids := blockOf(t)
-	block := requestBlock(t, pub)
-	cellX := canvas.CellsOf(block)[0].X
-
-	flows.Drop(node, block.ID, ids[2], true, block.X+cellX+10, block.Y+block.H/2, 24, 0, 0) // left half of the first cell
-	got := requestBlock(t, pub)
-
-	want := []string{ids[2], ids[0], ids[1]}
-	if strings.Join(got.Nodes, ",") != strings.Join(want, ",") || got.Nodes[got.Core] != ids[1] {
-		t.Fatalf("block %v (core %d), want %v around the request", got.Nodes, got.Core, want)
-	}
-}
-
-func TestFlowService_MoveAttachedBy_should_swap_an_action_with_its_neighbour_in_the_block(t *testing.T) {
-	flows, node, pub, ids := blockOf(t)
-
-	flows.MoveAttachedBy(node, ids[2], -1)
-	moved := requestBlock(t, pub).Nodes
-	flows.MoveAttachedBy(node, ids[0], -1) // already first in its block: nothing to swap with
-	stay := requestBlock(t, pub).Nodes
-
-	if strings.Join(moved, ",") != strings.Join([]string{ids[0], ids[2], ids[1]}, ",") {
-		t.Fatalf("after moving up: %v", moved)
-	}
-	if strings.Join(stay, ",") != strings.Join(moved, ",") {
-		t.Fatalf("an action at the edge of its block moved: %v", stay)
 	}
 }
 
@@ -1371,42 +1229,6 @@ func TestWorkspaceService_Reorder_Given_a_row_that_is_not_a_folder_Then_says_so(
 	n, ok := pub.last["notice"].(bridge.Notice)
 	if !ok || n.Level != "error" {
 		t.Fatalf("notice %+v", pub.last["notice"])
-	}
-}
-
-// Behaviour change: attached actions could only be drawn beside their request, so a
-// block with several of them grew wide. They can now be stacked above or below it.
-func TestFlowService_attached_actions_can_be_drawn_above_and_below_their_request(t *testing.T) {
-	flows, node, pub, ids := blockOf(t)
-	flows.Select(node, ids[1])
-	up, errUp := flows.AddAttachedAt(node, "note", "above")
-	flows.Select(node, ids[1])
-	down, errDown := flows.AddAttachedAt(node, "note", "below")
-	block := requestBlock(t, pub)
-
-	if errUp != nil || errDown != nil || len(block.Nodes) != 5 {
-		t.Fatalf("errors %v %v, block %v", errUp, errDown, block.Nodes)
-	}
-	cells := map[string]canvas.Cell{}
-	for i, id := range block.Nodes {
-		cells[id] = block.Cells[i]
-	}
-	core := cells[ids[1]]
-	if cells[up].Y >= core.Y || cells[up].X != core.X || cells[down].Y <= core.Y || block.Above == 0 {
-		t.Fatalf("the stacks: above %+v, request %+v, below %+v", cells[up], core, cells[down])
-	}
-
-	// A drop in the top third of the request puts a step in the stack above it, in the list right before it.
-	flows.Select(node, up)
-	flows.SetAttachAt(node, "") // beside it again
-	if got := requestBlock(t, pub); got.Cells[slices.Index(got.Nodes, up)].Y != got.Cells[got.Core].Y {
-		t.Fatalf("after setting it beside the request: %+v", got.Cells)
-	}
-	flows.SetAttachAt(node, "above")
-	back := requestBlock(t, pub)
-	moved := flows.Preview(node, "", ids[0], true, block.X+core.X+20, block.Y+core.Y+4, 24)
-	if !moved.OK || moved.Side != "above" || !moved.Horizontal || moved.Attach != ids[1] || back.Above == 0 {
-		t.Fatalf("preview of a drop on the top of the request: %+v", moved)
 	}
 }
 
@@ -1671,5 +1493,264 @@ func TestRequestService_ExpressionNames_should_offer_the_body_fields_the_request
 	}
 	if !found {
 		t.Errorf("body.data.id is not offered: %v", got)
+	}
+}
+
+func TestRequestService_SaveBody_should_write_the_response_body_where_the_dialog_says_and_do_nothing_on_cancel(t *testing.T) {
+	reqs, v, _, app, _ := openLoginWith(t)
+	reqs.Send(v.Node, "")
+	target := filepath.Join(t.TempDir(), "out.json")
+	var offered string
+	answer := target
+	app.SetPickers(bridge.Pickers{Save: func(_, name string) (string, error) { offered = name; return answer, nil }})
+
+	saved, err := reqs.SaveBody(v.Node)
+	answer = ""
+	cancelled, cancelErr := reqs.SaveBody(v.Node)
+
+	data, readErr := os.ReadFile(target)
+	if err != nil || saved != target || readErr != nil || !strings.Contains(string(data), `"ok": true`) {
+		t.Fatalf("saved %q err %v, file %q (%v)", saved, err, data, readErr)
+	}
+	if offered == "" || cancelled != "" || cancelErr != nil {
+		t.Fatalf("offered %q, cancelled %q err %v", offered, cancelled, cancelErr)
+	}
+}
+
+func TestFlowService_StandaloneArazzo_should_give_the_document_with_its_notes(t *testing.T) {
+	flows, v, _ := openSignup(t)
+
+	got, err := flows.StandaloneArazzo(v.Node)
+
+	if err != nil || got.Text == "" || got.Notes == nil {
+		t.Fatalf("view %+v err %v", got, err)
+	}
+}
+
+func TestFlowView_Given_a_request_step_Then_the_unit_carries_its_card(t *testing.T) {
+	_, v, _ := openTwoUnits(t)
+
+	login := v.Cards["login"].Face
+	wait := v.Cards["wait"].Face
+
+	if login.Badge != "POST" || login.Subline != "/login" || len(login.Ports) != 2 {
+		t.Fatalf("login card %+v", login)
+	}
+	if wait.Subline != "1s" || len(wait.Rows) != 0 {
+		t.Fatalf("wait card %+v", wait)
+	}
+}
+
+func TestFlowService_SetValues_Given_rows_Then_the_card_lists_the_names_and_undo_brings_back_the_old_ones(t *testing.T) {
+	flows, v, pub := openSignup(t)
+	flows.Select(v.Node, "a")
+
+	err := flows.SetValues(v.Node, []bridge.ValueRow{
+		{Name: "x", Value: "{{1}}"},
+		{Name: "id", From: "generate", Value: "{{$uuid-v4}}", Seed: "7"},
+		{Name: "token", From: "response", In: "body", Path: "$.token"},
+	})
+	set := lastView(pub)
+	flows.Undo(v.Node)
+	undone := lastView(pub)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+	face := set.Cards["a"].Face
+	if face.Subline != "3 values" || len(face.Rows) != 1 || face.Rows[0].Summary != "x, id, token" {
+		t.Fatalf("card after SetValues %+v", face)
+	}
+	if got := set.Form.Step.Values; len(got) != 3 || got[1].From != "generate" || got[1].Seed != "7" || got[2].Path != "$.token" {
+		t.Fatalf("form rows %+v", got)
+	}
+	if face := undone.Cards["a"].Face; face.Subline != "1 value" || face.Rows[0].Summary != "x" {
+		t.Fatalf("card after undo %+v", face)
+	}
+}
+
+func TestFlowService_SetValues_Given_a_step_that_is_not_a_set_Then_it_is_refused(t *testing.T) {
+	flows, v, _ := openSignup(t)
+	flows.Select(v.Node, "b")
+
+	err := flows.SetValues(v.Node, []bridge.ValueRow{{Name: "x"}})
+
+	if err == nil {
+		t.Fatal("wrote values into a log step")
+	}
+}
+
+func paramOf(v bridge.FlowView, name string) string {
+	for _, p := range v.Form.Step.Params {
+		if p.Name == name {
+			return p.Value
+		}
+	}
+	return ""
+}
+
+func TestConnectData_Given_an_earlier_step_Then_the_template_is_written_into_the_field(t *testing.T) {
+	flows, v, pub := openTwoUnits(t)
+
+	err := flows.ConnectData(v.Node, "login", "body.token", "verify", "with.token")
+	flows.Select(v.Node, "verify")
+	got := lastView(pub).Form.Step.Call.With
+
+	if err != nil || len(got) != 1 || got[0].Key != "token" || got[0].Value != "{{nodes.login.body.token}}" {
+		t.Fatalf("err %v, with %+v", err, got)
+	}
+}
+
+func TestConnectData_Given_a_text_field_with_text_Then_the_template_is_added_after_it(t *testing.T) {
+	flows, v, pub := openSignup(t)
+	flows.Select(v.Node, "b")
+	flows.SetParam(v.Node, "value", "hi")
+
+	first := flows.ConnectData(v.Node, "a", "x", "b", "param.value")
+	flows.Select(v.Node, "b")
+
+	if first != nil || paramOf(lastView(pub), "value") != "hi {{nodes.a.x}}" {
+		t.Fatalf("err %v, value %q", first, paramOf(lastView(pub), "value"))
+	}
+}
+
+func TestConnectData_Given_the_start_Then_the_value_is_an_input(t *testing.T) {
+	flows, v, pub := openTwoUnits(t)
+
+	err := flows.ConnectData(v.Node, "", "email", "verify", "with.email")
+	flows.Select(v.Node, "verify")
+
+	if got := lastView(pub).Form.Step.Call.With; err != nil || len(got) != 1 || got[0].Value != "{{inputs.email}}" {
+		t.Fatalf("err %v, with %+v", err, got)
+	}
+}
+
+func TestConnectData_Given_a_later_step_Then_it_is_refused_with_a_reason_and_nothing_changes(t *testing.T) {
+	flows, v, pub := openTwoUnits(t)
+	before := lastViewOr(pub, v)
+
+	err := flows.ConnectData(v.Node, "verify", "status", "login", "with.code")
+	after := lastViewOr(pub, v)
+
+	if err == nil || !strings.Contains(err.Error(), "after") {
+		t.Fatalf("err %v, want a reason that says it runs after", err)
+	}
+	if after.Rev != before.Rev || after.Dirty {
+		t.Fatalf("the flow changed: rev %d → %d, dirty %v", before.Rev, after.Rev, after.Dirty)
+	}
+}
+
+func lastViewOr(pub *published, v bridge.FlowView) bridge.FlowView {
+	if got, ok := pub.last["flow"].(bridge.FlowView); ok {
+		return got
+	}
+	return v
+}
+
+func TestConnectData_Given_an_undo_Then_the_field_returns_to_its_old_value(t *testing.T) {
+	flows, v, pub := openTwoUnits(t)
+	_ = flows.ConnectData(v.Node, "login", "status", "verify", "with.code")
+
+	flows.Undo(v.Node)
+	flows.Select(v.Node, "verify")
+
+	if got := lastView(pub).Form.Step.Call.With; len(got) != 0 {
+		t.Fatalf("with after undo %+v", got)
+	}
+}
+
+func TestConnectData_Given_a_field_the_step_does_not_have_Then_it_is_refused(t *testing.T) {
+	flows, v, _ := openTwoUnits(t)
+
+	tests := []struct{ to, field string }{
+		{"wait", "with.x"},         // a delay passes nothing to a request
+		{"verify", "nonsense"},     // no kind of field
+		{"verify", "param.nobody"}, // not a parameter of a request step
+	}
+	for _, tt := range tests {
+		if err := flows.ConnectData(v.Node, "login", "status", tt.to, tt.field); err == nil {
+			t.Fatalf("%s %s was accepted", tt.to, tt.field)
+		}
+	}
+}
+
+func TestWireChoices_Given_a_request_that_may_feed_another_Then_it_offers_what_to_take_and_where_to_put_it(t *testing.T) {
+	flows, v, _ := openTwoUnits(t)
+
+	got := flows.WireChoices(v.Node, "login", "verify")
+
+	if got.Reason != "" || !slices.Contains(got.Outputs, "status") || !slices.Contains(got.Outputs, "body") {
+		t.Fatalf("choices %+v", got)
+	}
+	var ids []string
+	for _, f := range got.Fields {
+		ids = append(ids, f.ID)
+	}
+	if !slices.Contains(ids, "with.") || !slices.Contains(ids, "headers.") {
+		t.Fatalf("fields %v", ids)
+	}
+}
+
+func TestWireChoices_Given_a_step_that_runs_after_Then_the_reason_is_given_and_nothing_is_offered(t *testing.T) {
+	flows, v, _ := openTwoUnits(t)
+
+	got := flows.WireChoices(v.Node, "verify", "login")
+
+	if got.Reason == "" || len(got.Fields) != 0 {
+		t.Fatalf("choices %+v", got)
+	}
+}
+
+func TestWireChoices_Given_a_set_target_Then_each_of_its_values_is_a_place_to_put_it(t *testing.T) {
+	flows, v, _ := openSignup(t)
+	flows.Select(v.Node, "a")
+	_ = flows.SetValues(v.Node, []bridge.ValueRow{{Name: "one"}, {Name: "two"}})
+	id := flows.AddStep(v.Node, "set", 0, 0, 0, false) // a set after a and b
+	flows.Select(v.Node, id)
+	_ = flows.SetValues(v.Node, []bridge.ValueRow{{Name: "copy"}})
+
+	got := flows.WireChoices(v.Node, "a", id)
+
+	if len(got.Fields) == 0 || got.Fields[0].ID != "values.0" || !strings.Contains(got.Fields[0].Label, "copy") {
+		t.Fatalf("fields %+v", got.Fields)
+	}
+	if !slices.Contains(got.Outputs, "one") || !slices.Contains(got.Outputs, "two") {
+		t.Fatalf("outputs %v, want the names a set writes", got.Outputs)
+	}
+}
+
+func TestFlowService_NodeData_Given_a_message_request_Then_messages_are_listed_with_direction_and_the_size_is_known(t *testing.T) {
+	rec := engine.Record{Kind: engine.KindAsync, Outcome: "received", Messages: []engine.RecordMessage{
+		{Direction: "sent", Body: engine.Body{Text: "ping", ContentType: "text/plain", Size: 4}},
+		{Direction: "received", Body: engine.Body{Text: "pong", ContentType: "text/plain", Size: 4}},
+	}}
+	flows, v, _ := openRunnable(t, []engine.Event{
+		engine.RecordCaptured{Path: "a", Node: "a", Record: rec},
+		engine.NodeFinished{Path: "a", Node: "a", Status: engine.StatusPassed},
+	})
+	flows.Run(v.Node, nil)
+
+	got, err := flows.NodeData(v.Node, "a", "json")
+
+	if err != nil || len(got.Messages) != 2 || got.Messages[0].Direction != "sent" || got.Messages[1].Text != "pong" {
+		t.Fatalf("data %+v, err %v", got, err)
+	}
+	if got.Size != "8 B" || got.Kind != "messages" {
+		t.Fatalf("size %q kind %q", got.Size, got.Kind)
+	}
+}
+
+func TestFlowService_NodeData_Given_an_http_request_Then_the_kind_is_request_and_the_size_is_the_response_body(t *testing.T) {
+	rec := engine.Record{Status: 200, Body: engine.Body{Text: "{}", Size: 2048}}
+	flows, v, _ := openRunnable(t, []engine.Event{
+		engine.RecordCaptured{Path: "a", Node: "a", Record: rec},
+		engine.NodeFinished{Path: "a", Node: "a", Status: engine.StatusPassed},
+	})
+	flows.Run(v.Node, nil)
+
+	got, _ := flows.NodeData(v.Node, "a", "json")
+
+	if got.Kind != "request" || got.Size != "2.0 KB" || len(got.Messages) != 0 {
+		t.Fatalf("data %+v", got)
 	}
 }

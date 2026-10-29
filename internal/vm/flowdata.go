@@ -5,6 +5,7 @@ package vm
 import (
 	"encoding/json"
 	"fmt"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -122,7 +123,7 @@ func InputParts(n model.Node, d NodeDetail) []Part {
 func sentParts(rec engine.Record) []Part {
 	parts := []Part{{Kind: PartLines, Lines: []string{rec.Request.Method + " " + rec.Request.URL}}}
 	if len(rec.Request.Header) > 0 {
-		parts = append(parts, Part{Heading: "Headers", Kind: PartTable, Rows: headerRows(rec.Request.Header)})
+		parts = append(parts, Part{Heading: "Headers", Kind: PartTable, Rows: maskedHeaderRows(rec.Request.Header)})
 	}
 	if rec.HasMessages() {
 		for _, m := range rec.Messages {
@@ -146,6 +147,81 @@ func sentParts(rec engine.Record) []Part {
 		}
 	}
 	return parts
+}
+
+// MessageRow is one message of a message request, in the order it went or came.
+type MessageRow struct {
+	Direction string // sent or received
+	Text      string
+	Lang      string
+}
+
+// MessageRows are the messages of a message-based request (async or gRPC) in the
+// last run, sent and received, each with its direction. Nil for any other step.
+func MessageRows(d NodeDetail) []MessageRow {
+	rec := d.Record
+	if rec == nil || !rec.HasMessages() {
+		return nil
+	}
+	rows := make([]MessageRow, 0, len(rec.Messages))
+	for _, m := range rec.Messages {
+		text, lang, ok := RenderBody(m.Body, ViewJSON)
+		if !ok {
+			text, lang, _ = RenderBody(m.Body, ViewRaw)
+		}
+		rows = append(rows, MessageRow{Direction: m.Direction, Text: text, Lang: lang})
+	}
+	return rows
+}
+
+// sensitiveHeaders are request headers that carry a credential. The engine
+// masks the secrets a run knows of; a token typed into a header by hand is not
+// one, and the input view of a step is often on screen where others look.
+func sensitiveHeaders() []string {
+	return []string{"authorization", "proxy-authorization", "cookie", "x-api-key", "x-auth-token", "x-csrf-token"}
+}
+
+// maskedHeaderRows are the headers as rows with a credential's value hidden:
+// "Bearer ••••••" keeps the scheme word, so the kind of credential still shows.
+func maskedHeaderRows(hs []engine.Header) []model.KeyValue {
+	rows := headerRows(hs)
+	for i, row := range rows {
+		if !slices.Contains(sensitiveHeaders(), strings.ToLower(row.Key)) || strings.Contains(row.Value, "••") {
+			continue
+		}
+		scheme, rest, found := strings.Cut(strings.TrimSpace(row.Value), " ")
+		if strings.EqualFold(row.Key, "authorization") && found && rest != "" {
+			rows[i].Value = scheme + " ••••••"
+			continue
+		}
+		rows[i].Value = "••••••"
+	}
+	return rows
+}
+
+// RecordSize is how much a step's call returned, as a person reads it ("2.0 KB"):
+// the response body, or all the messages of a message request; "" when it did
+// not call anything.
+func RecordSize(d NodeDetail) string {
+	rec := d.Record
+	if rec == nil {
+		return ""
+	}
+	size := rec.Body.Size
+	for _, m := range rec.Messages {
+		size += m.Body.Size
+	}
+	return byteSize(size)
+}
+
+func byteSize(n int64) string {
+	switch {
+	case n < 1024:
+		return fmt.Sprintf("%d B", n)
+	case n < 1024*1024:
+		return fmt.Sprintf("%.1f KB", float64(n)/1024)
+	}
+	return fmt.Sprintf("%.1f MB", float64(n)/(1024*1024))
 }
 
 // OutputParts is what node n produced in the last run: for a request node the

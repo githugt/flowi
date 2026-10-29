@@ -136,7 +136,7 @@ func TestInputParts_should_describe_the_request_as_sent_and_other_nodes_by_their
 
 func TestOutputParts_should_show_status_headers_body_and_timings_or_the_outputs(t *testing.T) {
 	request := model.Node{ID: "login", Type: "request", Request: &model.RequestCall{}}
-	other := model.Node{ID: "pick", Type: "extract"}
+	other := model.Node{ID: "pick", Type: "set"}
 
 	got := partTexts(vm.OutputParts(request, vm.NodeDetail{Status: "passed", Record: sampleRecord()}, vm.ViewJSON))
 	outs := partTexts(vm.OutputParts(other, vm.NodeDetail{Status: "passed", Outputs: map[string]any{"token": "t-1"}}, vm.ViewJSON))
@@ -168,5 +168,51 @@ func TestTestRows_should_list_an_assert_node_and_a_request_nodes_failed_assertio
 	}
 	if len(onRequest) != 1 || onRequest[0].Passed || !strings.Contains(onRequest[0].Name, "status == 201") || len(none) != 0 {
 		t.Fatalf("on request %+v, none %+v", onRequest, none)
+	}
+}
+
+func TestMessageRows_Given_a_message_request_Then_messages_are_listed_with_direction_in_order(t *testing.T) {
+	rec := engine.Record{Kind: engine.KindAsync, Outcome: "received", Messages: []engine.RecordMessage{
+		{Direction: "sent", Body: engine.Body{Text: `{"q":1}`, JSON: map[string]any{"q": float64(1)}, ContentType: "application/json"}},
+		{Direction: "received", Body: engine.Body{Text: `hello`, ContentType: "text/plain"}},
+		{Direction: "received", Body: engine.Body{Base64: "AAEC", Size: 3, ContentType: "application/octet-stream"}},
+	}}
+
+	got := vm.MessageRows(vm.NodeDetail{Status: "passed", Record: &rec})
+
+	if len(got) != 3 || got[0].Direction != "sent" || got[1].Direction != "received" || got[2].Direction != "received" {
+		t.Fatalf("rows %+v", got)
+	}
+	if !strings.Contains(got[0].Text, `"q": 1`) || got[1].Text != "hello" || !strings.Contains(got[2].Text, "3 bytes") {
+		t.Fatalf("texts %q %q %q", got[0].Text, got[1].Text, got[2].Text)
+	}
+}
+
+func TestMessageRows_Given_a_request_that_is_not_message_based_Then_there_are_none(t *testing.T) {
+	got := vm.MessageRows(vm.NodeDetail{Status: "passed", Record: sampleRecord()})
+
+	if len(got) != 0 {
+		t.Fatalf("rows %+v", got)
+	}
+}
+
+func TestInputParts_Given_an_http_request_Then_secrets_in_the_input_view_are_masked(t *testing.T) {
+	rec := sampleRecord()
+	rec.Request.Header = []engine.Header{
+		{Name: "Authorization", Value: "Bearer abc.def.ghi"},
+		{Name: "Cookie", Value: "sid=1234"},
+		{Name: "X-Api-Key", Value: "k-999"},
+		{Name: "X-A", Value: "plain"},
+	}
+
+	got := partTexts(vm.InputParts(model.Node{ID: "login", Type: "request", Request: &model.RequestCall{}}, vm.NodeDetail{Status: "passed", Record: rec}))
+
+	for _, leaked := range []string{"abc.def.ghi", "sid=1234", "k-999"} {
+		if strings.Contains(got, leaked) {
+			t.Fatalf("input view shows %q:\n%s", leaked, got)
+		}
+	}
+	if !strings.Contains(got, "Authorization=Bearer ••••") || !strings.Contains(got, "X-A=plain") {
+		t.Fatalf("input view:\n%s", got)
 	}
 }

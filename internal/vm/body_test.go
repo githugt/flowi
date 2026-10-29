@@ -160,3 +160,89 @@ func TestBodyVM_SetBodyKind_should_keep_a_content_type_the_user_wrote(t *testing
 		t.Fatalf("content type %q", headerValue(r, "Content-Type"))
 	}
 }
+
+func TestBodyVM_should_turn_a_JSON_body_into_a_JSON_RPC_call_and_edit_its_method_and_id(t *testing.T) {
+	// Arrange
+	r, _ := newRequestVM(t, sampleBackend())
+	r.SetBodyKind(vm.BodyText)
+	r.Edit(func(v *model.RequestVersion) { v.Body.JSON = `{"limit": 5}` })
+	_, before := r.JSONRPC()
+
+	// Act
+	r.MakeJSONRPC()
+	r.SetJSONRPCField("method", "pets.list")
+	r.SetJSONRPCField("id", "")
+	call, after := r.JSONRPC()
+
+	// Assert
+	if before || !after {
+		t.Fatalf("a plain JSON body is not a call (%v) and the wrapped one is (%v)", before, after)
+	}
+	if call.Method != "pets.list" || call.ID != "" || call.Params == "" {
+		t.Fatalf("call %+v: the old body should be the parameters, and an empty id makes a notification", call)
+	}
+}
+
+func TestBodyVM_MakeJSONRPC_Given_a_call_already_Then_changes_nothing(t *testing.T) {
+	r, _ := newRequestVM(t, sampleBackend())
+	r.SetBodyKind(vm.BodyText)
+	r.MakeJSONRPC()
+	r.SetJSONRPCField("method", "keep")
+	want := r.Current().Body.JSON
+
+	r.MakeJSONRPC()
+
+	if got := r.Current().Body.JSON; got != want {
+		t.Fatalf("got %q, want %q", got, want)
+	}
+}
+
+func TestBodyVM_should_edit_the_parts_of_a_multipart_body_text_and_several_files(t *testing.T) {
+	// Arrange
+	r, _ := newRequestVM(t, sampleBackend())
+	r.SetBodyKind(vm.BodyForm)
+	r.SetMultipart(true)
+
+	// Act
+	r.SetParts([]vm.MultipartPart{
+		{Name: "title", Value: "Report"},
+		{Name: "files", File: true, Value: "data/a.csv", ContentType: "text/csv"},
+		{Name: "files", File: true, Value: "data/b.csv"},
+		{Name: "", Value: "dropped: a part has a name"},
+	})
+	got := r.Parts()
+
+	// Assert
+	if len(got) != 3 || got[0].File || got[1].ContentType != "text/csv" || !got[2].File || got[2].Value != "data/b.csv" {
+		t.Fatalf("parts %+v", got)
+	}
+	if !r.Multipart() || r.BodyKind() != vm.BodyForm {
+		t.Errorf("the body should stay a multipart form: multipart %v kind %q", r.Multipart(), r.BodyKind())
+	}
+}
+
+func TestBodyVM_Parts_should_show_a_part_it_does_not_understand_as_text(t *testing.T) {
+	r, _ := newRequestVM(t, sampleBackend())
+	r.SetBodyKind(vm.BodyForm)
+	r.Edit(func(v *model.RequestVersion) { v.Body.Multipart = []model.Field{{Key: "n", Value: 7}} })
+
+	got := r.Parts()
+
+	if len(got) != 1 || got[0].Value != "7" || got[0].File {
+		t.Fatalf("parts %+v", got)
+	}
+}
+
+func TestBodyVM_Parts_should_read_a_file_part_the_way_a_request_file_decodes_it(t *testing.T) {
+	r, _ := newRequestVM(t, sampleBackend())
+	r.SetBodyKind(vm.BodyForm)
+	r.Edit(func(v *model.RequestVersion) {
+		v.Body.Multipart = []model.Field{{Key: "doc", Value: []model.Field{{Key: "file", Value: "a.txt"}, {Key: "content_type", Value: "text/plain"}}}}
+	})
+
+	got := r.Parts()
+
+	if len(got) != 1 || !got[0].File || got[0].Value != "a.txt" || got[0].ContentType != "text/plain" {
+		t.Fatalf("parts %+v", got)
+	}
+}

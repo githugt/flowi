@@ -23,8 +23,8 @@
         "profile"
       ],
       "types": [
-        "extract",
-        "generate"
+        "set",
+        "set"
       ],
       "path": "$.nodes[1]",
       "x": 280,
@@ -70,7 +70,7 @@
         "double"
       ],
       "types": [
-        "calc"
+        "set"
       ],
       "path": "$.nodes[3].body[1]",
       "x": 828,
@@ -216,7 +216,7 @@
         "summary"
       ],
       "types": [
-        "transform",
+        "set",
         "assert",
         "save",
         "digest"

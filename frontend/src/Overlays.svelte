@@ -5,6 +5,7 @@
   let innerHeight = $state(0)
   import BlueprintDialog from './BlueprintDialog.svelte'
   import MoveDialog from './MoveDialog.svelte'
+  import SignInDialog from './SignInDialog.svelte'
   import Dropdown from './Dropdown.svelte'
   import { protocolVerb } from './lib/verbs'
   import { ui } from './lib/ui.svelte'
@@ -56,6 +57,7 @@
           <span>{ui.dialog.label}</span>
           <input bind:this={input} bind:value={text} spellcheck="false" type={ui.dialog.secret ? 'password' : 'text'} autocomplete="off" />
         </label>
+        {#if ui.dialog.warning}<p class="warning" role="alert">{ui.dialog.warning}</p>{/if}
         {#if ui.dialog.select}
           <label>
             <span>{ui.dialog.select.label}</span>
@@ -88,6 +90,7 @@
 
 <BlueprintDialog />
 <MoveDialog />
+<SignInDialog />
 
 <div class="toasts" aria-live="polite">
   {#each ui.toasts as t (t.id)}<div class="toast {t.level}">{t.text}</div>{/each}
@@ -116,6 +119,7 @@
   .dialog { width: 380px; display: flex; flex-direction: column; gap: 10px; padding: 16px; background: var(--panel); border: 1px solid var(--line); border-radius: var(--r-lg); }
   .dialog h3 { margin: 0; }
   .dialog p { margin: 0; line-height: 1.45; }
+  .dialog .warning { padding: 6px 8px; border: 1px solid color-mix(in srgb, var(--warn) 60%, transparent); border-radius: var(--r-md); background: color-mix(in srgb, var(--warn) 12%, transparent); font-size: var(--fs-sm); }
   .dialog label { display: flex; flex-direction: column; gap: 3px; color: var(--muted); font-size: var(--fs-xs); }
   .dialog input, .dialog select {
     background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); padding: 5px 8px; font: inherit;

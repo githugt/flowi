@@ -76,13 +76,17 @@ func buildUserCreation(d *vm.FlowDoc) {
 		got := d.Insert(typ, "$.nodes", 99, nil)
 		d.EditNode(got, func(n *model.Node) { n.ID = id; n.Params = params })
 	}
+	values := func(id string, vs ...model.SetValue) {
+		got := d.Insert("set", "$.nodes", 99, nil)
+		d.EditNode(got, func(n *model.Node) { n.ID = id; n.Values = vs })
+	}
 	token, subject := model.KeyValue{Key: "token", Value: "{{vars.token}}"}, model.KeyValue{Key: "subject", Value: "{{vars.subject}}"}
 	request("login", model.Ref{ID: "01JA0000000000000000000010", Path: "auth/login"}, model.KeyValue{Key: "email", Value: "{{inputs.email}}"})
-	action("extract", "session", model.Field{Key: "token", Value: "{{nodes.login.token}}"}, model.Field{Key: "subject", Value: "{{nodes.login.subject}}"})
+	values("session", model.SetValue{Name: "token", Value: "{{nodes.login.token}}"}, model.SetValue{Name: "subject", Value: "{{nodes.login.subject}}"})
 	action("delay", "wait-for-code", model.Field{Key: "duration", Value: "{{env.verify_wait}}"})
 	request("verify", model.Ref{ID: "01JA0000000000000000000011", Path: "auth/verify"}, token, subject, model.KeyValue{Key: "code", Value: "123456"})
-	action("generate", "profile", model.Field{Key: "first_name", Value: "{{$first-name}}"}, model.Field{Key: "last_name", Value: "{{$last-name}}"},
-		model.Field{Key: "city", Value: "{{$city-name}}"})
+	values("profile", model.SetValue{Name: "first_name", From: "generate", Value: "{{$first-name}}"}, model.SetValue{Name: "last_name", From: "generate", Value: "{{$last-name}}"},
+		model.SetValue{Name: "city", From: "generate", Value: "{{$city-name}}"})
 	request("page-1", model.Ref{ID: "01JA0000000000000000000012", Path: "onboarding/form-page-1"}, token, subject,
 		model.KeyValue{Key: "first_name", Value: "{{vars.first_name}}"}, model.KeyValue{Key: "last_name", Value: "{{vars.last_name}}"})
 	request("page-2", model.Ref{ID: "01JA0000000000000000000013", Path: "onboarding/form-page-2"}, token, subject,

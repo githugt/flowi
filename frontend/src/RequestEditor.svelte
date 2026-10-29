@@ -14,8 +14,10 @@
   import RequestExtras from './RequestExtras.svelte'
   import MessageSections from './MessageSections.svelte'
   import AreaField from './AreaField.svelte'
+  import Markdown from './Markdown.svelte'
   import AssertCards from './AssertCards.svelte'
   import { requestVocabulary } from './lib/vocabulary'
+  import { sectionCounts } from './lib/tabcounts'
   import Dropdown from './Dropdown.svelte'
   import ExprHelp from './ExprHelp.svelte'
   import ReplayBar from './ReplayBar.svelte'
@@ -36,12 +38,19 @@
   import { Events } from '@wailsio/runtime'
   import type { KeptSpec, SpecOrigin } from './lib/types'
   import OverlayDialog from './OverlayDialog.svelte'
+  import VersionPicker from './VersionPicker.svelte'
+  import PartsEditor from './PartsEditor.svelte'
   import SpecUpdateDialog from './SpecUpdateDialog.svelte'
+  import FlowiOverlayDialog from './FlowiOverlayDialog.svelte'
+  import FlowiOverlayEditor from './FlowiOverlayEditor.svelte'
+  import FlowiOverlayWarning from './FlowiOverlayWarning.svelte'
 
   let { view }: { view: RequestView } = $props()
   const node = $derived(view.node)
   const v = $derived(view.current)
-  const methods = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS']
+  const methods = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS', 'QUERY']
+  // The registered WebDAV, CalDAV and other methods are not listed: they go through Custom…, which keeps their registered spelling.
+  const CUSTOM = '\u0000custom'
   const httpSections = ['Params', 'Headers', 'Body', 'Auth', 'Extract', 'Assert', 'Variables', 'Settings', 'Hooks', 'Schema', 'Docs', 'Code', 'Responses', 'Used by', 'Cookies']
   type Section = string
   const sections = $derived.by(() => {
@@ -102,12 +111,16 @@
       Extract: !!v.Extract?.length,
       Assert: !!v.Assert?.length,
     })[s] ?? false
-  const moreOptions = $derived<DropOption[]>(moreSecs.map((s) => ({ value: s, label: titleOf(s), icon: iconOf(s), dot: configured(s) })))
+  // The count badge: how many rows the section holds. Sections that are not lists keep the dot.
+  const counts = $derived(sectionCounts(view))
+  const moreOptions = $derived<DropOption[]>(moreSecs.map((s) => ({ value: s, label: titleOf(s), icon: iconOf(s), dot: configured(s), count: counts[s] })))
   let chosen = $state<Section>('')
   const section = $derived(sections.includes(chosen) ? chosen : sections[0])
   // The open menu: the Send button's (how to send) or the Save button's (versions).
   let menu = $state<'send' | 'save' | null>(null)
   let detailsOpen = $state(false)
+  // The Docs section shows the notes as written (Markdown source) or as read.
+  let docsPreview = $state(false)
 
   // The kept spec this request comes from, and which fields its overlays set. Asked again when the
   // version changes, after a save to the overlay ("spec-origin"), and when the workspace changes.
@@ -132,9 +145,16 @@
       offTree()
     }
   })
-  /** The rows an overlay sets in a section, by name: the tooltip names the overlay. */
-  function overlayMarks(section: 'query' | 'header'): Record<string, string> {
-    return Object.fromEntries((origin?.fields ?? []).filter((f) => f.section === section).map((f) => [f.key, `Set by the overlay ${f.file}`]))
+  /** The rows an overlay sets in a section, by name: the tooltip names the overlay. Spec overlays and
+   *  flowi overlays both tag rows; a header matches whatever case the row is written in. */
+  function overlayMarks(section: 'query' | 'header', rows: { Key: string }[] | null = null): Record<string, string> {
+    const marks: Record<string, string> = Object.fromEntries((origin?.fields ?? []).filter((f) => f.section === section).map((f) => [f.key, `Set by the overlay ${f.file}`]))
+    for (const m of view.flowiOverlayMarks) {
+      if (m.section !== section) continue
+      const row = (rows ?? []).find((r) => r.Key.toLowerCase() === m.key.toLowerCase())
+      marks[row?.Key ?? m.key] = `Set by the flowi overlay ${m.overlay}`
+    }
+    return marks
   }
   const fieldNames: Record<string, string> = { docs: 'docs', body: 'body', query: 'query', header: 'header' }
   const overlayFields = $derived((origin?.fields ?? []).map((f) => (f.key ? `${fieldNames[f.section]} ${f.key}` : fieldNames[f.section])))
@@ -157,10 +177,25 @@
   // xml and raw have no colouring of their own; their {{templates}} are still marked.
   const codeLangOf = (format: string): CodeLang => (format === 'json' ? 'json' : format === 'yaml' ? 'yaml' : 'text')
 
-  const methodOptions: DropOption[] = methods.map((m) => ({ value: m, label: m, tone: m }))
+  // A method the lists lack (typed through Custom…) shows as the current choice, so the button is never blank.
+  const methodOptions = $derived<DropOption[]>([
+    ...methods.map((m) => ({ value: m, label: m, tone: m })),
+    ...(v.Method && !methods.includes(v.Method) ? [{ value: v.Method, label: v.Method, tone: v.Method }] : []),
+    { value: '', label: '', separator: true },
+    { value: CUSTOM, label: 'Custom…', detail: 'any method name' },
+  ])
+  function pickMethod(m: string) {
+    if (m !== CUSTOM) return RequestService.SetMethod(node, m).catch(fail)
+    ui.prompt({ title: 'Custom method', label: 'Method name (case matters: PURGE is not Purge)', initial: '', done: (name) => RequestService.SetMethod(node, name.trim()).catch(fail) })
+  }
   const bodyKindOptions: DropOption[] = [['none', 'None'], ['text', 'Text'], ['form', 'Form'], ['file', 'File']].map(([value, label]) => ({ value, label }))
   const formatOptions: DropOption[] = formats.map((f) => ({ value: f, label: f.toUpperCase() }))
-  const authOptions: DropOption[] = authKinds.map(([value, label]) => ({ value, label }))
+  const authOptions = $derived<DropOption[]>([...authKinds.map(([value, label]) => ({ value, label })), ...view.auth.schemes.map((s) => ({ value: s.id, label: s.label }))])
+  const isScheme = $derived(view.auth.kind.startsWith('scheme:'))
+  function pickAuth(k: string) {
+    if (k.startsWith('scheme:')) RequestService.SetAuthScheme(node, k.slice('scheme:'.length))
+    else RequestService.SetAuth(node, k, view.auth.value)
+  }
   const protocolOptions = $derived<DropOption[]>((view.async?.protocols ?? []).map((p) => ({ value: p.id, label: p.label, tone: protocolVerb(p.id) })))
   const modeLabels: Record<string, string> = { send: 'Send', receive: 'Receive', send_receive: 'Send, then receive' }
   // The button says what a message request will do, in its own colour: it said Send while set to receive.
@@ -173,9 +208,38 @@
   const hookModes: [string, string][] = [['all', 'Run all hooks'], ['none', 'Run no hooks'], ['skip-pre', 'Skip the hooks before'], ['skip-post', 'Skip the hooks after']]
 
   const fail = (e: unknown) => ui.toast(errorText(e), 'error')
-  function save() {
+  // Writes the working copy over the saved version. With a flowi overlay laid over it, that includes the overlay.
+  function saveVersion() {
     if (view.inScratch) saveTo()
     else RequestService.Save(node)
+  }
+  // Save (the button, ⌘S): with a flowi overlay open, the edit belongs to the overlay.
+  function save() {
+    if (view.flowiOverlay && view.dirty && !view.inScratch) saveOverlayOpen = true
+    else saveVersion()
+  }
+
+  // Flowi overlays: laid over the open version beside the version picker. What does not fit shows once
+  // for each overlay and version, as a popup; the bar below the header keeps the list.
+  let saveOverlayOpen = $state(false)
+  let overlaysOpen = $state(false)
+  let warnedKey = $state('')
+  let warningOpen = $state(false)
+  const overlayKey = $derived(`${view.flowiOverlay}@${view.selected}:${view.flowiOverlayNotes.join('|')}`)
+  $effect(() => {
+    if (!view.flowiOverlay || !view.flowiOverlayNotes.length) {
+      warnedKey = ''
+      return
+    }
+    if (overlayKey !== warnedKey) {
+      warnedKey = overlayKey
+      warningOpen = true
+    }
+  })
+  // Overlays can be stacked ("vip+slow"): they apply in the order named and a later one wins.
+  const stack = $derived(view.flowiOverlay ? view.flowiOverlay.split('+') : [])
+  function unstackOverlay(name: string) {
+    RequestService.SelectFlowiOverlay(node, stack.filter((n) => n !== name).join('+'))
   }
   function newVersion() {
     ui.prompt({ title: 'New version', label: 'Label', initial: '', done: (label) => RequestService.NewVersion(node, label).catch(fail) })
@@ -235,8 +299,7 @@
   function onkeydown(e: KeyboardEvent) {
     if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 's') {
       e.preventDefault()
-      if (view.inScratch) saveTo()
-      else RequestService.Save(node)
+      save()
     }
   }
 </script>
@@ -253,7 +316,7 @@
 <div class="req">
   <header {onpaste}>
     {#if view.kind === 'http'}
-      <Dropdown pill title="Method" options={methodOptions} value={v.Method} width="108px" onpick={(m) => RequestService.SetMethod(node, m)} />
+      <Dropdown pill title="Method" options={methodOptions} value={v.Method} width="108px" onpick={pickMethod} />
       <div class="url">
         <TemplateField
           value={view.fullUrl}
@@ -279,12 +342,7 @@
         <MethodPicker {node} info={view.grpc} />
       </div>
     {/if}
-    <div class="ver">
-      <span class="muted">Ver.</span>
-      <select value={view.selected} onchange={(e) => RequestService.SelectVersion(node, e.currentTarget.value)} aria-label="Version">
-        {#each view.versions as l, i}<option value={l}>{l}{view.versionNames[i] ? ' · ' + view.versionNames[i] : ''}{l === view.default ? ' (default)' : ''}</option>{/each}
-      </select>
-    </div>
+    <VersionPicker {view} {node} onmanage={() => (overlaysOpen = true)} />
     <div class="send" style:--act={`var(--act-${action.tone})`}>
       {#if view.sending}
         <button class="act main" onclick={() => RequestService.Cancel(node)}>Cancel</button>
@@ -318,13 +376,21 @@
       {#if view.inScratch}
         <button class="saveicon main pending" title="Save to a collection…" aria-label="Save to a collection" onclick={saveTo}><Icon name="save" size={15} /></button>
       {:else}
-        <button class="saveicon main" class:pending={view.dirty} title="Save (⌘S)" aria-label="Save" disabled={!view.dirty} onclick={() => RequestService.Save(node)}><Icon name="save" size={15} /></button>
+        <button class="saveicon main" class:pending={view.dirty} title={view.flowiOverlay ? `Save to the flowi overlay ${view.flowiOverlay} (⌘S)` : 'Save (⌘S)'} aria-label="Save" disabled={!view.dirty} onclick={save}><Icon name="save" size={15} /></button>
       {/if}
       <button class="more" aria-label="Save options" aria-expanded={menu === 'save'} onpointerdown={(e) => e.stopPropagation()} onclick={() => (menu = menu === 'save' ? null : 'save')}>▾</button>
       {#if menu === 'save'}
         <div class="menu" role="menu" tabindex="-1" onpointerdown={(e) => e.stopPropagation()}>
-          <button role="menuitem" onclick={() => menuAction(save)}><span class="tick"></span>Save current version<kbd>⌘S</kbd></button>
+          {#if view.flowiOverlay}
+            <button role="menuitem" disabled={!view.dirty} onclick={() => menuAction(() => (saveOverlayOpen = true))}><span class="tick"></span>Save to flowi overlay {view.flowiOverlay}…<kbd>⌘S</kbd></button>
+            <button role="menuitem" title="Writes the overlay's changes into the version itself" onclick={() => menuAction(saveVersion)}><span class="tick"></span>Save into the version, with the overlay</button>
+          {:else}
+            <button role="menuitem" onclick={() => menuAction(saveVersion)}><span class="tick"></span>Save current version<kbd>⌘S</kbd></button>
+          {/if}
           <button role="menuitem" onclick={() => menuAction(newVersion)}><span class="tick"></span>Save as new version…</button>
+          {#if !view.inScratch}
+            <button role="menuitem" disabled={!view.dirty && !view.flowiOverlay} title="Keeps the changes apart from the version, to lay over it when sending" onclick={() => menuAction(() => (saveOverlayOpen = true))}><span class="tick"></span>Save as flowi overlay…</button>
+          {/if}
           {#if origin?.spec}
             <button role="menuitem" title={`Also write what the spec can say to an overlay on ${origin.spec}`} onclick={() => menuAction(() => (overlayOpen = true))}><span class="tick"></span>Save to spec overlay…</button>
           {/if}
@@ -349,9 +415,23 @@
     />
   {/if}
   {#if overlayOpen}<OverlayDialog {node} onclose={() => (overlayOpen = false)} />{/if}
+  {#if saveOverlayOpen}<FlowiOverlayDialog {node} onclose={() => (saveOverlayOpen = false)} />{/if}
+  {#if overlaysOpen}<FlowiOverlayEditor {node} overlays={view.flowiOverlays} current={view.flowiOverlay} onclose={() => (overlaysOpen = false)} />{/if}
+  {#if warningOpen && view.flowiOverlay}<FlowiOverlayWarning overlay={view.flowiOverlay} notes={view.flowiOverlayNotes} version={view.selected} onclose={() => (warningOpen = false)} />{/if}
   {#if updating && origin}<SpecUpdateDialog collection={origin.collection} spec={updating} onclose={() => (updating = null)} />{/if}
   <FileBanner onDisk={view.onDisk} needsDrop={view.needsDrop} revert={() => RequestService.Revert(node)} saveDropping={() => RequestService.SaveDroppingComments(node)} declineDrop={() => RequestService.DeclineDrop(node)} />
   {#if view.error}<p class="bar err"><Problem text={view.error} /></p>{/if}
+  {#if view.flowiOverlay}
+    {@const info = stack.length === 1 ? view.flowiOverlays.find((o) => o.name === view.flowiOverlay) : undefined}
+    <p class="bar overlaybar">
+      Flowi {stack.length > 1 ? 'overlays' : 'overlay'}
+      {#each stack as n, i}{#if i}<span class="then">&nbsp;then&nbsp;</span>{/if}<strong>{n}</strong>{#if stack.length > 1}<button class="link" title={`Take ${n} off`} aria-label={`Take ${n} off`} onclick={() => unstackOverlay(n)}>×</button>{/if}{/each}
+      {stack.length > 1 ? 'are' : 'is'} laid over version {view.selected}{#if info} · {info.shared} shared {info.shared === 1 ? 'change' : 'changes'}{info.used ? `, ${info.own} for this request` : ''}{/if}.
+      Sends use the request as shown; their responses are kept apart from the version's.
+      {#if view.flowiOverlayNotes.length}<button class="link" onclick={() => (warningOpen = true)}>{view.flowiOverlayNotes.length} not applied in full</button>{/if}
+      · <button class="link" onclick={() => RequestService.SelectFlowiOverlay(node, '')}>Take it off</button>
+    </p>
+  {/if}
   <MissingBar {view} />
   {#if origin?.spec}
     <p class="bar specbar">
@@ -373,7 +453,7 @@
           {#each mainSecs as sec}
             <!-- Icons keep six tabs and More in a narrow pane; the open tab also shows its name, the others say it on hover. -->
             <button role="tab" aria-selected={section === sec} aria-label={titleOf(sec)} title={titleOf(sec)} class="tab" class:on={section === sec} onclick={() => (chosen = sec)}>
-              <Icon name={iconOf(sec)} size={15} />{#if section === sec}<span class="tname">{titleOf(sec)}</span>{/if}{#if configured(sec)}<i class="cdot" title="Has content"></i>{/if}
+              <Icon name={iconOf(sec)} size={15} />{#if section === sec}<span class="tname">{titleOf(sec)}</span>{/if}{#if counts[sec]}<span class="count tabcount" title={`${counts[sec]} ${counts[sec] === 1 ? 'entry' : 'entries'}`}>{counts[sec]}</span>{:else if configured(sec)}<i class="cdot" title="Has content"></i>{/if}
             </button>
           {/each}
           </div>
@@ -387,11 +467,11 @@
           {#if ['Message', 'Receive', 'Credentials', 'Binding', 'Proto'].includes(section)}
             <MessageSections {view} {section} />
           {:else if section === 'Params'}
-            <KVRows rows={v.Query} describe marks={overlayMarks('query')} onchange={(r) => RequestService.SetRows(node, 'query', r)}
+            <KVRows rows={v.Query} describe marks={overlayMarks('query', v.Query)} onchange={(r) => RequestService.SetRows(node, 'query', r)}
               empty={{ icon: 'params', title: 'No query parameters', hint: 'Add one here, or type ?name=value at the end of the address.', add: 'Add parameter' }} />
           {:else if section === 'Headers'}
             {@const sendHeaders = view.async && !view.async.headersAreConnection}
-            <KVRows rows={sendHeaders ? (view.async?.block.Send?.Headers ?? null) : v.Headers} describe keyLabel="header" marks={sendHeaders ? {} : overlayMarks('header')} onchange={(r) => RequestService.SetRows(node, 'headers', r)}
+            <KVRows rows={sendHeaders ? (view.async?.block.Send?.Headers ?? null) : v.Headers} describe keyLabel="header" marks={sendHeaders ? {} : overlayMarks('header', v.Headers)} onchange={(r) => RequestService.SetRows(node, 'headers', r)}
               empty={{ icon: 'headers', title: 'No headers', hint: sendHeaders ? 'Headers travel with each message sent.' : 'Content-Type, Accept and the like. Credentials go in Auth.', add: 'Add header' }} />
           {:else if section === 'Body'}
             {@const bodyFrom = origin?.fields.find((f) => f.section === 'body')}
@@ -403,7 +483,7 @@
               <KVRows rows={v.Body.Form} onchange={(r) => RequestService.SetFormRows(node, r)}
                 empty={{ icon: 'list', title: 'No form fields', hint: 'Each field is sent as name=value.', add: 'Add field' }} />
             {:else if view.bodyKind === 'form'}
-              <p class="muted">Multipart fields (including files) are edited in the file for now.</p>
+              <PartsEditor parts={view.parts} onchange={(p) => RequestService.SetParts(node, p as never)} />
             {:else if view.bodyKind === 'file'}
               <TextField label="File path" mono value={v.Body.File} oninput={(t) => RequestService.SetBodyFile(node, t)} />
             {:else}
@@ -412,6 +492,11 @@
           {:else if section === 'Auth'}
             {#if view.auth.kind === 'none'}
               <EmptyState icon="auth" title="No auth" hint={'Pick a type below. Keep credentials out of the file: use {{secret.name}}.'} compact />
+            {:else if isScheme}
+              {#each view.auth.fields as f (f.name)}
+                <TextField label={f.name + (f.known ? '' : ' (not a parameter of this scheme)')} mono placeholder={f.secret ? '{{secret.' + f.name + '}}' : ''} value={f.value} oninput={(t) => RequestService.SetAuthParam(node, f.name, t)} />
+              {/each}
+              <p class="muted">Every value is a template. Keep credentials out of the file: {'{{secret.name}}'} reads the vault. The request is signed or authenticated as it is sent.</p>
             {:else}
               <TextField label={view.auth.kind === 'bearer' ? 'Token' : view.auth.kind === 'basic' ? 'Base64 credentials or a template' : 'Authorization header value'} mono
                 value={view.auth.value} oninput={(t) => RequestService.SetAuth(node, view.auth.kind, t)} />
@@ -468,8 +553,16 @@
           {:else if section === 'Cookies'}
             <RequestExtras {view} which="cookies" />
           {:else}
-            <AreaField mono={false} value={v.Docs} oninput={(t) => RequestService.SetDocs(node, t)}
-              empty={{ icon: 'docs', title: 'No notes', hint: 'Click to write about this request, in Markdown.' }} />
+            <div class="docsbar" role="group" aria-label="Notes view">
+              <button class:on={!docsPreview} onclick={() => (docsPreview = false)}>Write</button>
+              <button class:on={docsPreview} onclick={() => (docsPreview = true)} disabled={!v.Docs}>Preview</button>
+            </div>
+            {#if docsPreview && v.Docs}
+              <div class="docsview"><Markdown text={v.Docs} /></div>
+            {:else}
+              <AreaField mono={false} value={v.Docs} oninput={(t) => RequestService.SetDocs(node, t)}
+                empty={{ icon: 'docs', title: 'No notes', hint: 'Click to write about this request, in Markdown.' }} />
+            {/if}
           {/if}
         </div>
       {/if}
@@ -479,12 +572,23 @@
             {#if view.bodyKind === 'text'}
               <Dropdown title="Format" options={formatOptions} value={view.bodyFormat} onpick={(f) => RequestService.SetBodyFormat(node, f)} />
             {/if}
+            {#if view.bodyKind === 'text' && view.bodyFormat === 'json'}
+              {#if view.jsonrpc}
+                <span class="rpc" title="This body is a JSON-RPC 2.0 call. Its parameters are edited above.">
+                  <span class="muted">JSON-RPC</span>
+                  <input class="mini" aria-label="JSON-RPC method" placeholder="method" value={view.jsonrpc.method} onchange={(e) => RequestService.SetJSONRPC(node, 'method', e.currentTarget.value)} />
+                  <input class="mini id" aria-label="JSON-RPC id" placeholder="id" title="The call's id. Empty makes it a notification: no id, no answer." value={view.jsonrpc.id} onchange={(e) => RequestService.SetJSONRPC(node, 'id', e.currentTarget.value)} />
+                </span>
+              {:else}
+                <button class="link" title="Wrap this body as the parameters of a JSON-RPC 2.0 call" onclick={() => RequestService.MakeJSONRPC(node)}>Make it a JSON-RPC call</button>
+              {/if}
+            {/if}
             {#if view.bodyKind === 'form'}
               <label class="radio"><input type="checkbox" checked={view.multipart} onchange={(e) => RequestService.SetMultipart(node, e.currentTarget.checked)} />Multipart</label>
             {/if}
           </div>
         {:else if section === 'Auth'}
-          <div class="typebar"><Dropdown title="Auth type" options={authOptions} value={view.auth.kind} onpick={(k) => RequestService.SetAuth(node, k, view.auth.value)} /></div>
+          <div class="typebar"><Dropdown title="Auth type" options={authOptions} value={view.auth.kind} onpick={pickAuth} /></div>
         {/if}
     </div>
     <Splitter name="request-left" side="left" min={300} max={1000} bind:width={leftWidth} />
@@ -521,9 +625,18 @@
   .menu button { border: 0; text-align: left; }
   .hd { color: var(--muted); font-size: var(--fs-xs); padding: 2px 10px; }
   .bar { margin: 0; padding: 6px 12px; font-size: var(--fs-sm); }
-  .specbar { color: var(--muted); border-bottom: 1px solid var(--line); }
+  .specbar, .overlaybar { color: var(--muted); border-bottom: 1px solid var(--line); }
+  .overlaybar { background: color-mix(in srgb, var(--accent) 7%, transparent); }
+  .overlaybar strong { color: var(--text); font-weight: 600; }
+  .overlaybar .then { color: var(--muted); }
+  .overlaybar strong + .link { margin-left: 3px; font-size: 1.1em; line-height: 1; }
+  .overlaybar .link { background: none; border: 0; padding: 0; color: var(--accent); font: inherit; }
   .specbar code, .overlaynote code { font-size: var(--fs-xs); }
   .specbar .link { background: none; border: 0; padding: 0; color: var(--accent); font: inherit; }
+  .rpc { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; min-width: 0; }
+  .rpc .mini { width: 110px; background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); padding: 2px 6px; font: inherit; font-size: var(--fs-sm); }
+  .rpc .mini.id { width: 64px; }
+  .typebar .link { background: none; border: 0; padding: 0; color: var(--accent); font: inherit; font-size: var(--fs-sm); }
   .overlaynote { margin: 0 0 6px; font-size: var(--fs-xs); }
   .err { color: var(--fail); background: color-mix(in srgb, var(--fail) 12%, transparent); }
   .panels { flex: 1; min-height: 0; display: flex; }
@@ -534,13 +647,20 @@
   .sectabs::-webkit-scrollbar { display: none; }
   .tab { position: relative; flex: none; display: inline-flex; align-items: center; gap: 6px; border: 0; border-bottom: 2px solid transparent; border-radius: 0; color: var(--muted); padding: 8px 10px 6px; white-space: nowrap; }
   .cdot { position: absolute; top: 6px; right: 5px; }
+  /* The badge sits on the icon's corner, so an icon-only tab keeps its width. */
+  .tabcount { position: absolute; top: 1px; right: -2px; min-width: 14px; margin: 0; padding: 0 4px; font-size: 10px; line-height: 14px; }
+  .tab.on .tabcount { position: static; margin-left: 2px; }
   .tab:hover:not(:disabled) { color: var(--text); border-color: transparent; border-bottom-color: var(--line); }
   .tab.on, .tab.on:hover:not(:disabled) { color: var(--text); border-bottom-color: var(--accent); }
   .cdot { display: block; width: 5px; height: 5px; border-radius: 50%; background: var(--ok); }
   .more-secs { flex: none; margin: 0 0 4px auto; padding-left: 6px; }
   .more-secs.on :global(.btn) { border-color: var(--accent); }
-  .typebar { flex: none; display: flex; align-items: center; gap: 10px; padding: 6px 10px; border-top: 1px solid var(--line); }
-  .ver { display: flex; align-items: center; gap: 4px; }
+  .docsbar { flex: none; display: flex; gap: 2px; padding: 0 0 6px; }
+  .docsbar button { background: transparent; color: var(--muted); border: 1px solid var(--line); border-radius: var(--r-md); padding: 1px 10px; font: inherit; font-size: var(--fs-xs); }
+  .docsbar button.on { color: var(--text); background: var(--panel); }
+  .docsbar button:disabled { opacity: 0.5; }
+  .docsview { flex: 1; min-height: 0; overflow: auto; padding: 4px 2px; }
+  .typebar { flex: none; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; padding: 6px 10px; border-top: 1px solid var(--line); }
   .act { background: var(--act); color: var(--on-act); border-color: var(--act); font-weight: 600; box-shadow: 0 2px 10px color-mix(in srgb, var(--act) 32%, transparent); }
   .act:hover:not(:disabled) { border-color: var(--act); background: color-mix(in srgb, var(--act) 88%, white); }
   /* The floppy disk is the save everyone knows; the words stay as the tooltip and the name read aloud. */

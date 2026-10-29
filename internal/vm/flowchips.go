@@ -25,7 +25,7 @@ const (
 type Chip struct {
 	Kind  ChipKind
 	Text  string   // ChipError: the error
-	Steps []string // ChipWarning: the steps only Flow-I can run, as "id (type)"; ChipNeeds: the needs on a later node, as "c needs b"
+	Steps []string // ChipWarning: the steps only Flowi can run, as "id (type)"; ChipNeeds: the needs on a later node, as "c needs b"
 }
 
 // FlowChips are the chips d needs now, most urgent first.

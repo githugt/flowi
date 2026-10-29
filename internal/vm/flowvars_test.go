@@ -14,8 +14,8 @@ func param(k string, v any) model.Field { return model.Field{Key: k, Value: v} }
 func TestScanFlow_should_list_written_read_and_unset_variables_and_secrets(t *testing.T) {
 	f := model.Flow{Nodes: []model.Node{
 		{ID: "s", Type: "set", Params: []model.Field{param("target", "vars.token"), param("value", "{{secret.api_key}}")}},
-		{ID: "e", Type: "extract", Params: []model.Field{param("name", "user_id"), param("path", "$.id")}},
-		{ID: "g", Type: "generate", Params: []model.Field{param("email", "$email")}},
+		{ID: "e", Type: "set", Values: []model.SetValue{{Name: "user_id", From: "response", Where: "body", Path: "$.id"}}},
+		{ID: "g", Type: "set", Values: []model.SetValue{{Name: "email", From: "generate", Value: "{{$email}}"}}},
 		{ID: "l", Type: "log", Params: []model.Field{param("value", "{{vars.token}} {{vars.user_id}} {{vars.missing}}")}},
 	}}
 

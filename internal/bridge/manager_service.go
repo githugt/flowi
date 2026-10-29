@@ -21,7 +21,7 @@ type CollectionView struct {
 	Name    string    `json:"name"`
 	Path    string    `json:"path"`
 	Missing bool      `json:"missing"` // its directory is gone: relocate it
-	Draft   bool      `json:"draft"`   // kept in Flow-I's own folder: save it somewhere or discard it
+	Draft   bool      `json:"draft"`   // kept in Flowi's own folder: save it somewhere or discard it
 	Deps    []DepView `json:"deps"`
 }
 
@@ -62,6 +62,13 @@ func (s *ManagerService) State() ManagerView {
 // Mount mounts the collection in dir.
 func (s *ManagerService) Mount(dir string) { s.app.actor.Do(func() { s.vm.Mount(dir) }) }
 
+// OpenArazzo opens an Arazzo document (a file or an http(s) address) as a collection whose flows run against the
+// server the document's OpenAPI description names, until the app quits.
+func (s *ManagerService) OpenArazzo(ref string) { s.app.actor.Do(func() { s.vm.OpenArazzo(ref) }) }
+
+// OpenBundle opens a run bundle file as a collection whose runs play the recording back.
+func (s *ManagerService) OpenBundle(path string) { s.app.actor.Do(func() { s.vm.OpenBundle(path) }) }
+
 // Unmount removes a collection from the workspace; its files stay.
 func (s *ManagerService) Unmount(id string) { s.app.actor.Do(func() { s.vm.Unmount(model.ID(id)) }) }
 
@@ -71,7 +78,7 @@ func (s *ManagerService) Relocate(id, dir string) {
 }
 
 // NewCollection creates a collection: in location when given (the folder
-// is created or must be empty), else in Flow-I's own folder.
+// is created or must be empty), else in Flowi's own folder.
 func (s *ManagerService) NewCollection(name, location string) {
 	s.app.actor.Do(func() { s.vm.NewCollection(name, location) })
 }

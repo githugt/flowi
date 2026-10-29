@@ -158,6 +158,19 @@ func TestRequestVM_PickMethod_should_set_the_method_and_fill_an_empty_body_with_
 	}
 }
 
+func TestRequestVM_PickMethod_should_start_a_client_streaming_method_with_an_array_of_one_message(t *testing.T) {
+	b := grpcBackend()
+	b.Cols[0].Requests[3].Versions[0].GRPC.Body = model.Body{}
+	r, _ := asyncRequestVM(t, b)
+	upload := grpcx.Method{Service: "shop.Shop", Name: "Upload", ClientStream: true, Example: `{"id":""}`}
+
+	r.PickMethod(upload)
+
+	if got := r.GRPC().Body.JSON; got != `[{"id":""}]` {
+		t.Fatalf("body %s, want an array holding the example", got)
+	}
+}
+
 func TestRequestVM_MethodsSource_should_say_whether_the_schema_comes_from_files_or_reflection(t *testing.T) {
 	r, _ := asyncRequestVM(t, grpcBackend()) // lists a proto file
 	byFiles := r.MethodsSource()

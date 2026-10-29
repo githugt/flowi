@@ -11,6 +11,7 @@ import (
 	"github.com/githugt/flowi-lib/model"
 
 	"github.com/githugt/flowi/internal/canvas"
+	"github.com/githugt/flowi/internal/card"
 	"github.com/githugt/flowi/internal/vm"
 )
 
@@ -18,7 +19,12 @@ import (
 type Card struct {
 	Title    string     `json:"title"`
 	Subtitle string     `json:"subtitle"`
-	Hooks    []HookTick `json:"hooks"` // a request step: the hooks that run around it, and how each went
+	Hooks    []HookTick `json:"hooks"`              // a request step: the hooks that run around it, and how each went
+	Face     card.Card  `json:"face"`               // what the card shows: badge, sub-line, summary rows, ports
+	Color    string     `json:"color,omitempty"`    // the colour the person gave the step
+	Skipped  bool       `json:"skipped"`            // this run leaves the step out
+	SkipNote string     `json:"skipNote,omitempty"` // "login is skipped, so this has no value", on a step that reads from one
+	Break    bool       `json:"break"`              // a debug session pauses before this step
 }
 
 // FlowView is an open flow as the canvas shows it.
@@ -29,7 +35,14 @@ type FlowView struct {
 	Chips     []ChipView      `json:"chips"`
 	Form      Form            `json:"form"`
 	Palette   []PaletteEntry  `json:"palette"`
+	Steps     []StepChoice    `json:"steps"`   // what the step popup offers
+	Start     card.Card       `json:"start"`   // the flow's inputs, drawn as the first card
+	Inputs    []IOView        `json:"inputs"`  // what the Start card's rows open
+	Outputs   []IOView        `json:"outputs"` // what the End card's rows open
+	End       *card.Card      `json:"end"`     // its outputs, drawn as the last card; nil without outputs
 	Run       RunView         `json:"run"`
+	Skips     SkipView        `json:"skips"`
+	Debug     DebugView       `json:"debug"`
 	Vars      VarsView        `json:"vars"`
 	Node      string          `json:"node"` // the workspace tree node it was opened from
 	Name      string          `json:"name"`
@@ -95,6 +108,7 @@ func (s *FlowService) open(node string) (FlowView, error) {
 		doc.UseGraphView()
 		o := &openFlow{doc: doc, run: vm.NewFlowRun(s.app.backend, s.app.worker, doc), history: vm.NewRunHistory(s.app.backend, s.app.worker, doc)}
 		doc.OnChange(func() { s.app.emit("flow", s.view(node, o)) })
+		o.run.OnPrompt(s.app.promptPerson)
 		o.run.OnStatus(func(string, string) { s.app.emit("flowrun", FlowRunEvent{Node: node, Run: runViewOf(o)}) })
 		// The hook ticks on the cards are part of the flow view, so a run's change publishes both.
 		o.run.OnChange(func() {
@@ -164,12 +178,13 @@ func (s *FlowService) view(node string, o *openFlow) FlowView {
 	o.prune()
 	diagram := d.Diagram()
 	_, rev := d.Snapshot()
+	start, end := startEndOf(o)
 	return FlowView{
 		Rev:  rev,
 		Node: node, Name: d.Draft().Name, Dirty: d.Dirty(), OnDisk: d.ChangedOnDisk(), NeedsDrop: d.NeedsDropConfirm(), CanUndo: d.CanUndo(), CanRedo: d.CanRedo(),
 		Error: d.Err(), Diagram: diagram, Cards: s.cardsOf(o, diagram), Data: dataEdgesOf(d, diagram), Selection: o.selection(), Chips: chipsOf(d),
-		Selected: o.selected, Form: s.formOf(d, o.selected), Palette: paletteOf(),
-		Run: runViewOf(o), Vars: varsOf(o),
+		Selected: o.selected, Form: s.formOf(d, o.run, o.selected), Palette: paletteOf(), Steps: stepsOf(),
+		Run: runViewOf(o), Skips: skipsOf(o), Debug: debugOf(o), Vars: varsOf(o), Start: start, End: end, Inputs: inputViewsOf(d.Draft()), Outputs: outputViewsOf(d.Draft()),
 	}
 }
 
@@ -195,11 +210,22 @@ func dataEdgesOf(d *vm.FlowDoc, g canvas.Diagram) []DataEdge {
 func (s *FlowService) cardsOf(o *openFlow, g canvas.Diagram) map[string]Card {
 	cards := make(map[string]Card, len(g.Units))
 	selected := o.selection()
+	skips, debug := skipsOf(o), debugOf(o)
 	for _, u := range g.Units {
 		n, _ := o.doc.Node(u.Nodes[u.Core]) // the request of a block with attached actions, else the only or first node
-		cards[u.ID] = Card{Title: unitTitle(u, n, selected), Subtitle: unitSubtitle(u, n), Hooks: nonNilTicks(s.hookTicksOf(o, n))}
+		skipped, note := skipMark(skips, u.Nodes)
+		cards[u.ID] = Card{Title: unitTitle(u, n, selected), Subtitle: unitSubtitle(u, n), Hooks: nonNilTicks(s.hookTicksOf(o, n)), Face: faceOf(o.doc, n), Color: n.Color, Skipped: skipped, SkipNote: note, Break: slices.ContainsFunc(u.Nodes, func(id string) bool { return slices.Contains(debug.Breaks, id) })}
 	}
 	return cards
+}
+
+// faceOf is what the step's card shows; empty when the document draws no cards.
+func faceOf(d *vm.FlowDoc, n model.Node) card.Card {
+	face, ok := d.Cards()[n.ID]
+	if !ok {
+		return card.Card{Rows: []card.Row{}, More: []card.Row{}, Ports: []card.Port{}}
+	}
+	return face
 }
 
 func nonNilTicks(t []HookTick) []HookTick {
@@ -281,7 +307,7 @@ func (o *openFlow) prune() {
 }
 
 // ChipView is one thing to tell about the flow: an error, steps that wait for
-// a step after them, steps only Flow-I can run, a change on disk, unsaved edits.
+// a step after them, steps only Flowi can run, a change on disk, unsaved edits.
 type ChipView struct {
 	Kind  string   `json:"kind"` // error, needs, warning, disk, unsaved
 	Text  string   `json:"text,omitempty"`

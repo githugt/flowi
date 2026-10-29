@@ -23,7 +23,7 @@
         "wait-for-code"
       ],
       "types": [
-        "extract",
+        "set",
         "delay"
       ],
       "path": "$.nodes[1]",
@@ -54,7 +54,7 @@
         "profile"
       ],
       "types": [
-        "generate"
+        "set"
       ],
       "path": "$.nodes[4]",
       "x": 880,

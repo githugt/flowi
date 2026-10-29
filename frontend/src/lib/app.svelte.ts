@@ -69,6 +69,7 @@ class AppState {
       const n = this.find(String(e.data))
       if (n) this.open(n)
     })
+    Events.On('authprompt', (e: any) => (ui.signIn = e.data))
     Events.On('notice', (e: any) => ui.toast(e.data.text, e.data.level))
     Events.On('clipboard', (e: any) => {
       Clipboard.SetText(String(e.data))
@@ -165,13 +166,39 @@ class AppState {
     this.settings = v
     const a = v.appearance
     const root = document.documentElement
-    if (a.theme && a.theme !== 'system') root.dataset.theme = a.theme
-    else delete root.dataset.theme
+    this.applyTheme(a)
     if (/^#[0-9a-fA-F]{6}$/.test(a.accent)) root.style.setProperty('--accent', a.accent)
-    else root.style.removeProperty('--accent')
+    else if (!(a.theme === 'custom' && a.custom?.vars['--accent'])) root.style.removeProperty('--accent')
     if (a.font) root.style.setProperty('--font', a.font)
     else root.style.removeProperty('--font')
     root.style.setProperty('--font-size', `${a.fontSize || 13}px`)
+  }
+
+  /** CSS variables the custom palette set last, to take away when another theme is chosen. */
+  private customVars: string[] = []
+  /** Why the custom theme's palette could not be used, "" when it can or is not chosen. */
+  paletteProblem = $state('')
+  /** The tints of the collection rows (the palette's rainbow), empty for the other themes. */
+  rainbow = $state<string[]>([])
+
+  /** Puts the theme on the root. A custom palette that does not read changes nothing: the window keeps the theme it has. */
+  private applyTheme(a: SettingsView['appearance']) {
+    const root = document.documentElement
+    this.paletteProblem = a.theme === 'custom' ? (a.customProblem ?? '') : ''
+    if (a.theme === 'custom') {
+      if (!a.custom) return
+      for (const name of this.customVars) root.style.removeProperty(name)
+      this.customVars = Object.keys(a.custom.vars)
+      for (const [name, value] of Object.entries(a.custom.vars)) root.style.setProperty(name, value)
+      root.dataset.theme = a.custom.base
+      this.rainbow = a.custom.rainbow
+      return
+    }
+    for (const name of this.customVars) root.style.removeProperty(name)
+    this.customVars = []
+    this.rainbow = []
+    if (a.theme && a.theme !== 'system') root.dataset.theme = a.theme
+    else delete root.dataset.theme
   }
 
   /** Opens a screen that is not a tree node (settings, import, ...) as a tab. */
@@ -193,7 +220,7 @@ class AppState {
     const have = new Set(v.rows.map((r) => r.name))
     const added = vars
       .filter((x) => x.name && !have.has(x.name))
-      .map((x) => ({ name: x.name, value: '', secret: x.secret, secretSet: false, override: false }))
+      .map((x) => ({ name: x.name, value: '', secret: x.secret, secretSet: false, override: false, kind: '' as const }))
     // Awaited: calls can reach Go in any order, and an Open answered before the
     // new rows would show the environment without them.
     if (added.length) await EnvironmentService.SetRows(n.id, [...v.rows, ...added])

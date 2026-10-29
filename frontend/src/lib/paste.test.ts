@@ -6,6 +6,7 @@ describe('recognise', () => {
     ['a curl command', "curl --location 'https://pokeapi.co/api/v2/pokemon/ditto'", 'curl', true],
     ['a curl command copied with its prompt', '$ curl -X POST https://example.com', 'curl', true],
     ['a .http request', 'POST https://example.com/orders\nContent-Type: application/json\n\n{}', 'http', true],
+    ['a .http QUERY request', 'QUERY https://example.com/search\nContent-Type: application/json\n\n{}', 'http', true],
     ['a .http request after a comment', '# make an order\nGET {{base}}/orders HTTP/1.1\n', 'http', true],
     ['an OpenAPI document in JSON', '{"openapi": "3.1.0", "paths": {}}', 'openapi', false],
     ['a Swagger document in YAML', 'swagger: "2.0"\ninfo:\n  title: Shop', 'openapi', false],

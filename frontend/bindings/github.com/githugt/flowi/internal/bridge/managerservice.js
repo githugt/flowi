@@ -13,6 +13,10 @@ import { Call as $Call, CancellablePromise as $CancellablePromise, Create as $Cr
 
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
+import * as model$0 from "../../../flowi-lib/model/models.js";
+
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore: Unused imports
 import * as $models from "./models.js";
 
 /**
@@ -57,13 +61,32 @@ export function Mount(dir) {
 
 /**
  * NewCollection creates a collection: in location when given (the folder
- * is created or must be empty), else in Flow-I's own folder.
+ * is created or must be empty), else in Flowi's own folder.
  * @param {string} name
  * @param {string} location
  * @returns {$CancellablePromise<void>}
  */
 export function NewCollection(name, location) {
     return $Call.ByID(3167706474, name, location);
+}
+
+/**
+ * OpenArazzo opens an Arazzo document (a file or an http(s) address) as a collection whose flows run against the
+ * server the document's OpenAPI description names, until the app quits.
+ * @param {string} ref
+ * @returns {$CancellablePromise<void>}
+ */
+export function OpenArazzo(ref) {
+    return $Call.ByID(2218726819, ref);
+}
+
+/**
+ * OpenBundle opens a run bundle file as a collection whose runs play the recording back.
+ * @param {string} path
+ * @returns {$CancellablePromise<void>}
+ */
+export function OpenBundle(path) {
+    return $Call.ByID(269125420, path);
 }
 
 /**
@@ -102,6 +125,18 @@ export function SaveDraft(id, dir) {
 }
 
 /**
+ * SetVariables replaces the variables of a collection. needsConfirm is true when
+ * the file has comments that writing would drop: ask, then call again with dropComments.
+ * @param {string} collection
+ * @param {model$0.KeyValue[]} rows
+ * @param {boolean} dropComments
+ * @returns {$CancellablePromise<boolean>}
+ */
+export function SetVariables(collection, rows, dropComments) {
+    return $Call.ByID(3784045581, collection, rows, dropComments);
+}
+
+/**
  * State loads the collections and returns them; changes arrive as the "manager" event.
  * @returns {$CancellablePromise<$models.ManagerView>}
  */
@@ -120,8 +155,21 @@ export function Unmount(id) {
     return $Call.ByID(3310655496, id);
 }
 
+/**
+ * Variables lists the variables of a collection, read in templates as collection_var.<name>.
+ * @param {string} collection
+ * @returns {$CancellablePromise<model$0.KeyValue[]>}
+ */
+export function Variables(collection) {
+    return $Call.ByID(554019013, collection).then(/** @type {($result: any) => any} */(($result) => {
+        return $$createType5($result);
+    }));
+}
+
 // Private type creation functions
 const $$createType0 = $models.KeptSpecView.createFrom;
 const $$createType1 = $Create.Array($$createType0);
 const $$createType2 = $models.SpecUpdateView.createFrom;
 const $$createType3 = $models.ManagerView.createFrom;
+const $$createType4 = model$0.KeyValue.createFrom;
+const $$createType5 = $Create.Array($$createType4);

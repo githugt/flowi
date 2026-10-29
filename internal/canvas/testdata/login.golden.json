@@ -22,7 +22,7 @@
         "session"
       ],
       "types": [
-        "extract"
+        "set"
       ],
       "path": "$.nodes[1]",
       "x": 280,

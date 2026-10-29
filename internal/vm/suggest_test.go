@@ -89,3 +89,14 @@ func TestSuggest_should_use_the_text_before_the_caret_only(t *testing.T) {
 		t.Fatalf("got %v", texts(got))
 	}
 }
+
+func TestSuggest_should_offer_the_collections_variables_in_their_own_namespace(t *testing.T) {
+	src := suggestSource()
+	src.Collection = []string{"region", "api_base"}
+
+	got := texts(Suggest("{{collection_var.", len("{{collection_var."), src, 10))
+
+	if !slices.Equal(got, []string{"collection_var.api_base", "collection_var.region"}) {
+		t.Fatalf("got %v", got)
+	}
+}

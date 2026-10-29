@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <title>Flow-I</title>
+  <!-- The layer of the macOS icon bundle: the waves and the Fi, full bleed. Icon Composer supplies the tile
+       colour (see icon.json) and the rounded shape. Keep the colours in step with ../../appicon.svg. -->
+  <g transform="scale(10.24)">
+    <path d="M0 68C30 52 55 82 100 40V100H0Z" fill="#c8153f"/>
+    <path d="M0 84C30 70 58 96 100 62V100H0Z" fill="#9f1239"/>
+    <g fill="none" stroke="#ffffff" stroke-width="10" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M26 78V26"/>
+      <path d="M26 26Q40 12 54 26T76 26"/>
+      <path d="M26 52H50"/>
+      <path d="M78 52V76"/>
+    </g>
+    <circle cx="78" cy="34" r="7" fill="#ffe600"/>
+  </g>
+</svg>

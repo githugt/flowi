@@ -68,11 +68,21 @@
     })
   }
 
-  function pin() {
+  async function saveBody() {
+    try {
+      const file = (await RequestService.SaveBody(view.node)) as string
+      if (file) ui.toast('Saved: ' + file)
+    } catch (e) {
+      ui.toast(errorText(e), 'error')
+    }
+  }
+
+  async function pin() {
     ui.prompt({
       title: 'Pin as example',
       label: 'Name (empty: the status code)',
       initial: '',
+      warning: (await RequestService.PinWarning(view.node)) as string,
       done: async (name) => {
         try {
           ui.toast('Pinned: ' + (await RequestService.PinExample(view.node, name)))
@@ -168,10 +178,13 @@
     {/if}
     <header>
       <span class="title" class:ok={r.passed} class:bad={!r.passed}>{r.title}</span>
+      {#if r.took}<span class="meta" title="Time the send took">{r.took}</span>{/if}
+      {#if r.size}<span class="meta" title="Size of the response body">{r.size}</span>{/if}
       <span class="muted">{r.at}</span>
       {#if tab === 'received'}
         <span class="grow"></span>
         <button class="mini" onclick={pin}>Pin as example…</button>
+        <button class="mini" onclick={saveBody}>Save body…</button>
         <select bind:value={format} onchange={() => format !== 'tree' && RequestService.SetFormat(view.node, format)} aria-label="Body format">
           <option value="tree">Tree</option>
           <option value="json">JSON</option>
@@ -226,6 +239,8 @@
   section { display: flex; flex-direction: column; min-height: 0; height: 100%; padding: 12px; gap: 8px; }
   header { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
   .grow { flex: 1; }
+  /* Time and size beside the title, as quiet chips: the figures people look for first. */
+  .meta { padding: 1px 8px; border-radius: var(--r-pill); background: var(--tint-hover); color: var(--text); font: 600 var(--fs-xs)/16px var(--mono); font-variant-numeric: tabular-nums; }
   .title { font-weight: 600; }
   .ok { color: var(--ok); }
   .bad { color: var(--fail); }

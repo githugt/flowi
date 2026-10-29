@@ -18,6 +18,8 @@ type EnvRow struct {
 	Secret    bool   `json:"secret"`
 	SecretSet bool   `json:"secretSet"`
 	Override  bool   `json:"override"`
+	// Kind is how Value is read: "" text, "number", "boolean" or "json" (an object or list).
+	Kind string `json:"kind"`
 }
 
 // EnvView is an open environment as its screen shows it.
@@ -27,6 +29,8 @@ type EnvView struct {
 	Rows      []EnvRow `json:"rows"`
 	Colour    string   `json:"colour"`  // "" for the default
 	Colours   []string `json:"colours"` // what it can be set to
+	Extends   string   `json:"extends"` // the environment this one builds on, or ""
+	Bases     []string `json:"bases"`   // what it may build on
 	Dirty     bool     `json:"dirty"`
 	OnDisk    bool     `json:"onDisk"`
 	NeedsDrop bool     `json:"needsDrop"`
@@ -79,12 +83,17 @@ func (s *EnvironmentService) SetColour(node, colour string) {
 	s.with(node, func(e *vm.Environment) { e.SetColour(colour) })
 }
 
+// SetExtends chooses the environment this one builds on; "" builds on none.
+func (s *EnvironmentService) SetExtends(node, base string) {
+	s.with(node, func(e *vm.Environment) { e.SetExtends(base) })
+}
+
 // SetRows replaces the variables.
 func (s *EnvironmentService) SetRows(node string, rows []EnvRow) {
 	s.with(node, func(e *vm.Environment) {
 		out := make([]vm.EnvVarRow, len(rows))
 		for i, r := range rows {
-			out[i] = vm.EnvVarRow{Name: r.Name, Value: r.Value, Secret: r.Secret, SecretSet: r.SecretSet, Override: r.Override}
+			out[i] = vm.EnvVarRow{Name: r.Name, Value: r.Value, Secret: r.Secret, SecretSet: r.SecretSet, Override: r.Override, Kind: model.VarKind(r.Kind)}
 		}
 		e.SetRows(out)
 	})
@@ -113,7 +122,10 @@ func (s *EnvironmentService) Revert(node string) {
 func envViewOf(node string, e *vm.Environment) EnvView {
 	rows := make([]EnvRow, 0)
 	for _, r := range e.Rows() {
-		rows = append(rows, EnvRow{Name: r.Name, Value: r.Value, Secret: r.Secret, SecretSet: r.SecretSet, Override: r.Override})
+		rows = append(rows, EnvRow{Name: r.Name, Value: r.Value, Secret: r.Secret, SecretSet: r.SecretSet, Override: r.Override, Kind: string(r.Kind)})
 	}
-	return EnvView{Node: node, Name: e.Name(), Rows: rows, Colour: e.Colour(), Colours: model.EnvColours(), Dirty: e.Dirty(), OnDisk: e.ChangedOnDisk(), NeedsDrop: e.NeedsDropConfirm(), Error: e.Err()}
+	return EnvView{Node: node, Name: e.Name(), Rows: rows, Colour: e.Colour(), Colours: model.EnvColours(), Extends: e.Extends(), Bases: bases(e), Dirty: e.Dirty(), OnDisk: e.ChangedOnDisk(), NeedsDrop: e.NeedsDropConfirm(), Error: e.Err()}
 }
+
+// bases is never nil, so the front end can loop over it.
+func bases(e *vm.Environment) []string { return append([]string{}, e.Bases()...) }

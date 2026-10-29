@@ -32,11 +32,12 @@
     if (problem) ui.toast(problem, 'error')
   }
 
-  function pin(r: StoredView) {
+  async function pin(r: StoredView) {
     ui.prompt({
       title: 'Pin as example',
       label: 'Example name (empty: the status)',
       initial: r.status ? String(r.status) : '',
+      warning: (await RequestService.PinStoredWarning(node, r.version, r.name)) as string,
       done: async (name) => {
         try {
           ui.toast('Pinned: ' + (await RequestService.PinStored(node, r.version, r.name, name)))

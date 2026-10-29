@@ -65,7 +65,7 @@ type ImportView struct {
 func importLabels() map[flowi.ImportKind]string {
 	return map[flowi.ImportKind]string{
 		flowi.ImportOpenAPI: "OpenAPI", flowi.ImportAsyncAPI: "AsyncAPI", flowi.ImportProto: "gRPC .proto", flowi.ImportArazzo: "Arazzo",
-		flowi.ImportPostman: "Postman", flowi.ImportBruno: "Bruno", flowi.ImportHAR: "HAR", flowi.ImportHTTP: ".http file",
+		flowi.ImportPostman: "Postman", flowi.ImportBruno: "Bruno", flowi.ImportInsomnia: "Insomnia", flowi.ImportThunderClient: "Thunder Client", flowi.ImportHoppscotch: "Hoppscotch", flowi.ImportOpenRPC: "OpenRPC", flowi.ImportHAR: "HAR", flowi.ImportHTTP: ".http file",
 		flowi.ImportCurl: "curl", flowi.ImportMermaid: "Mermaid",
 	}
 }

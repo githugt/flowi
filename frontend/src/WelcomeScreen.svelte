@@ -38,7 +38,7 @@
 </script>
 
 <div class="page">
-  <h1>Welcome to Flow-I</h1>
+  <h1>Welcome to Flowi</h1>
   <p class="muted">Version {view?.version ?? ''}</p>
 
   <h3>Get started</h3>
@@ -69,7 +69,7 @@
   </ol>
 
   <div class="cards">
-    <button onclick={() => app.openScreen('screen:import', 'Import')}><strong>Import an API</strong><span>OpenAPI, AsyncAPI, Postman, Bruno, HAR, curl…</span></button>
+    <button onclick={() => app.openScreen('screen:import', 'Import')}><strong>Import an API</strong><span>OpenAPI, AsyncAPI, Postman, Bruno, Insomnia, Hoppscotch, HAR, curl…</span></button>
     <button onclick={() => app.openScreen('screen:telemetry', 'Telemetry')}><strong>Usage reporting</strong><span>Off unless you choose otherwise.</span></button>
   </div>
 

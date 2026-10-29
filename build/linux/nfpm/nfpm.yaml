@@ -13,9 +13,9 @@ version: ${VERSION}
 version_schema: semver
 section: "default"
 priority: "extra"
-maintainer: "Flow-I <githugt@users.noreply.github.com>"
+maintainer: "Flowi <githugt@users.noreply.github.com>"
 description: "Compose API requests into flows"
-vendor: "Flow-I"
+vendor: "Flowi"
 homepage: "https://github.com/githugt/flowi"
 license: "AGPL-3.0-or-later"
 release: "1"

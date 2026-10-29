@@ -15,8 +15,11 @@ type HooksView struct {
 	Request    string   `json:"request"` // the request row it belongs to
 	Pre        string   `json:"pre"`     // the flow row of the pre-hooks document
 	Post       string   `json:"post"`
+	Message    string   `json:"message"`    // the flow row of the message hooks: they run for each message a message request keeps
 	OthersPre  int      `json:"othersPre"`  // hook steps that run but are not edited here
 	OthersPost int      `json:"othersPost"` // likewise
+	OthersMsg  int      `json:"othersMessage"`
+	ShowMsg    bool     `json:"showMessage"` // the request receives messages (or already has message hooks), so the section is shown
 	Dirty      bool     `json:"dirty"`
 	Blueprints []Choice `json:"blueprints"` // hook blueprints that can be added
 }
@@ -54,7 +57,7 @@ func (s *HooksService) Open(request string) (HooksView, error) {
 			return
 		}
 		h := &openHooks{editor: vm.NewHookEditor(s.app.backend, s.app.worker, o.req)}
-		for _, p := range []vm.HookPhase{vm.PhasePre, vm.PhasePost} {
+		for _, p := range vm.HookPhases() {
 			row, doc := hookRow(request, p), h.editor.Doc(p)
 			s.app.Flows().adopt(row, doc)
 			doc.OnChange(func() { s.app.emit("hooks", s.view(request, h)) })
@@ -71,7 +74,7 @@ func (s *HooksService) Close(request string) {
 		if _, ok := s.hooks[request]; !ok {
 			return
 		}
-		for _, p := range []vm.HookPhase{vm.PhasePre, vm.PhasePost} {
+		for _, p := range vm.HookPhases() {
 			delete(s.app.Flows().docs, hookRow(request, p))
 		}
 		delete(s.hooks, request)
@@ -123,8 +126,9 @@ func (s *HooksService) AddBlueprint(request, key string) {
 
 func (s *HooksService) view(request string, h *openHooks) HooksView {
 	v := HooksView{
-		Request: request, Pre: hookRow(request, vm.PhasePre), Post: hookRow(request, vm.PhasePost),
-		OthersPre: h.editor.Others(vm.PhasePre), OthersPost: h.editor.Others(vm.PhasePost), Dirty: h.editor.Dirty(), Blueprints: []Choice{},
+		Request: request, Pre: hookRow(request, vm.PhasePre), Post: hookRow(request, vm.PhasePost), Message: hookRow(request, vm.PhaseMessage),
+		OthersPre: h.editor.Others(vm.PhasePre), OthersPost: h.editor.Others(vm.PhasePost), OthersMsg: h.editor.Others(vm.PhaseMessage),
+		ShowMsg: h.editor.ShowsMessages(), Dirty: h.editor.Dirty(), Blueprints: []Choice{},
 	}
 	for _, bp := range h.editor.Blueprints(s.app.workspace) {
 		v.Blueprints = append(v.Blueprints, Choice{ID: blueprintKey(bp), Label: bp.Name + " (" + bp.Phase + ")", Path: bp.Path})
