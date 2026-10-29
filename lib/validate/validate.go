@@ -26,12 +26,14 @@ func checks() []check {
 	return []check{
 		checkDuplicateIDs,
 		checkDefaultVersions,
+		checkEnvironmentExtends,
 		checkRefs,
 		checkNodes,
 		checkParams,
 		checkExecution,
 		checkGotos,
 		checkAttach,
+		checkColors,
 		checkConcurrentWrites,
 		checkSubflowInputs,
 		checkReferences,
@@ -40,9 +42,12 @@ func checks() []check {
 		checkHookCycles,
 		checkTemplates,
 		checkSetTargets,
+		checkSetValues,
 		checkLint,
 		checkHeaderNames,
+		checkMethods,
 		checkAsync,
+		checkAuth,
 		checkBlueprints,
 	}
 }

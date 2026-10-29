@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/githugt/flowi-lib/schema/common.schema.json",
-  "title": "Flow-I shared definitions",
+  "title": "Flowi shared definitions",
   "$defs": {
     "ulid": {
       "type": "string",
@@ -46,12 +46,9 @@
             "fetch",
             "webhook",
             "subflow",
-            "extract",
             "set",
-            "generate",
-            "transform",
-            "calc",
             "assert",
+            "fuzz",
             "condition",
             "delay",
             "batch",
@@ -93,6 +90,17 @@
           "type": "string",
           "description": "The id of a request or subflow node right next to this one that the canvas draws it with; a view only."
         },
+        "color": {
+          "enum": [
+            "blue",
+            "green",
+            "amber",
+            "pink",
+            "purple",
+            "teal"
+          ],
+          "description": "The colour the canvas draws this step in; the step's category colour when left out. A view only."
+        },
         "attach_at": {
           "enum": [
             "above",
@@ -105,6 +113,22 @@
         },
         "version": {
           "type": "string"
+        },
+        "overlay": {
+          "type": "string",
+          "description": "A flowi overlay of the request's collection laid over the version; several are joined with +, the later one winning."
+        },
+        "open": {
+          "type": "string",
+          "description": "Opens an async connection (WebSocket, MQTT 5, core NATS) of this name and keeps it for later steps."
+        },
+        "over": {
+          "type": "string",
+          "description": "Runs this step's send and receive over the connection an earlier step opened."
+        },
+        "close": {
+          "type": "boolean",
+          "description": "Closes the connection named by over once this step has run."
         },
         "hooks": {
           "oneOf": [
@@ -228,27 +252,77 @@
           ],
           "description": "stop: how the run ends; passed (the default) is a normal end that skips the rest"
         },
-        "from": {
+        "values": {
+          "type": "array",
+          "description": "set: values written in order; a later one may read an earlier one",
+          "items": {
+            "type": "object",
+            "required": [
+              "name"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "from": {
+                "enum": [
+                  "expr",
+                  "literal",
+                  "response",
+                  "generate"
+                ],
+                "description": "where the value comes from; expr when left out"
+              },
+              "value": {
+                "description": "expr, literal or generate: the value or template"
+              },
+              "in": {
+                "enum": [
+                  "body",
+                  "header",
+                  "cookie",
+                  "status"
+                ],
+                "description": "response: which part of the response"
+              },
+              "path": {
+                "type": "string",
+                "description": "response body: RFC 9535 JSONPath"
+              },
+              "header": {
+                "type": "string"
+              },
+              "cookie": {
+                "type": "string"
+              },
+              "regex": {
+                "type": "string"
+              },
+              "seed": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "generate: seed for this value only"
+              }
+            }
+          }
+        },
+        "count": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 200,
+          "description": "fuzz: how many bad bodies to send (default 20)"
+        },
+        "expect": {
           "enum": [
-            "body",
-            "header",
-            "cookie",
-            "status"
+            "no_server_error",
+            "rejected"
           ],
-          "description": "extract (single form): where the value comes from"
+          "description": "fuzz: no_server_error fails on a 5xx or no answer; rejected also fails when a bad body is accepted"
         },
-        "path": {
+        "schema": {
           "type": "string",
-          "description": "extract: RFC 9535 JSONPath into the body"
-        },
-        "header": {
-          "type": "string"
-        },
-        "cookie": {
-          "type": "string"
-        },
-        "regex": {
-          "type": "string"
+          "description": "assert: the id of a request step whose response must match the response schema kept for its request"
         }
       },
       "allOf": [
@@ -264,9 +338,18 @@
             ]
           },
           "then": {
-            "required": [
-              "target",
-              "value"
+            "anyOf": [
+              {
+                "required": [
+                  "target",
+                  "value"
+                ]
+              },
+              {
+                "required": [
+                  "values"
+                ]
+              }
             ]
           }
         },
@@ -282,9 +365,6 @@
             ]
           },
           "then": {
-            "required": [
-              "check"
-            ],
             "properties": {
               "on_fail": {
                 "enum": [
@@ -292,7 +372,19 @@
                   "warn"
                 ]
               }
-            }
+            },
+            "anyOf": [
+              {
+                "required": [
+                  "check"
+                ]
+              },
+              {
+                "required": [
+                  "schema"
+                ]
+              }
+            ]
           }
         },
         {
@@ -338,49 +430,6 @@
           "if": {
             "properties": {
               "type": {
-                "const": "extract"
-              }
-            },
-            "required": [
-              "type",
-              "from"
-            ]
-          },
-          "then": {
-            "required": [
-              "name",
-              "from"
-            ]
-          }
-        },
-        {
-          "if": {
-            "properties": {
-              "type": {
-                "const": "extract"
-              }
-            },
-            "required": [
-              "type"
-            ]
-          },
-          "then": {
-            "properties": {
-              "from": {
-                "enum": [
-                  "body",
-                  "header",
-                  "cookie",
-                  "status"
-                ]
-              }
-            }
-          }
-        },
-        {
-          "if": {
-            "properties": {
-              "type": {
                 "const": "note"
               }
             },
@@ -391,23 +440,6 @@
           "then": {
             "required": [
               "text"
-            ]
-          }
-        },
-        {
-          "if": {
-            "properties": {
-              "type": {
-                "const": "transform"
-              }
-            },
-            "required": [
-              "type"
-            ]
-          },
-          "then": {
-            "required": [
-              "value"
             ]
           }
         },
@@ -621,6 +653,31 @@
             "required": [
               "flow"
             ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "fuzz"
+              }
+            },
+            "required": [
+              "type"
+            ]
+          },
+          "then": {
+            "required": [
+              "request"
+            ],
+            "properties": {
+              "expect": {
+                "enum": [
+                  "no_server_error",
+                  "rejected"
+                ]
+              }
+            }
           }
         }
       ]

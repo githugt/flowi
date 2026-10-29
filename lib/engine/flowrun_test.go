@@ -190,7 +190,7 @@ func TestSubflow_should_map_inputs_and_outputs_and_isolate_vars(t *testing.T) {
 	f := newFixture(t)
 	sub := f.addFlow("shared/greet", setNode("inner", "vars.secret_inner", "{{inputs.who}}!"), flowNode("say", "note", "text", "hi {{inputs.who}}"))
 	sub.Inputs = []model.Input{{Name: "who"}, {Name: "greeting", Default: "hello"}}
-	sub.Outputs = []model.KeyValue{{Key: "text", Value: "{{inputs.greeting}} {{vars.secret_inner}}"}, {Key: "said", Value: "{{nodes.say.text}}"}}
+	sub.Outputs = []model.Output{{Name: "text", Value: "{{inputs.greeting}} {{vars.secret_inner}}"}, {Name: "said", Value: "{{nodes.say.text}}"}}
 	f.update(func(c *model.Collection) { c.Flows[len(c.Flows)-1] = sub })
 	call := model.Node{ID: "greet", Type: "subflow", Subflow: &model.SubflowCall{Flow: model.Ref{ID: sub.ID, Path: sub.Path},
 		With: []model.KeyValue{{Key: "who", Value: "Ada"}}}}

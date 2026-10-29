@@ -22,7 +22,7 @@ A command-line command finished.
 
 | Field | Meaning | Values |
 |---|---|---|
-| `command` | Which command, never its arguments. | `send`, `run`, `ls`, `validate`, `fmt`, `serve`, `import`, `export`, `new`, `config`, `secret`, `env`, `workspace`, `init`, `schedule`, `news`, `changelog`, `telemetry`, `version`, `impact`, `cookies`, `blueprint`, `other` |
+| `command` | Which command, never its arguments. | `send`, `run`, `ls`, `validate`, `fmt`, `serve`, `import`, `export`, `new`, `config`, `secret`, `env`, `workspace`, `init`, `schedule`, `news`, `changelog`, `telemetry`, `version`, `impact`, `cookies`, `blueprint`, `overlay`, `access`, `coverage`, `drift`, `other` |
 | `exit` | How it ended. | `ok`, `failed`, `usage`, `cancelled`, `error` |
 
 ### `run_finished` (full)

@@ -23,6 +23,7 @@ func (c *Codec) DecodeFolder(file, dir string, data []byte) (model.Folder, diag.
 	f.Settings = c.settingsChild(d, m, settings.LayerFolder)
 	f.Hooks = m.hooks()
 	f.Order = m.stringList("order")
+	f.Tags = m.stringList("tags")
 	m.closeStrict()
 	return f, d.diags
 }
@@ -33,5 +34,6 @@ func (c *Codec) EncodeFolder(f model.Folder) ([]byte, error) {
 	o.put("settings", c.encodeSettings(f.Settings))
 	o.put("hooks", encodeHooks(f.Hooks))
 	o.put("order", f.Order)
+	o.put("tags", f.Tags)
 	return marshal(o.items)
 }

@@ -12,7 +12,7 @@ import (
 	"github.com/githugt/flowi-lib/diag"
 )
 
-// CurrentFormat is the collection format this version of Flow-I writes.
+// CurrentFormat is the collection format this version of Flowi writes.
 const CurrentFormat = 1
 
 // Step upgrades every file of a collection from format From to From+1.

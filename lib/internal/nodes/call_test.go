@@ -4,8 +4,10 @@ package nodes
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
+	"strings"
 	"testing"
 	"time"
 
@@ -136,5 +138,112 @@ func TestWebhook_Given_wait_false_Then_background_and_no_outputs(t *testing.T) {
 
 	if out.Outputs != nil || len(rt.background) != 1 || len(rt.https) != 0 || rt.background[0].Method != "POST" {
 		t.Fatalf("outcome %+v background %v", out, rt.background)
+	}
+}
+
+func fuzzNode(params ...model.Field) model.Node {
+	return model.Node{ID: "fuzz-login", Type: "fuzz", Params: params, Request: &model.RequestCall{Request: model.Ref{ID: "01JA0000000000000000000011", Path: "auth/login"}}}
+}
+
+func goodBody() map[string]any {
+	return map[string]any{"email": "a@x.test", "password": "pw", "age": json.Number("3")}
+}
+
+func TestFuzz_Given_a_server_that_rejects_every_bad_body_Then_it_passes_and_counts_the_statuses(t *testing.T) {
+	// Arrange
+	s, _, rt := flowState()
+	rt.fuzz = FuzzSubject{Body: goodBody()}
+	rt.requestOut = Outcome{Outputs: map[string]any{"status": 400}, Status: StatusPassed}
+
+	// Act
+	out := runOutcome(t, fuzzNode(model.Field{Key: "count", Value: int64(6)}), s)
+
+	// Assert
+	if out.Status == StatusFailed || len(out.Diags) != 0 || out.Outputs["cases"] != 6 || out.Outputs["failed"] != 0 {
+		t.Fatalf("outcome %+v", out)
+	}
+	if len(rt.requests) != 6 || rt.requests[0].Body == nil {
+		t.Fatalf("each case is sent with its body: %d requests", len(rt.requests))
+	}
+	if statuses, _ := out.Outputs["statuses"].(map[string]int); statuses["400"] != 6 {
+		t.Errorf("statuses %v", out.Outputs["statuses"])
+	}
+}
+
+func TestFuzz_Given_a_server_error_on_a_bad_body_Then_it_fails_naming_the_case_and_the_status(t *testing.T) {
+	// Arrange
+	s, _, rt := flowState()
+	rt.fuzz = FuzzSubject{Body: goodBody()}
+	rt.requestFor = func(c RequestCall) Outcome {
+		if body, _ := (*c.Body).(map[string]any); body["email"] == nil {
+			return Outcome{Outputs: map[string]any{"status": 500}, Status: StatusPassed}
+		}
+		return Outcome{Outputs: map[string]any{"status": 422}, Status: StatusPassed}
+	}
+
+	// Act
+	out := runOutcome(t, fuzzNode(model.Field{Key: "count", Value: int64(40)}), s)
+
+	// Assert
+	if out.Status != StatusFailed || len(out.Diags) != 1 || out.Diags[0].Code != diag.CodeRunFuzzFailed {
+		t.Fatalf("outcome %+v", out)
+	}
+	failures, _ := out.Outputs["failures"].([]any)
+	if len(failures) == 0 || !strings.Contains(fmt.Sprint(failures[0]), "email: null") || !strings.Contains(fmt.Sprint(failures[0]), "500") {
+		t.Fatalf("failures %v", failures)
+	}
+}
+
+func TestFuzz_Given_expect_rejected_and_a_body_the_server_accepts_Then_it_fails(t *testing.T) {
+	// Arrange
+	s, _, rt := flowState()
+	rt.fuzz = FuzzSubject{Body: goodBody()}
+	rt.requestOut = Outcome{Outputs: map[string]any{"status": 200}, Status: StatusPassed}
+
+	// Act
+	plain := runOutcome(t, fuzzNode(model.Field{Key: "count", Value: int64(3)}), s)
+	strict := runOutcome(t, fuzzNode(model.Field{Key: "count", Value: int64(3)}, model.Field{Key: "expect", Value: "rejected"}), s)
+
+	// Assert
+	if plain.Status == StatusFailed {
+		t.Errorf("by default only a server error fails: %+v", plain)
+	}
+	if strict.Status != StatusFailed {
+		t.Errorf("expect rejected should fail on a 200: %+v", strict)
+	}
+}
+
+func TestFuzz_Given_no_cases_param_Then_twenty_are_sent_and_a_body_that_is_not_json_is_a_clear_error(t *testing.T) {
+	// Arrange
+	s, _, rt := flowState()
+	rt.fuzz = FuzzSubject{Body: goodBody()}
+	rt.requestOut = Outcome{Outputs: map[string]any{"status": 400}, Status: StatusPassed}
+
+	// Act
+	out := runOutcome(t, fuzzNode(), s)
+	rt.fuzzErr = errors.New("the request has no JSON body")
+	bad := runOutcome(t, fuzzNode(), s)
+
+	// Assert
+	if out.Outputs["cases"] != 20 {
+		t.Errorf("default cases: %v", out.Outputs["cases"])
+	}
+	if bad.Status == StatusPassed || len(bad.Diags) == 0 {
+		t.Errorf("a request that cannot be fuzzed must say so: %+v", bad)
+	}
+}
+
+func TestFuzz_Given_a_call_that_got_no_answer_Then_it_is_a_failure(t *testing.T) {
+	// Arrange
+	s, _, rt := flowState()
+	rt.fuzz = FuzzSubject{Body: goodBody()}
+	rt.requestOut = Outcome{Status: StatusError}
+
+	// Act
+	out := runOutcome(t, fuzzNode(model.Field{Key: "count", Value: int64(2)}), s)
+
+	// Assert
+	if out.Status != StatusFailed {
+		t.Fatalf("outcome %+v", out)
 	}
 }

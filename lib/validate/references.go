@@ -193,7 +193,7 @@ func (w *refWalk) checkRef(s sites.Site, path []string, available, pending map[s
 		}
 	case "vars":
 		if w.vars != nil && !w.vars[path[1]] {
-			return unresolved(" (set it with a set, extract, generate or calc node)")
+			return unresolved(" (set it with a set node)")
 		}
 	}
 	return diag.Diagnostic{}, false

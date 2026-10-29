@@ -1,0 +1,8 @@
+item "environment Staging" imported at 0:0
+  warning FLW-IMPORT-006 0:0 variable token looked like a credential and was replaced by a secret declaration
+--- environment staging
+name: staging
+vars:
+  base_url: https://staging.example.com
+  token:
+    secret: true

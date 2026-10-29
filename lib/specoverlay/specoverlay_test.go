@@ -55,3 +55,34 @@ actions:
 		t.Fatalf("bad %v", bad)
 	}
 }
+
+func TestApplyTo_should_warn_when_extends_names_another_document(t *testing.T) {
+	cases := map[string]struct {
+		extends, name string
+		warns         bool
+	}{
+		"same file, other place":  {"https://example.com/api/examples.yaml", "specs/examples.yaml", false},
+		"pointer after the name":  {"examples.yaml#/paths", "examples.yaml", false},
+		"another document":        {"https://example.com/other.yaml", "examples.yaml", true},
+		"no extends":              {"", "examples.yaml", false},
+		"document without a name": {"other.yaml", "", false},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			ov := "overlay: 1.0.0\ninfo: {title: t, version: 1.0.0}\n"
+			if tc.extends != "" {
+				ov += "extends: " + tc.extends + "\n"
+			}
+			ov += "actions:\n  - target: $.paths['/examples'].get\n    update: {operationId: listExamples}\n"
+
+			out, diags := ApplyTo([]byte(spec), tc.name, [][]byte{[]byte(ov)})
+
+			if got := len(diags) == 1 && diags[0].Code == diag.CodeImportUnmapped; got != tc.warns {
+				t.Errorf("warned %v, want %v: %v", got, tc.warns, diags)
+			}
+			if !strings.Contains(string(out), "listExamples") {
+				t.Errorf("the overlay was not applied:\n%s", out)
+			}
+		})
+	}
+}

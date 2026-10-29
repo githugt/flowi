@@ -79,23 +79,25 @@ type AttemptRecord struct {
 // Record is a response record (design §6.4). Its JSON form is the saved
 // response format.
 type Record struct {
-	ID            string          `json:"id"`
-	RunID         string          `json:"run_id"`
-	CollectionID  model.ID        `json:"collection_id"`
-	RequestID     model.ID        `json:"request_id"`
-	RequestPath   string          `json:"request_path"`
-	Version       string          `json:"version"`
-	VersionSource string          `json:"version_source"` // pinned | preferred | default | highest
-	At            time.Time       `json:"at"`
-	Request       SentRequest     `json:"request"`
-	Status        int             `json:"status"`
-	Proto         string          `json:"proto,omitempty"`
-	Header        []Header        `json:"headers,omitempty"`
-	Body          Body            `json:"body"`
-	Redirects     []Hop           `json:"redirects,omitempty"`
-	Timings       Timings         `json:"timings"`
-	Attempts      []AttemptRecord `json:"attempts"`
-	Outputs       map[string]any  `json:"outputs,omitempty"`
+	ID            string   `json:"id"`
+	RunID         string   `json:"run_id"`
+	CollectionID  model.ID `json:"collection_id"`
+	RequestID     model.ID `json:"request_id"`
+	RequestPath   string   `json:"request_path"`
+	Version       string   `json:"version"`
+	VersionSource string   `json:"version_source"` // pinned | preferred | default | highest
+	// Overlay names the flowi overlay the request was sent with, if any.
+	Overlay   string          `json:"overlay,omitempty"`
+	At        time.Time       `json:"at"`
+	Request   SentRequest     `json:"request"`
+	Status    int             `json:"status"`
+	Proto     string          `json:"proto,omitempty"`
+	Header    []Header        `json:"headers,omitempty"`
+	Body      Body            `json:"body"`
+	Redirects []Hop           `json:"redirects,omitempty"`
+	Timings   Timings         `json:"timings"`
+	Attempts  []AttemptRecord `json:"attempts"`
+	Outputs   map[string]any  `json:"outputs,omitempty"`
 
 	// Kind is "async" for an async request; "" is an HTTP one. An async
 	// record has Status 0, Request.Method is the protocol and Outcome says
@@ -139,8 +141,11 @@ const (
 	// OutcomeCancelled is a message-based run the user stopped; the messages that
 	// had arrived are kept.
 	OutcomeCancelled = "cancelled"
-	directionSent    = "sent"
-	directionRecvd   = "received"
+	// OutcomeStopped is a message-based run a message hook ended: the messages kept up to
+	// the one that failed its check are the record.
+	OutcomeStopped = "stopped"
+	directionSent  = "sent"
+	directionRecvd = "received"
 )
 
 func (m RecordMessage) masked(mk vault.Masker) RecordMessage {

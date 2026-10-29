@@ -133,7 +133,7 @@ func TestDecodeFlow_Given_a_foreign_document_Then_steps_become_nodes(t *testing.
 	}
 }
 
-// A person edited the standard part of a step in another tool, and left Flow-I's own data alone.
+// A person edited the standard part of a step in another tool, and left Flowi's own data alone.
 func TestDecodeFlow_Given_a_step_edited_outside_Flow_I_Then_FLW_ARAZZO_001_and_Flow_I_s_data_wins(t *testing.T) {
 	o := flowCodecOptions()
 	f := sampleFlow()
@@ -168,7 +168,7 @@ func firstDifference(t *testing.T, got, want model.Flow) string {
 	return "one is a prefix of the other"
 }
 
-// Other Arazzo tools must be able to read what Flow-I writes.
+// Other Arazzo tools must be able to read what Flowi writes.
 func TestEncodeFlow_should_produce_a_document_a_standard_parser_accepts(t *testing.T) {
 	for _, f := range append(fixtureFlows(t), sampleFlow()) {
 		data, _, err := EncodeFlow(f, flowCodecOptions())

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-// Package yamlcodec reads and writes Flow-I files as YAML.
+// Package yamlcodec reads and writes Flowi files as YAML.
 //
 // Decoding walks the parsed syntax tree instead of reflecting into structs,
 // so that it can report every problem with its line and column, keep keys
@@ -26,7 +26,7 @@ import (
 // utf8BOM is the byte order mark some Windows editors prepend.
 const utf8BOM = "\xEF\xBB\xBF"
 
-// Codec decodes and encodes Flow-I files.
+// Codec decodes and encodes Flowi files.
 type Codec struct {
 	schema []settings.Key
 }
@@ -82,7 +82,7 @@ func extraDocument(file string, doc *ast.DocumentNode) diag.Diagnostic {
 	if doc.Start != nil && doc.Start.Position != nil {
 		loc.Pos = diag.Position{Line: doc.Start.Position.Line, Column: doc.Start.Position.Column}
 	}
-	return diag.New(diag.CodeYAMLSyntax, loc, map[string]string{"detail": "a Flow-I file holds exactly one YAML document"})
+	return diag.New(diag.CodeYAMLSyntax, loc, map[string]string{"detail": "a Flowi file holds exactly one YAML document"})
 }
 
 // HasComments reports whether data contains YAML comments, which the

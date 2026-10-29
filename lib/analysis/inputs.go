@@ -19,7 +19,7 @@ type need struct {
 // scopeRoots are the names a request template can start with that are not
 // bare inputs.
 func scopeRoots() []string {
-	return []string{"env", "secret", "with", "vars", "var", "inputs", "nodes", "request", "response", "status", "run", "item", "index"}
+	return []string{"env", "secret", "with", "vars", "var", "collection_var", "inputs", "nodes", "request", "response", "status", "run", "item", "index"}
 }
 
 // needs lists what version v's templates read from with, vars or a bare

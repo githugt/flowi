@@ -5,7 +5,7 @@
 
 ## Context
 
-People move to Flow-I from Postman, Bruno, browser recordings (HAR) and curl commands
+People move to Flowi from Postman, Bruno, browser recordings (HAR) and curl commands
 they already have. They also sketch flows as Mermaid diagrams (design §11; roadmap M6).
 
 Other tools' exports are messy:

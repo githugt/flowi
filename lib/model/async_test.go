@@ -46,7 +46,7 @@ func TestTargetURL_should_join_the_channel_except_for_sse_where_it_is_an_event_n
 }
 
 func TestAsyncProtocols_should_list_the_managed_messaging_protocols_after_the_open_ones(t *testing.T) {
-	want := []string{"ws", "sse", "mqtt", "kafka", "amqp", "nats", "redis", "sqs", "sns", "servicebus", "pubsub"}
+	want := []string{"ws", "sse", "mqtt", "kafka", "amqp", "amqp10", "nats", "redis", "sqs", "sns", "servicebus", "pubsub"}
 
 	got := AsyncProtocols()
 
@@ -137,5 +137,12 @@ func TestProtocolVerb_should_be_a_short_upper_case_name_that_maps_back(t *testin
 	}
 	if ProtocolOfVerb("GET") != "" {
 		t.Error("an HTTP method is not a protocol verb")
+	}
+}
+
+func TestProtocolVerb_should_name_amqp_1_0_apart_from_amqp(t *testing.T) {
+	// Act and Assert
+	if ProtocolVerb(ProtocolAMQP10) != "AMQP1" || ProtocolOfVerb("AMQP1") != ProtocolAMQP10 || ProtocolOfVerb("AMQP") != ProtocolAMQP {
+		t.Errorf("verbs: %q %q %q", ProtocolVerb(ProtocolAMQP10), ProtocolOfVerb("AMQP1"), ProtocolOfVerb("AMQP"))
 	}
 }

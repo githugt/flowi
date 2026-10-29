@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-// Package announce fetches Flow-I's announcements: a short list of notices
+// Package announce fetches Flowi's announcements: a short list of notices
 // from the project, shown at startup and by `flowi news`.
 //
 // The feed is a JSON document {"payload": base64, "signature": base64}

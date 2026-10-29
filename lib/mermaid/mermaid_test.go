@@ -110,18 +110,18 @@ func TestImport_should_map_label_conventions(t *testing.T) {
 	for _, n := range f.Nodes {
 		ids = append(ids, n.ID+":"+string(n.Type))
 	}
-	want := []string{"login:request", "wait:delay", "grab:extract", "grab-2:extract", "mark:set", "check:assert", "say:log", "sub:subflow", "memo:note", "make:request"}
+	want := []string{"login:request", "wait:delay", "grab:set", "grab-2:set", "mark:set", "check:assert", "say:log", "sub:subflow", "memo:note", "make:request"}
 	if !slices.Equal(ids, want) {
 		t.Fatalf("nodes %v", ids)
 	}
 	if f.Nodes[0].Request.Version != "2" || f.Nodes[0].Request.Request.ID != "R-auth/login" || f.Path != "mermaid/sketch" {
 		t.Fatalf("login %+v path %s", f.Nodes[0].Request, f.Path)
 	}
-	if got := f.Nodes[3].Params; len(got) != 3 || got[0].Value != "id" || got[2].Value != "$.id" {
+	if got := f.Nodes[3].Values; len(got) != 1 || got[0] != (model.SetValue{Name: "id", From: "response", Where: "body", Path: "$.id"}) {
 		t.Fatalf("second extract %+v", got)
 	}
-	if f.Nodes[4].Params[0] != (model.Field{Key: "target", Value: "vars.done"}) {
-		t.Fatalf("set %+v", f.Nodes[4].Params)
+	if got := f.Nodes[4].Values; len(got) != 1 || got[0] != (model.SetValue{Name: "done", Value: "yes"}) {
+		t.Fatalf("set %+v", got)
 	}
 }
 

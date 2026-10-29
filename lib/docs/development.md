@@ -1,6 +1,6 @@
 # Development guide
 
-Flow-I is three Go modules in three repositories:
+Flowi is three Go modules in three repositories:
 
 | Repository | Module | Contents |
 |---|---|---|
@@ -13,7 +13,7 @@ Flow-I is three Go modules in three repositories:
 Clone the repositories side by side and link them with a Go workspace in the **parent** folder:
 
 ```bash
-mkdir flow-i && cd flow-i
+mkdir flowi-workspace && cd flowi-workspace
 git clone https://github.com/githugt/flowi-lib
 git clone https://github.com/githugt/flowi-cli
 git clone https://github.com/githugt/flowi

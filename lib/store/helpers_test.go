@@ -61,7 +61,7 @@ func codesOf(l diag.List) []diag.Code {
 }
 
 // arazzoFlow wraps a flow's own YAML (id, name, nodes, …) in the minimal
-// Arazzo document a flow file is: Flow-I reads the flow from x-flowi-flow.
+// Arazzo document a flow file is: Flowi reads the flow from x-flowi-flow.
 func arazzoFlow(body string) string {
 	var sb strings.Builder
 	sb.WriteString("arazzo: 1.1.0\nworkflows:\n  - workflowId: w\n    x-flowi-flow:\n")

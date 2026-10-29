@@ -19,7 +19,7 @@ import (
 var (
 	separator   = regexp.MustCompile(`^###`)
 	variableDef = regexp.MustCompile(`^@([A-Za-z_][A-Za-z0-9_.-]*)\s*=\s*(.*)$`)
-	requestLine = regexp.MustCompile(`^(?i:(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS|TRACE)\s+)?(\S+)(?:\s+HTTP/[\d.]+)?\s*$`)
+	requestLine = regexp.MustCompile(`^(?i:(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS|TRACE|QUERY)\s+)?(\S+)(?:\s+HTTP/[\d.]+)?\s*$`)
 	nameNote    = regexp.MustCompile(`^(?:#|//)\s*@name\s+(\S+)`)
 	headerLine  = regexp.MustCompile(`^([A-Za-z0-9!#$%&'*+.^_` + "`" + `|~-]+)\s*:\s*(.*)$`)
 	nonSlug     = regexp.MustCompile(`[^A-Za-z0-9]+`)
@@ -222,10 +222,10 @@ func body(lines []string, v *model.RequestVersion, it *importers.Item, tr *impor
 				inScript = false
 			}
 		case strings.HasPrefix(t, "> {%"):
-			it.Unmapped("a response handler script", "left out", "Flow-I has hooks: add an assert or extract by hand")
+			it.Unmapped("a response handler script", "left out", "Flowi has hooks: add an assert or extract by hand")
 			inScript = !strings.Contains(t, "%}")
 		case strings.HasPrefix(t, "> ") || strings.HasPrefix(t, "<> "):
-			it.Unmapped("a response handler or saved-response reference", "left out", "it has no Flow-I equivalent")
+			it.Unmapped("a response handler or saved-response reference", "left out", "it has no Flowi equivalent")
 		case strings.HasPrefix(t, "< ") && !strings.HasPrefix(t, "<<"):
 			it.Unmapped("a body read from "+strings.TrimSpace(t[2:]), "left out", "set the request body by hand")
 		default:

@@ -97,7 +97,7 @@ func (ix *index) nestedHookFlows(from model.Collection, ref model.Ref) []entityK
 	}
 	var out []entityKey
 	for _, h := range requestHooks(c, r) {
-		for _, step := range append(h.Pre, h.Post...) {
+		for _, step := range slices.Concat(h.Pre, h.Post, h.Message) {
 			if step.Flow == nil {
 				continue
 			}

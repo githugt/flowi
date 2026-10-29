@@ -33,3 +33,28 @@ paths:
 		t.Fatalf("description changed: %q", docs.String())
 	}
 }
+
+func TestImport_should_warn_about_an_operation_without_an_operationId(t *testing.T) {
+	// Act
+	_, diags := importDoc(t, `openapi: 3.0.3
+info: {title: t, version: 1.0.0}
+paths:
+  /pets:
+    get:
+      operationId: listPets
+      responses: {"200": {description: ok}}
+    post:
+      responses: {"201": {description: created}}
+`)
+
+	// Assert
+	var found []string
+	for _, d := range diags {
+		if d.Code == "FLW-IMPORT-008" {
+			found = append(found, d.Args["operation"]+" as "+d.Args["name"])
+		}
+	}
+	if len(found) != 1 || !strings.HasPrefix(found[0], "POST /pets as ") {
+		t.Errorf("warnings %v: only the operation without an operationId is named", found)
+	}
+}

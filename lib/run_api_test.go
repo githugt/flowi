@@ -188,3 +188,38 @@ func slicesContains(codes []diag.Code, c diag.Code) bool {
 	}
 	return false
 }
+
+func TestCheckSkips_Given_a_skipped_step_that_a_later_step_reads_Then_a_problem_names_the_reader(t *testing.T) {
+	w := demoWorkspace(t)
+	target, err := w.FindFlow("user-creation", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := w.CheckSkips(target, []string{"login"})
+
+	if err != nil {
+		t.Fatal(err)
+	}
+	var readers []string
+	for _, d := range got {
+		if d.Code != diag.CodeRunSkipRead || d.Severity != diag.SeverityError || d.Args["skipped"] != "login" {
+			t.Fatalf("unexpected problem %+v", d)
+		}
+		readers = append(readers, d.Args["reader"])
+	}
+	if len(readers) == 0 || readers[0] != "session" {
+		t.Fatalf("readers %v, want session first", readers)
+	}
+}
+
+func TestCheckSkips_Given_nothing_skipped_Then_no_problem(t *testing.T) {
+	w := demoWorkspace(t)
+	target, _ := w.FindFlow("user-creation", "")
+
+	got, err := w.CheckSkips(target, nil)
+
+	if err != nil || len(got) != 0 {
+		t.Fatalf("got %v, %v", got, err)
+	}
+}

@@ -129,6 +129,9 @@ func TestGRPC_should_report_what_is_wrong_with_a_version(t *testing.T) {
 		{name: "both_grpc_and_async", v: grpcVersion(ok, &model.Async{Protocol: "ws"}), want: diag.CodeGRPCRequest, path: "$.versions.1.grpc"},
 		{name: "bad_method", v: grpcVersion(model.GRPC{Server: "grpc://h:1", Method: "NoSlash"}, nil), want: diag.CodeGRPCRequest, path: "$.versions.1.grpc.method"},
 		{name: "bad_scheme", v: grpcVersion(model.GRPC{Server: "http://h:1", Method: "a.B/C"}, nil), want: diag.CodeGRPCRequest, path: "$.versions.1.grpc.server"},
+		{name: "web_over_http", v: grpcVersion(model.GRPC{Server: "https://proxy.example/api", Method: "a.B/C", Proto: []string{"p.proto"}, Web: true}, nil)},
+		{name: "web_without_proto_files", v: grpcVersion(model.GRPC{Server: "https://h", Method: "a.B/C", Web: true}, nil), want: diag.CodeGRPCRequest, path: "$.versions.1.grpc.proto"},
+		{name: "web_over_grpc_scheme", v: grpcVersion(model.GRPC{Server: "grpc://h:1", Method: "a.B/C", Proto: []string{"p.proto"}, Web: true}, nil), want: diag.CodeGRPCRequest, path: "$.versions.1.grpc.server"},
 		{name: "negative_count", v: grpcVersion(model.GRPC{Server: "grpc://h:1", Method: "a.B/C", Receive: &model.AsyncReceive{Count: -1}}, nil), want: diag.CodeGRPCRequest, path: "$.versions.1.grpc.receive.count"},
 		{name: "negative_timeout", v: grpcVersion(model.GRPC{Server: "grpc://h:1", Method: "a.B/C", Receive: &model.AsyncReceive{Timeout: -time.Second}}, nil), want: diag.CodeGRPCRequest, path: "$.versions.1.grpc.receive.timeout"},
 		{name: "multipart_body", v: grpcVersion(model.GRPC{Server: "grpc://h:1", Method: "a.B/C", Body: model.Body{Multipart: []model.Field{{Key: "a", Value: "b"}}}}, nil), want: diag.CodeGRPCRequest, path: "$.versions.1.grpc.body"},
@@ -157,5 +160,46 @@ func TestGRPC_should_report_what_is_wrong_with_a_version(t *testing.T) {
 				t.Fatalf("path %q, want %q", d.Path, tt.path)
 			}
 		})
+	}
+}
+
+func TestValidate_should_report_misuse_of_connections_kept_open_between_steps(t *testing.T) {
+	// Arrange
+	f := newFixture(t)
+	c := f.collection("c")
+	chat := f.request(&c, "chat", "1")
+	c.Requests[0].Versions[0].Async = &model.Async{Protocol: "ws", Server: "ws://h", Receive: &model.AsyncReceive{Count: 1}}
+	plain := f.request(&c, "plain", "1")
+	both, closeOnly, onHTTP, orphan, fine := requestNode("both", chat), requestNode("closeOnly", chat), requestNode("onHTTP", plain), requestNode("orphan", chat), requestNode("fine", chat)
+	both.Request.Open, both.Request.Over = "a", "a"
+	closeOnly.Request.Close = true
+	onHTTP.Request.Open = "h"
+	orphan.Request.Over = "nobody"
+	fine.Request.Over = "a"
+	f.flow(&c, "x", both, closeOnly, onHTTP, orphan, fine)
+
+	// Act
+	got := Validate(Target{Collections: []model.Collection{c}})
+
+	// Assert
+	paths := map[string]diag.Code{}
+	for _, d := range got {
+		if d.Code == diag.CodeAsyncConn || d.Code == diag.CodeAsyncConnName {
+			paths[d.Path] = d.Code
+		}
+	}
+	want := map[string]diag.Code{
+		"$.nodes[0].over":  diag.CodeAsyncConn,
+		"$.nodes[1].close": diag.CodeAsyncConn,
+		"$.nodes[2].open":  diag.CodeAsyncConn,
+		"$.nodes[3].over":  diag.CodeAsyncConnName,
+	}
+	for p, code := range want {
+		if paths[p] != code {
+			t.Errorf("missing %s at %s; got %v", code, p, paths)
+		}
+	}
+	if len(paths) != len(want) {
+		t.Errorf("a step over a connection that another step of the flow opens must pass: %v", paths)
 	}
 }

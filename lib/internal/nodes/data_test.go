@@ -80,23 +80,26 @@ func runOutcome(t *testing.T, n model.Node, s *State) Outcome {
 	return runner(context.Background(), n, s)
 }
 
-func TestGenerate_should_write_vars_and_outputs(t *testing.T) {
+func TestSet_Given_generate_values_When_run_Then_vars_and_outputs_are_written(t *testing.T) {
 	s, _, _ := flowState()
 
-	out := runOutcome(t, node("generate", "id", "{{$uuid-v4}}", "n", "{{$int(1, 1)}}"), s)
+	out := runOutcome(t, setNode(
+		model.SetValue{Name: "id", From: "generate", Value: "{{$uuid-v4}}"},
+		model.SetValue{Name: "n", From: "generate", Value: "{{$int(1, 1)}}"},
+	), s)
 
 	if len(out.Diags) != 0 || out.Outputs["n"] != varOf(s, "n") || out.Outputs["id"] == nil || varOf(s, "id") != out.Outputs["id"] {
 		t.Fatalf("outcome %+v vars %v", out, s.Vars.Snapshot())
 	}
 }
 
-func TestGenerate_Given_seed_Then_values_independent_of_run_seed(t *testing.T) {
+func TestSet_Given_a_seed_on_a_generated_value_Then_it_does_not_change_with_the_run_seed(t *testing.T) {
 	first, _, _ := flowState()
 	second, _, rt := flowState()
 	other := template.NewGeneration(999, rt.Now).Func()
 	inner := second.Scope
 	second.Scope = func() template.Scope { sc := inner(); sc.Gen = other; return sc }
-	n := node("generate", "seed", int64(7), "name", "{{$first-name}}")
+	n := setNode(model.SetValue{Name: "name", From: "generate", Value: "{{$first-name}}", Seed: 7})
 
 	a := runOutcome(t, n, first)
 	b := runOutcome(t, n, second)
@@ -104,23 +107,20 @@ func TestGenerate_Given_seed_Then_values_independent_of_run_seed(t *testing.T) {
 	if a.Outputs["name"] == nil || a.Outputs["name"] != b.Outputs["name"] {
 		t.Fatalf("got %v and %v", a.Outputs, b.Outputs)
 	}
-	if _, wrote := a.Outputs["seed"]; wrote {
-		t.Fatal("seed must not become a variable")
-	}
 }
 
-func TestTransform_should_output_value_and_write_into(t *testing.T) {
+func TestSet_Given_an_expression_over_a_list_Then_the_reshaped_value_is_written(t *testing.T) {
 	s, _, _ := flowState()
 	s.Vars.Set("items", []any{map[string]any{"id": 1}, map[string]any{"id": 2}})
 
-	out := runOutcome(t, node("transform", "value", "{{map(vars.items, .id)}}", "into", "ids"), s)
+	out := runOutcome(t, setNode(model.SetValue{Name: "ids", Value: "{{map(vars.items, .id)}}"}), s)
 
-	if len(out.Diags) != 0 || fmt.Sprint(out.Outputs["value"]) != "[1 2]" || fmt.Sprint(varOf(s, "ids")) != "[1 2]" {
+	if len(out.Diags) != 0 || fmt.Sprint(out.Outputs["ids"]) != "[1 2]" || fmt.Sprint(varOf(s, "ids")) != "[1 2]" {
 		t.Fatalf("outcome %+v vars %v", out, s.Vars.Snapshot())
 	}
 }
 
-func TestCalc_should_compute_arithmetic_min_max_and_modulo(t *testing.T) {
+func TestSet_Given_arithmetic_Then_the_result_is_written(t *testing.T) {
 	tests := []struct {
 		expr string
 		want any
@@ -138,7 +138,7 @@ func TestCalc_should_compute_arithmetic_min_max_and_modulo(t *testing.T) {
 			s.Vars.Set("a", 3)
 			s.Vars.Set("b", 4)
 
-			out := runOutcome(t, node("calc", "x", tt.expr), s)
+			out := runOutcome(t, setNode(model.SetValue{Name: "x", Value: tt.expr}), s)
 
 			if len(out.Diags) != 0 || out.Outputs["x"] != tt.want || varOf(s, "x") != tt.want {
 				t.Fatalf("outcome %+v", out)
@@ -147,20 +147,30 @@ func TestCalc_should_compute_arithmetic_min_max_and_modulo(t *testing.T) {
 	}
 }
 
-func TestCalc_Given_non_number_or_division_by_zero_Then_FLW_RUN_011(t *testing.T) {
-	for _, expr := range []string{"{{'a'}}", "{{1 / 0}}", "{{5 % 0}}", "{{vars.missing ?? nil}}"} {
+func TestSet_Given_a_division_by_zero_Then_a_diagnostic_is_reported_and_the_variable_is_not_written(t *testing.T) {
+	for _, expr := range []string{"{{1 / 0}}", "{{5 % 0}}"} {
 		t.Run(expr, func(t *testing.T) {
 			s, _, _ := flowState()
 
-			out := runOutcome(t, node("calc", "x", expr), s)
+			out := runOutcome(t, setNode(model.SetValue{Name: "x", Value: expr}), s)
 
-			if len(out.Diags) != 1 || out.Diags[0].Code != diag.CodeRunCalcNumber {
+			if len(out.Diags) != 1 {
 				t.Fatalf("diags %v", out.Diags)
 			}
 			if _, set := s.Vars.Get("x"); set {
-				t.Fatal("failed calc must not write the variable")
+				t.Fatal("a failed value must not write the variable")
 			}
 		})
+	}
+}
+
+func TestSet_Given_a_float_division_by_zero_Then_FLW_RUN_011(t *testing.T) {
+	s, _, _ := flowState()
+
+	out := runOutcome(t, setNode(model.SetValue{Name: "x", Value: "{{1 / 0}}"}), s)
+
+	if len(out.Diags) != 1 || out.Diags[0].Code != diag.CodeRunCalcNumber {
+		t.Fatalf("diags %v", out.Diags)
 	}
 }
 
@@ -175,10 +185,10 @@ func TestNote_should_output_rendered_text(t *testing.T) {
 	}
 }
 
-func TestExtract_single_form_Given_PhaseFlow_Then_FLW_RUN_013(t *testing.T) {
+func TestSet_Given_a_response_value_in_PhaseFlow_Then_FLW_RUN_013(t *testing.T) {
 	s, _, _ := flowState()
 
-	out := runOutcome(t, node("extract", "name", "token", "from", "body", "path", "$.token"), s)
+	out := runOutcome(t, setNode(model.SetValue{Name: "token", From: "response", Where: "body", Path: "$.token"}), s)
 
 	if len(out.Diags) != 1 || out.Diags[0].Code != diag.CodeRunExtractNoResp {
 		t.Fatalf("diags %v", out.Diags)
@@ -192,17 +202,6 @@ func TestSet_Given_request_target_in_PhaseFlow_Then_FLW_RUN_004(t *testing.T) {
 
 	if len(out.Diags) != 1 || out.Diags[0].Code != diag.CodeRunSetTarget {
 		t.Fatalf("diags %v", out.Diags)
-	}
-}
-
-func TestExtract_map_form_should_return_written_vars_as_outputs(t *testing.T) {
-	s, _, _ := flowState()
-	s.Vars.Set("x", "1")
-
-	out := runOutcome(t, node("extract", "copy", "{{vars.x}}"), s)
-
-	if out.Outputs["copy"] != "1" {
-		t.Fatalf("outputs %v", out.Outputs)
 	}
 }
 

@@ -60,8 +60,11 @@ func (x *execution) sendAsync(ctx context.Context, post []HookRef) {
 			x.r.emit(MessageReceived{RunID: x.r.runID, Path: x.c.path, RequestID: string(x.c.request.ID), Seq: seq, Depth: x.c.depth,
 				Message: recordMessage(m).masked(x.r.secrets.current())})
 		}
+		if len(x.messageHooks) > 0 {
+			b.op.Receive.OnKept = func(m transport.Message) error { return x.runMessageHooks(ctx, seq, m) }
+		}
 	}
-	res, err := x.runTransport(ctx, tr, b)
+	res, err := x.runAsync(ctx, tr, b)
 	if ctx.Err() != nil {
 		x.fail(StatusCancelled, nil)
 		return
@@ -70,7 +73,9 @@ func (x *execution) sendAsync(ctx context.Context, post []HookRef) {
 	x.emitAsyncReceived(res, err)
 	x.observeAsync(res)
 	if err != nil {
-		x.failAsync(err, res)
+		if !errors.Is(err, errMessageHook) {
+			x.failAsync(err, res) // a failed message hook has reported itself
+		}
 		x.save() // the messages that did arrive are worth keeping
 		return
 	}
@@ -121,6 +126,11 @@ func (x *execution) failAsync(err error, res transport.Result) {
 		rc := normalizedReceive(x.version.Async.Receive)
 		x.fail(StatusError, diag.List{diag.New(diag.CodeAsyncTimeout, diag.Location{}, map[string]string{
 			"got": itoa(len(res.Received)), "want": itoa(rc.Count), "timeout": rc.Timeout.String()})})
+		return
+	}
+	var ce connectionError
+	if errors.As(err, &ce) {
+		x.fail(StatusError, diag.List{diag.New(diag.CodeAsyncConn, diag.Location{}, map[string]string{"detail": ce.Error()})})
 		return
 	}
 	x.fail(StatusError, diag.List{diag.New(diag.CodeHTTPFailed, diag.Location{}, map[string]string{"detail": err.Error()})})
@@ -279,7 +289,7 @@ func (x *execution) newAsyncRecord(b builtAsync, res transport.Result, err error
 	rec := &Record{
 		ID: x.r.deps.NewID(), RunID: x.r.runID, CollectionID: x.c.collection.Manifest.ID, RequestID: x.c.request.ID,
 		RequestPath: x.c.request.Path, Version: x.version.Label, VersionSource: x.source, At: x.r.deps.Clock(),
-		Request: b.sent, Kind: KindAsync, Proto: b.protocol, Outcome: outcomeOf(err),
+		Request: b.sent, Kind: KindAsync, Proto: b.protocol, Outcome: outcomeOf(err), Overlay: x.c.overlayName(),
 		Timings:  Timings{Connect: res.Connect, Total: res.Total},
 		Attempts: []AttemptRecord{{Duration: res.Total}},
 	}
@@ -302,6 +312,8 @@ func outcomeOf(err error) string {
 		return OutcomeOK
 	case errors.Is(err, transport.ErrTimeout):
 		return OutcomeTimeout
+	case errors.Is(err, errMessageHook):
+		return OutcomeStopped
 	}
 	return OutcomeError
 }
@@ -426,4 +438,35 @@ func (x *execution) asyncView() map[string]any {
 		body = string(b.op.Send.Body)
 	}
 	return map[string]any{"method": model.ProtocolVerb(b.protocol), "url": model.TargetURL(b.protocol, b.op.Server, b.op.Channel), "headers": headers, "body": body}
+}
+
+// errMessageHook ends a receive whose message hook failed: the hook has
+// reported its own diagnostics and failed the request.
+var errMessageHook = errors.New("a message hook stopped the run")
+
+// runMessageHooks runs the message hooks for the message just kept. They run
+// with the rules of post hooks (the request has gone) and read this message as
+// body, headers, message (seq, body, headers) and seq; a failing hook stops the
+// receive.
+func (x *execution) runMessageHooks(ctx context.Context, seq int, m transport.Message) error {
+	x.showMessage(seq, m)
+	if !x.runPhaseNamed(ctx, x.messageHooks, nodes.PhasePost, "message") {
+		return errMessageHook
+	}
+	return nil
+}
+
+// showMessage makes one message the one expressions and hooks read.
+func (x *execution) showMessage(seq int, m transport.Message) {
+	msg := scopeMessage(recordMessage(m))
+	x.mu.Lock()
+	x.async = map[string]any{"body": msg["body"], "headers": msg["headers"], "seq": seq,
+		"message": map[string]any{"seq": seq, "body": msg["body"], "headers": msg["headers"]}}
+	x.mu.Unlock()
+	hdr := http.Header{}
+	for _, h := range m.Headers {
+		hdr.Add(h.Name, h.Value)
+	}
+	x.state.Response = &nodes.Response{Header: hdr, Body: msg["body"], Text: string(m.Body), Time: 0}
+	x.state.Request = nil
 }

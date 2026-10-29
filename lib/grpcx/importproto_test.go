@@ -45,7 +45,7 @@ func TestReadProto_Given_a_missing_import_or_bad_syntax_Then_a_schema_error(t *t
 
 // Before: an import such as "../secret.proto" was opened from disk during the
 // compile, before the import's containment check ran at write time, so a
-// hostile .proto could make Flow-I read files above its folder.
+// hostile .proto could make Flowi read files above its folder.
 func TestReadProto_Given_an_import_outside_the_folder_Then_it_is_never_opened(t *testing.T) {
 	tests := []string{"../secret.proto", "a/../../secret.proto", "/etc/hosts"}
 	for _, imp := range tests {

@@ -8,9 +8,10 @@ import (
 	"strings"
 
 	"github.com/githugt/flowi-lib/diag"
+	"github.com/githugt/flowi-lib/model"
 )
 
-// Translator turns another tool's {{var}} text into Flow-I templates for
+// Translator turns another tool's {{var}} text into Flowi templates for
 // one item, and applies the credential rules there. Runtime names are
 // variables the source sets while running (Bruno's post-response vars,
 // which import as extracts): they are read bare ({{token}}), which looks
@@ -42,7 +43,7 @@ func (t *Translator) Text(s string) string {
 	}
 }
 
-// Expression is the Flow-I expression for {{name}}.
+// Expression is the Flowi expression for {{name}}.
 func (t *Translator) Expression(name string) string {
 	if t.Runtime[name] && varIdentifier.MatchString(name) {
 		return name
@@ -55,7 +56,7 @@ func (t *Translator) Expression(name string) string {
 func (t *Translator) ReportUnknown() {
 	slices.Sort(t.unknown)
 	for _, name := range slices.Compact(t.unknown) {
-		t.Item.Unmapped("dynamic variable "+name, "replaced by an env reference", "Flow-I has no generator for it")
+		t.Item.Unmapped("dynamic variable "+name, "replaced by an env reference", "Flowi has no generator for it")
 	}
 }
 
@@ -110,4 +111,26 @@ func (t *Translator) APIKey(key, value string) string {
 		return t.Item.Redact("API key "+key, key)
 	}
 	return t.Text(value)
+}
+
+// AuthBlock builds the auth block of a scheme from name, value pairs (the
+// model's parameter names). A credential written out literally becomes a
+// secret placeholder, as everywhere else; a {{variable}} stays a reference.
+// Empty values are left out.
+func (t *Translator) AuthBlock(scheme string, pairs ...string) *model.Auth {
+	secret := model.AuthSecretParams(scheme)
+	a := &model.Auth{Type: scheme}
+	for i := 0; i+1 < len(pairs); i += 2 {
+		name, value := pairs[i], pairs[i+1]
+		if value == "" {
+			continue
+		}
+		if slices.Contains(secret, name) && !HasVar(value) {
+			value = t.Item.Redact(scheme+" auth "+name, name)
+		} else {
+			value = t.Text(value)
+		}
+		a.Params = append(a.Params, model.KeyValue{Key: name, Value: value})
+	}
+	return a
 }

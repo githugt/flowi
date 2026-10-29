@@ -10,7 +10,9 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
+	"errors"
 	"fmt"
+	"io"
 	"math/big"
 	"net"
 	"testing"
@@ -46,6 +48,7 @@ service Orders {
   rpc List(ListRequest) returns (stream Order);
   rpc Trickle(ListRequest) returns (stream Order);
   rpc Upload(stream GetRequest) returns (Order);
+  rpc Chat(stream GetRequest) returns (stream Order);
   rpc Create(CreateRequest) returns (Order);
 }
 
@@ -162,11 +165,54 @@ func (f *fake) handle(_ any, stream grpc.ServerStream) error {
 	if method == nil {
 		return status.Error(codes.Unimplemented, "no such method "+full)
 	}
+	if method.IsStreamingClient() {
+		return f.answerClientStream(stream, method)
+	}
 	in := dynamicpb.NewMessage(method.Input())
 	if err := stream.RecvMsg(in); err != nil {
 		return err
 	}
 	return f.answer(stream, string(method.Name()), method, in)
+}
+
+// answerClientStream reads the ids sent. Upload answers once, at the end: an
+// order named after the last id, whose seq is how many arrived. Chat answers
+// each message as it arrives with an order of the same id, and "stop" ends
+// the call with a failed precondition.
+func (f *fake) answerClientStream(stream grpc.ServerStream, method protoreflect.MethodDescriptor) error {
+	order := func(id string, seq int) *dynamicpb.Message {
+		out := dynamicpb.NewMessage(method.Output())
+		fields := out.Descriptor().Fields()
+		out.Set(fields.ByName("id"), protoreflect.ValueOfString(id))
+		out.Set(fields.ByName("seq"), protoreflect.ValueOfInt32(int32(seq))) //nolint:gosec // test counts are tiny
+		return out
+	}
+	count, last := 0, ""
+	for {
+		in := dynamicpb.NewMessage(method.Input())
+		err := stream.RecvMsg(in)
+		if errors.Is(err, io.EOF) {
+			break
+		}
+		if err != nil {
+			return err
+		}
+		count++
+		last = in.Get(in.Descriptor().Fields().ByName("id")).String()
+		if method.Name() != "Chat" {
+			continue
+		}
+		if last == "stop" {
+			return status.Error(codes.FailedPrecondition, "told to stop")
+		}
+		if err := stream.SendMsg(order(last, count)); err != nil {
+			return err
+		}
+	}
+	if method.Name() == "Upload" {
+		return stream.SendMsg(order(last, count))
+	}
+	return nil
 }
 
 func (f *fake) answer(stream grpc.ServerStream, name string, method protoreflect.MethodDescriptor, in *dynamicpb.Message) error {
@@ -194,7 +240,11 @@ func (f *fake) answer(stream grpc.ServerStream, name string, method protoreflect
 		return status.FromContextError(stream.Context().Err()).Err()
 	case "Echo":
 		md, _ := metadata.FromIncomingContext(stream.Context())
-		_ = stream.SendHeader(metadata.Pairs("x-seen", fmt.Sprint(md.Get("x-token"))))
+		reply := metadata.Pairs("x-seen", fmt.Sprint(md.Get("x-token")))
+		for _, blob := range md.Get("x-blob-bin") {
+			reply.Append("x-blob-bin", blob) // the bytes, which grpc encodes on the wire
+		}
+		_ = stream.SendHeader(reply)
 		stream.SetTrailer(metadata.Pairs("x-trail", "done"))
 		return stream.SendMsg(order(0))
 	case "List", "Trickle":

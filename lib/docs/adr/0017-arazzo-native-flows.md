@@ -1,15 +1,15 @@
-# 0017: A flow is an Arazzo document; Flow-I's own data rides along in it
+# 0017: A flow is an Arazzo document; Flowi's own data rides along in it
 
 - **Status:** Accepted
 - **Date:** 2026-10-15
-- **Supersedes in part:** 0013 (flows were Flow-I's own YAML, converted to and from Arazzo on
+- **Supersedes in part:** 0013 (flows were Flowi's own YAML, converted to and from Arazzo on
   import and export; they are now stored as Arazzo)
 
 ## Context
 
-The owner is moving Flow-I from "a request tool with flows" to defining APIs and requests first
+The owner is moving Flowi from "a request tool with flows" to defining APIs and requests first
 and stitching them together with Arazzo. A flow that other Arazzo tools can read, diff and run
-(where they can) is worth more than a private format plus a lossy export. But a Flow-I flow holds
+(where they can) is worth more than a private format plus a lossy export. But a Flowi flow holds
 more than Arazzo can say: parallel lanes, conditions, batches, `set`/`log`/`fetch`/`webhook`
 nodes, concurrency and error policy, hook controls.
 
@@ -19,18 +19,18 @@ nodes, concurrency and error policy, hook controls.
   workflow. Canvas positions stay in `<path>.layout.yaml`. Old `*.flow.yaml` files are not
   migrated or read; they are reported as unrecognised files (the owner had none to keep).
 - **The flow's own data is kept whole in the workflow's `x-flowi-flow`** (the same YAML the old
-  flow files held). Flow-I reads that, so encode → decode → encode is byte-stable and nothing
+  flow files held). Flowi reads that, so encode → decode → encode is byte-stable and nothing
   can be lost, whatever the node types. The standard Arazzo part (steps, `successCriteria`,
   `outputs`, `inputs`) is *derived* from it for other tools.
 - **A node Arazzo cannot express becomes a custom step**: an ordinary step whose `operationId`
   is the built-in `flowiCustomStep`, with `x-flowi-node: <id>`. It resolves in any tool and cannot
-  be run by one; Flow-I runs the node. (A stub workflow was considered and rejected: every step
+  be run by one; Flowi runs the node. (A stub workflow was considered and rejected: every step
   of it would itself need an operation to call.) The GUI tells the person editing which steps
   these are (`FLW-ARAZZO-002`, from `FlowCompatibility`; `Validate` does not raise it, because
   the example flows are full of them).
 - **Drift is detected, not merged.** The workflow carries `x-flowi-digest`, a hash of the
-  standard steps as Flow-I wrote them. If the steps no longer match, someone edited them in
-  another tool: `FLW-ARAZZO-001`, and Flow-I's own data is used. A hand-written file without a
+  standard steps as Flowi wrote them. If the steps no longer match, someone edited them in
+  another tool: `FLW-ARAZZO-001`, and Flowi's own data is used. A hand-written file without a
   digest is not checked.
 - **A foreign Arazzo document** (no `x-flowi-flow`) is read through the existing importer, which
   reports every loss (`FLW-IMPORT-001`); saving it writes the native form.
@@ -44,7 +44,7 @@ nodes, concurrency and error policy, hook controls.
 
 ## Consequences
 
-- Other Arazzo tools can read a Flow-I flow, but not run custom steps; `ExportArazzo` still
+- Other Arazzo tools can read a Flowi flow, but not run custom steps; `ExportArazzo` still
   writes the standard-only form for them (steps Arazzo cannot express are left out and reported).
 - The engine, canvas, validation and GUI are unchanged: `model.Flow` is still the in-memory model,
   and only the flow codec behind the store changed.

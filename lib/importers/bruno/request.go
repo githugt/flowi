@@ -160,7 +160,7 @@ func (b requestBuilder) body(mode string, v *model.RequestVersion) model.Body {
 	case "graphql":
 		return b.graphQL(text("body:graphql"), text("body:graphql:vars"), v)
 	default:
-		b.it.Unmapped("body mode "+mode, "left out", "Flow-I has no equivalent")
+		b.it.Unmapped("body mode "+mode, "left out", "Flowi has no equivalent")
 	}
 	return model.Body{}
 }
@@ -210,7 +210,7 @@ func (b requestBuilder) asserts() []string {
 		if check, ok := assertion(e.key, e.value); ok {
 			out = append(out, check)
 		} else {
-			b.it.UnmappedAt(b.at(e), "assert "+e.key+": "+e.value, "left out", "only comparisons and isDefined/isUndefined/isNull map to Flow-I checks")
+			b.it.UnmappedAt(b.at(e), "assert "+e.key+": "+e.value, "left out", "only comparisons and isDefined/isUndefined/isNull map to Flowi checks")
 		}
 	}
 	return out
@@ -238,7 +238,7 @@ func assertion(lhs, rhs string) (string, bool) {
 var bodyPath = regexp.MustCompile(`^(\.[A-Za-z_][A-Za-z0-9_]*|\[[0-9]+\])*$`)
 
 // responseRef maps res.status, res.body…, res.headers.x and
-// res.responseTime to Flow-I's response scope.
+// res.responseTime to Flowi's response scope.
 func responseRef(s string) (string, bool) {
 	switch {
 	case s == "res.status":

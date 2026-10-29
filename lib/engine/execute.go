@@ -39,6 +39,8 @@ type execution struct {
 	// (messages, count, outcome, body, headers); nil before and for HTTP.
 	async map[string]any
 	diags diag.List
+	// messageHooks run for each message a message request keeps (see sendAsync).
+	messageHooks []HookRef
 }
 
 // execute runs one request: version and settings, pre-hooks, render, send,
@@ -49,6 +51,7 @@ func (r *runner) execute(ctx context.Context, c call) outcome {
 		return outcome{status: StatusError, diags: diags}
 	}
 	chain, ok := x.hookChain()
+	x.messageHooks = chain.Message
 	if ok && x.runPhase(ctx, chain.Pre, nodes.PhasePre) {
 		x.sendAndCheck(ctx, chain.Post)
 	}
@@ -87,7 +90,9 @@ func (x *execution) sendAndCheck(ctx context.Context, post []HookRef) {
 // schemas, then learns from them. What it finds is added to the send's
 // diagnostics without changing its status: a schema mismatch never stops a send.
 func (x *execution) checkSchemas() {
-	if x.r.deps.Schemas == nil || !x.cfg.schemas || x.record == nil {
+	// A flowi overlay is often a deliberately odd request (a bad token, a
+	// delay), so its responses must not teach the schema what is normal.
+	if x.r.deps.Schemas == nil || !x.cfg.schemas || x.record == nil || x.c.overlay != nil {
 		return
 	}
 	notes := x.r.deps.Schemas.Check(x.c.collection, x.c.request, x.version.Label, *x.record)
@@ -103,13 +108,14 @@ func (r *runner) prepare(c call) (*execution, diag.List) {
 	if diags.HasErrors() {
 		return nil, diags
 	}
+	v, overlayNotes := laidOver(c, v)
 	cfg := newConfig(r.deps.Lookup.Settings(c.collection.Manifest.ID, folderOf(c.request), v.Settings))
 	env, diags := selectEnvironment(c.collection, r.env, cfg.defaultEnv)
 	if diags.HasErrors() {
 		return nil, diags
 	}
 	x := &execution{r: r, c: c, version: v, source: source, cfg: cfg, env: env, status: StatusPassed,
-		memo: newGenMemo(r.gen)}
+		memo: newGenMemo(r.gen), diags: overlayNotes}
 	x.state = &nodes.State{Vars: nodes.NewVars(nil), Request: &nodes.MutableRequest{}, Emit: emitter{x}, Masker: r.secrets,
 		Scope: func() template.Scope { return x.scope(false) }, Secret: r.secrets.derived}
 	with, diags := x.renderWith()
@@ -165,7 +171,7 @@ func (x *execution) scope(lenient bool) template.Scope {
 	values := map[string]any{
 		"env": x.env.values, "secret": x.r.secrets.namespace(x.c.collection.Manifest.ID, x.env),
 		"with": x.with, "vars": x.state.Vars.Snapshot(), "inputs": map[string]any{}, "nodes": map[string]any{},
-		"var": x.requestVariables(),
+		"var": x.requestVariables(), "collection_var": collectionVariables(x.c.collection, x.env.values),
 	}
 	if view := x.currentView(); view != nil {
 		values["request"] = view
@@ -175,6 +181,19 @@ func (x *execution) scope(lenient bool) template.Scope {
 		values["response"], values["status"] = resp.Values(), resp.Status
 	}
 	return template.Scope{Values: values, Bare: []string{"with", "vars", "inputs", "env", "var"}, Gen: x.r.gen, Lenient: lenient}
+}
+
+// collectionVariables are the collection's own values, each replaced by the
+// environment's variable of the same name when the environment has one.
+func collectionVariables(c model.Collection, env map[string]any) map[string]any {
+	out := make(map[string]any, len(c.Manifest.Variables))
+	for _, kv := range c.Manifest.Variables {
+		out[kv.Key] = kv.Value
+		if v, ok := env[kv.Key]; ok {
+			out[kv.Key] = v
+		}
+	}
+	return out
 }
 
 // requestVariables are the version's variables as defaults: an environment
@@ -210,7 +229,11 @@ func (x *execution) render(lenient bool) (built, diag.List) {
 		secret: x.r.secrets.derived, defaults: x.r.defaultHeaders(x.cfg),
 	})
 	applyNodeHeaders(&b, x.c.headers)
-	return b, append(diags, applyOverrides(&b, x.state.Request)...)
+	diags = append(diags, applyOverrides(&b, x.state.Request)...)
+	if x.c.bodyOver != nil {
+		diags = append(diags, applyBody(&b, &nodes.MutableRequest{Body: x.c.bodyOver})...)
+	}
+	return b, diags
 }
 
 func (x *execution) currentView() map[string]any {
@@ -262,13 +285,24 @@ func viewOf(b built) map[string]any {
 // (transport failure, or cancellation).
 func (x *execution) send(ctx context.Context, b built) (*httpx.Response, bool) {
 	x.r.addTraceparent(b.request.Header, x.c.path)
-	client, err := httpx.NewClient(x.clientOptions(b))
+	signer, ok := x.authenticate(ctx, &b)
+	if !ok {
+		return nil, false
+	}
+	opts, ok := x.clientOptionsFor(b)
+	if !ok {
+		return nil, false
+	}
+	client, err := httpx.NewClient(opts)
 	if err != nil {
 		x.fail(StatusError, diag.List{diag.New(diag.CodeHTTPFailed, diag.Location{}, map[string]string{"detail": err.Error()})})
 		return nil, false
 	}
 	defer client.Close()
 	attempts, err := client.Do(ctx, b.request)
+	if err == nil {
+		attempts, err = x.answerChallenge(ctx, client, signer, &b, attempts)
+	}
 	if err != nil {
 		// The context ended (the run was cancelled or the node timed out):
 		// nothing usable came back, so this request did not pass.
@@ -296,7 +330,7 @@ func (x *execution) newRecord(b built, attempts []httpx.Attempt) *Record {
 	rec := &Record{
 		ID: x.r.deps.NewID(), RunID: x.r.runID, CollectionID: x.c.collection.Manifest.ID, RequestID: x.c.request.ID,
 		RequestPath: x.c.request.Path, Version: x.version.Label, VersionSource: x.source, At: x.r.deps.Clock(),
-		Request: b.sent, Attempts: attemptRecords(attempts),
+		Request: b.sent, Attempts: attemptRecords(attempts), Overlay: x.c.overlayName(),
 	}
 	if last := attempts[len(attempts)-1]; last.Response != nil {
 		fillResponse(rec, last.Response)

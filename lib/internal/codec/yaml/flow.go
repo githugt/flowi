@@ -23,6 +23,7 @@ func (c *Codec) DecodeFlow(file, path string, data []byte) (model.Flow, diag.Lis
 		return f, d.diags
 	}
 	f.Meta = m.meta()
+	f.Tags = m.stringList("tags")
 	m.flowBody(&f)
 	m.closeStrict()
 	return f, d.diags
@@ -33,7 +34,7 @@ func (c *Codec) DecodeFlow(file, path string, data []byte) (model.Flow, diag.Lis
 func (m *mapping) flowBody(f *model.Flow) {
 	f.PreferVersion = m.versionLabel("prefer_version")
 	f.Inputs = m.inputs()
-	f.Outputs = m.keyValues("outputs")
+	f.Outputs = m.outputs()
 	f.Execution = m.execution()
 	f.Run = m.runTill()
 	f.Nodes = m.nodes("nodes")
@@ -49,9 +50,47 @@ func (m *mapping) inputs() []model.Input {
 		in := model.Input{Name: e.key}
 		if dm, ok := m.d.mapping(e.value, e.path, e.key); ok {
 			in.Default = dm.str("default")
+			in.Type = dm.str("type")
 			dm.closeStrict()
 		}
 		out = append(out, in)
+	}
+	return out
+}
+
+// outputs reads the flow's outputs in file order. An output is a template, or
+// a mapping with value and type.
+func (m *mapping) outputs() []model.Output {
+	e, ok := m.take("outputs")
+	if !ok {
+		return nil
+	}
+	om, ok := m.d.mapping(e.value, e.path, "outputs")
+	if !ok {
+		return nil
+	}
+	out := make([]model.Output, 0, len(om.entries))
+	for _, oe := range om.entries {
+		if _, typed := oe.value.(*ast.MappingNode); !typed {
+			out = append(out, model.Output{Name: oe.key, Value: m.d.scalarString(oe.value, oe.path, oe.key, true)})
+			continue
+		}
+		if dm, ok := m.d.mapping(oe.value, oe.path, oe.key); ok {
+			out = append(out, model.Output{Name: oe.key, Type: dm.str("type"), Value: dm.str("value")})
+			dm.closeStrict()
+		}
+	}
+	return out
+}
+
+func encodeOutputs(outs []model.Output) yaml.MapSlice {
+	var out yaml.MapSlice
+	for _, o := range outs {
+		if o.Type == "" {
+			out = append(out, yaml.MapItem{Key: o.Name, Value: o.Value})
+			continue
+		}
+		out = append(out, yaml.MapItem{Key: o.Name, Value: yaml.MapSlice{{Key: "type", Value: o.Type}, {Key: "value", Value: o.Value}}})
 	}
 	return out
 }
@@ -112,6 +151,7 @@ func (m *mapping) runTill() *model.RunTill {
 func (c *Codec) EncodeFlow(f model.Flow) ([]byte, error) {
 	var o omap
 	putMeta(&o, f.Meta)
+	o.put("tags", f.Tags)
 	putFlowBody(&o, f)
 	return marshal(o.items)
 }
@@ -120,7 +160,7 @@ func (c *Codec) EncodeFlow(f model.Flow) ([]byte, error) {
 func putFlowBody(o *omap, f model.Flow) {
 	o.put("prefer_version", f.PreferVersion)
 	o.put("inputs", encodeInputs(f.Inputs))
-	o.put("outputs", keyValues(f.Outputs))
+	o.put("outputs", encodeOutputs(f.Outputs))
 	o.put("execution", encodeExecution(f.Execution))
 	if f.Run != nil {
 		o.put("run", encodeRunTill(*f.Run))
@@ -132,6 +172,7 @@ func encodeInputs(ins []model.Input) yaml.MapSlice {
 	var out yaml.MapSlice
 	for _, in := range ins {
 		var o omap
+		o.put("type", in.Type)
 		o.put("default", in.Default)
 		value := any(o.items)
 		if o.items == nil {

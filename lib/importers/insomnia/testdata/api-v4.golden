@@ -1,0 +1,106 @@
+item "Orders/List-orders" imported at 0:0
+  warning FLW-IMPORT-006 0:0 header X-Api-Key looked like a credential and was replaced by {{secret.x_api_key}}
+item "Orders/Admin/Create-order" imported at 0:0
+  warning FLW-IMPORT-006 0:0 basic auth password looked like a credential and was replaced by {{secret.password}}
+  warning FLW-IMPORT-006 0:0 the request body (1 values) looked like a credential and was replaced by (redacted)
+item "Orders/Form-post" imported at 0:0
+  warning FLW-IMPORT-006 0:0 form field secret looked like a credential and was replaced by {{secret.secret}}
+item "Orders/Token" imported at 0:0
+  warning FLW-IMPORT-006 0:0 oauth2 auth client_secret looked like a credential and was replaced by {{secret.client_secret}}
+  warning FLW-IMPORT-001 0:0 script preRequestScript has no Flowi equivalent and was left out: scripts are JavaScript; use hooks and extract or assert nodes instead
+item "Orders/Browser-sign-in" imported at 0:0
+  warning FLW-IMPORT-006 0:0 oauth2 auth client_secret looked like a credential and was replaced by {{secret.client_secret}}
+  warning FLW-IMPORT-001 0:0 OAuth 2.0 redirect address https://app.insomnia.rest/oauth/redirect has no Flowi equivalent and was not used: Flowi redirects to http://127.0.0.1:<port>/callback; register that address with the provider and set redirect_port to its port
+item "Orders/Tagged" imported at 0:0
+  warning FLW-IMPORT-001 0:0 template tag {% uuid 'v4' %} has no Flowi equivalent and was kept as text: Insomnia's tags have no Flowi equivalent; use a generator or an extract
+  warning FLW-IMPORT-001 0:0 auth type ntlm has no Flowi equivalent and was left out: set the credentials up with headers or a pre-hook
+item "No-URL" skipped at 0:0
+  error FLW-IMPORT-005 0:0 No-URL was skipped: the request has no URL
+item "Stream" skipped at 0:0
+  error FLW-IMPORT-005 0:0 Stream was skipped: this kind of request is not imported (grpc_request)
+item "base environment" imported at 0:0
+  warning FLW-IMPORT-006 0:0 variable api_token looked like a credential and was replaced by a secret declaration
+  warning FLW-IMPORT-001 0:0 variable nested has no Flowi equivalent and was left out: a nested object has no Flowi equivalent; flatten it into separate variables
+item "environment Production" imported at 0:0
+  warning FLW-IMPORT-006 0:0 variable api_token looked like a credential and was replaced by a secret declaration
+  warning FLW-IMPORT-001 0:0 variable nested has no Flowi equivalent and was left out: a nested object has no Flowi equivalent; flatten it into separate variables
+--- request Orders/List-orders
+name: List orders
+versions:
+  "1":
+    method: GET
+    url: "{{env.base_url}}/orders"
+    query:
+      status: open
+      page: "1"
+    headers:
+      Accept: application/json
+      X-Api-Key: "{{secret.x_api_key}}"
+      Authorization: Bearer {{secret.api_token}}
+--- request Orders/Admin/Create-order
+name: Create order
+versions:
+  "1":
+    method: POST
+    url: "{{env.base_url}}/orders"
+    headers:
+      Authorization: Basic {{toBase64("ada" + ":" + secret.password)}}
+    body:
+      json: "{\"password\":\"(redacted)\",\"sku\":\"abc\"}"
+--- request Orders/Form-post
+name: Form post
+versions:
+  "1":
+    method: POST
+    url: "{{env.base_url}}/forms"
+    body:
+      form:
+        a: "1"
+        secret: "{{secret.secret}}"
+--- request Orders/Token
+name: Token
+versions:
+  "1":
+    method: POST
+    url: "{{env.base_url}}/token"
+    auth:
+      type: oauth2
+      grant: client_credentials
+      token_url: "{{env.base_url}}/oauth/token"
+      client_id: abc
+      client_secret: "{{secret.client_secret}}"
+      scope: read
+      client_auth: basic
+--- request Orders/Browser-sign-in
+name: Browser sign-in
+versions:
+  "1":
+    method: GET
+    url: "{{env.base_url}}/me"
+    auth:
+      type: oauth2
+      grant: authorization_code
+      authorization_url: "{{env.base_url}}/oauth/authorize"
+      token_url: "{{env.base_url}}/oauth/token"
+      client_id: abc
+      client_secret: "{{secret.client_secret}}"
+      scope: read
+      pkce: "on"
+--- request Orders/Tagged
+name: Tagged
+versions:
+  "1":
+    method: GET
+    url: "{{env.base_url}}/{% uuid 'v4' %}"
+--- environment shop-api
+name: shop-api
+vars:
+  api_token:
+    secret: true
+  base_url: https://shop.example.com
+--- environment production
+name: production
+vars:
+  api_token:
+    secret: true
+  base_url: https://prod.example.com

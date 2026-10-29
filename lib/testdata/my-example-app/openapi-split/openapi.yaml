@@ -1,0 +1,18 @@
+openapi: 3.0.3
+info: {title: my-example-app, version: 1.0.0}
+paths:
+  /examples:
+    post:
+      operationId: createExample
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: ./schemas/example.yaml
+      responses:
+        "201":
+          description: created
+          content:
+            application/json:
+              schema:
+                $ref: ./schemas/example.yaml

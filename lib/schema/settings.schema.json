@@ -1,8 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/githugt/flowi-lib/schema/settings.schema.json",
-  "title": "Flow-I settings",
-  "description": "User settings file (settings.yaml) and every settings: block. Which keys a layer may set is enforced by Flow-I.",
+  "title": "Flowi settings",
+  "description": "User settings file (settings.yaml) and every settings: block. Which keys a layer may set is enforced by Flowi.",
   "type": "object",
   "additionalProperties": false,
   "properties": {

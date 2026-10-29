@@ -41,6 +41,9 @@ type Contract struct {
 	Source  string
 	Files   []string
 	Samples []Sample
+	// Removed says the request version is gone: a changed API description no longer has it. Every consumer
+	// of it is broken, whatever it reads.
+	Removed bool
 }
 
 // Contracts finds the contract of one request version.

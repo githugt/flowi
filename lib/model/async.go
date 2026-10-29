@@ -13,8 +13,11 @@ const (
 	ProtocolSSE   = "sse"
 	ProtocolMQTT  = "mqtt"
 	ProtocolKafka = "kafka"
-	ProtocolAMQP  = "amqp"
+	ProtocolAMQP  = "amqp" // AMQP 0-9-1 (RabbitMQ and compatible)
 	ProtocolNATS  = "nats"
+
+	// ProtocolAMQP10 is AMQP 1.0 (ActiveMQ Artemis, Qpid, IBM MQ, RabbitMQ 4 ...), a different protocol from AMQP 0-9-1.
+	ProtocolAMQP10 = "amqp10"
 
 	// Managed messaging and Redis (ADR 0019).
 	ProtocolRedis      = "redis"
@@ -56,13 +59,16 @@ func protocolOf(p string) asyncProtocol {
 		return asyncProtocol{schemes: []string{"http", "https"}, bindings: []string{"last_event_id"}}
 	case ProtocolMQTT:
 		return asyncProtocol{schemes: []string{"mqtt", "mqtts", "ws", "wss"}, credentials: userPassToken(),
-			bindings: []string{"qos", "retain", "client_id", "username", "password"}}
+			bindings: []string{"version", "qos", "retain", "client_id", "username", "password"}}
 	case ProtocolKafka:
 		return asyncProtocol{schemes: []string{"kafka", "kafkas"}, credentials: userPassToken(),
 			bindings: []string{"key", "partition", "group", "offset", "sasl.mechanism", "username", "password"}}
 	case ProtocolAMQP:
 		return asyncProtocol{schemes: []string{"amqp", "amqps"}, credentials: userPassToken(),
 			bindings: []string{"exchange", "routing_key", "queue", "username", "password"}}
+	case ProtocolAMQP10:
+		return asyncProtocol{schemes: []string{"amqp", "amqps"}, credentials: userPass(),
+			bindings: []string{"subject", "content_type", "durable", "ttl", "username", "password"}}
 	case ProtocolNATS:
 		return asyncProtocol{schemes: []string{"nats", "tls"}, credentials: userPassToken(), bindings: []string{
 			"queue_group", "reply_to", "token", "username", "password", "stream", "consumer", "deliver", "ack"}}
@@ -96,7 +102,7 @@ func managedProtocolOf(p string) asyncProtocol {
 
 // AsyncProtocols lists the protocols in catalogue order.
 func AsyncProtocols() []string {
-	return []string{ProtocolWS, ProtocolSSE, ProtocolMQTT, ProtocolKafka, ProtocolAMQP, ProtocolNATS,
+	return []string{ProtocolWS, ProtocolSSE, ProtocolMQTT, ProtocolKafka, ProtocolAMQP, ProtocolAMQP10, ProtocolNATS,
 		ProtocolRedis, ProtocolSQS, ProtocolSNS, ProtocolServiceBus, ProtocolPubSub}
 }
 
@@ -179,10 +185,13 @@ func RedactedTarget(target string) string {
 }
 
 // ProtocolVerb is the short upper-case name a protocol shows where an HTTP
-// request shows its method: MQTT, WS, … and BUS for Service Bus.
+// request shows its method: MQTT, WS, … BUS for Service Bus and AMQP1 for AMQP 1.0.
 func ProtocolVerb(protocol string) string {
-	if protocol == ProtocolServiceBus {
+	switch protocol {
+	case ProtocolServiceBus:
 		return "BUS"
+	case ProtocolAMQP10:
+		return "AMQP1"
 	}
 	return strings.ToUpper(protocol)
 }

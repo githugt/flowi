@@ -82,8 +82,7 @@ func Specs() []Spec {
 
 func specList() []Spec {
 	return []Spec{
-		setSpec(), extractSpec(), assertSpec(), logSpec(),
-		generateSpec(), transformSpec(), calcSpec(), noteSpec(),
+		setSpec(), assertSpec(), fuzzSpec(), logSpec(), noteSpec(),
 		delaySpec(), conditionSpec(), batchSpec(), runTillSpec(), parallelSpec(), stopSpec(),
 		requestSpec(), subflowSpec(), fetchSpec(), webhookSpec(), digestSpec(), saveSpec(),
 	}

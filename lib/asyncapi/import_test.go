@@ -85,3 +85,131 @@ func TestImport_should_report_an_unsupported_protocol_and_not_a_non_asyncapi_doc
 		t.Fatalf("diags %v", bad)
 	}
 }
+
+func bindingOf(a *model.Async, name string) string {
+	for _, kv := range a.Binding {
+		if kv.Key == name {
+			return kv.Value
+		}
+	}
+	return ""
+}
+
+func TestImport_should_map_the_protocol_bindings_it_understands_and_report_the_rest(t *testing.T) {
+	doc := `asyncapi: 3.0.0
+info: {title: t, version: 1.0.0}
+servers:
+  broker:
+    host: broker:1883
+    protocol: mqtt
+    bindings:
+      mqtt: {clientId: flowi-client, keepAlive: 60}
+channels:
+  readings:
+    address: sensors/{id}/readings
+    bindings:
+      mqtt: {}
+operations:
+  publishReading:
+    action: send
+    channel: {$ref: '#/channels/readings'}
+    bindings:
+      mqtt: {qos: 1, retain: true, bindingVersion: 0.2.0}
+`
+	kafka := `asyncapi: 3.0.0
+info: {title: t, version: 1.0.0}
+servers: {k: {host: 'kafka:9092', protocol: kafka}}
+channels:
+  orders:
+    address: orders-address
+    bindings:
+      kafka: {topic: orders.v1, partitions: 3}
+    messages:
+      order:
+        payload: {type: object}
+        bindings:
+          kafka: {key: {type: string, enum: [order-key]}}
+operations:
+  readOrders:
+    action: receive
+    channel: {$ref: '#/channels/orders'}
+    bindings:
+      kafka: {groupId: {type: string, enum: [billing]}, clientId: {type: string}}
+`
+	amqp := `asyncapi: 2.6.0
+info: {title: t, version: 1.0.0}
+servers: {a: {url: 'amqp://rabbit:5672', protocol: amqp}}
+channels:
+  user.signedup:
+    bindings:
+      amqp:
+        is: routingKey
+        exchange: {name: events, type: topic}
+    publish:
+      operationId: announce
+      bindings:
+        amqp: {deliveryMode: 2}
+      message: {payload: {type: object}}
+`
+	nats := `asyncapi: 2.6.0
+info: {title: t, version: 1.0.0}
+servers: {n: {url: 'nats://nats:4222', protocol: nats}}
+channels:
+  jobs:
+    subscribe:
+      operationId: work
+      bindings:
+        nats: {queue: workers}
+      message: {payload: {type: object}}
+`
+
+	m, mDiags := Import([]byte(doc), Options{NewID: newID()})
+	k, kDiags := Import([]byte(kafka), Options{NewID: newID()})
+	a, aDiags := Import([]byte(amqp), Options{NewID: newID()})
+	n, nDiags := Import([]byte(nats), Options{NewID: newID()})
+
+	mq := m.Requests[0].Versions[0].Async
+	if bindingOf(mq, "qos") != "1" || bindingOf(mq, "retain") != "true" || bindingOf(mq, "client_id") != "flowi-client" {
+		t.Errorf("mqtt binding %+v", mq.Binding)
+	}
+	if len(mDiags) != 1 || !strings.Contains(mDiags[0].Args["what"], "mqtt.keepAlive") {
+		t.Errorf("mqtt: want the keepAlive reported, got %v", mDiags)
+	}
+	kf := k.Requests[0].Versions[0].Async
+	if kf.Channel != "orders.v1" || bindingOf(kf, "group") != "billing" || bindingOf(kf, "key") != "order-key" {
+		t.Errorf("kafka channel %q binding %+v", kf.Channel, kf.Binding)
+	}
+	if len(kDiags) != 2 {
+		t.Errorf("kafka: want partitions and clientId reported, got %v", kDiags)
+	}
+	am := a.Requests[0].Versions[0].Async
+	if bindingOf(am, "exchange") != "events" || len(aDiags) != 1 {
+		t.Errorf("amqp binding %+v diags %v", am.Binding, aDiags)
+	}
+	nt := n.Requests[0].Versions[0].Async
+	if bindingOf(nt, "queue_group") != "workers" || len(nDiags) != 0 {
+		t.Errorf("nats binding %+v diags %v", nt.Binding, nDiags)
+	}
+}
+
+func TestImport_should_ignore_the_bindings_of_other_protocols(t *testing.T) {
+	doc := `asyncapi: 3.0.0
+info: {title: t, version: 1.0.0}
+servers: {n: {host: 'nats:4222', protocol: nats}}
+channels:
+  jobs:
+    address: jobs
+    bindings:
+      kafka: {topic: elsewhere}
+operations:
+  work:
+    action: receive
+    channel: {$ref: '#/channels/jobs'}
+`
+
+	res, diags := Import([]byte(doc), Options{NewID: newID()})
+
+	if len(diags) != 0 || res.Requests[0].Versions[0].Async.Channel != "jobs" {
+		t.Fatalf("channel %q diags %v", res.Requests[0].Versions[0].Async.Channel, diags)
+	}
+}

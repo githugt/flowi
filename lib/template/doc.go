@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-// Package template renders Flow-I's {{…}} templates. Each placeholder holds
+// Package template renders Flowi's {{…}} templates. Each placeholder holds
 // an expr-lang expression evaluated against a Scope of namespaces (env,
 // vars, nodes, secret, request, response, …).
 //

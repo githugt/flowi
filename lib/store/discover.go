@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/githugt/flowi-lib/diag"
+	"github.com/githugt/flowi-lib/flowioverlay"
 )
 
 // fileKind classifies a file found in a collection directory.
@@ -24,6 +25,7 @@ const (
 	kindFlow
 	kindFolder
 	kindBlueprint
+	kindOverlay
 	kindUnrecognised
 )
 
@@ -64,6 +66,11 @@ func classify(rel string) fileKind {
 	case top == "blueprints":
 		if strings.HasSuffix(rel, blueprintSuffix) {
 			return kindBlueprint
+		}
+		return kindUnrecognised
+	case top == "overlays":
+		if strings.HasSuffix(rel, flowioverlay.Suffix) && !strings.Contains(rest, "/") {
+			return kindOverlay
 		}
 		return kindUnrecognised
 	case top != "requests" && top != "flows":

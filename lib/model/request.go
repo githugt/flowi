@@ -44,6 +44,11 @@ type RequestVersion struct {
 	Variables []KeyValue
 	// Docs is the version's documentation, written as Markdown.
 	Docs string
+	// Auth, when set, signs or authenticates the request when it is sent: an
+	// API key, Digest, OAuth 2.0 or 1.0a, AWS Signature v4, a signed JWT, Hawk
+	// or a client certificate. The Authorization header of Headers is the
+	// simple form of the same thing.
+	Auth *Auth
 	// Async, when set, makes this an async (message) request instead of an
 	// HTTP one: Method, Query and Body are then unused.
 	Async *Async
@@ -105,6 +110,8 @@ func (a Async) Action() string {
 // relative to requests/ without the .req.yaml suffix, e.g. "auth/login".
 type Request struct {
 	Meta
+	// Tags label the request; the tags of its folders apply as well.
+	Tags      []string
 	Path      string
 	Operation string // the OpenAPI operationId of its first version; Arazzo steps refer to it
 	Default   string
@@ -117,4 +124,8 @@ type Request struct {
 	// the label of the version it started from.
 	Edit     *RequestVersion
 	EditBase string
+	// EditOverlay names the flowi overlay the edit was made with laid over
+	// its base version: the edit then shows the overlay's changes too, and the
+	// window restores the overlay choice with it. "" when there was none.
+	EditOverlay string
 }

@@ -32,7 +32,7 @@ func FromFlow(f model.Flow, newID func() model.ID, name string) (model.Blueprint
 		bp.Params = append(bp.Params, model.Param{Name: in.Name, Type: model.ParamString, Default: in.Default})
 	}
 	bp.Body.Inputs = nil
-	bp.Body.Outputs = append([]model.KeyValue(nil), f.Outputs...)
+	bp.Body.Outputs = append([]model.Output(nil), f.Outputs...)
 	bp.Body.Nodes = cloneNodes(f.Nodes, func(n *model.Node) {
 		if n.Request != nil {
 			n.Request.Request = d.param(&bp, n.Request.Request, model.ParamRequestRef)

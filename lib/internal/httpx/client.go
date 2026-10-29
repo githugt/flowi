@@ -4,6 +4,7 @@ package httpx
 
 import (
 	"context"
+	"crypto/tls"
 	"errors"
 	"fmt"
 	"io"
@@ -18,6 +19,8 @@ import (
 
 // Options configures a client. Every request it sends uses them.
 type Options struct {
+	// Transport, when set, sends every attempt instead of the network: a run played back from a recording.
+	Transport       http.RoundTripper
 	Version         string // auto | 1.1 | 2 | h2c | 3
 	FollowRedirects bool
 	MaxRedirects    int
@@ -32,9 +35,10 @@ type Options struct {
 	Timeout             time.Duration // per attempt
 	Proxy               *httpproxy.Config
 	CAFiles             []string
-	RequestCompression  string         // none | gzip
-	Jar                 http.CookieJar // nil sends and keeps no cookies
-	StreamThreshold     int64          // bodies larger than this stream to DownloadDir
+	ClientCert          *tls.Certificate // sent when the server asks for one (mutual TLS)
+	RequestCompression  string           // none | gzip
+	Jar                 http.CookieJar   // nil sends and keeps no cookies
+	StreamThreshold     int64            // bodies larger than this stream to DownloadDir
 	DownloadDir         string
 	Retry               RetryPolicy
 	Clock               func() time.Time // nil → time.Now
@@ -126,9 +130,12 @@ func NewClient(o Options) (*Client, error) {
 	if o.Rand == nil {
 		o.Rand = rand.New(rand.NewPCG(rand.Uint64(), rand.Uint64())) //nolint:gosec // jitter, not security
 	}
-	tr, err := newRoundTripper(o)
-	if err != nil {
-		return nil, err
+	tr := o.Transport
+	if tr == nil {
+		var err error
+		if tr, err = newRoundTripper(o); err != nil {
+			return nil, err
+		}
 	}
 	hc := &http.Client{Transport: tr, Jar: o.Jar, CheckRedirect: redirectPolicy(o)}
 	return &Client{opts: o, http: hc, rt: tr}, nil

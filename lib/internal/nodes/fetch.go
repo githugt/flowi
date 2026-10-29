@@ -5,7 +5,6 @@ package nodes
 import (
 	"context"
 	"maps"
-	"strings"
 
 	"github.com/githugt/flowi-lib/diag"
 	"github.com/githugt/flowi-lib/model"
@@ -66,12 +65,21 @@ func buildCall(n model.Node, s *State, defaultMethod, bodyKey string) (HTTPCall,
 		}
 		return v
 	}
-	call := HTTPCall{Method: strings.ToUpper(stringParam(n, "method")), URL: template.String(render("url")),
+	call := HTTPCall{Method: sentMethod(stringParam(n, "method")), URL: template.String(render("url")),
 		Headers: textMap(render("headers")), Query: textMap(render("query")), Body: render(bodyKey)}
 	if call.Method == "" {
 		call.Method = defaultMethod
 	}
 	return call, Outcome{Diags: diags}
+}
+
+// sentMethod is the method as it goes on the wire: a known method is sent in its registered spelling, so "query" works;
+// any other name is a case-sensitive token and is sent as written.
+func sentMethod(name string) string {
+	if spelling, known := model.KnownMethod(name); known {
+		return spelling
+	}
+	return name
 }
 
 func textMap(v any) map[string]string {

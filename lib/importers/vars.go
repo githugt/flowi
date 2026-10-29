@@ -8,7 +8,7 @@ import (
 	"strings"
 )
 
-// dynamicVariables maps Postman and Bruno's dynamic variables to Flow-I generators.
+// dynamicVariables maps Postman and Bruno's dynamic variables to Flowi generators.
 func dynamicVariables() map[string]string {
 	return map[string]string{
 		"$guid": "$uuid-v4", "$randomUUID": "$uuid-v4",
@@ -23,7 +23,7 @@ func dynamicVariables() map[string]string {
 
 var varIdentifier = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
 
-// VarRef is the Flow-I reference for a Postman or Bruno variable: secret.x for
+// VarRef is the Flowi reference for a Postman or Bruno variable: secret.x for
 // credential-like names (the same rule that declares them secret when
 // environments import), env.x otherwise.
 func VarRef(name string) string {
@@ -37,7 +37,7 @@ func VarRef(name string) string {
 	return ns + "[" + strconv.Quote(name) + "]"
 }
 
-// Translate rewrites Postman's and Bruno's {{var}} references as Flow-I
+// Translate rewrites Postman's and Bruno's {{var}} references as Flowi
 // templates and returns the dynamic variables it has no generator for.
 // It is Translator.Text without runtime variables or an item.
 func Translate(s string) (string, []string) {
@@ -46,12 +46,12 @@ func Translate(s string) (string, []string) {
 	return out, t.unknown
 }
 
-// VarExpression is the Flow-I expression for a {{name}}: a generator for
+// VarExpression is the Flowi expression for a {{name}}: a generator for
 // dynamic variables it knows, else a variable reference; unknown dynamic
 // variables are appended to unknown.
 func VarExpression(name string, unknown *[]string) string {
 	if env, ok := strings.CutPrefix(name, "process.env."); ok {
-		return VarRef(env) // Bruno reads the shell environment; Flow-I's environment plays that part
+		return VarRef(env) // Bruno reads the shell environment; Flowi's environment plays that part
 	}
 	if !strings.HasPrefix(name, "$") {
 		return VarRef(name)

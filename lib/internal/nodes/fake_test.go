@@ -39,7 +39,15 @@ type fakeRuntime struct {
 	files   []string
 	written map[string][]byte
 	fileErr error
+
+	schemaOut map[string]SchemaCheck
+
+	fuzz       FuzzSubject
+	fuzzErr    error
+	requestFor func(RequestCall) Outcome // when set, answers each request
 }
+
+func (f *fakeRuntime) CheckSchema(step string) SchemaCheck { return f.schemaOut[step] }
 
 func newFakeRuntime() *fakeRuntime {
 	return &fakeRuntime{now: time.Date(2026, 10, 7, 9, 0, 0, 0, time.UTC), reports: map[string]report.Run{}, written: map[string][]byte{}}
@@ -64,7 +72,14 @@ func (f *fakeRuntime) Lanes(_ context.Context, lanes []Lane, o LaneOptions) []La
 
 func (f *fakeRuntime) Request(_ context.Context, c RequestCall) Outcome {
 	f.requests = append(f.requests, c)
+	if f.requestFor != nil {
+		return f.requestFor(c)
+	}
 	return f.requestOut
+}
+
+func (f *fakeRuntime) FuzzSubject(context.Context, RequestCall) (FuzzSubject, error) {
+	return f.fuzz, f.fuzzErr
 }
 
 func (f *fakeRuntime) Subflow(_ context.Context, _ model.Ref, inputs map[string]any) Outcome {

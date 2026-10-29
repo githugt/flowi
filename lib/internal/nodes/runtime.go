@@ -86,6 +86,33 @@ type Runtime interface {
 	// "digests"). name is one or more "/"-separated segments, each a
 	// plain file name; anything else wraps ErrFileName.
 	WriteFile(dir, name string, data []byte, appendTo bool) (string, error)
+	// CheckSchema checks what an earlier request step received against the
+	// response schema kept for its request.
+	CheckSchema(step string) SchemaCheck
+	// FuzzSubject prepares a request step for fuzzing: its body as it would be sent, and the request-body schema
+	// kept for it. An error says why the request cannot be fuzzed (it has no JSON body).
+	FuzzSubject(ctx context.Context, c RequestCall) (FuzzSubject, error)
+}
+
+// FuzzSubject is a request ready to be sent with bad bodies.
+type FuzzSubject struct {
+	Body   any            // the good body, decoded JSON with numbers as json.Number
+	Schema map[string]any // the stored request-body schema, nil when none is kept
+}
+
+// SchemaCheck is the result of checking a step's response against its kept
+// schema. Found is false when no schema is kept (or the step has no response).
+type SchemaCheck struct {
+	Found      bool
+	Request    string // the request's path, for messages
+	Status     int
+	Violations []SchemaViolation
+}
+
+// SchemaViolation is one place a body does not match its schema.
+type SchemaViolation struct {
+	Path    string
+	Message string
 }
 
 // ErrFileName is wrapped by Runtime.WriteFile when a name is not a plain
@@ -125,9 +152,16 @@ type LaneResult struct {
 type RequestCall struct {
 	Ref     model.Ref
 	Version string
-	Hooks   model.HookControl
-	With    map[string]any
-	Headers map[string]string
+	Overlay string // a flowi overlay of the request's collection, "" for none
+	// Open, Over and Close are the node's connection use (see model.RequestCall).
+	Open, Over string
+	Close      bool
+	Hooks      model.HookControl
+	With       map[string]any
+	Headers    map[string]string
+	// Body, when set, is sent in place of the request's own body (a fuzz case). A string is sent as text and
+	// anything else as JSON.
+	Body *any
 }
 
 // HTTPCall is an ad-hoc HTTP call (fetch, webhook, digest webhook). A

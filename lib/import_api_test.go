@@ -4,11 +4,13 @@ package flowi
 
 import (
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
+	"unicode/utf16"
 
 	"github.com/pb33f/libopenapi"
 
@@ -629,5 +631,186 @@ func TestImport_should_apply_overlays_before_mapping_and_keep_both_documents(t *
 	}
 	if _, err := w.PreviewImportSource(ImportSource{Kind: ImportOpenAPI, Data: []byte(spec), Overlays: [][]byte{[]byte("not: overlay")}}, c); err == nil {
 		t.Fatal("an invalid overlay must refuse the import")
+	}
+}
+
+func TestImportArazzo_should_apply_an_OpenAPI_Overlay_first_and_keep_both(t *testing.T) {
+	// Arrange
+	w, c := petsCollection(t)
+	importPetstore(t, w, c)
+	broken := strings.Replace(fetchNameWorkflow, "operationId: getPet", "operationId: getPett", 1)
+	overlay := "overlay: 1.0.0\ninfo: {title: fix, version: 1.0.0}\nactions:\n  - target: $.workflows[0].steps[0]\n    update: {operationId: getPet}\n"
+	src := ImportSource{Kind: ImportArazzo, Name: "fetch.arazzo.yaml", Data: []byte(broken), Overlays: [][]byte{[]byte(overlay)}}
+
+	// Act
+	plan, err := w.PreviewImportSource(src, c)
+	if err != nil {
+		t.Fatal(err)
+	}
+	applyErr := w.ApplyImport(plan, ApplyOptions{})
+
+	// Assert
+	want := []string{"descriptions/fetch.arazzo.yaml", "descriptions/fetch.overlay.yaml", "flows/arazzo/fetchName.arazzo.yaml"}
+	if applyErr != nil || !slices.Equal(relsOf(plan), want) {
+		t.Fatalf("err %v rels %v diags %v", applyErr, relsOf(plan), plan.Diags)
+	}
+	f := flowAt(t, w, c, "arazzo/fetchName")
+	if f.Nodes[0].Request.Request.ID != requestAt(t, w, c, "pets/getPet").ID {
+		t.Errorf("the overlay did not fix the operation id: %+v", f.Nodes[0])
+	}
+}
+
+func TestImportArazzo_should_keep_nothing_when_no_overlay_is_given(t *testing.T) {
+	// Arrange
+	w, c := petsCollection(t)
+	importPetstore(t, w, c)
+
+	// Act
+	plan, err := w.PreviewImportSource(ImportSource{Kind: ImportArazzo, Name: "fetch.arazzo.yaml", Data: []byte(fetchNameWorkflow)}, c)
+
+	// Assert
+	if err != nil || !slices.Equal(relsOf(plan), []string{"flows/arazzo/fetchName.arazzo.yaml"}) {
+		t.Fatalf("err %v rels %v", err, relsOf(plan))
+	}
+}
+
+func TestImportOpenAPI_should_follow_files_beside_a_local_source_and_keep_them_for_the_update(t *testing.T) {
+	w, c := petsCollection(t)
+	dir := t.TempDir()
+	spec := "openapi: 3.0.3\ninfo: {title: t, version: 1.0.0}\npaths:\n  /pets:\n    post:\n      operationId: addPet\n      requestBody:\n        content:\n          application/json:\n            schema: {$ref: ./schemas/pet.yaml}\n      responses: {\"200\": {description: ok}}\n"
+	if err := os.MkdirAll(filepath.Join(dir, "schemas"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "schemas", "pet.yaml"), []byte("type: object\nproperties:\n  nickname: {type: string}\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	local := ImportSource{Kind: ImportOpenAPI, Name: filepath.Join(dir, "pets.openapi.yaml"), Data: []byte(spec), RefDir: dir}
+
+	plan, err := w.PreviewImportSource(local, c)
+	if err == nil {
+		err = w.ApplyImport(plan, ApplyOptions{})
+	}
+
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Contains(relsOf(plan), "descriptions/pets.files/schemas/pet.yaml") {
+		t.Fatalf("the file read should be kept beside the document, got %v", relsOf(plan))
+	}
+	req := requestAt(t, w, c, "addPet")
+	if !strings.Contains(req.Versions[0].Body.JSON, "nickname") {
+		t.Errorf("the body should come from the referenced file, got %q", req.Versions[0].Body.JSON)
+	}
+	again, err := w.PreviewSpecUpdate(c, "pets", []byte(spec))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, d := range again.Diags {
+		if strings.Contains(d.Args["what"], "external reference") {
+			t.Errorf("the update should find the kept file, got %v", d)
+		}
+	}
+}
+
+func TestImportOpenAPI_should_not_read_local_files_for_a_source_without_a_folder(t *testing.T) {
+	w, c := petsCollection(t)
+	spec := "openapi: 3.0.3\ninfo: {title: t, version: 1.0.0}\npaths:\n  /pets:\n    post:\n      operationId: addPet\n      requestBody:\n        content:\n          application/json:\n            schema: {$ref: ./schemas/pet.yaml}\n      responses: {\"200\": {description: ok}}\n"
+
+	plan, err := w.PreviewImportSource(ImportSource{Kind: ImportOpenAPI, Name: "pets.json", Data: []byte(spec)}, c)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+	found := false
+	for _, d := range plan.Diags {
+		found = found || strings.Contains(d.Args["what"], "external reference")
+	}
+	if !found {
+		t.Fatalf("the reference should be reported, got %v", plan.Diags)
+	}
+}
+
+func TestPreviewImportSource_should_accept_a_JSON_export_that_starts_with_a_byte_order_mark(t *testing.T) {
+	w, c := petsCollection(t)
+	postman := "\xef\xbb\xbf" + `{"info":{"name":"x","schema":"https://schema.getpostman.com/json/collection/v2.1.0/collection.json"},"item":[{"name":"Ping","request":{"method":"GET","url":"https://example.com/ping"}}]}`
+
+	plan, err := w.PreviewImportSource(ImportSource{Kind: ImportPostman, Name: "x.json", Data: []byte(postman)}, c)
+
+	if err != nil || !slices.Contains(relsOf(plan), "requests/Ping.req.yaml") {
+		t.Fatalf("files %v, err %v", relsOf(plan), err)
+	}
+}
+
+func TestPreviewImportSource_should_accept_a_JSON_export_saved_as_UTF_16_by_PowerShell(t *testing.T) {
+	w, c := petsCollection(t)
+	postman := `{"info":{"name":"x","schema":"https://schema.getpostman.com/json/collection/v2.1.0/collection.json"},"item":[{"name":"Ping","request":{"method":"GET","url":"https://example.com/ping"}}]}`
+	data := []byte{0xff, 0xfe}
+	for _, u := range utf16.Encode([]rune(postman)) {
+		data = append(data, byte(u), byte(u>>8))
+	}
+
+	plan, err := w.PreviewImportSource(ImportSource{Kind: ImportPostman, Name: "x.json", Data: data}, c)
+
+	if err != nil || !slices.Contains(relsOf(plan), "requests/Ping.req.yaml") {
+		t.Fatalf("files %v, err %v", relsOf(plan), err)
+	}
+}
+
+func TestPreviewImportSource_should_refuse_a_document_of_the_wrong_kind(t *testing.T) {
+	openapiDoc := string(readFixture(t, "openapi/testdata/petstore30.yaml"))
+	kinds := []ImportKind{ImportAsyncAPI, ImportArazzo, ImportPostman, ImportHAR, ImportInsomnia, ImportThunderClient, ImportHoppscotch, ImportProto}
+	for _, kind := range kinds {
+		t.Run(string(kind), func(t *testing.T) {
+			w, c := petsCollection(t)
+
+			plan, err := w.PreviewImportSource(ImportSource{Kind: kind, Name: "petstore.yaml", Data: []byte(openapiDoc)}, c)
+
+			var le *diag.ListError
+			if !errors.As(err, &le) || len(le.List) == 0 {
+				t.Fatalf("err %v, plan has %d files: want the import refused with a diagnostic", err, len(plan.Files))
+			}
+			if code := le.List[0].Code; code != diag.CodeImportInvalid && code != diag.CodeImportSyntax {
+				t.Errorf("code %s, want FLW-IMPORT-002 or FLW-IMPORT-004", code)
+			}
+		})
+	}
+}
+
+func TestPreviewImportSource_should_refuse_an_AsyncAPI_document_given_to_the_OpenAPI_import(t *testing.T) {
+	w, c := petsCollection(t)
+
+	_, err := w.PreviewImportSource(ImportSource{Kind: ImportOpenAPI, Name: "streetlights.yaml", Data: readFixture(t, "asyncapi/testdata/streetlights3.yaml")}, c)
+
+	var le *diag.ListError
+	if !errors.As(err, &le) || len(le.List) == 0 || le.List[0].Code != diag.CodeImportInvalid {
+		t.Fatalf("err %v, want FLW-IMPORT-002", err)
+	}
+}
+
+func TestImportAsyncAPI_should_plan_the_same_files_over_the_ones_it_wrote_when_imported_again(t *testing.T) {
+	w, c := petsCollection(t)
+	data := readFixture(t, "asyncapi/testdata/streetlights3.yaml")
+	src := ImportSource{Kind: ImportAsyncAPI, Name: "streetlights.yaml", Data: data}
+	plan, err := w.PreviewImportSource(src, c)
+	if err == nil {
+		err = w.ApplyImport(plan, ApplyOptions{})
+	}
+	if err != nil {
+		t.Fatal(err)
+	}
+	first := relsOf(plan)
+
+	again, err := w.PreviewImportSource(src, c)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, f := range again.Files {
+		if strings.HasPrefix(f.Rel, "requests/") && !f.Exists {
+			t.Errorf("%s is new on the second import: the same document should plan the same files (first %v)", f.Rel, first)
+		}
+	}
+	if len(relsOf(again)) != len(first) {
+		t.Errorf("first import %v, second %v", first, relsOf(again))
 	}
 }

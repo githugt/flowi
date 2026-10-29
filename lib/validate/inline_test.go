@@ -22,10 +22,8 @@ func TestValidate_Given_inline_node_missing_param_Then_FLW_NODE_004(t *testing.T
 		node  model.Node
 		field string
 	}{
-		{model.Node{ID: "s", Type: "set", Params: params("value", "x")}, "target"},
+		{model.Node{ID: "s", Type: "set", Params: params("value", "x")}, "values"},
 		{model.Node{ID: "s", Type: "set", Params: params("target", "vars.x")}, "value"},
-		{model.Node{ID: "e", Type: "extract", Params: params("from", "body", "path", "$.a")}, "name"},
-		{model.Node{ID: "e", Type: "extract", Params: params("name", "a", "path", "$.a")}, "from"},
 		{model.Node{ID: "a", Type: "assert"}, "check"},
 		{model.Node{ID: "l", Type: "log"}, "value"},
 	}
@@ -45,10 +43,10 @@ func TestValidate_Given_inline_node_missing_param_Then_FLW_NODE_004(t *testing.T
 	}
 }
 
-func TestValidate_Given_extract_map_form_Then_no_missing_field(t *testing.T) {
+func TestValidate_Given_set_values_Then_no_missing_field(t *testing.T) {
 	f := newFixture(t)
 	c := f.collection("c")
-	c.Manifest.Hooks.Post = []model.HookStep{{Inline: []model.Node{{ID: "e", Type: "extract", Params: params("token", "{{response.body.token}}")}}}}
+	c.Manifest.Hooks.Post = []model.HookStep{{Inline: []model.Node{{ID: "e", Type: "set", Values: []model.SetValue{{Name: "token", Value: "{{response.body.token}}"}}}}}}
 
 	got := Validate(Target{Collections: []model.Collection{c}})
 
@@ -67,5 +65,22 @@ func TestValidate_Given_unknown_set_target_Then_FLW_RUN_004_warning(t *testing.T
 	d := only(t, got, diag.CodeRunSetTarget)
 	if d.Severity != diag.SeverityWarning || d.Path != "$.hooks.pre[0].inline[0].target" {
 		t.Fatalf("diag %+v", d)
+	}
+}
+
+func TestValidate_Given_an_assert_with_only_a_schema_Then_it_is_complete(t *testing.T) {
+	// Arrange
+	f := newFixture(t)
+	c := f.collection("c")
+	c.Manifest.Hooks.Post = []model.HookStep{{Inline: []model.Node{{ID: "a", Type: "assert", Params: params("schema", "login")}}}}
+
+	// Act
+	got := Validate(Target{Collections: []model.Collection{c}})
+
+	// Assert
+	for _, d := range got {
+		if d.Code == diag.CodeNodeMissingField {
+			t.Fatalf("an assert with a schema needs no check: %v", d)
+		}
 	}
 }

@@ -1,15 +1,15 @@
 # flowi-lib
 
-The core library of **Flow-I**: everything that is not a user interface. The
+The core library of **Flowi**: everything that is not a user interface. The
 [CLI](https://github.com/githugt/flowi-cli) and the [desktop app](https://github.com/githugt/flowi)
 are thin layers over it, and other Go programs can embed it.
 
 > Status: **pre-alpha**. The file format and the API will change.
 
-## Why Flow-I
+## Why Flowi
 
 Most API tools stop at the single request. Real work is a journey: log in, take the token, verify,
-fill in a form, check the result. Flow-I keeps a library of **requests** and chains them into
+fill in a form, check the result. Flowi keeps a library of **requests** and chains them into
 **flows**, such as:
 
 > Login → extract token → Verify → generate form values → Form page 1 → delay → Form page 2
@@ -67,7 +67,7 @@ go run ./examples/demoserver/cmd/flowi-demo-server &   # http://127.0.0.1:8080, 
 export FLOWI_CONFIG_DIR=$PWD/.try FLOWI_SECRET_LOCAL_PASSWORD=demo
 flowi workspace mount ./examples/user-creation
 # environments belong to the workspace, so copy the example's there
-mkdir -p .try/workspaces/default/environments && cp examples/user-creation/environments/*.yaml .try/workspaces/default/environments/
+mkdir -p .try/workspaces/default-workspace/environments && cp examples/user-creation/environments/*.yaml .try/workspaces/default-workspace/environments/
 flowi run user-creation --env local                    # login → verify → onboarding
 flowi run onboarding-check --env local                 # subflows, batch, parallel, run_till, digest
 flowi impact auth/login                                # who uses this request, and does it still fit?

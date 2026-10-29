@@ -27,6 +27,8 @@ workflows:
             id: 01JA0000000000000000000014
             path: config
         - id: client
-          type: extract
-          client_id: "{{nodes.fetch.body.client_id}}"
+          type: set
+          values:
+            - name: client_id
+              value: "{{nodes.fetch.body.client_id}}"
 x-flowi-version: 1

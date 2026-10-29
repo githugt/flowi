@@ -57,16 +57,16 @@ func (r *runner) resolveInputs(fl model.Flow, given map[string]any, sc template.
 }
 
 // renderOutputs renders a subflow's declared outputs in its final scope.
-func (r *runner) renderOutputs(kvs []model.KeyValue, sc template.Scope) (map[string]any, diag.List) {
-	out := make(map[string]any, len(kvs))
+func (r *runner) renderOutputs(outs []model.Output, sc template.Scope) (map[string]any, diag.List) {
+	out := make(map[string]any, len(outs))
 	var diags diag.List
-	for _, kv := range kvs {
-		v, err := r.evalTemplate(kv.Value, sc)
+	for _, o := range outs {
+		v, err := r.evalTemplate(o.Value, sc)
 		if err != nil {
-			diags = append(diags, templateFailure("output "+kv.Key, err)...)
+			diags = append(diags, templateFailure("output "+o.Name, err)...)
 			continue
 		}
-		out[kv.Key] = v
+		out[o.Name] = v
 	}
 	return out, diags
 }

@@ -13,11 +13,11 @@ import (
 const descriptionsDir = "descriptions"
 
 // GeneratedDescription is the collection-relative path of the OpenAPI
-// description Flow-I derives from the collection's requests.
+// description Flowi derives from the collection's requests.
 const GeneratedDescription = descriptionsDir + "/requests.openapi.yaml"
 
 // GeneratedAsyncDescription is the collection-relative path of the AsyncAPI
-// description Flow-I derives from the collection's async requests; it exists
+// description Flowi derives from the collection's async requests; it exists
 // only while the collection has one.
 const GeneratedAsyncDescription = descriptionsDir + "/requests.asyncapi.yaml"
 

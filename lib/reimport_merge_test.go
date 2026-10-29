@@ -86,7 +86,7 @@ func TestMergeReimport_should_keep_your_edits_and_take_the_specs_changes(t *test
 			},
 		},
 		{
-			name: "what only Flow-I has is kept",
+			name: "what only Flowi has is kept",
 			ours: func(r *model.Request) {
 				r.Versions[0].Assert = []string{"status == 200"}
 				r.Versions[0].Extract = []model.Extraction{{Name: "id", From: "body", Path: "$.id"}}
@@ -113,7 +113,7 @@ func TestMergeReimport_should_keep_your_edits_and_take_the_specs_changes(t *test
 			},
 		},
 		{
-			name:   "without a base the spec's fields come as they are, Flow-I's stay",
+			name:   "without a base the spec's fields come as they are, Flowi's stay",
 			noBase: true,
 			ours: func(r *model.Request) {
 				r.Versions[0].Docs = "mine"

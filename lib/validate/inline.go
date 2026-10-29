@@ -16,10 +16,6 @@ func missingParam(key string) requiredField {
 	return requiredField{key, func(n model.Node) bool { return !sites.HasParam(n, key) }}
 }
 
-func missingInSingleExtract(key string) requiredField {
-	return requiredField{key, func(n model.Node) bool { return sites.SingleExtract(n) && !sites.HasParam(n, key) }}
-}
-
 // paramRequired is what node types need beyond their typed fields: every
 // spec parameter marked required, plus rules that depend on other
 // parameters.
@@ -32,7 +28,10 @@ func paramRequired() map[model.NodeType][]requiredField {
 			}
 		}
 	}
-	out["extract"] = append(out["extract"], missingInSingleExtract("name"), missingInSingleExtract("from"))
+	out["set"] = append(out["set"],
+		requiredField{"values", func(n model.Node) bool { return len(n.Values) == 0 && !sites.HasParam(n, "target") }},
+		requiredField{"value", func(n model.Node) bool { return sites.HasParam(n, "target") && !sites.HasParam(n, "value") }})
+	out["assert"] = append(out["assert"], requiredField{"check", func(n model.Node) bool { return !sites.HasParam(n, "check") && !sites.HasParam(n, "schema") }})
 	out["digest"] = append(out["digest"], missingForSink("file", "file"), missingForSink("webhook", "url"))
 	out["condition"] = append(out["condition"], requiredField{"check", func(n model.Node) bool { return len(n.Cases) == 0 && !sites.HasParam(n, "check") }})
 	return out

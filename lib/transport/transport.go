@@ -24,6 +24,9 @@ type Message struct {
 	At        time.Time
 	Headers   []Header
 	Body      []byte
+	// Channel, on a message sent over a Session, is where to send it; empty
+	// means the channel the connection was opened on.
+	Channel   string
 	Key       string // Kafka key
 	Partition int32  // Kafka partition
 	Offset    int64  // Kafka offset
@@ -44,6 +47,11 @@ type Receive struct {
 	// (so a caller can show progress while Count is still being waited for).
 	// It runs on the goroutine that called Wait and must return quickly.
 	OnMessage func(Message)
+	// OnKept, when set, is called after OnMessage with each message kept. An
+	// error stops the receive: Wait returns the messages kept so far, this one
+	// included, and the error. It is how a hook can stop a run at the first
+	// message that fails its check. It runs on the goroutine that called Wait.
+	OnKept func(Message) error
 }
 
 // Operation is one run: where to go and what to do there.
@@ -140,33 +148,51 @@ func IsText(b []byte) bool { return utf8.Valid(b) }
 // kept; with ErrTimeout or ErrTooLarge it is the partial list. in must be
 // fed by a goroutine the caller stops after Wait returns.
 func Wait(ctx context.Context, r Receive, in <-chan Message, fail <-chan error) ([]Message, error) {
+	return collect(ctx, r, func(ctx context.Context) (Message, error) {
+		select {
+		case <-ctx.Done():
+			return Message{}, context.Cause(ctx)
+		case err := <-fail:
+			return Message{}, err
+		case m := <-in:
+			return m, nil
+		}
+	})
+}
+
+// collect keeps what next hands over until r is satisfied. next blocks for the
+// next message and returns the error that ends the receive (the context's
+// cause, a lost connection).
+func collect(ctx context.Context, r Receive, next func(context.Context) (Message, error)) ([]Message, error) {
 	r = r.Normalized()
 	ctx, cancel := context.WithTimeoutCause(ctx, r.Timeout, ErrTimeout)
 	defer cancel()
 	var kept []Message
 	var size int64
 	for len(kept) < r.Count {
-		select {
-		case <-ctx.Done():
-			return kept, context.Cause(ctx)
-		case err := <-fail:
+		m, err := next(ctx)
+		if err != nil {
 			return kept, err
-		case m := <-in:
-			ok, err := matches(r, m)
-			if err != nil {
-				return kept, fmt.Errorf("matching a message: %w", err)
+		}
+		ok, err := matches(r, m)
+		if err != nil {
+			return kept, fmt.Errorf("matching a message: %w", err)
+		}
+		if !ok {
+			continue
+		}
+		kept = append(kept, m)
+		if r.OnMessage != nil {
+			r.OnMessage(m)
+		}
+		if r.OnKept != nil {
+			if err := r.OnKept(m); err != nil {
+				return kept, err
 			}
-			if !ok {
-				continue
-			}
-			kept = append(kept, m)
-			if r.OnMessage != nil {
-				r.OnMessage(m)
-			}
-			size += int64(len(m.Body))
-			if r.MaxBytes > 0 && size > r.MaxBytes {
-				return kept, ErrTooLarge
-			}
+		}
+		size += int64(len(m.Body))
+		if r.MaxBytes > 0 && size > r.MaxBytes {
+			return kept, ErrTooLarge
 		}
 	}
 	return kept, nil

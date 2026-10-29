@@ -59,7 +59,7 @@ func TestCheckParams(t *testing.T) {
 		{name: "digest_file_missing", node: model.Node{ID: "d", Type: "digest", Params: fields("sink", "file")}, want: diag.CodeNodeMissingField, sev: diag.SeverityError},
 		{name: "digest_webhook_missing_url", node: model.Node{ID: "d", Type: "digest", Params: fields("sink", "webhook")}, want: diag.CodeNodeMissingField, sev: diag.SeverityError},
 		{name: "unknown_param_warning", node: model.Node{ID: "n", Type: "note", Params: fields("text", "x", "colour", "red")}, want: diag.CodeNodeParam, sev: diag.SeverityWarning},
-		{name: "map_form_keys_ok", node: model.Node{ID: "g", Type: "generate", Params: fields("email", "{{$email}}", "seed", int64(3))}},
+		{name: "set_values_ok", node: model.Node{ID: "g", Type: "set", Values: []model.SetValue{{Name: "email", From: "generate", Value: "{{$email}}", Seed: 3}}}},
 		{name: "required_note_text", node: model.Node{ID: "n", Type: "note"}, want: diag.CodeNodeMissingField, sev: diag.SeverityError},
 		{name: "condition_without_check", node: model.Node{ID: "c", Type: "condition", Then: []model.Node{note("x")}}, want: diag.CodeNodeMissingField, sev: diag.SeverityError},
 	}
@@ -154,7 +154,7 @@ func TestCheckConcurrentWrites(t *testing.T) {
 		{name: "concurrent_sibling_depending_on_writer", nodes: []model.Node{setVar("a", "token"), concurrent(setVar("b", "token"), "a")}},
 		{name: "nested_condition_writes_count", nodes: []model.Node{branches(
 			model.Node{ID: "c", Type: "condition", Params: params("check", "true"), Then: []model.Node{setVar("a", "token")}},
-			model.Node{ID: "e", Type: "extract", Params: params("token", "{{1}}")})}, clash: true},
+			model.Node{ID: "e", Type: "set", Values: []model.SetValue{{Name: "token", Value: "{{1}}"}}})}, clash: true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

@@ -173,7 +173,7 @@ func responseRead(path []string) (Read, bool) {
 }
 
 // hookReads are a hook step's reads: response.… in its templates, and
-// single-form extract nodes. They do not depend on the hooked request, so
+// set values read from the response. They do not depend on the hooked request, so
 // a collection hook's are worked out once.
 func (ix *index) hookReads(rt root) []Read {
 	if reads, ok := ix.hookMemo[rt.key()]; ok {
@@ -181,21 +181,23 @@ func (ix *index) hookReads(rt root) []Read {
 	}
 	out := responseReads(ix.refsOf(rt))
 	for _, n := range rt.allNodes() {
-		if n.Value.Type != "extract" || !sites.SingleExtract(n.Value) {
-			continue
-		}
-		e := extractionOf(n.Value)
-		if r, ok := extractRead(e); ok {
-			out = append(out, r.at(sites.Site{File: n.File, Path: n.Path, Node: n.Value.ID}, "extract "+e.Name))
+		for i, v := range n.Value.Values {
+			if v.From != "response" {
+				continue
+			}
+			e := extractionOf(v)
+			if r, ok := extractRead(e); ok {
+				at := yamlpath.Index(yamlpath.Key(n.Path, "values"), i)
+				out = append(out, r.at(sites.Site{File: n.File, Path: at, Node: n.Value.ID}, "value "+e.Name))
+			}
 		}
 	}
 	ix.hookMemo[rt.key()] = out
 	return out
 }
 
-func extractionOf(n model.Node) model.Extraction {
-	str := func(key string) string { s, _ := sites.ParamValue(n, key).(string); return s }
-	return model.Extraction{Name: str("name"), From: str("from"), Path: str("path"), Header: str("header"), Cookie: str("cookie"), Regex: str("regex")}
+func extractionOf(v model.SetValue) model.Extraction {
+	return model.Extraction{Name: v.Name, From: v.Where, Path: v.Path, Header: v.Header, Cookie: v.Cookie, Regex: v.Regex}
 }
 
 // ownReads are a version's own extract entries and the response reads of

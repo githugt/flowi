@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/githugt/flowi-lib/schema/manifest.schema.json",
-  "title": "Flow-I collection manifest (flowi.yaml)",
+  "title": "Flowi collection manifest (flowi.yaml)",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -48,6 +48,13 @@
     },
     "hooks": {
       "$ref": "common.schema.json#/$defs/hooks"
+    },
+    "variables": {
+      "type": "object",
+      "description": "The collection's own values, read as {{collection_var.name}}; an environment variable of the same name overrides one.",
+      "additionalProperties": {
+        "type": "string"
+      }
     }
   }
 }

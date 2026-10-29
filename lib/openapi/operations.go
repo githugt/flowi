@@ -22,7 +22,7 @@ type OperationRef struct {
 
 // ErrSwagger2 is returned by OperationsOf for a Swagger 2.0 document: Import
 // converts it first, so an overlay could not point into it.
-var ErrSwagger2 = errors.New("a Swagger 2.0 document cannot take overlays from Flow-I; convert it to OpenAPI 3 first")
+var ErrSwagger2 = errors.New("a Swagger 2.0 document cannot take overlays from Flowi; convert it to OpenAPI 3 first")
 
 // OperationsOf lists the operations of an OpenAPI 3 document with the
 // request path and version label Import gives each.

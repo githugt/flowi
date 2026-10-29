@@ -32,9 +32,9 @@ func TestSendRequest_Given_UseEdit_Then_the_edit_replaces_its_base_version(t *te
 	_ = w.StoreEdit(target, base, editOf("http://sent-from-edit.example"), SaveOptions{})
 	c, r, _ := w.requestFor(target)
 
-	with := sendInput(c, r, SendOptions{UseEdit: true})
-	without := sendInput(c, r, SendOptions{})
-	other := sendInput(c, r, SendOptions{UseEdit: true, Version: "99"})
+	with, _ := sendInput(c, r, SendOptions{UseEdit: true})
+	without, _ := sendInput(c, r, SendOptions{})
+	other, _ := sendInput(c, r, SendOptions{UseEdit: true, Version: "99"})
 
 	if with.PinnedVersion != base || with.Request.Versions[0].URL != "http://sent-from-edit.example" || with.Request.Versions[0].Label != base {
 		t.Fatalf("with edit: %+v", with.Request.Versions)

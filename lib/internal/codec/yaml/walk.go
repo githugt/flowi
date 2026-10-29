@@ -37,7 +37,7 @@ func (d *decoder) typeError(path string, n ast.Node, key, expected string) {
 	d.add(diag.CodeYAMLType, path, n, map[string]string{"key": key, "expected": expected, "got": describe(n)})
 }
 
-// unwrap removes anchors and tags, which carry no meaning for Flow-I.
+// unwrap removes anchors and tags, which carry no meaning for Flowi.
 // Aliases are rejected: they would let one file silently share values.
 func (d *decoder) unwrap(n ast.Node, path, key string) (ast.Node, bool) {
 	for {

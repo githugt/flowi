@@ -142,6 +142,38 @@ func TestRequest_should_round_trip_the_dirty_edit(t *testing.T) {
 	}
 }
 
+func TestRequest_should_round_trip_the_overlay_an_edit_was_made_with(t *testing.T) {
+	// Arrange
+	data := []byte(requestHeader + "versions:\n  \"1\":\n    method: GET\n    url: http://x\nedit:\n  method: GET\n  url: http://y\nedit_base: \"1\"\nedit_overlay: vip\n")
+	c := newCodec()
+
+	// Act
+	r, diags := c.DecodeRequest("r.req.yaml", "r", data)
+	requireNoDiagnostics(t, diags)
+	out, err := c.EncodeRequest(r)
+
+	// Assert
+	if err != nil || r.EditOverlay != "vip" || !bytes.Equal(out, data) {
+		t.Fatalf("err %v overlay %q, output:\n%s", err, r.EditOverlay, out)
+	}
+}
+
+func TestRequest_should_round_trip_message_hooks(t *testing.T) {
+	// Arrange
+	data := []byte(requestHeader + "versions:\n  \"1\":\n    method: GET\n    url: http://x\n    hooks:\n      message:\n        - inline:\n            - id: ok\n              type: assert\n              check: body.ok\n")
+	c := newCodec()
+
+	// Act
+	r, diags := c.DecodeRequest("r.req.yaml", "r", data)
+	requireNoDiagnostics(t, diags)
+	out, err := c.EncodeRequest(r)
+
+	// Assert
+	if err != nil || len(r.Versions[0].Hooks.Message) != 1 || !bytes.Equal(out, data) {
+		t.Fatalf("err %v hooks %+v, output:\n%s", err, r.Versions[0].Hooks, out)
+	}
+}
+
 func TestEncodeRequest_should_omit_the_edit_when_absent(t *testing.T) {
 	data := []byte(requestHeader + "versions:\n  \"1\":\n    url: a\n")
 	c := newCodec()
@@ -293,6 +325,22 @@ func TestDecodeRequest_should_read_and_round_trip_a_grpc_version(t *testing.T) {
 	}
 }
 
+func TestDecodeRequest_should_round_trip_a_grpc_web_version(t *testing.T) {
+	// Arrange
+	text := requestHeader + "versions:\n  \"1\":\n    grpc:\n      server: https://proxy.example/api\n      method: acme.orders.v1.Orders/GetOrder\n      proto:\n        - protos/orders.proto\n      web: true\n"
+	c := newCodec()
+
+	// Act
+	r, diags := c.DecodeRequest("r.req.yaml", "r", []byte(text))
+	requireNoDiagnostics(t, diags)
+	out, err := c.EncodeRequest(r)
+
+	// Assert
+	if err != nil || !r.Versions[0].GRPC.Web || string(out) != text {
+		t.Fatalf("err %v web %v, output:\n%s", err, r.Versions[0].GRPC.Web, out)
+	}
+}
+
 func TestDecodeRequest_should_leave_http_versions_without_async(t *testing.T) {
 	data := []byte(requestHeader + "versions:\n  \"1\":\n    url: http://x\n")
 
@@ -324,5 +372,71 @@ func TestDecodeRequest_should_read_and_write_the_name_of_a_version(t *testing.T)
 
 	if err != nil || r.Versions[0].Name != "Before the tax change" || !bytes.Contains(out, []byte("name: Before the tax change")) {
 		t.Fatalf("name %q, encoded:\n%s (%v)", r.Versions[0].Name, out, err)
+	}
+}
+
+func TestRequest_should_round_trip_an_auth_block(t *testing.T) {
+	// Arrange
+	data := []byte(requestHeader + "versions:\n  \"1\":\n    method: GET\n    url: http://x\n    auth:\n      type: oauth2\n      grant: client_credentials\n      token_url: \"{{env.auth_url}}/token\"\n      client_id: abc\n      client_secret: \"{{secret.client_secret}}\"\n")
+	c := newCodec()
+
+	// Act
+	r, diags := c.DecodeRequest("r.req.yaml", "r", data)
+	requireNoDiagnostics(t, diags)
+	out, err := c.EncodeRequest(r)
+
+	// Assert
+	a := r.Versions[0].Auth
+	if err != nil || a == nil || a.Type != "oauth2" || len(a.Params) != 4 || a.Params[3].Key != "client_secret" || !bytes.Equal(out, data) {
+		t.Fatalf("err %v auth %+v, output:\n%s", err, a, out)
+	}
+}
+
+// Behaviour change: a multipart body is a mapping keyed by part name, so two parts of the same name (several files
+// sent as "files") were written as two "files:" keys, which the loader refuses and the request could no longer be
+// opened. Repeated names are now written as a list of one-entry mappings, in order; unique names stay a mapping.
+func TestEncodeRequest_Given_two_parts_with_one_name_Then_they_are_written_as_a_list_and_read_back(t *testing.T) {
+	// Arrange
+	data := []byte(requestHeader + "versions:\n  \"1\":\n    method: post\n    url: https://x.dev/up\n    body:\n      multipart:\n        - files:\n            file: a.txt\n        - note: hi\n        - files:\n            file: b.txt\n")
+	c := newCodec()
+
+	// Act
+	r, diags := c.DecodeRequest("r.req.yaml", "r", data)
+	requireNoDiagnostics(t, diags)
+	out, err := c.EncodeRequest(r)
+
+	// Assert
+	if err != nil {
+		t.Fatal(err)
+	}
+	parts := r.Versions[0].Body.Multipart
+	if len(parts) != 3 || parts[0].Key != "files" || parts[1].Key != "note" || parts[2].Key != "files" {
+		t.Fatalf("parts %+v", parts)
+	}
+	if !bytes.Equal(out, data) {
+		t.Fatalf("round trip differs:\n--- got\n%s\n--- want\n%s", out, data)
+	}
+}
+
+func TestEncodeRequest_Given_unique_part_names_Then_multipart_stays_a_mapping(t *testing.T) {
+	data := []byte(requestHeader + "versions:\n  \"1\":\n    method: post\n    url: https://x.dev/up\n    body:\n      multipart:\n        note: hi\n        doc:\n          file: a.txt\n")
+	c := newCodec()
+
+	r, diags := c.DecodeRequest("r.req.yaml", "r", data)
+	requireNoDiagnostics(t, diags)
+	out, _ := c.EncodeRequest(r)
+
+	if !bytes.Equal(out, data) {
+		t.Fatalf("round trip differs:\n--- got\n%s\n--- want\n%s", out, data)
+	}
+}
+
+func TestDecodeRequest_Given_a_multipart_list_item_with_two_keys_Then_it_is_refused(t *testing.T) {
+	data := []byte(requestHeader + "versions:\n  \"1\":\n    method: post\n    url: https://x.dev/up\n    body:\n      multipart:\n        - a: 1\n          b: 2\n")
+
+	_, diags := newCodec().DecodeRequest("r.req.yaml", "r", data)
+
+	if len(diags) == 0 {
+		t.Fatal("a part holds one name; two keys in one item should be reported")
 	}
 }

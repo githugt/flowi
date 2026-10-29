@@ -9,7 +9,7 @@ import (
 	"runtime"
 )
 
-// Paths are the directories Flow-I keeps its own files in.
+// Paths are the directories Flowi keeps its own files in.
 type Paths struct {
 	ConfigDir string
 }

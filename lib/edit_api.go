@@ -16,12 +16,20 @@ import (
 // should leave o.DropComments false so a commented file is refused
 // (FLW-WRITE-001) instead of silently losing its comments.
 func (w *Workspace) StoreEdit(t RequestTarget, base string, v model.RequestVersion, o SaveOptions) error {
+	return w.StoreEditUnder(t, base, "", v, o)
+}
+
+// StoreEditUnder is StoreEdit for an edit made with the flowi overlay
+// overlay laid over the base version: v already shows the overlay, and the
+// file remembers its name so that the overlay is chosen again with the edit
+// and the edit is not mistaken for a plain change of the version.
+func (w *Workspace) StoreEditUnder(t RequestTarget, base, overlay string, v model.RequestVersion, o SaveOptions) error {
 	_, r, err := w.requestFor(t)
 	if err != nil {
 		return err
 	}
 	v.Label = ""
-	r.Edit, r.EditBase = &v, base
+	r.Edit, r.EditBase, r.EditOverlay = &v, base, overlay
 	return w.SaveRequest(t, r, o)
 }
 
@@ -51,7 +59,7 @@ func (w *Workspace) DiscardEdit(t RequestTarget, o SaveOptions) error {
 	if err != nil || r.Edit == nil {
 		return err
 	}
-	r.Edit, r.EditBase = nil, ""
+	r.Edit, r.EditBase, r.EditOverlay = nil, "", ""
 	return w.SaveRequest(t, r, o)
 }
 
@@ -80,7 +88,7 @@ func withPromotedEdit(r model.Request, asLabel string) (model.Request, error) {
 		promoted.Label = label
 		r.Versions[i] = promoted
 	}
-	r.Edit, r.EditBase = nil, ""
+	r.Edit, r.EditBase, r.EditOverlay = nil, "", ""
 	return r, nil
 }
 

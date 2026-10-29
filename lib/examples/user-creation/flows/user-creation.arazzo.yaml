@@ -57,9 +57,12 @@ workflows:
           with:
             email: "{{inputs.email}}"
         - id: session
-          type: extract
-          token: "{{nodes.login.token}}"
-          subject: "{{nodes.login.subject}}"
+          type: set
+          values:
+            - name: token
+              value: "{{nodes.login.token}}"
+            - name: subject
+              value: "{{nodes.login.subject}}"
         - id: wait-for-code
           type: delay
           duration: "{{env.verify_wait}}"
@@ -73,10 +76,17 @@ workflows:
             subject: "{{vars.subject}}"
             code: "123456"
         - id: profile
-          type: generate
-          first_name: "{{$first-name}}"
-          last_name: "{{$last-name}}"
-          city: "{{$city-name}}"
+          type: set
+          values:
+            - name: first_name
+              from: generate
+              value: "{{$first-name}}"
+            - name: last_name
+              from: generate
+              value: "{{$last-name}}"
+            - name: city
+              from: generate
+              value: "{{$city-name}}"
         - id: page-1
           type: request
           request:

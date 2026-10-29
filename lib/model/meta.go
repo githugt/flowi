@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-// Package model defines Flow-I's domain types as plain data. It performs no
+// Package model defines Flowi's domain types as plain data. It performs no
 // I/O and holds no behaviour beyond small structural helpers; storage,
 // validation and execution live in other packages.
 package model
@@ -55,8 +55,12 @@ type HookStep struct {
 	Inline []Node
 }
 
-// Hooks are the pre and post steps attached to an API at some scope.
+// Hooks are the steps attached to an API at some scope: Pre runs before the
+// request is sent and Post after its response. Message runs for each message
+// a message request keeps, as it arrives, in the order Pre does; requests that
+// receive no messages never run it.
 type Hooks struct {
-	Pre  []HookStep
-	Post []HookStep
+	Pre     []HookStep
+	Post    []HookStep
+	Message []HookStep
 }

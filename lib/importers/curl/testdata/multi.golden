@@ -1,10 +1,10 @@
 item "curl/get-health" imported at 1:3
 item "curl/put-v1-users-42" imported at 2:1
-  warning FLW-IMPORT-001 2:1 flag --frobnicate has no Flow-I equivalent and was ignored: it is not a curl flag Flow-I knows
+  warning FLW-IMPORT-001 2:1 flag --frobnicate has no Flowi equivalent and was ignored: it is not a curl flag Flowi knows
   warning FLW-IMPORT-006 2:1 header Authorization looked like a credential and was replaced by {{secret.authorization}}
 item "curl/get-v1-things" imported at 4:1
 item "curl/post-v1-upload" imported at 5:1
-  warning FLW-IMPORT-001 5:1 file part file has no Flow-I equivalent and was kept with its path: the path is relative to where curl ran
+  warning FLW-IMPORT-001 5:1 file part file has no Flowi equivalent and was kept with its path: the path is relative to where curl ran
 --- request curl/get-health
 name: GET /health
 versions:

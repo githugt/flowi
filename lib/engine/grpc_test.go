@@ -4,8 +4,17 @@ package engine
 
 import (
 	"context"
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rand"
+	"crypto/tls"
+	"crypto/x509"
+	"crypto/x509/pkix"
 	"encoding/json"
+	"encoding/pem"
+	"math/big"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -106,6 +115,17 @@ func TestSend_GRPC_should_call_the_method_and_record_the_response(t *testing.T) 
 	if got.Server != "grpc://api:50051" || got.Method != "acme.Orders/Get" || string(got.JSON) != `{"id":"7"}` || got.Root != f.coll().Root ||
 		len(got.Protos) != 1 || len(got.Imports) != 1 || len(got.Metadata) != 1 || got.Metadata[0].Value != "abc" {
 		t.Fatalf("call %+v", got)
+	}
+}
+
+func TestSend_GRPC_should_ask_for_gRPC_Web_when_the_version_does(t *testing.T) {
+	runner := &scriptedGRPC{res: okOrder()}
+	v := grpcVersion(model.GRPC{Server: "https://proxy.example/api", Proto: []string{"protos/o.proto"}, Web: true})
+
+	res, _ := sendGRPC(t, runner, v, nil)
+
+	if res.Status != StatusPassed || !runner.got.Web || runner.got.Server != "https://proxy.example/api" {
+		t.Fatalf("status %s call %+v", res.Status, runner.got)
 	}
 }
 
@@ -386,4 +406,52 @@ func TestSend_GRPC_should_pass_with_a_warning_when_a_field_of_the_message_was_le
 	if res.Status != StatusPassed || !hasCode(res.Diags, diag.CodeGRPCField) || res.Diags.HasErrors() {
 		t.Fatalf("status %s diags %v, want passed with a FLW-GRPC-006 warning", res.Status, res.Diags)
 	}
+}
+
+func TestWithClientCert_should_add_the_certificate_a_mutual_TLS_block_names_and_report_a_missing_one(t *testing.T) {
+	root := t.TempDir()
+	certPEM, keyPEM := selfSignedPEM(t)
+	for name, data := range map[string][]byte{"client.pem": certPEM, "client.key": keyPEM} {
+		if err := os.WriteFile(filepath.Join(root, name), data, 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	base := &tls.Config{MinVersion: tls.VersionTLS12}
+	good := &model.Auth{Type: model.AuthMutualTLS, Params: []model.KeyValue{{Key: "cert", Value: "client.pem"}, {Key: "key", Value: "client.key"}}}
+	missing := &model.Auth{Type: model.AuthMutualTLS, Params: []model.KeyValue{{Key: "cert", Value: "gone.pem"}, {Key: "key", Value: "gone.key"}}}
+	var okDiags, badDiags, otherDiags diag.List
+
+	withCert := withClientCert(base, good, root, &okDiags)
+	withClientCert(base, missing, root, &badDiags)
+	untouched := withClientCert(base, &model.Auth{Type: model.AuthDigest}, root, &otherDiags)
+
+	if len(okDiags) != 0 || len(withCert.Certificates) != 1 || len(base.Certificates) != 0 {
+		t.Fatalf("diags %v, certificates %d (the shared config must stay as it was: %d)", okDiags, len(withCert.Certificates), len(base.Certificates))
+	}
+	if len(badDiags) != 1 || badDiags[0].Code != diag.CodeAuthInvalid {
+		t.Fatalf("a missing certificate should be reported, got %v", badDiags)
+	}
+	if untouched != base || len(otherDiags) != 0 {
+		t.Fatal("another scheme should leave the TLS settings alone")
+	}
+}
+
+// selfSignedPEM makes a throwaway certificate and key in PEM.
+func selfSignedPEM(t *testing.T) (certPEM, keyPEM []byte) {
+	t.Helper()
+	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tmpl := &x509.Certificate{SerialNumber: big.NewInt(1), Subject: pkix.Name{CommonName: "flowi-test"},
+		NotBefore: time.Now().Add(-time.Hour), NotAfter: time.Now().Add(time.Hour), ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth}}
+	der, err := x509.CreateCertificate(rand.Reader, tmpl, tmpl, &key.PublicKey, key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	keyDER, err := x509.MarshalECPrivateKey(key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: der}), pem.EncodeToMemory(&pem.Block{Type: "EC PRIVATE KEY", Bytes: keyDER})
 }

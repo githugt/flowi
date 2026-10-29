@@ -44,6 +44,7 @@ const (
 	CodeNodeUnresolved   Code = "FLW-NODE-009"
 	CodeNodeContract     Code = "FLW-NODE-010"
 	CodeNodeAttach       Code = "FLW-NODE-011"
+	CodeNodeRemovedType  Code = "FLW-NODE-012"
 
 	CodeImportUnmapped  Code = "FLW-IMPORT-001"
 	CodeImportInvalid   Code = "FLW-IMPORT-002"
@@ -52,6 +53,7 @@ const (
 	CodeImportSkipped   Code = "FLW-IMPORT-005"
 	CodeImportSensitive Code = "FLW-IMPORT-006"
 	CodeImportKeptEdit  Code = "FLW-IMPORT-007"
+	CodeImportNoOpID    Code = "FLW-IMPORT-008"
 
 	CodeMermaidPlaceholder Code = "FLW-MERMAID-001"
 	CodeMermaidCycle       Code = "FLW-MERMAID-002"
@@ -69,6 +71,8 @@ const (
 	CodeAsyncBinding  Code = "FLW-ASYNC-003"
 	CodeAsyncServer   Code = "FLW-ASYNC-004"
 	CodeAsyncTimeout  Code = "FLW-ASYNC-005"
+	CodeAsyncConn     Code = "FLW-ASYNC-006"
+	CodeAsyncConnName Code = "FLW-ASYNC-007"
 
 	CodeGRPCRequest Code = "FLW-GRPC-001"
 	CodeGRPCMethod  Code = "FLW-GRPC-002"
@@ -91,6 +95,14 @@ const (
 	CodeBlueprintNotFound    Code = "FLW-BP-006"
 	CodeBlueprintAmbiguous   Code = "FLW-BP-007"
 
+	CodeAuthInvalid Code = "FLW-AUTH-001"
+
+	CodeOverlayInvalid    Code = "FLW-OVL-001"
+	CodeOverlayNotFound   Code = "FLW-OVL-002"
+	CodeOverlayNotFitting Code = "FLW-OVL-003"
+	CodeOverlayDrift      Code = "FLW-OVL-004"
+	CodeOverlayName       Code = "FLW-OVL-005"
+
 	CodeWriteDropsComments Code = "FLW-WRITE-001"
 	CodeWriteRequestPath   Code = "FLW-WRITE-002"
 	CodeWriteEditNone      Code = "FLW-WRITE-003"
@@ -103,6 +115,7 @@ const (
 	CodeFlowOption    Code = "FLW-FLOW-001"
 	CodeFlowNotFound  Code = "FLW-FLOW-002"
 	CodeFlowAmbiguous Code = "FLW-FLOW-003"
+	CodeFlowTagEmpty  Code = "FLW-FLOW-004"
 
 	CodeCycleNeeds   Code = "FLW-CYC-001"
 	CodeCycleSubflow Code = "FLW-CYC-002"
@@ -139,28 +152,34 @@ const (
 	CodeRequestHeader      Code = "FLW-REQ-005"
 	CodeRequestFileRead    Code = "FLW-REQ-006"
 	CodeRequestExampleName Code = "FLW-REQ-007"
+	CodeRequestEnvExtends  Code = "FLW-REQ-008"
+	CodeRequestMethod      Code = "FLW-REQ-009"
+	CodeRequestMethodCase  Code = "FLW-REQ-010"
 
-	CodeRunAssertFailed  Code = "FLW-RUN-001"
-	CodeRunAssertWarning Code = "FLW-RUN-002"
-	CodeRunNodeType      Code = "FLW-RUN-003"
-	CodeRunSetTarget     Code = "FLW-RUN-004"
-	CodeRunExtractEmpty  Code = "FLW-RUN-005"
-	CodeRunHookDepth     Code = "FLW-RUN-006"
-	CodeRunNodeTimeout   Code = "FLW-RUN-007"
-	CodeRunTillLimit     Code = "FLW-RUN-008"
-	CodeRunInputMissing  Code = "FLW-RUN-009"
-	CodeRunInputUnknown  Code = "FLW-RUN-010"
-	CodeRunCalcNumber    Code = "FLW-RUN-011"
-	CodeRunBatchOver     Code = "FLW-RUN-012"
-	CodeRunExtractNoResp Code = "FLW-RUN-013"
-	CodeRunDigestTarget  Code = "FLW-RUN-014"
-	CodeRunHandled       Code = "FLW-RUN-015"
-	CodeRunBackground    Code = "FLW-RUN-016"
-	CodeRunFileName      Code = "FLW-RUN-017"
-	CodeRunSaveStatus    Code = "FLW-RUN-018"
-	CodeRunNoBranchOK    Code = "FLW-RUN-019"
-	CodeRunWriteFailed   Code = "FLW-RUN-020"
-	CodeRunStopped       Code = "FLW-RUN-021"
+	CodeRunAssertFailed   Code = "FLW-RUN-001"
+	CodeRunAssertWarning  Code = "FLW-RUN-002"
+	CodeRunNodeType       Code = "FLW-RUN-003"
+	CodeRunSetTarget      Code = "FLW-RUN-004"
+	CodeRunExtractEmpty   Code = "FLW-RUN-005"
+	CodeRunHookDepth      Code = "FLW-RUN-006"
+	CodeRunNodeTimeout    Code = "FLW-RUN-007"
+	CodeRunTillLimit      Code = "FLW-RUN-008"
+	CodeRunInputMissing   Code = "FLW-RUN-009"
+	CodeRunInputUnknown   Code = "FLW-RUN-010"
+	CodeRunCalcNumber     Code = "FLW-RUN-011"
+	CodeRunBatchOver      Code = "FLW-RUN-012"
+	CodeRunExtractNoResp  Code = "FLW-RUN-013"
+	CodeRunDigestTarget   Code = "FLW-RUN-014"
+	CodeRunHandled        Code = "FLW-RUN-015"
+	CodeRunBackground     Code = "FLW-RUN-016"
+	CodeRunFileName       Code = "FLW-RUN-017"
+	CodeRunSaveStatus     Code = "FLW-RUN-018"
+	CodeRunNoBranchOK     Code = "FLW-RUN-019"
+	CodeRunWriteFailed    Code = "FLW-RUN-020"
+	CodeRunStopped        Code = "FLW-RUN-021"
+	CodeRunSkipRead       Code = "FLW-RUN-022"
+	CodeRunAssertNoSchema Code = "FLW-RUN-023"
+	CodeRunFuzzFailed     Code = "FLW-RUN-024"
 
 	CodeHTTPFailed  Code = "FLW-HTTP-001"
 	CodeHTTPTimeout Code = "FLW-HTTP-002"
@@ -187,7 +206,7 @@ func codeTable() map[Code]codeInfo {
 		CodeYAMLType:         {e, `"{key}" must be {expected}, got {got}`},
 		CodeYAMLEmpty:        {e, "file is empty"},
 
-		CodeFormatTooNew:  {e, "format {got} is newer than supported {max}; upgrade Flow-I"},
+		CodeFormatTooNew:  {e, "format {got} is newer than supported {max}; upgrade Flowi"},
 		CodeFormatMissing: {e, `missing "format" in flowi.yaml`},
 
 		CodeFileUnrecognised: {w, `unrecognised file "{name}" (expected *.req.yaml / *.arazzo.yaml / _folder.yaml)`},
@@ -210,6 +229,7 @@ func codeTable() map[Code]codeInfo {
 		CodeRefStalePath:      {w, `path hint "{got}" is out of date, should be "{want}" (run "flowi fmt")`},
 
 		CodeNodeUnknownType:  {e, `unknown node type "{type}"`},
+		CodeNodeRemovedType:  {e, `node type "{type}" no longer exists` + hintMarker + "use {use}"},
 		CodeNodeDuplicateID:  {e, `duplicate node id "{node}" in flow`},
 		CodeNodeNeedsSibling: {e, `needs "{target}" is not a sibling node` + hintMarker + "needs can only reference nodes in the same list"},
 		CodeNodeMissingField: {e, `node type "{type}" requires "{field}"`},
@@ -221,19 +241,20 @@ func codeTable() map[Code]codeInfo {
 		CodeNodeUnresolved:   {e, "nothing produces `{name}` used in {field}{hint}"},
 		CodeNodeContract:     {w, `node "{node}" reads "{name}", which request {request} version {version} does not extract`},
 
-		CodeImportUnmapped:  {w, "{what} has no Flow-I equivalent and was {how}: {detail}"},
-		CodeImportInvalid:   {e, "not a document Flow-I can import: {detail}"},
+		CodeImportUnmapped:  {w, "{what} has no Flowi equivalent and was {how}: {detail}"},
+		CodeImportInvalid:   {e, "not a document Flowi can import: {detail}"},
 		CodeImportExists:    {e, "{count} of the files to import already exist ({files})" + hintMarker + "overwrite them, or skip them to add only the new files"},
 		CodeImportSyntax:    {e, "{format} syntax error: {detail}"},
 		CodeImportSkipped:   {e, "{item} was skipped: {detail}"},
 		CodeImportSensitive: {w, "{where} looked like a credential and was replaced by {placeholder}" + hintMarker + "set the value with flowi secret set"},
+		CodeImportNoOpID:    {w, "the operation {operation} has no operationId, so it is named {name} and an Arazzo step cannot refer to it" + hintMarker + "give it an operationId with an overlay (flowi import --overlay), or in the spec"},
 		CodeImportKeptEdit:  {w, "{what} was changed both by you and by the spec; your edit was kept" + hintMarker + "compare it with the spec, and save it to the spec overlay if the spec should say so too"},
 
 		CodeMermaidPlaceholder: {w, `"{label}" does not resolve and became a placeholder note: {detail}`},
 		CodeMermaidCycle:       {e, "the diagram has a cycle through {nodes}; flows run once, top to bottom"},
-		CodeArazzoDrift:        {w, "the steps of {flow} were edited outside Flow-I; Flow-I's own data is used"},
+		CodeArazzoDrift:        {w, "the steps of {flow} were edited outside Flowi; Flowi's own data is used"},
 		CodeArazzoLimit:        {w, `step "{step}" of {flow} has a {what} that other Arazzo tools do not see`},
-		CodeArazzoCustom:       {w, `step "{step}" of {flow} is a Flow-I step ({type}); other Arazzo tools cannot run it`},
+		CodeArazzoCustom:       {w, `step "{step}" of {flow} is a Flowi step ({type}); other Arazzo tools cannot run it`},
 
 		CodeSchemaRequest:  {w, "the request body of {request} does not match its schema at {path}: {message}"},
 		CodeSchemaResponse: {e, "the response ({status}) of {request} does not match its schema at {path}: {message}"},
@@ -245,6 +266,8 @@ func codeTable() map[Code]codeInfo {
 		CodeAsyncBinding:  {e, `binding "{name}" is not an option of {protocol}`},
 		CodeAsyncServer:   {e, `server "{server}" does not fit protocol {protocol} (expected {schemes})`},
 		CodeAsyncTimeout:  {e, "received {got} of {want} messages before the {timeout} timeout"},
+		CodeAsyncConn:     {e, "{detail}"},
+		CodeAsyncConnName: {w, `no step of this flow opens a connection named "{name}" (a flow that calls this one may)`},
 
 		CodeGRPCRequest: {e, "{detail}"},
 		CodeGRPCMethod:  {e, "method {method} is not available: {detail}"},
@@ -257,6 +280,13 @@ func codeTable() map[Code]codeInfo {
 		CodeServeSchedule:     {e, `schedule "{name}": {detail}`},
 		CodeServeScheduleFlow: {w, `schedule "{name}" cannot run: {detail}` + hintMarker + "it is skipped until the flow can be found"},
 		CodeExportValue:       {w, `{what} of "{node}" is {value}, which has no Arazzo equivalent, and was left out`},
+
+		CodeAuthInvalid:       {e, "auth: {detail}"},
+		CodeOverlayInvalid:    {e, "flowi overlay is not valid: {detail}"},
+		CodeOverlayNotFound:   {e, `no flowi overlay named "{name}"` + hintMarker + "list them with: flowi overlay ls"},
+		CodeOverlayNotFitting: {w, `flowi overlay "{overlay}": {detail} was left out: {reason}`},
+		CodeOverlayDrift:      {w, `flowi overlay "{overlay}": {detail}: {reason}`},
+		CodeOverlayName:       {e, `flowi overlay name "{name}": {detail}`},
 
 		CodeBlueprintParamType:   {e, `parameter "{name}" has {detail}`},
 		CodeBlueprintParamName:   {e, `parameter "{name}": {detail}`},
@@ -277,6 +307,7 @@ func codeTable() map[Code]codeInfo {
 
 		CodeFlowOption:    {e, "invalid {field}: {detail}"},
 		CodeFlowNotFound:  {e, `no flow matches "{ref}"`},
+		CodeFlowTagEmpty:  {e, `no flow carries the tag "{tag}"` + hintMarker + "add `tags: [{tag}]` to a flow, or to its folder's _folder.yaml"},
 		CodeFlowAmbiguous: {e, `"{ref}" matches flows in {count} collections` + hintMarker + "use --collection"},
 
 		CodeCycleNeeds:   {e, "dependency cycle: {cycle}"},
@@ -314,29 +345,35 @@ func codeTable() map[Code]codeInfo {
 		CodeRequestEnvUnknown:  {e, `environment "{env}" not found` + hintMarker + "see `flowi env ls`"},
 		CodeRequestHeader:      {e, "invalid header {name}: {detail}"},
 		CodeRequestFileRead:    {e, `file "{path}" cannot be read: {detail}`},
+		CodeRequestEnvExtends:  {e, `environment "{env}" cannot be built: {detail}` + hintMarker + "check the `extends:` line and the variables of the environment file"},
+		CodeRequestMethod:      {e, `"{method}" cannot be sent as an HTTP method` + hintMarker + "a method is one word of letters, digits and !#$%&'*+-.^_`|~: GET, QUERY, PROPFIND, PURGE or your own"},
+		CodeRequestMethodCase:  {w, `method "{method}" is not written as {spelling}` + hintMarker + "method names are case-sensitive on the wire: a server that knows {spelling} will not know {method}"},
 		CodeRequestExampleName: {e, `invalid example name "{name}"` + hintMarker + "use letters, digits, '.', '_' and '-', not starting with '.'"},
 
-		CodeRunAssertFailed:  {e, "assertion failed: {check}{message}"},
-		CodeRunAssertWarning: {w, "assertion failed: {check}{message}"},
-		CodeRunNodeType:      {e, `node type "{type}" cannot run here`},
-		CodeRunSetTarget:     {e, "cannot set {target}: {detail}"},
-		CodeRunExtractEmpty:  {e, `extract "{name}" found nothing ({detail})`},
-		CodeRunHookDepth:     {e, "hooks nested deeper than max_depth {max}"},
-		CodeRunNodeTimeout:   {e, `node "{node}" timed out after {timeout}`},
-		CodeRunTillLimit:     {e, `node "{node}" stopped at {limit} before its until condition held`},
-		CodeRunInputMissing:  {e, `input "{name}" of flow {flow} has no value and no default` + hintMarker + "pass it with --input {name}=…"},
-		CodeRunInputUnknown:  {e, `flow {flow} has no input "{name}"`},
-		CodeRunCalcNumber:    {e, `calc "{name}" of node "{node}" is not a finite number: {detail}`},
-		CodeRunBatchOver:     {e, `over of batch "{node}" is not a list: {detail}`},
-		CodeRunExtractNoResp: {e, `extract "{node}" reads a response, but none is in reach` + hintMarker + "outside post-hooks use the map form: name: \"{{nodes.<id>.body.…}}\""},
-		CodeRunDigestTarget:  {e, `digest "{node}" cannot summarise "{of}": it is unknown or has not finished`},
-		CodeRunHandled:       {w, `node "{node}" failed; continuing (on_error: {on_error})`},
-		CodeRunBackground:    {w, `background webhook "{node}" failed: {detail}`},
-		CodeRunFileName:      {e, `node "{node}" cannot write "{name}": not a plain file name`},
-		CodeRunSaveStatus:    {e, `save "{node}" uses latest-by-status but its value has no status`},
-		CodeRunNoBranchOK:    {e, `no branch of parallel "{node}" succeeded`},
-		CodeRunWriteFailed:   {e, `node "{node}" could not write "{name}": {detail}`},
-		CodeRunStopped:       {e, `the run was stopped by "{node}" as failed{message}`},
+		CodeRunAssertFailed:   {e, "assertion failed: {check}{message}"},
+		CodeRunAssertWarning:  {w, "assertion failed: {check}{message}"},
+		CodeRunNodeType:       {e, `node type "{type}" cannot run here`},
+		CodeRunSetTarget:      {e, "cannot set {target}: {detail}"},
+		CodeRunExtractEmpty:   {e, `value "{name}" found nothing in the response ({detail})`},
+		CodeRunHookDepth:      {e, "hooks nested deeper than max_depth {max}"},
+		CodeRunNodeTimeout:    {e, `node "{node}" timed out after {timeout}`},
+		CodeRunTillLimit:      {e, `node "{node}" stopped at {limit} before its until condition held`},
+		CodeRunInputMissing:   {e, `input "{name}" of flow {flow} has no value and no default` + hintMarker + "pass it with --input {name}=…"},
+		CodeRunInputUnknown:   {e, `flow {flow} has no input "{name}"`},
+		CodeRunCalcNumber:     {e, `value "{name}" of node "{node}" is not a finite number: {detail}`},
+		CodeRunBatchOver:      {e, `over of batch "{node}" is not a list: {detail}`},
+		CodeRunExtractNoResp:  {e, `set "{node}" reads a response, but none is in reach` + hintMarker + "outside post-hooks read an earlier step: from: expr with {{nodes.<id>.body.…}}"},
+		CodeRunDigestTarget:   {e, `digest "{node}" cannot summarise "{of}": it is unknown or has not finished`},
+		CodeRunHandled:        {w, `node "{node}" failed; continuing (on_error: {on_error})`},
+		CodeRunBackground:     {w, `background webhook "{node}" failed: {detail}`},
+		CodeRunFileName:       {e, `node "{node}" cannot write "{name}": not a plain file name`},
+		CodeRunSaveStatus:     {e, `save "{node}" uses latest-by-status but its value has no status`},
+		CodeRunNoBranchOK:     {e, `no branch of parallel "{node}" succeeded`},
+		CodeRunWriteFailed:    {e, `node "{node}" could not write "{name}": {detail}`},
+		CodeRunStopped:        {e, `the run was stopped by "{node}" as failed{message}`},
+		CodeRunFuzzFailed:     {e, `{failed} of {cases} bad inputs sent by "{node}" broke the check: {first}` + hintMarker + "the step's outputs hold every failure with its case name; send that body by hand to see what the server did"},
+		CodeRunAssertNoSchema: {e, `"{node}" checks the schema of "{step}", but no response schema is kept for what "{step}" received` + hintMarker + "send the request once with schemas.infer on, or import an OpenAPI document, so a schema is kept"},
+		CodeRunSkipRead:       {e, `"{reader}" reads {reads}, which "{skipped}" would have made, and "{skipped}" is skipped` + hintMarker + "keep its last values (hold), skip \"{reader}\" too, or add a default with ??"},
 
 		CodeHTTPFailed:  {e, "request failed: {detail}"},
 		CodeHTTPTimeout: {e, "request timed out after {timeout}"},

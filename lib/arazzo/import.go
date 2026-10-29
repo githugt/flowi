@@ -80,10 +80,12 @@ func (im *importer) workflow(w map[string]any) model.Flow {
 	for _, s := range mapsOf(w["steps"]) {
 		f.Nodes = append(f.Nodes, im.step(s)...)
 	}
-	f.Outputs = im.keyValues(fmt.Sprintf("output %%s of workflow %s", id), w["outputs"], "")
+	for _, kv := range im.keyValues(fmt.Sprintf("output %%s of workflow %s", id), w["outputs"], "") {
+		f.Outputs = append(f.Outputs, model.Output{Name: kv.Key, Value: kv.Value})
+	}
 	for _, key := range []string{"successActions", "failureActions", "parameters", "dependsOn"} {
 		if w[key] != nil {
-			im.lossy("workflow "+id+" "+key, "left out", "Flow-I flows have no equivalent")
+			im.lossy("workflow "+id+" "+key, "left out", "Flowi flows have no equivalent")
 		}
 	}
 	return f
@@ -112,7 +114,7 @@ func (im *importer) inputs(workflow string, v any) []model.Input {
 }
 
 // step maps one step to its node and, when it has them, the assert nodes
-// of its success criteria and the extract node of its outputs.
+// of its success criteria and the set node of its outputs.
 func (im *importer) step(s map[string]any) []model.Node {
 	id := str(s, "stepId")
 	n, ok := im.callNode(id, s)
@@ -131,7 +133,7 @@ func (im *importer) step(s map[string]any) []model.Node {
 }
 
 // callNode builds the request or subflow node, or a note when the step
-// cannot be called from Flow-I.
+// cannot be called from Flowi.
 func (im *importer) callNode(id string, s map[string]any) (model.Node, bool) {
 	switch {
 	case s["channelPath"] != nil || (s["operationId"] == nil && s["action"] != nil):
@@ -196,7 +198,7 @@ func (im *importer) payload(step string, v any) []model.KeyValue {
 		return nil
 	}
 	if body["replacements"] != nil {
-		im.lossy("request body replacements of step "+step, "left out", "Flow-I fills the request's own body template instead")
+		im.lossy("request body replacements of step "+step, "left out", "Flowi fills the request's own body template instead")
 	}
 	if body["payload"] == nil {
 		return nil
@@ -239,7 +241,7 @@ func (im *importer) value(what string, v any, step string) (string, bool) {
 		return "", false
 	}
 	if !ok {
-		im.lossy(what, "left out", fmt.Sprintf("expression %q has no Flow-I equivalent", text))
+		im.lossy(what, "left out", fmt.Sprintf("expression %q has no Flowi equivalent", text))
 	}
 	return out, ok
 }
@@ -269,7 +271,7 @@ func (im *importer) criteria(step string, v any) []model.Node {
 		}
 		check, ok := mapCondition(cond, step)
 		if !ok || !im.outputsWritten(cond) {
-			im.lossy(what, "left out", fmt.Sprintf("condition %q has no Flow-I equivalent", cond))
+			im.lossy(what, "left out", fmt.Sprintf("condition %q has no Flowi equivalent", cond))
 			continue
 		}
 		id := step + "-check"
@@ -281,13 +283,13 @@ func (im *importer) criteria(step string, v any) []model.Node {
 	return out
 }
 
-// outputs maps step outputs to an extract node writing vars.<step>_<name>.
+// outputs maps step outputs to a set node writing vars.<step>_<name>.
 func (im *importer) outputs(step string, v any) *model.Node {
 	values := im.keyValues("output %s of step "+step, v, step)
 	if len(values) == 0 {
 		return nil
 	}
-	n := model.Node{ID: step + "-outputs", Type: "extract"}
+	n := model.Node{ID: step + "-outputs", Type: "set"}
 	for _, kv := range values {
 		name, owner := varName(step, kv.Key), step+"\x00"+kv.Key
 		if other, taken := im.written[name]; taken && other != owner {
@@ -295,20 +297,20 @@ func (im *importer) outputs(step string, v any) *model.Node {
 				fmt.Sprintf("its variable vars.%s is already written by output %s", name, strings.Replace(other, "\x00", ".", 1)))
 			continue
 		}
-		n.Params = append(n.Params, model.Field{Key: name, Value: kv.Value})
+		n.Values = append(n.Values, model.SetValue{Name: name, Value: kv.Value})
 		im.written[name] = owner
 	}
-	if len(n.Params) == 0 {
+	if len(n.Values) == 0 {
 		return nil
 	}
 	return &n
 }
 
-// stepLosses reports step fields Flow-I does not carry over.
+// stepLosses reports step fields Flowi does not carry over.
 func (im *importer) stepLosses(step string, s map[string]any) {
 	for _, key := range []string{"onSuccess", "onFailure"} {
 		if s[key] != nil {
-			im.lossy("step "+step+" "+key, "left out", "Flow-I has no step actions; use on_error and condition nodes")
+			im.lossy("step "+step+" "+key, "left out", "Flowi has no step actions; use on_error and condition nodes")
 		}
 	}
 }
@@ -317,7 +319,7 @@ func (im *importer) stepLosses(step string, s map[string]any) {
 // ignored like any other unreadable timeout.
 const maxTimeoutMS = uint64(math.MaxInt64 / int64(time.Millisecond))
 
-// timeoutOf reads the 1.1 step timeout, or the extension Flow-I exports
+// timeoutOf reads the 1.1 step timeout, or the extension Flowi exports
 // to stay within 1.0.1; both are milliseconds.
 func timeoutOf(s map[string]any) time.Duration {
 	for _, key := range []string{"timeout", "x-flowi-timeout"} {

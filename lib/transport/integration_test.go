@@ -4,7 +4,7 @@
 
 // These tests talk to real brokers: run `just test-integration`, which starts
 // testdata/compose/docker-compose.yml (podman compose, else docker compose).
-// Addresses can be changed with FLOWI_TEST_MQTT, _NATS, _KAFKA and _AMQP.
+// Addresses can be changed with FLOWI_TEST_MQTT, _NATS, _KAFKA, _AMQP and _AMQP10.
 // WebSocket and SSE need no broker and are tested with the unit tests.
 
 package transport_test
@@ -25,6 +25,7 @@ import (
 
 	"github.com/githugt/flowi-lib/transport"
 	"github.com/githugt/flowi-lib/transport/amqp"
+	"github.com/githugt/flowi-lib/transport/amqp10"
 	"github.com/githugt/flowi-lib/transport/kafka"
 	"github.com/githugt/flowi-lib/transport/mqtt"
 	"github.com/githugt/flowi-lib/transport/nats"
@@ -243,6 +244,46 @@ func TestAMQP_against_rabbitmq(t *testing.T) {
 
 		if err != nil || len(got.Received) != 1 || string(got.Received[0].Body) != "pong" {
 			t.Fatalf("err %v received %v", err, bodies(got.Received))
+		}
+	})
+}
+
+// AMQP 1.0 is spoken by ActiveMQ Artemis here (RabbitMQ in this compose file is the 0-9-1 transport's).
+func TestAMQP10_against_artemis(t *testing.T) {
+	server := address("FLOWI_TEST_AMQP10", "amqp://127.0.0.1:5673")
+	waitForPort(t, strings.Replace(server, "amqp://", "tcp://", 1))
+	binding := map[string]string{"username": "flowi", "password": "flowi"}
+	queue := fmt.Sprintf("flowi.test.%d", time.Now().UnixNano())
+
+	t.Run("send then receive keeps the body and the headers", func(t *testing.T) {
+		retry(t, func() error {
+			_, err := amqp10.New().Run(t.Context(), transport.Operation{
+				Server: server, Channel: queue, Binding: binding,
+				Send: &transport.Message{Body: []byte("one"), Headers: []transport.Header{{Name: "type", Value: "order"}}},
+			})
+			return err
+		})
+		got, err := amqp10.New().Run(t.Context(), transport.Operation{
+			Server: server, Channel: queue, Binding: binding, Receive: &transport.Receive{Timeout: 10 * time.Second},
+		})
+		if err != nil || len(got.Received) != 1 || string(got.Received[0].Body) != "one" {
+			t.Fatalf("err %v received %+v", err, got.Received)
+		}
+		headers := map[string]string{}
+		for _, h := range got.Received[0].Headers {
+			headers[h.Name] = h.Value
+		}
+		if headers["type"] != "order" {
+			t.Errorf("headers %v", headers)
+		}
+	})
+
+	t.Run("a wrong password is refused", func(t *testing.T) {
+		_, err := amqp10.New().Run(t.Context(), transport.Operation{
+			Server: server, Channel: queue, Binding: map[string]string{"username": "flowi", "password": "nope"}, Send: &transport.Message{Body: []byte("x")},
+		})
+		if err == nil || strings.Contains(err.Error(), "nope") {
+			t.Fatalf("err %v (must fail, and must not quote the password)", err)
 		}
 	})
 }

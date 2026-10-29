@@ -36,6 +36,19 @@ type RunInput struct {
 	// not by a flow-level run: loop.
 	Only  []string
 	Prior map[string]map[string]any
+	// Skip lists node ids (or node paths) that do not run this time: they
+	// finish as skipped with the reason "skipped by you", wherever they are,
+	// in every iteration of a loop. A skipped node whose id is in Prior keeps
+	// those outputs ("hold"), so later steps read the old values; the
+	// flow's variables come from PriorVars as for a partial run.
+	Skip []string
+	// Overlay is a flowi overlay (or a stack, "vip+slow") laid over every request step that names no overlay of
+	// its own. A step's own overlay wins. "" lays none.
+	Overlay string
+	// PriorVars are the flow's variables as an earlier run ended (masked),
+	// for the chosen nodes' templates to read as vars.<name>: a node left out
+	// of a partial run may have set them.
+	PriorVars map[string]any
 }
 
 // RunResult is a finished flow run. Everything in it is masked.
@@ -46,6 +59,9 @@ type RunResult struct {
 	// Diags are the unhandled failure's diagnostics and every warning.
 	Diags diag.List
 	Saved []string // files written (saved responses, values, digests)
+	// Captured are the masked records of every call the run made, in the order they finished: what a HAR
+	// file is written from. A hook flow's calls are included.
+	Captured []Record
 	// Report is the run's report; ReportFile where it was saved
 	// (runs/<flow-id>/<run-id>.json in the workspace data dir).
 	Report     report.Run
@@ -90,7 +106,7 @@ func (r *Run) Wait() RunResult {
 
 func newFlowRunner(d Deps, in RunInput, events chan<- Event) *runner {
 	r := newRunState(d, in.Seed, events)
-	r.kind, r.env, r.prefer = "flow", in.Env, in.PreferVersion
+	r.kind, r.env, r.prefer, r.overlay = "flow", in.Env, in.PreferVersion, in.Overlay
 	r.builder = newReportBuilder(d.Clock, in.Flow.Name, in.Collection.Manifest.Name)
 	r.jar = httpx.NewJar() // one in-memory jar per run (design §6.3)
 	return r
@@ -99,9 +115,10 @@ func newFlowRunner(d Deps, in RunInput, events chan<- Event) *runner {
 // runFlow is the whole run: start, the flow's nodes, finish.
 func (r *runner) runFlow(ctx context.Context, in RunInput) RunResult {
 	r.ctx = ctx
+	defer r.conns.closeAll() // also when the run is aborted: no connection outlives its run
 	start := r.deps.Clock()
 	cfg := newConfig(r.deps.Lookup.Settings(in.Collection.Manifest.ID, flowFolder(in.Flow), nil))
-	r.emit(RunStarted{RunID: r.runID, Kind: "flow", FlowID: string(in.Flow.ID), FlowPath: in.Flow.Path, Env: in.Env, Seed: r.seed, At: start})
+	r.emit(RunStarted{RunID: r.runID, Kind: "flow", FlowID: string(in.Flow.ID), FlowPath: in.Flow.Path, Env: in.Env, Overlay: in.Overlay, Seed: r.seed, At: start})
 	done := make(chan listOutcome, 1)
 	// The flow goroutine is owned by the run: it ends when the flow's
 	// nodes and background calls have ended, which cancellation makes
@@ -110,12 +127,15 @@ func (r *runner) runFlow(ctx context.Context, in RunInput) RunResult {
 	go func() {
 		out := r.flowOutcome(ctx, in, cfg)
 		r.bg.Wait()
+		r.conns.closeAll() // an aborted run does not wait for this goroutine; the connections must not wait for it either
 		done <- out
 	}()
 	out := r.awaitFlow(ctx, done, cmpOrDuration(in.Grace, cfg.grace, defaultGrace))
 	r.finalEmit(RunFinished{RunID: r.runID, Status: out.status, Duration: elapsed(r.deps.Clock, start)})
 	res := r.runResult(out)
 	res.Report = r.builder.snapshot()
+	res.Report.Vars = r.finalVars()
+	res.Report.Outputs = r.finalOutputs()
 	res.ReportFile, res.Err = r.saveReport(in, res.Report, res.Err)
 	return res
 }
@@ -194,16 +214,20 @@ func (r *runner) flowOutcome(ctx context.Context, in RunInput, cfg config) listO
 		return listOutcome{status: StatusFailed, diags: diags}
 	}
 	fs.inputs = inputs
+	r.keepVars(root.vars, in.PriorVars)
+	r.skip, r.prior = skipSet(in.Skip), in.Prior
 	list := in.Flow.Nodes
 	if in.Only != nil {
 		list = onlyNodes(list, in.Only)
 		in.Flow.Nodes = list
 	}
 	if in.Flow.Run != nil {
-		return r.runIterations(ctx, fs, root.vars, in.Flow)
+		return r.runIterations(ctx, fs, root.vars, in.Flow, in.Prior)
 	}
 	seedPrior(root.outputs, in.Prior, list)
-	return r.runList(ctx, root, list)
+	out := r.runList(ctx, root, list)
+	r.keepOutputs(ctx, in.Flow, root.scope(r), out.status)
+	return out
 }
 
 // flowInputs renders the given --input templates and resolves every
@@ -222,7 +246,7 @@ func (r *runner) runResult(out listOutcome) RunResult {
 	defer r.mu.Unlock()
 	m := r.secrets.current()
 	diags := append(maskDiags(out.diags, m), r.warnings...)
-	return RunResult{RunID: r.runID, Seed: r.seed, Status: out.status, Diags: diags, Saved: r.saved, Err: r.err}
+	return RunResult{RunID: r.runID, Seed: r.seed, Status: out.status, Diags: diags, Saved: r.saved, Captured: r.captured, Err: r.err}
 }
 
 // onlyNodes keeps the listed nodes in flow order. A kept node's needs on a

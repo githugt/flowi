@@ -38,6 +38,10 @@ type Call struct {
 	// Receive says which messages of a server stream to keep and how long to
 	// wait for them; unused for a unary call.
 	Receive *transport.Receive
+	// Web makes the call over gRPC-Web: an HTTP POST to Server (an http:// or
+	// https:// address) instead of an HTTP/2 connection, for proxies and
+	// gateways that speak gRPC-Web. It needs Protos and cannot stream from the client.
+	Web bool
 	// Timeout is the deadline of the whole call; zero means DefaultTimeout.
 	Timeout time.Duration
 	Clock   func() time.Time // nil: time.Now

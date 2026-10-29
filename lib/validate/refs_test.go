@@ -3,6 +3,7 @@
 package validate
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/githugt/flowi-lib/diag"
@@ -179,5 +180,77 @@ func TestRefs_should_check_hook_flow_steps_and_nested_container_nodes(t *testing
 	}
 	if len(got) != len(want) {
 		t.Fatalf("got %d diagnostics, want %d: %v", len(got), len(want), paths)
+	}
+}
+
+func TestRefs_should_report_a_step_that_names_an_unknown_flowi_overlay(t *testing.T) {
+	// Arrange
+	f := newFixture(t)
+	c := f.collection("c")
+	r := f.request(&c, "r", "1")
+	c.Overlays = []model.Overlay{{Name: "vip"}}
+	known, unknown := requestNode("known", r), requestNode("unknown", r)
+	known.Request.Overlay, unknown.Request.Overlay = "vip", "ghost"
+	f.flow(&c, "x", known, unknown)
+
+	// Act
+	got := Validate(Target{Collections: []model.Collection{c}})
+
+	// Assert
+	d := only(t, got, diag.CodeOverlayNotFound)
+	if d.Path != "$.nodes[1].overlay" || d.Args["name"] != "ghost" {
+		t.Errorf("got %+v", d)
+	}
+}
+
+func TestValidate_should_report_auth_blocks_that_can_never_work(t *testing.T) {
+	// Arrange
+	f := newFixture(t)
+	c := f.collection("c")
+	f.request(&c, "r", "1")
+	c.Requests[0].Versions[0].Auth = &model.Auth{Type: "kerberos"}
+	f.request(&c, "s", "1")
+	c.Requests[1].Versions[0].Auth = &model.Auth{Type: "apikey", Params: []model.KeyValue{{Key: "name", Value: "k"}, {Key: "colour", Value: "red"}}}
+
+	// Act
+	got := Validate(Target{Collections: []model.Collection{c}})
+
+	// Assert
+	var details []string
+	for _, d := range got {
+		if d.Code == diag.CodeAuthInvalid {
+			details = append(details, d.Args["detail"])
+		}
+	}
+	if len(details) != 2 {
+		t.Fatalf("details %v", details)
+	}
+}
+
+func TestValidate_should_allow_only_mutual_TLS_as_the_auth_block_of_a_gRPC_call(t *testing.T) {
+	// Arrange
+	f := newFixture(t)
+	c := f.collection("c")
+	for _, name := range []string{"mtls", "digest"} {
+		f.request(&c, name, "1")
+	}
+	call := model.GRPC{Server: "grpcs://h:1", Method: "a.B/C"}
+	c.Requests[0].Versions[0].GRPC = &call
+	c.Requests[0].Versions[0].Auth = &model.Auth{Type: model.AuthMutualTLS, Params: []model.KeyValue{{Key: "cert", Value: "c.pem"}, {Key: "key", Value: "c.key"}}}
+	c.Requests[1].Versions[0].GRPC = &call
+	c.Requests[1].Versions[0].Auth = &model.Auth{Type: model.AuthDigest}
+
+	// Act
+	got := Validate(Target{Collections: []model.Collection{c}})
+
+	// Assert
+	var files []string
+	for _, d := range got {
+		if d.Code == diag.CodeAuthInvalid {
+			files = append(files, d.File)
+		}
+	}
+	if len(files) != 1 || !strings.Contains(files[0], "digest") {
+		t.Fatalf("only the digest request should be reported, got %v in %v", files, got)
 	}
 }

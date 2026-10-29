@@ -15,7 +15,7 @@ import (
 	"github.com/githugt/flowi-lib/workspace"
 )
 
-// A draft is a collection kept in Flow-I's own directory
+// A draft is a collection kept in Flowi's own directory
 // (workspace.DraftsDir) until the user saves it to a folder of their own.
 // It is an ordinary mounted collection: being a draft is read from where
 // it is mounted, so workspace.yaml has no draft flag to keep in step.
@@ -215,13 +215,13 @@ func insideDir(parent, path string) bool {
 	return err == nil && rel != "." && rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator))
 }
 
-// checkSaveTarget refuses a target inside Flow-I's own workspace directory
+// checkSaveTarget refuses a target inside Flowi's own workspace directory
 // (drafts and their data live there, and discarding a draft deletes its
 // folder) or one that holds anything; it reports whether the (empty)
 // target already existed.
 func checkSaveTarget(wsDir, target string) (bool, error) {
 	if resolvedPath(target) == resolvedPath(wsDir) || insideDir(wsDir, target) {
-		return false, fmt.Errorf("%s is inside Flow-I's own folder; choose a folder of your own", target)
+		return false, fmt.Errorf("%s is inside Flowi's own folder; choose a folder of your own", target)
 	}
 	entries, err := os.ReadDir(target)
 	if errors.Is(err, fs.ErrNotExist) {
@@ -237,7 +237,7 @@ func checkSaveTarget(wsDir, target string) (bool, error) {
 }
 
 // copyDraft copies directories and regular files from root to target.
-// Drafts are written only by Flow-I, so anything else (a symlink, a
+// Drafts are written only by Flowi, so anything else (a symlink, a
 // device) is left out rather than followed.
 func copyDraft(root, target string) error {
 	err := filepath.WalkDir(root, func(p string, d fs.DirEntry, err error) error {
@@ -263,7 +263,7 @@ func copyDraft(root, target string) error {
 }
 
 func copyFile(src, dst string) error {
-	in, err := os.Open(src) //nolint:gosec // src is inside Flow-I's own drafts directory
+	in, err := os.Open(src) //nolint:gosec // src is inside Flowi's own drafts directory
 	if err != nil {
 		return err
 	}

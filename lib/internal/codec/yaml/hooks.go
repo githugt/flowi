@@ -11,7 +11,7 @@ func (m *mapping) hooks() model.Hooks {
 	if !ok {
 		return model.Hooks{}
 	}
-	h := model.Hooks{Pre: hm.hookSteps("pre"), Post: hm.hookSteps("post")}
+	h := model.Hooks{Pre: hm.hookSteps("pre"), Post: hm.hookSteps("post"), Message: hm.hookSteps("message")}
 	hm.closeStrict()
 	return h
 }
@@ -55,6 +55,7 @@ func encodeHooks(h model.Hooks) any {
 	var o omap
 	o.put("pre", encodeHookSteps(h.Pre))
 	o.put("post", encodeHookSteps(h.Post))
+	o.put("message", encodeHookSteps(h.Message))
 	return o.items
 }
 

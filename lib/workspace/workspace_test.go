@@ -33,7 +33,7 @@ func TestLoadOrCreate_should_create_default_workspace_with_valid_id(t *testing.T
 	if err != nil || len(diags) != 0 {
 		t.Fatalf("err %v diags %v", err, diags)
 	}
-	if !ids.Valid(ws.ID) || ws.Name != "Default" {
+	if !ids.Valid(ws.ID) || ws.Name != "default-workspace" {
 		t.Fatalf("got %+v", ws)
 	}
 	if _, err := os.Stat(filepath.Join(Dir(p, DefaultName), "workspace.yaml")); err != nil {
@@ -174,9 +174,9 @@ func TestCheckMounts_should_report_missing_and_keep_others(t *testing.T) {
 func TestDataDir_should_nest_under_workspace(t *testing.T) {
 	p := settings.Paths{ConfigDir: "/cfg"}
 
-	got := DataDir(p, "default", "01J")
+	got := DataDir(p, DefaultName, "01J")
 
-	if got != filepath.Join("/cfg", "workspaces", "default", "data", "01J") {
+	if got != filepath.Join("/cfg", "workspaces", "default-workspace", "data", "01J") {
 		t.Fatalf("got %q", got)
 	}
 }

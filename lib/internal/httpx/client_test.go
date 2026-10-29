@@ -6,10 +6,17 @@ import (
 	"bytes"
 	"compress/gzip"
 	"context"
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rand"
+	"crypto/tls"
+	"crypto/x509"
+	"crypto/x509/pkix"
 	"encoding/pem"
 	"errors"
 	"fmt"
 	"io"
+	"math/big"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -381,5 +388,50 @@ func TestClient_Given_307_and_308_with_body_Then_follows_and_resends_body(t *tes
 				t.Fatalf("%s: body %q", path, a.Response.Body)
 			}
 		}
+	}
+}
+
+// clientCert makes a self-signed certificate for a TLS client.
+func clientCert(t *testing.T) tls.Certificate {
+	t.Helper()
+	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tmpl := &x509.Certificate{
+		SerialNumber: big.NewInt(1), Subject: pkix.Name{CommonName: "flowi-test-client"},
+		NotBefore: time.Now().Add(-time.Hour), NotAfter: time.Now().Add(time.Hour),
+		KeyUsage: x509.KeyUsageDigitalSignature, ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
+	}
+	der, err := x509.CreateCertificate(rand.Reader, tmpl, tmpl, &key.PublicKey, key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return tls.Certificate{Certificate: [][]byte{der}, PrivateKey: key}
+}
+
+func TestClient_Given_a_client_certificate_Then_a_server_that_requires_one_accepts_it(t *testing.T) {
+	// Arrange
+	srv := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = io.WriteString(w, r.TLS.PeerCertificates[0].Subject.CommonName)
+	}))
+	srv.TLS = &tls.Config{ClientAuth: tls.RequireAnyClientCert, MinVersion: tls.VersionTLS12}
+	srv.StartTLS()
+	defer srv.Close()
+	o := defaultOptions()
+	o.CAFiles = []string{tlsCAFile(t, srv)}
+	without := get(t, newClient(t, o), srv.URL)
+	cert := clientCert(t)
+	o.ClientCert = &cert
+
+	// Act
+	with := get(t, newClient(t, o), srv.URL)
+
+	// Assert
+	if without.Err == nil {
+		t.Error("a server that requires a client certificate must refuse a client with none")
+	}
+	if with.Err != nil || string(with.Response.Body) != "flowi-test-client" {
+		t.Fatalf("with the certificate: %+v", with)
 	}
 }

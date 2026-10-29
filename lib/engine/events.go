@@ -34,6 +34,7 @@ type RunStarted struct {
 	Kind          string
 	FlowID        string
 	FlowPath, Env string
+	Overlay       string // the run-level flowi overlay, if any
 	Seed          uint64
 	At            time.Time
 }
@@ -60,6 +61,9 @@ type NodeFinished struct {
 	Outputs                   map[string]any
 	Diags                     diag.List
 	Depth                     int
+	// Reason says why a node was skipped by the person ("skipped by you");
+	// "" otherwise, including a node skipped by its when.
+	Reason string
 }
 
 // RecordCaptured carries the record of a request node's call: the request as
@@ -72,6 +76,18 @@ type RecordCaptured struct {
 	RunID, Path, Node string
 	Depth             int
 	Record            Record
+}
+
+// AuthPrompted says a request is waiting for the person to do something
+// before it can be sent: Kind "open" asks them to open URL in a browser and
+// approve; "device" asks them to open URL on any device and enter Code. It
+// arrives while the request waits, so a window shows it and a terminal prints
+// it. Expires is when the request stops being valid.
+type AuthPrompted struct {
+	RunID, Path string // Path is the request node's path; "" for a standalone send
+	Kind        string
+	URL, Code   string
+	Expires     time.Time
 }
 
 // HookStarted marks the start of one hook step. Level is collection,
@@ -171,6 +187,9 @@ func (NodeFinished) EventName() string { return "NodeFinished" }
 
 // EventName returns "RunAborted".
 func (RunAborted) EventName() string { return "RunAborted" }
+
+// EventName returns "AuthPrompted".
+func (AuthPrompted) EventName() string { return "AuthPrompted" }
 
 // EventName returns "RecordCaptured".
 func (RecordCaptured) EventName() string { return "RecordCaptured" }

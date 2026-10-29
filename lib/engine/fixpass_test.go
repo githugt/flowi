@@ -120,7 +120,7 @@ func TestSend_hook_flow_fetch_should_use_the_send_cookie_jar(t *testing.T) {
 	v := get("/echo/")
 	v.Hooks.Pre = []model.HookStep{inlineHook(
 		flowNode("look", "fetch", "url", "{{env.base_url}}/cookie/echo"),
-		flowNode("keep", "extract", "seen", "{{nodes.look.body}}"),
+		setValues("keep", model.SetValue{Name: "seen", Value: "{{nodes.look.body}}"}),
 	)}
 	r := f.addRequest("x", v)
 

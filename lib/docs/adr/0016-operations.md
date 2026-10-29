@@ -8,7 +8,7 @@
 Roadmap M8 adds nine small, independent items: OpenTelemetry traces, opt-in telemetry,
 signed announcements, a changelog, blueprints, more digest sinks, a shared store for several
 `flowi serve` instances, HTTP/3 and more colour themes. Most of them talk to the network or
-to a user's infrastructure, and Flow-I is a tool people run against their own APIs: it must
+to a user's infrastructure, and Flowi is a tool people run against their own APIs: it must
 never surprise them.
 
 ## Decision

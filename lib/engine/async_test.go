@@ -50,6 +50,14 @@ func (s *scripted) Run(ctx context.Context, op transport.Operation) (transport.R
 				}
 			}
 			res.Received = append(res.Received, m)
+			if op.Receive.OnMessage != nil {
+				op.Receive.OnMessage(m)
+			}
+			if op.Receive.OnKept != nil {
+				if err := op.Receive.OnKept(m); err != nil { // a real transport stops the receive, as transport.Wait does
+					return res, err
+				}
+			}
 		}
 	}
 	return res, s.err
@@ -377,4 +385,65 @@ func (a *announcing) Run(_ context.Context, op transport.Operation) (transport.R
 		}
 	}
 	return res, nil
+}
+
+func TestSend_Async_message_hooks_should_run_for_each_message_and_read_it(t *testing.T) {
+	// Arrange
+	tr := &scripted{incoming: []string{`{"n":1}`, `{"n":2}`, `{"n":3}`}}
+	v := asyncVersion(model.Async{Channel: "orders", Receive: &model.AsyncReceive{Count: 3}})
+	v.Hooks = model.Hooks{Message: []model.HookStep{inlineHook(
+		assertNode("seen", "body.n == seq"),
+		setNode("last", "vars.last", "{{body.n}}"),
+	)}}
+
+	// Act
+	res, _ := sendAsync(t, tr, v, nil)
+
+	// Assert
+	if res.Status != StatusPassed || res.Record == nil || len(res.Record.Messages) != 3 {
+		t.Fatalf("result %+v diags %v", res, res.Diags)
+	}
+	if res.Vars["last"] != "3" && res.Vars["last"] != 3 {
+		t.Errorf("the hook ran for the last message too: vars %v", res.Vars)
+	}
+}
+
+func TestSend_Async_message_hooks_should_stop_at_the_first_message_that_fails_a_check(t *testing.T) {
+	// Arrange
+	tr := &scripted{incoming: []string{`{"ok":true}`, `{"ok":false}`, `{"ok":true}`}}
+	v := asyncVersion(model.Async{Channel: "orders", Receive: &model.AsyncReceive{Count: 3}})
+	v.Hooks = model.Hooks{Message: []model.HookStep{inlineHook(assertNode("must-be-ok", "body.ok"))}}
+
+	// Act
+	res, _ := sendAsync(t, tr, v, nil)
+
+	// Assert
+	if res.Status != StatusFailed || res.Record == nil {
+		t.Fatalf("status %v diags %v", res.Status, res.Diags)
+	}
+	if res.Record.Outcome != OutcomeStopped || len(res.Record.Messages) != 2 {
+		t.Errorf("outcome %q with %d messages: the run must stop at the second message, which is kept", res.Record.Outcome, len(res.Record.Messages))
+	}
+	if hasCode(res.Diags, diag.CodeHTTPFailed) {
+		t.Errorf("the failed hook has reported; the run must not add a transport failure: %v", res.Diags)
+	}
+}
+
+func TestSend_Async_message_hooks_should_be_skippable_and_ignored_without_a_receive(t *testing.T) {
+	// Arrange
+	tr := &scripted{incoming: []string{`{"ok":false}`}}
+	failing := model.Hooks{Message: []model.HookStep{inlineHook(assertNode("must-be-ok", "body.ok"))}}
+	receiving := asyncVersion(model.Async{Channel: "orders", Receive: &model.AsyncReceive{}})
+	receiving.Hooks = failing
+	sending := asyncVersion(model.Async{Channel: "orders", Send: &model.AsyncSend{Body: model.Body{Text: "x"}}})
+	sending.Hooks = failing
+
+	// Act
+	skipped, _ := sendAsync(t, tr, receiving, func(in *SendInput) { in.Hooks = model.HookControl{Skip: []string{"message"}} })
+	sendOnly, _ := sendAsync(t, tr, sending, nil)
+
+	// Assert
+	if skipped.Status != StatusPassed || sendOnly.Status != StatusPassed {
+		t.Errorf("skipped %v %v, send only %v %v", skipped.Status, skipped.Diags, sendOnly.Status, sendOnly.Diags)
+	}
 }

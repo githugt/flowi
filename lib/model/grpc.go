@@ -23,6 +23,11 @@ type GRPC struct {
 	// Receive says which messages of a server stream to keep; unused for a
 	// unary call. Count 0 means 1 and Timeout 0 means 30s when it runs.
 	Receive *AsyncReceive
+	// Web makes the call over gRPC-Web: an HTTP POST to Server, which is then
+	// an http:// or https:// address, for a proxy or gateway that speaks it.
+	// It needs Proto files (such a proxy has no reflection) and a method that
+	// does not stream from the client.
+	Web bool
 }
 
 // The URL schemes of a gRPC server.

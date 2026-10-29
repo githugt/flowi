@@ -29,14 +29,20 @@ type ServeOptions struct {
 	ReplayAddr  string // host:port; "" uses serve.replay_addr; port 0 picks a free one
 	TriggerAddr string // host:port; "" uses serve.trigger_addr
 
-	Latency  time.Duration // added to every replayed answer
-	Sequence bool          // replay a request's responses one call at a time
-	CORS     bool          // let browsers call the replayer
-	Record   string        // upstream base URL: forward calls and save the real responses
+	Latency time.Duration // added to every replayed answer
+	// Faults make a share of replayed calls fail on purpose (see replay.Faults). Refused with Record.
+	Faults   replay.Faults
+	Sequence bool   // replay a request's responses one call at a time
+	CORS     bool   // let browsers call the replayer
+	Record   string // upstream base URL: forward calls and save the real responses
 	// RecordTo is the collection (name or id) that calls matching no saved
 	// request are saved in, as new requests; "" is the Scratch draft. Only
 	// used with Record.
 	RecordTo string
+	// RecordHAR is a file the recorded calls are also written to, as a HAR file in the order they were made
+	// (credentials masked). `flowi import har` turns it into a flow whose steps read the values earlier
+	// responses gave. Only used with Record.
+	RecordHAR string
 
 	NoReplay, NoTriggers, NoSchedules bool
 
@@ -102,6 +108,12 @@ func (w *Workspace) resolveServe(o ServeOptions) (ServeOptions, error) {
 		return o, fmt.Errorf("%w: nothing to serve, the replayer, triggers and schedules are all turned off", ErrInvalidServeOptions)
 	case o.CORS && o.Record != "":
 		return o, fmt.Errorf("%w: --cors with --record would let any web page read the real API through your network position", ErrInvalidServeOptions)
+	case o.Faults.Validate() != nil:
+		return o, fmt.Errorf("%w: %w", ErrInvalidServeOptions, o.Faults.Validate())
+	case o.Faults.Active() && o.Record != "":
+		return o, fmt.Errorf("%w: faults are for replayed answers; with --record the calls go to the real API", ErrInvalidServeOptions)
+	case o.RecordHAR != "" && o.Record == "":
+		return o, fmt.Errorf("%w: --record-har needs --record: there is nothing to put on the tape", ErrInvalidServeOptions)
 	case o.Latency < 0:
 		return o, fmt.Errorf("%w: the latency cannot be negative", ErrInvalidServeOptions)
 	case o.ShutdownTimeout < 0:

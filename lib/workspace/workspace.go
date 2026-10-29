@@ -20,7 +20,7 @@ import (
 )
 
 // DefaultName is the workspace used when none is named.
-const DefaultName = "default"
+const DefaultName = "default-workspace"
 
 const fileName = "workspace.yaml"
 
@@ -47,12 +47,8 @@ func LoadOrCreate(p settings.Paths, name string, c Codec, idSource *ids.Source) 
 	return ws, diags, nil
 }
 
-func displayName(name string) string {
-	if name == DefaultName {
-		return "Default"
-	}
-	return name
-}
+// displayName is the name a new workspace shows: its folder name.
+func displayName(name string) string { return name }
 
 // Save writes workspace.yaml atomically. Its location comes from ws.File,
 // or the default location for the workspace's directory when unset.

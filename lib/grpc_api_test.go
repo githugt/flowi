@@ -125,8 +125,12 @@ func TestGenerateGRPCRequests_should_create_a_request_per_method_with_an_example
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(got.Created) != 2 || len(got.Skipped) != 1 || !strings.Contains(got.Skipped[0], "Upload") {
-		t.Fatalf("created %d skipped %v, want 2 created and the client-streaming method skipped", len(got.Created), got.Skipped)
+	if len(got.Created) != 3 || len(got.Skipped) != 0 {
+		t.Fatalf("created %d skipped %v, want all three", len(got.Created), got.Skipped)
+	}
+	_, upload, err := w.requestFor(got.Created[2])
+	if err != nil || upload.Versions[0].GRPC.Body.JSON != "[{}]" {
+		t.Fatalf("a client-streaming method should start with an array of one message, got %+v, err %v", upload.Versions[0].GRPC.Body, err)
 	}
 	_, r, err := w.requestFor(got.Created[0])
 	if err != nil {

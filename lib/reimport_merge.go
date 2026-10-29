@@ -16,7 +16,7 @@ import (
 // place for, were lost, and so was every saved edit. A request a spec
 // import replaces is now merged instead:
 //
-//   - what only Flow-I has (the version's title, checks, extractions,
+//   - what only Flowi has (the version's title, checks, extractions,
 //     settings, hooks and variables; the request's hooks; versions the spec
 //     never had) is kept;
 //   - what the spec decides (method, URL, parameters, body, docs) is merged

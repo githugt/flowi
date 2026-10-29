@@ -13,8 +13,14 @@ import (
 // runPhase runs hook steps in order and stops at the first that fails.
 // It reports whether every step passed.
 func (x *execution) runPhase(ctx context.Context, refs []HookRef, phase nodes.Phase) bool {
+	return x.runPhaseNamed(ctx, refs, phase, map[nodes.Phase]string{nodes.PhasePre: "pre", nodes.PhasePost: "post"}[phase])
+}
+
+// runPhaseNamed is runPhase for a phase with its own name in events and
+// reports: "message" hooks run with the rules of the post phase (the request
+// has gone) and are named apart.
+func (x *execution) runPhaseNamed(ctx context.Context, refs []HookRef, phase nodes.Phase, name string) bool {
 	x.state.Phase = phase
-	name := map[nodes.Phase]string{nodes.PhasePre: "pre", nodes.PhasePost: "post"}[phase]
 	for i, ref := range refs {
 		if ctx.Err() != nil {
 			return false

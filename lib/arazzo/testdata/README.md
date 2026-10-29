@@ -5,4 +5,4 @@
 © Princess Beef Heavy Industries, LLC / Dave Shanley). The 1.1 document follows the
 example in the OpenAPI Initiative's Arazzo 1.1 specification.
 
-`*.golden.yaml` are what Flow-I exports after importing them (`go test ./arazzo -update`).
+`*.golden.yaml` are what Flowi exports after importing them (`go test ./arazzo -update`).

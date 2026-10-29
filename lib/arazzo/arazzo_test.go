@@ -102,10 +102,10 @@ func TestImport_official_10_maps_steps_outputs_and_workflow_outputs(t *testing.T
 		!slices.Equal(fetch.Request.With, []model.KeyValue{{Key: "petId", Value: "{{inputs.petId}}"}}) {
 		t.Fatalf("fetch %+v", fetch)
 	}
-	if outputs.Type != "extract" || len(outputs.Params) != 1 || outputs.Params[0] != (model.Field{Key: "fetch_petId", Value: "{{nodes.fetch.body.id}}"}) {
+	if outputs.Type != "set" || len(outputs.Values) != 1 || outputs.Values[0] != (model.SetValue{Name: "fetch_petId", Value: "{{nodes.fetch.body.id}}"}) {
 		t.Fatalf("outputs %+v", outputs)
 	}
-	if !slices.Equal(f.Outputs, []model.KeyValue{{Key: "petId", Value: "{{vars.fetch_petId}}"}}) {
+	if !slices.Equal(f.Outputs, []model.Output{{Name: "petId", Value: "{{vars.fetch_petId}}"}}) {
 		t.Fatalf("flow outputs %v", f.Outputs)
 	}
 }

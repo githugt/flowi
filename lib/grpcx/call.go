@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/tls"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -30,14 +31,20 @@ import (
 	"github.com/githugt/flowi-lib/transport"
 )
 
-// Run calls the method and returns what came back. Only unary and
-// server-streaming methods are supported; a stream is collected with the same
-// rules as an async receive (count, timeout, match, live OnMessage).
+// Run calls the method and returns what came back. All four kinds of method
+// work. A method that streams from the client takes a JSON array as its body,
+// one message for each element (a lone object is one message); a stream from
+// the server is collected with the same rules as an async receive (count,
+// timeout, match, live OnMessage).
 //
-// Goroutine ownership: a stream starts one reader goroutine; Run cancels the
-// call and waits for it before it returns, and closes the connection last.
+// Goroutine ownership: a server stream starts one reader goroutine, and a
+// bidirectional call one more that sends; Run cancels the call and waits for
+// both before it returns, and closes the connection last.
 func Run(ctx context.Context, c Call) (Result, error) {
 	started := c.now()
+	if c.Web {
+		return runWeb(ctx, c, started)
+	}
 	ctx, cancel := context.WithTimeout(ctx, c.timeout())
 	defer cancel()
 	conn, err := dial(c)
@@ -49,10 +56,7 @@ func Run(ctx context.Context, c Call) (Result, error) {
 	if err != nil {
 		return Result{}, err
 	}
-	if md.IsStreamingClient() {
-		return Result{}, fmt.Errorf("%s is a client-streaming method, which is not supported yet", c.Method)
-	}
-	in, warnings, err := requestMessage(md, c.JSON)
+	in, warnings, err := requestMessages(md, c.JSON)
 	if err != nil {
 		return Result{}, err
 	}
@@ -61,16 +65,17 @@ func Run(ctx context.Context, c Call) (Result, error) {
 		return Result{}, err
 	}
 	res := Result{Connect: c.now().Sub(started), Warnings: warnings}
-	sent, err := jsonOf(in)
-	if err != nil {
+	if res.Messages, err = sentMessages(in, c); err != nil {
 		return res, err
 	}
-	res.Messages = []transport.Message{{Direction: "sent", At: c.now(), Body: sent, Headers: c.sentHeaders()}}
 	path := "/" + string(md.Parent().FullName()) + "/" + string(md.Name())
-	if md.IsStreamingServer() {
+	switch {
+	case md.IsStreamingServer():
 		err = runStream(out, conn, path, md, in, c, &res)
-	} else {
-		runUnary(out, conn, path, md, in, c, &res)
+	case md.IsStreamingClient():
+		runClientStream(out, conn, path, md, in, c, &res)
+	default:
+		runUnary(out, conn, path, md, in[0], c, &res)
 	}
 	res.Total = c.now().Sub(started)
 	return res, err
@@ -99,7 +104,8 @@ func dial(c Call) (*grpc.ClientConn, error) {
 	return conn, nil
 }
 
-// outgoingContext attaches the metadata: names lower-cased, -bin refused.
+// outgoingContext attaches the metadata: names lower-cased. The value of a
+// binary (-bin) header is written as base64 and sent as the bytes it stands for.
 func outgoingContext(ctx context.Context, headers []transport.Header) (context.Context, error) {
 	if len(headers) == 0 {
 		return ctx, nil
@@ -107,12 +113,71 @@ func outgoingContext(ctx context.Context, headers []transport.Header) (context.C
 	md := metadata.MD{}
 	for _, h := range headers {
 		name := strings.ToLower(h.Name)
+		value := h.Value
 		if strings.HasSuffix(name, "-bin") {
-			return nil, fmt.Errorf("metadata %q: binary (-bin) metadata is not supported yet", h.Name)
+			raw, err := decodeBase64(value)
+			if err != nil {
+				return nil, fmt.Errorf("metadata %q: a binary (-bin) value is written as base64: %w", h.Name, err)
+			}
+			value = string(raw)
 		}
-		md.Append(name, h.Value)
+		md.Append(name, value)
 	}
 	return metadata.NewOutgoingContext(ctx, md), nil
+}
+
+// sentMessages records the requests as sent. The metadata went with the call,
+// so only the first message carries it.
+func sentMessages(in []*dynamicpb.Message, c Call) ([]transport.Message, error) {
+	out := make([]transport.Message, 0, len(in))
+	for i, m := range in {
+		body, err := jsonOf(m)
+		if err != nil {
+			return nil, err
+		}
+		msg := transport.Message{Direction: "sent", At: c.now(), Body: body}
+		if i == 0 {
+			msg.Headers = c.sentHeaders()
+		}
+		out = append(out, msg)
+	}
+	return out, nil
+}
+
+// requestMessages converts the JSON into the messages to send: for a method
+// that streams from the client, a JSON array is one message for each element
+// (an empty array sends none); anything else, and every other kind of method,
+// is exactly one message.
+func requestMessages(md protoreflect.MethodDescriptor, body []byte) ([]*dynamicpb.Message, []string, error) {
+	trimmed := bytes.TrimSpace(body)
+	if !md.IsStreamingClient() || !bytes.HasPrefix(trimmed, []byte("[")) {
+		in, warnings, err := requestMessage(md, body)
+		if err != nil {
+			return nil, nil, err
+		}
+		return []*dynamicpb.Message{in}, warnings, nil
+	}
+	var elements []json.RawMessage
+	if err := json.Unmarshal(trimmed, &elements); err != nil {
+		return nil, nil, &BadBodyError{Detail: "the array of messages is not valid JSON: " + err.Error()}
+	}
+	var out []*dynamicpb.Message
+	var warnings []string
+	for i, el := range elements {
+		in, w, err := requestMessage(md, el)
+		var bad *BadBodyError
+		if errors.As(err, &bad) {
+			return nil, nil, &BadBodyError{Detail: fmt.Sprintf("message %d: %s", i+1, bad.Detail)}
+		}
+		if err != nil {
+			return nil, nil, err
+		}
+		out = append(out, in)
+		for _, text := range w {
+			warnings = append(warnings, fmt.Sprintf("message %d: %s", i+1, text))
+		}
+	}
+	return out, warnings, nil
 }
 
 // requestMessage converts the JSON into the method's request message. A
@@ -187,6 +252,17 @@ func statusOf(err error) (codes.Code, string) {
 	return st.Code(), st.Message()
 }
 
+// decodeBase64 reads standard or URL-safe base64, padded or not.
+func decodeBase64(s string) ([]byte, error) {
+	s = strings.TrimRight(strings.TrimSpace(s), "=")
+	if raw, err := base64.RawStdEncoding.DecodeString(s); err == nil {
+		return raw, nil
+	}
+	return base64.RawURLEncoding.DecodeString(s)
+}
+
+// headersOf lists metadata in name order; the value of a binary (-bin) header
+// is shown as base64, as the bytes are not text.
 func headersOf(md metadata.MD) []transport.Header {
 	names := make([]string, 0, len(md))
 	for name := range md {
@@ -196,6 +272,9 @@ func headersOf(md metadata.MD) []transport.Header {
 	var out []transport.Header
 	for _, name := range names {
 		for _, v := range md[name] {
+			if strings.HasSuffix(name, "-bin") {
+				v = base64.StdEncoding.EncodeToString([]byte(v))
+			}
 			out = append(out, transport.Header{Name: name, Value: v})
 		}
 	}
@@ -206,22 +285,65 @@ func headersOf(md metadata.MD) []transport.Header {
 // more will come, so waiting for more messages is pointless.
 var errStreamEnded = errors.New("the stream ended")
 
-// runStream sends the request and collects the stream.
-func runStream(ctx context.Context, conn *grpc.ClientConn, path string, md protoreflect.MethodDescriptor, in *dynamicpb.Message, c Call, res *Result) error {
+// runClientStream sends the messages and reads the one response.
+func runClientStream(ctx context.Context, conn *grpc.ClientConn, path string, md protoreflect.MethodDescriptor, in []*dynamicpb.Message, c Call, res *Result) {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
-	stream, err := conn.NewStream(ctx, &grpc.StreamDesc{ServerStreams: true}, path)
+	stream, err := conn.NewStream(ctx, &grpc.StreamDesc{ClientStreams: true}, path)
+	if err != nil {
+		res.Code, res.Message = statusOf(err)
+		return
+	}
+	if err := sendAll(stream, in); err != nil {
+		res.Code, res.Message = statusOf(err)
+		return
+	}
+	reply := dynamicpb.NewMessage(md.Output())
+	err = stream.RecvMsg(reply)
+	if h, herr := stream.Header(); herr == nil {
+		res.Header = headersOf(h)
+	}
+	res.Trailer = headersOf(stream.Trailer())
+	res.Code, res.Message = statusOf(err)
+	if err != nil {
+		return
+	}
+	if body, jerr := jsonOf(reply); jerr == nil {
+		res.Messages = append(res.Messages, transport.Message{Direction: "received", At: c.now(), Body: body, Headers: res.Header})
+	}
+}
+
+// sendAll sends the messages and closes the sending side. When the server
+// ends the call early, SendMsg reports io.EOF and the real status is read by
+// the receiver, so that is not an error here.
+func sendAll(stream grpc.ClientStream, in []*dynamicpb.Message) error {
+	for _, m := range in {
+		if err := stream.SendMsg(m); err != nil {
+			if errors.Is(err, io.EOF) {
+				return nil
+			}
+			return err
+		}
+	}
+	return stream.CloseSend()
+}
+
+// runStream sends the request or requests and collects the stream. A call that
+// streams both ways sends from its own goroutine, so a server that answers
+// while the requests are still going out is read at the same time.
+func runStream(ctx context.Context, conn *grpc.ClientConn, path string, md protoreflect.MethodDescriptor, in []*dynamicpb.Message, c Call, res *Result) error {
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	stream, err := conn.NewStream(ctx, &grpc.StreamDesc{ServerStreams: true, ClientStreams: md.IsStreamingClient()}, path)
 	if err != nil {
 		res.Code, res.Message = statusOf(err)
 		return nil
 	}
-	if err := stream.SendMsg(in); err != nil {
-		res.Code, res.Message = statusOf(err)
-		return nil
-	}
-	if err := stream.CloseSend(); err != nil {
-		res.Code, res.Message = statusOf(err)
-		return nil
+	if !md.IsStreamingClient() {
+		if err := sendAll(stream, in); err != nil {
+			res.Code, res.Message = statusOf(err)
+			return nil
+		}
 	}
 	// Without a count to wait for, a stream is read until the server ends it, the
 	// timeout passes or the call is cancelled, and the messages that came are the
@@ -238,13 +360,22 @@ func runStream(ctx context.Context, conn *grpc.ClientConn, path string, md proto
 		}
 	}
 	incoming := make(chan transport.Message)
-	fail := make(chan error, 1)
+	fail := make(chan error, 2)
 	var done sync.WaitGroup
 	done.Add(1)
 	go func() {
 		defer done.Done()
 		readStream(ctx, stream, md, c.now, incoming, fail)
 	}()
+	if md.IsStreamingClient() {
+		done.Add(1)
+		go func() {
+			defer done.Done()
+			if err := sendAll(stream, in); err != nil {
+				fail <- err
+			}
+		}()
+	}
 
 	kept, werr := transport.Wait(ctx, rc, incoming, fail)
 	cancel()

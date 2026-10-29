@@ -6,22 +6,38 @@ import "time"
 
 // Run is the report of one run (a flow run or a standalone send).
 type Run struct {
-	ID         string        `json:"id"`
-	Kind       string        `json:"kind"` // "flow" or "send"
-	FlowID     string        `json:"flow_id,omitempty"`
-	FlowPath   string        `json:"flow_path,omitempty"`
-	FlowName   string        `json:"flow_name,omitempty"`
-	Collection string        `json:"collection,omitempty"`
-	Env        string        `json:"env,omitempty"`
-	Status     string        `json:"status"`
-	Seed       uint64        `json:"seed"`
-	Started    time.Time     `json:"started,omitzero"`
-	Duration   time.Duration `json:"-"`
-	Nodes      []Node        `json:"nodes"`
-	Warnings   []Diagnostic  `json:"warnings,omitempty"`
-	Notes      []Note        `json:"notes,omitempty"`
-	Versions   []VersionUse  `json:"versions,omitempty"`
-	Aborted    *Abort        `json:"aborted,omitempty"`
+	ID         string `json:"id"`
+	Kind       string `json:"kind"` // "flow" or "send"
+	FlowID     string `json:"flow_id,omitempty"`
+	FlowPath   string `json:"flow_path,omitempty"`
+	FlowName   string `json:"flow_name,omitempty"`
+	Collection string `json:"collection,omitempty"`
+	Env        string `json:"env,omitempty"`
+	// Overlay is the run-level flowi overlay the run was started with, if any.
+	Overlay  string        `json:"overlay,omitempty"`
+	Status   string        `json:"status"`
+	Seed     uint64        `json:"seed"`
+	Started  time.Time     `json:"started,omitzero"`
+	Duration time.Duration `json:"-"`
+	Nodes    []Node        `json:"nodes"`
+	// Vars are the flow's variables when the run ended, masked: what a later
+	// partial run needs to carry on from here.
+	Vars map[string]any `json:"vars,omitempty"`
+	// Outputs are the flow's declared outputs as the run ended, in declared
+	// order and masked. One that could not be worked out (the run failed
+	// before it had its value) is left out, never filled with a wrong value.
+	Outputs  []OutputValue `json:"outputs,omitempty"`
+	Warnings []Diagnostic  `json:"warnings,omitempty"`
+	Notes    []Note        `json:"notes,omitempty"`
+	Versions []VersionUse  `json:"versions,omitempty"`
+	Aborted  *Abort        `json:"aborted,omitempty"`
+}
+
+// OutputValue is one declared output of a finished run.
+type OutputValue struct {
+	Name  string `json:"name"`
+	Type  string `json:"type,omitempty"`
+	Value any    `json:"value"`
 }
 
 // Node is one node instance. Containers group their children in Lanes
@@ -33,6 +49,7 @@ type Node struct {
 	Name        string         `json:"name,omitempty"`
 	Status      string         `json:"status"`
 	Handled     bool           `json:"handled,omitempty"` // failed, but on_error let the run continue
+	Reason      string         `json:"reason,omitempty"`  // why a skipped node was skipped, when the person chose it
 	Started     time.Time      `json:"started,omitzero"`
 	Duration    time.Duration  `json:"-"`
 	Outputs     map[string]any `json:"outputs,omitempty"`

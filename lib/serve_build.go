@@ -102,7 +102,7 @@ func (b *serveBuild) assembleReplay() error {
 	}
 	b.replayLn, b.s.replayAddr = ln, ln.Addr().String()
 	ro := replay.Options{
-		Collections: b.w.Collections, DataDir: b.w.DataDir, Latency: b.o.Latency, Sequence: b.o.Sequence, CORS: b.o.CORS,
+		Collections: b.w.Collections, DataDir: b.w.DataDir, Latency: b.o.Latency, Faults: b.o.Faults, Sequence: b.o.Sequence, CORS: b.o.CORS,
 		Log: b.s.traffic, Logger: b.log, Sleep: b.o.replaySleep, Hosts: loopbackHosts(b.s.replayAddr),
 	}
 	if b.o.Record != "" {
@@ -114,6 +114,9 @@ func (b *serveBuild) assembleReplay() error {
 			return fmt.Errorf("%w: the record upstream is the replayer itself; give the real API's URL", ErrInvalidServeOptions)
 		}
 		rec := &replay.Recorder{Upstream: upstream}
+		if b.o.RecordHAR != "" {
+			rec.Tape = &replay.Tape{Path: b.o.RecordHAR}
+		}
 		target, err := b.w.recordCollection(b.o.RecordTo)
 		if err != nil {
 			return err

@@ -1,22 +1,22 @@
 item "collection Shop API" imported at 1:1
-  warning FLW-IMPORT-001 1:1 collection pre-request script has no Flow-I equivalent and was left out: scripts are JavaScript; use hooks and extract or assert nodes instead
+  warning FLW-IMPORT-001 1:1 collection pre-request script has no Flowi equivalent and was left out: scripts are JavaScript; use hooks and extract or assert nodes instead
   warning FLW-IMPORT-006 1:1 variable api_secret looked like a credential and was replaced by a secret declaration
 item "Auth/Login" imported at 18:9
   warning FLW-IMPORT-006 18:9 saved response OK (1 values) looked like a credential and was replaced by (redacted)
-  warning FLW-IMPORT-001 18:9 request test script has no Flow-I equivalent and was left out: scripts are JavaScript; use hooks and extract or assert nodes instead
+  warning FLW-IMPORT-001 18:9 request test script has no Flowi equivalent and was left out: scripts are JavaScript; use hooks and extract or assert nodes instead
 item "Users/Get-user" imported at 43:9
 item "Users/Get-user-orders" imported at 56:9
 item "Users/Create-user" imported at 60:9
   warning FLW-IMPORT-006 60:9 header X-Api-Key looked like a credential and was replaced by {{secret.x_api_key}}
-  warning FLW-IMPORT-001 60:9 file part avatar has no Flow-I equivalent and was kept with its path: the path is on the machine that exported the collection
-  warning FLW-IMPORT-001 60:9 dynamic variable $randomBankAccountIban has no Flow-I equivalent and was replaced by an env reference: Flow-I has no generator for it
+  warning FLW-IMPORT-001 60:9 file part avatar has no Flowi equivalent and was kept with its path: the path is on the machine that exported the collection
+  warning FLW-IMPORT-001 60:9 dynamic variable $randomBankAccountIban has no Flowi equivalent and was replaced by an env reference: Flowi has no generator for it
 item "Users/Search-users" imported at 74:9
   warning FLW-IMPORT-006 74:9 basic auth password looked like a credential and was replaced by {{secret.password}}
 item "Users/Broken" skipped at 83:9
   error FLW-IMPORT-005 83:9 Users/Broken was skipped: the request has no URL
 item "Graph" imported at 89:5
 item "Partner" imported at 98:5
-  warning FLW-IMPORT-001 98:5 auth type oauth2 has no Flow-I equivalent and was left out: set the credentials up with headers or a pre-hook
+  warning FLW-IMPORT-001 98:5 auth type oauth2 has no Flowi equivalent and was left out: a token fetched in Postman or a grant Flowi does not have (implicit) has no Flowi equivalent; use client credentials, password or authorization code, or send the token as a Bearer header
 item "Empty thing" skipped at 106:5
   error FLW-IMPORT-005 106:5 Empty thing was skipped: it is neither a request nor a folder
 --- request Auth/Login

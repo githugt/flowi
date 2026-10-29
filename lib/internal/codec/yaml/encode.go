@@ -65,6 +65,25 @@ func fieldsToYAML(fields []model.Field) yaml.MapSlice {
 	return out
 }
 
+// multipartToYAML writes the parts as a mapping, or, when a name repeats, as a
+// list of one-entry mappings: a mapping cannot hold a key twice.
+func multipartToYAML(parts []model.Field) any {
+	seen := map[string]bool{}
+	repeated := false
+	for _, p := range parts {
+		repeated = repeated || seen[p.Key]
+		seen[p.Key] = true
+	}
+	if !repeated {
+		return fieldsToYAML(parts)
+	}
+	out := make([]any, 0, len(parts))
+	for _, p := range parts {
+		out = append(out, fieldsToYAML([]model.Field{p}))
+	}
+	return out
+}
+
 func valueToYAML(v any) any {
 	switch x := v.(type) {
 	case []model.Field:

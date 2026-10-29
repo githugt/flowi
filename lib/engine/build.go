@@ -92,6 +92,8 @@ type built struct {
 	missingSecrets []string
 	// parts are a multipart body's rendered fields, kept for previews.
 	parts []httpx.Part
+	// auth is the version's auth block with its parameters rendered, nil when it has none.
+	auth *model.Auth
 }
 
 // build renders a request version. Diagnostics are user errors (undefined
@@ -109,7 +111,23 @@ func build(in buildInput) (built, diag.List) {
 	shown = b.addDefaultHeaders(header, shown)
 	req := httpx.Request{Method: in.version.Method, URL: requestURL, Header: header, Body: body}
 	sent := SentRequest{Method: in.version.Method, URL: shownURL, Header: shown, Body: sentBody}
-	return built{request: req, sent: sent, tainted: b.tainted, bodyText: b.bodyText, missingSecrets: b.missingSecrets, parts: b.parts}, b.diags
+	return built{request: req, sent: sent, tainted: b.tainted, bodyText: b.bodyText, missingSecrets: b.missingSecrets, parts: b.parts, auth: b.auth()}, b.diags
+}
+
+// auth renders the parameters of the version's auth block (credentials come
+// from templates such as {{secret.client_secret}}); nil when there is none.
+func (b *builder) auth() *model.Auth {
+	a := b.in.version.Auth
+	if a == nil {
+		return nil
+	}
+	out := model.Auth{Type: a.Type, Params: make([]model.KeyValue, 0, len(a.Params))}
+	for _, kv := range a.Params {
+		if v, ok := b.text("auth "+kv.Key, "auth:"+kv.Key, kv.Value); ok {
+			out.Params = append(out.Params, model.KeyValue{Key: kv.Key, Value: v})
+		}
+	}
+	return &out
 }
 
 type builder struct {
@@ -380,13 +398,25 @@ func (b *builder) part(f model.Field) (httpx.Part, bool) {
 		text, ok := b.text(desc, "body", v)
 		return httpx.Part{Name: f.Key, Value: text}, ok
 	case map[string]any:
-		file, _ := v["file"].(string)
-		ctype, _ := v["content_type"].(string)
-		path, ok := b.text(desc, "body", file)
-		return httpx.Part{Name: f.Key, File: path, ContentType: ctype}, ok && path != ""
+		return b.filePart(f.Key, desc, v)
+	case []model.Field:
+		// A request file decodes a mapping as its ordered fields.
+		fields := make(map[string]any, len(v))
+		for _, field := range v {
+			fields[field.Key] = field.Value
+		}
+		return b.filePart(f.Key, desc, fields)
 	}
 	b.add(diag.CodeTemplateSyntax, map[string]string{"field": b.field(desc), "detail": "must be text or {file, content_type}"})
 	return httpx.Part{}, false
+}
+
+// filePart reads {file, content_type} of a multipart part.
+func (b *builder) filePart(name, desc string, v map[string]any) (httpx.Part, bool) {
+	file, _ := v["file"].(string)
+	ctype, _ := v["content_type"].(string)
+	path, ok := b.text(desc, "body", file)
+	return httpx.Part{Name: name, File: path, ContentType: ctype}, ok && path != ""
 }
 
 func (b *builder) fileBody(src string) (httpx.BodySource, *Body) {

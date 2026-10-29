@@ -160,6 +160,9 @@ func (s completionSet) addFlow(c model.Collection, f model.Flow) {
 	for _, in := range f.Inputs {
 		s.add("inputs."+in.Name, "flow input")
 	}
+	for _, kv := range c.Manifest.Variables {
+		s.add("collection_var."+kv.Key, "collection variable")
+	}
 	for _, e := range c.Environments {
 		for _, v := range e.Vars {
 			if v.Secret {

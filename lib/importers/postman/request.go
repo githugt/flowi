@@ -12,7 +12,7 @@ import (
 	"github.com/githugt/flowi-lib/model"
 )
 
-// translator turns one request's parts into Flow-I values.
+// translator turns one request's parts into Flowi values.
 type translator struct {
 	importers.Translator
 	it       *importers.Item
@@ -75,8 +75,67 @@ func (t *translator) auth(a *auth, v *model.RequestVersion) {
 		v.Headers = append(v.Headers, model.KeyValue{Key: "Authorization", Value: t.Basic(a.param("username"), a.param("password"))})
 	case "apikey":
 		t.apiKey(a, v)
+	case "digest", "hawk", "oauth1", "awsv4", "oauth2":
+		t.authBlock(a, v)
 	default:
 		t.it.Unmapped("auth type "+a.Type, "left out", "set the credentials up with headers or a pre-hook")
+	}
+}
+
+// authBlock maps the schemes Flowi signs or negotiates itself to an auth
+// block. An OAuth 2.0 token already fetched, or a grant that needs a browser,
+// has no block and is reported.
+func (t *translator) authBlock(a *auth, v *model.RequestVersion) {
+	switch a.Type {
+	case "digest":
+		v.Auth = t.AuthBlock(model.AuthDigest, "username", a.param("username"), "password", a.param("password"))
+	case "hawk":
+		v.Auth = t.AuthBlock(model.AuthHawk, "id", a.param("authId"), "key", a.param("authKey"),
+			"algorithm", strings.ToLower(strings.ReplaceAll(a.param("algorithm"), "-", "")), "ext", a.param("extraData"), "app", a.param("app"), "dlg", a.param("delegation"))
+	case "oauth1":
+		v.Auth = t.AuthBlock(model.AuthOAuth1, "consumer_key", a.param("consumerKey"), "consumer_secret", a.param("consumerSecret"),
+			"token", a.param("token"), "token_secret", a.param("tokenSecret"), "signature_method", a.param("signatureMethod"),
+			"realm", a.param("realm"), "verifier", a.param("verifier"), "callback", a.param("callback"))
+	case "awsv4":
+		v.Auth = t.AuthBlock(model.AuthAWSSigV4, "access_key_id", a.param("accessKey"), "secret_access_key", a.param("secretKey"),
+			"session_token", a.param("sessionToken"), "region", a.param("region"), "service", a.param("service"))
+	case "oauth2":
+		t.oauth2(a, v)
+	}
+}
+
+func (t *translator) oauth2(a *auth, v *model.RequestVersion) {
+	switch a.param("grant_type") {
+	case "authorization_code", "authorization_code_with_pkce":
+		t.authorizationCode(a, v)
+		return
+	}
+	grant := map[string]string{"client_credentials": "client_credentials", "password_credentials": "password"}[a.param("grant_type")]
+	if grant == "" {
+		t.it.Unmapped("auth type oauth2", "left out", "a token fetched in Postman or a grant Flowi does not have (implicit) has no Flowi equivalent; use client credentials, password or authorization code, or send the token as a Bearer header")
+		return
+	}
+	clientAuth := "basic"
+	if a.param("client_authentication") == "body" {
+		clientAuth = "body"
+	}
+	v.Auth = t.AuthBlock(model.AuthOAuth2, "grant", grant, "token_url", a.param("accessTokenUrl"), "client_id", a.param("clientId"),
+		"client_secret", a.param("clientSecret"), "scope", a.param("scope"), "username", a.param("username"), "password", a.param("password"),
+		"client_auth", clientAuth)
+}
+
+// authorizationCode maps Postman's authorization code grant. Flowi always
+// redirects to the loopback address, so the redirect address Postman used is
+// reported: the provider must be told about Flowi's.
+func (t *translator) authorizationCode(a *auth, v *model.RequestVersion) {
+	pkce := "off"
+	if a.param("grant_type") == "authorization_code_with_pkce" {
+		pkce = "on"
+	}
+	v.Auth = t.AuthBlock(model.AuthOAuth2, "grant", "authorization_code", "authorization_url", a.param("authUrl"), "token_url", a.param("accessTokenUrl"),
+		"client_id", a.param("clientId"), "client_secret", a.param("clientSecret"), "scope", a.param("scope"), "pkce", pkce)
+	if redirect := a.param("redirect_uri"); redirect != "" {
+		t.it.Unmapped("OAuth 2.0 redirect address "+redirect, "not used", "Flowi redirects to http://127.0.0.1:<port>/callback; register that address with the provider and set redirect_port to its port")
 	}
 }
 
@@ -126,7 +185,7 @@ func (t *translator) body(b *body, v *model.RequestVersion) model.Body {
 	case "graphql":
 		return t.graphQL(b, v)
 	default:
-		t.it.Unmapped("body mode "+b.Mode, "left out", "Flow-I has no equivalent")
+		t.it.Unmapped("body mode "+b.Mode, "left out", "Flowi has no equivalent")
 	}
 	return model.Body{}
 }

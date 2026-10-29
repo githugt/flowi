@@ -4,6 +4,7 @@ package engine
 
 import (
 	"context"
+	"crypto/tls"
 	"errors"
 	"net/http"
 	"sort"
@@ -43,6 +44,9 @@ type builtGRPC struct {
 	sent    SentRequest // as recorded: secret-bearing fields already masked
 	missing []string    // declared secrets with no value (FLW-SEC-001)
 	method  string
+	// auth is the auth block with its parameters rendered; only mutual TLS
+	// applies to a gRPC call.
+	auth *model.Auth
 }
 
 // sendGRPC is everything after the pre-hooks for a gRPC request: render, make
@@ -62,6 +66,9 @@ func (x *execution) sendGRPC(ctx context.Context, post []HookRef) {
 			x.r.emit(MessageReceived{RunID: x.r.runID, Path: x.c.path, RequestID: string(x.c.request.ID), Seq: seq, Depth: x.c.depth,
 				Message: recordMessage(m).masked(x.r.secrets.current())})
 		}
+		if len(x.messageHooks) > 0 {
+			b.call.Receive.OnKept = func(m transport.Message) error { return x.runMessageHooks(ctx, seq, m) }
+		}
 	}
 	res, err := x.r.grpcRunner().Run(ctx, b.call)
 	if ctx.Err() != nil {
@@ -77,7 +84,9 @@ func (x *execution) sendGRPC(ctx context.Context, post []HookRef) {
 	x.emitGRPCReceived(res, err)
 	x.observeGRPC(res)
 	if err != nil {
-		x.failGRPC(err, b, res)
+		if !errors.Is(err, errMessageHook) {
+			x.failGRPC(err, b, res) // a failed message hook has reported itself
+		}
 		x.save() // the messages that did arrive are worth keeping
 		return
 	}
@@ -111,6 +120,8 @@ func grpcOutcome(res grpcx.Result, err error) string {
 	switch {
 	case errors.Is(err, transport.ErrTimeout), err == nil && res.Code == codes.DeadlineExceeded:
 		return OutcomeTimeout
+	case errors.Is(err, errMessageHook):
+		return OutcomeStopped
 	case err != nil:
 		return OutcomeError
 	case res.Code == codes.OK:
@@ -182,7 +193,7 @@ func (x *execution) renderGRPC(lenient bool) (builtGRPC, diag.List) {
 	if err != nil {
 		diags = append(diags, diag.New(diag.CodeHTTPFailed, diag.Location{}, map[string]string{"detail": err.Error()}))
 	}
-	b.call.TLS = tlsCfg
+	b.call.TLS = withClientCert(tlsCfg, b.auth, x.c.collection.Root, &diags)
 	b.call.Clock = x.r.deps.Clock
 	b.call.Timeout = x.cfg.timeout
 	if g := x.version.GRPC; g.Receive != nil {
@@ -206,7 +217,7 @@ func buildGRPC(in buildInput) (builtGRPC, diag.List) {
 	method, _ := b.text("method", "method", g.Method)
 	meta, shownMeta := b.headers()
 	src, shownBody := b.body()
-	call := grpcx.Call{Server: server, Method: method, Root: in.root, Protos: g.Proto, Imports: g.Import, Metadata: metadataOf(meta)}
+	call := grpcx.Call{Server: server, Method: method, Root: in.root, Protos: g.Proto, Imports: g.Import, Metadata: metadataOf(meta), Web: g.Web}
 	if src != nil {
 		data, err := readBody(src)
 		if err != nil {
@@ -222,7 +233,7 @@ func buildGRPC(in buildInput) (builtGRPC, diag.List) {
 		rc := normalizedReceive(g.Receive)
 		call.Receive = &transport.Receive{Count: rc.Count, Timeout: rc.Timeout, MaxBytes: asyncMaxBytes}
 	}
-	out := builtGRPC{call: call, method: method, missing: b.missingSecrets}
+	out := builtGRPC{call: call, method: method, missing: b.missingSecrets, auth: b.auth()}
 	out.sent = SentRequest{Method: model.ProtocolVerbGRPC, URL: shownGRPCTarget(b, server, method), Header: shownMeta, Body: shownBody}
 	return out, b.diags
 }
@@ -257,7 +268,7 @@ func (x *execution) newGRPCRecord(b builtGRPC, res grpcx.Result, err error) *Rec
 	rec := &Record{
 		ID: x.r.deps.NewID(), RunID: x.r.runID, CollectionID: x.c.collection.Manifest.ID, RequestID: x.c.request.ID,
 		RequestPath: x.c.request.Path, Version: x.version.Label, VersionSource: x.source, At: x.r.deps.Clock(),
-		Request: b.sent, Kind: KindGRPC, Proto: "grpc", Outcome: grpcOutcome(res, err),
+		Request: b.sent, Kind: KindGRPC, Proto: "grpc", Outcome: grpcOutcome(res, err), Overlay: x.c.overlayName(),
 		GRPCCode: grpcCodeName(res.Code), GRPCMessage: res.Message,
 		Timings:  Timings{Connect: res.Connect, Total: res.Total},
 		Attempts: []AttemptRecord{{Duration: res.Total}},
@@ -373,7 +384,7 @@ func GRPCCallOf(d Deps, in SendInput, includeSecrets bool) (grpcx.Call, diag.Lis
 	if !includeSecrets {
 		r.secrets.lockErr = errPreviewLocked
 	}
-	x, diags := r.prepare(call{collection: in.Collection, request: in.Request, pinned: in.PinnedVersion, with: in.With, hooks: in.Hooks})
+	x, diags := r.prepare(sendCall(in))
 	if diags.HasErrors() {
 		return grpcx.Call{}, diags
 	}
@@ -382,4 +393,21 @@ func GRPCCallOf(d Deps, in SendInput, includeSecrets bool) (grpcx.Call, diag.Lis
 	}
 	b, diags := x.renderGRPC(true)
 	return b.call, diags
+}
+
+// withClientCert adds the client certificate a mutual TLS auth block names to
+// the TLS settings of a gRPC call; a plaintext call ignores TLS settings, so
+// the certificate is only used when the server is reached over TLS.
+func withClientCert(cfg *tls.Config, auth *model.Auth, root string, diags *diag.List) *tls.Config {
+	if auth == nil || auth.Type != model.AuthMutualTLS || cfg == nil {
+		return cfg
+	}
+	cert, err := loadClientCert(*auth, root)
+	if err != nil {
+		*diags = append(*diags, diag.New(diag.CodeAuthInvalid, diag.Location{}, map[string]string{"detail": err.Error()}))
+		return cfg
+	}
+	out := cfg.Clone()
+	out.Certificates = append(out.Certificates, cert)
+	return out
 }

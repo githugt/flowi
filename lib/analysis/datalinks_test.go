@@ -14,9 +14,9 @@ func param(key string, value any) model.Field { return model.Field{Key: key, Val
 func TestDataLinks_should_link_the_reader_of_an_output_or_a_variable_to_its_maker(t *testing.T) {
 	f := model.Flow{Nodes: []model.Node{
 		{ID: "login", Type: "request", Request: &model.RequestCall{}},
-		{ID: "grab", Type: "extract", Params: []model.Field{param("token", "{{nodes.login.body.token}}")}},
-		{ID: "shout", Type: "transform", Params: []model.Field{param("value", "{{upper(vars.token)}}"), param("into", "loud")}},
-		{ID: "show", Type: "log", Params: []model.Field{param("value", "{{vars.loud}} and {{nodes.shout.value}}")}},
+		{ID: "grab", Type: "set", Values: []model.SetValue{{Name: "token", Value: "{{nodes.login.body.token}}"}}},
+		{ID: "shout", Type: "set", Values: []model.SetValue{{Name: "loud", Value: "{{upper(vars.token)}}"}}},
+		{ID: "show", Type: "log", Params: []model.Field{param("value", "{{vars.loud}} and {{nodes.shout.loud}}")}},
 	}}
 
 	got := DataLinks(f)
@@ -25,19 +25,19 @@ func TestDataLinks_should_link_the_reader_of_an_output_or_a_variable_to_its_make
 		{From: "login", To: "grab", Via: "login.body"},
 		{From: "grab", To: "shout", Via: "token"},
 		{From: "shout", To: "show", Via: "loud"},
-		{From: "shout", To: "show", Via: "shout.value"},
+		{From: "shout", To: "show", Via: "shout.loud"},
 	}
 	if !slices.Equal(got, want) {
 		t.Fatalf("got %+v, want %+v", got, want)
 	}
 }
 
-// Behaviour: values a generate node makes are fresh, not taken from another
-// step, so they are not drawn as a link; what a generate node reads still is.
+// Behaviour: values a generated set value makes are fresh, not taken from another
+// step, so they are not drawn as a link; what a generator reads still is.
 func TestDataLinks_should_not_link_generated_values_but_link_what_a_generator_reads(t *testing.T) {
 	f := model.Flow{Nodes: []model.Node{
 		{ID: "login", Type: "request", Request: &model.RequestCall{}},
-		{ID: "make", Type: "generate", Params: []model.Field{param("email", "{{$email}}"), param("tag", "{{nodes.login.status}}")}},
+		{ID: "make", Type: "set", Values: []model.SetValue{{Name: "email", From: "generate", Value: "{{$email}}"}, {Name: "tag", From: "generate", Value: "{{nodes.login.status}}"}}},
 		{ID: "use", Type: "log", Params: []model.Field{param("value", "{{vars.email}}")}},
 	}}
 

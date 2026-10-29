@@ -3,6 +3,7 @@
 package yamlcodec
 
 import (
+	"github.com/goccy/go-yaml"
 	"github.com/goccy/go-yaml/ast"
 
 	"github.com/githugt/flowi-lib/model"
@@ -48,9 +49,10 @@ func (m *mapping) flowNode() model.Node {
 		Timeout:     m.duration("timeout"),
 		Attach:      m.str("attach"),
 		AttachAt:    m.str("attach_at"),
+		Color:       m.str("color"),
 	}
 	switch n.Type {
-	case "request":
+	case "request", "fuzz":
 		n.Request = m.requestCall()
 	case "subflow":
 		n.Subflow = m.subflowCall()
@@ -60,14 +62,56 @@ func (m *mapping) flowNode() model.Node {
 		n.Branches = m.branches()
 	case "condition":
 		n.Then, n.Else, n.Cases = m.nodes("then"), m.nodes("else"), m.cases()
+	case "set":
+		n.Values = m.setValues()
 	}
 	n.Params = m.d.rawFields(&mapping{d: m.d, entries: m.rest()})
 	return n
 }
 
+// setValues reads a set node's list of values. A value without a source is
+// an expression; the keys that name a part of a response are in, path,
+// header, cookie and regex.
+func (m *mapping) setValues() []model.SetValue {
+	e, ok := m.take("values")
+	if !ok {
+		return nil
+	}
+	items, ok := m.d.sequence(e.value, e.path, "values")
+	if !ok {
+		return nil
+	}
+	out := make([]model.SetValue, 0, len(items))
+	for i, item := range items {
+		vm, ok := m.d.mapping(item, indexPath(e.path, i), "values")
+		if !ok {
+			continue
+		}
+		out = append(out, vm.setValue())
+		vm.closeStrict()
+	}
+	return out
+}
+
+func (m *mapping) setValue() model.SetValue {
+	v := model.SetValue{
+		Name: m.str("name"), From: m.str("from"), Where: m.str("in"),
+		Path: m.str("path"), Header: m.str("header"), Cookie: m.str("cookie"), Regex: m.str("regex"),
+		Seed: m.integer("seed"),
+	}
+	if e, ok := m.take("value"); ok {
+		v.Value = m.d.raw(e.value, e.path, "value")
+	}
+	return v
+}
+
 func (m *mapping) requestCall() *model.RequestCall {
 	call := &model.RequestCall{
 		Version: m.versionLabel("version"),
+		Overlay: m.str("overlay"),
+		Open:    m.str("open"),
+		Over:    m.str("over"),
+		Close:   m.boolean("close"),
 		Hooks:   m.hookControl(),
 		With:    m.keyValues("with"),
 		Headers: m.keyValues("headers"),
@@ -159,11 +203,13 @@ func encodeNode(n model.Node) any {
 	o.put("on_error", n.OnError)
 	o.put("attach", n.Attach)
 	o.put("attach_at", n.AttachAt)
+	o.put("color", n.Color)
 	if n.Timeout > 0 {
 		o.put("timeout", formatDuration(n.Timeout))
 	}
 	encodeRequestCall(&o, n.Request)
 	encodeSubflowCall(&o, n.Subflow)
+	o.put("values", encodeSetValues(n.Values))
 	// Type-specific options come before nested node lists so a container reads
 	// as "configuration, then body".
 	o.items = append(o.items, fieldsToYAML(n.Params)...)
@@ -175,12 +221,38 @@ func encodeNode(n model.Node) any {
 	return o.items
 }
 
+func encodeSetValues(values []model.SetValue) []any {
+	out := make([]any, 0, len(values))
+	for _, v := range values {
+		var o omap
+		o.put("name", v.Name)
+		o.put("from", v.From)
+		o.put("in", v.Where)
+		o.put("path", v.Path)
+		o.put("header", v.Header)
+		o.put("cookie", v.Cookie)
+		o.put("regex", v.Regex)
+		if v.Value != nil {
+			o.items = append(o.items, yaml.MapItem{Key: "value", Value: valueToYAML(v.Value)})
+		}
+		if v.Seed != 0 {
+			o.put("seed", v.Seed)
+		}
+		out = append(out, o.items)
+	}
+	return out
+}
+
 func encodeRequestCall(o *omap, c *model.RequestCall) {
 	if c == nil {
 		return
 	}
 	o.put("request", encodeRef(c.Request))
 	o.put("version", c.Version)
+	o.put("overlay", c.Overlay)
+	o.put("open", c.Open)
+	o.put("over", c.Over)
+	o.put("close", c.Close)
 	o.put("hooks", encodeHookControl(c.Hooks))
 	o.put("with", keyValues(c.With))
 	o.put("headers", keyValues(c.Headers))

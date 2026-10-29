@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 // Package schema_test keeps the published JSON Schemas in step with what
-// Flow-I actually accepts.
+// Flowi actually accepts.
 package schema_test
 
 import (
@@ -194,7 +194,7 @@ func normalise(v any) any {
 }
 
 func TestSchemas_should_reject_inline_nodes_missing_required_params(t *testing.T) {
-	for _, file := range []string{"set-no-target.yaml", "assert-no-check.yaml", "log-no-value.yaml", "extract-no-name.yaml"} {
+	for _, file := range []string{"set-no-target.yaml", "assert-no-check.yaml", "log-no-value.yaml", "set-value-no-name.yaml"} {
 		t.Run(file, func(t *testing.T) {
 			err := compile(t, "manifest").Validate(yamlInstance(t, "testdata/invalid-inline/"+file))
 

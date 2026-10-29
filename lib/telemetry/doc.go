@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-// Package telemetry is Flow-I's opt-in usage reporting.
+// Package telemetry is Flowi's opt-in usage reporting.
 //
 // It is off unless the user sets the telemetry setting to minimal or full,
 // and nothing leaves the machine unless telemetry_endpoint is also set. What

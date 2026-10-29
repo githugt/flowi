@@ -55,7 +55,7 @@ func PreviewSend(d Deps, in SendInput, includeSecrets bool) Preview {
 	if !includeSecrets {
 		r.secrets.lockErr = errPreviewLocked
 	}
-	x, diags := r.prepare(call{collection: in.Collection, request: in.Request, pinned: in.PinnedVersion, with: in.With, hooks: in.Hooks})
+	x, diags := r.prepare(sendCall(in))
 	if diags.HasErrors() {
 		return Preview{Diags: diags}
 	}

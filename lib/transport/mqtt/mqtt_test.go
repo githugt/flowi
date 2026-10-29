@@ -9,7 +9,6 @@ import (
 	"net"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"testing"
 	"time"
 
@@ -48,10 +47,17 @@ func broker(t *testing.T, rules auth.AuthRules) (*mochi.Server, string) {
 // listener serves a net.Listener to the broker. mochi's own TCP listener
 // shares one error variable between its accept loop and the goroutines it
 // starts, which the race detector rightly flags.
+//
+// It closes the connections it accepted itself, not through mochi's
+// closeClients: that path (Clients.GetByListener, then Len) takes the clients'
+// read lock twice, so a client connecting at that moment queues a write lock
+// between the two and the broker deadlocks (mochi v2.7.9, seen under CPU load).
 type listener struct {
 	id     string
 	ln     net.Listener
-	closed atomic.Bool
+	mu     sync.Mutex
+	conns  []net.Conn
+	closed bool
 }
 
 func (l *listener) Init(*slog.Logger) error { return nil }
@@ -65,14 +71,35 @@ func (l *listener) Serve(establish listeners.EstablishFn) {
 		if err != nil {
 			return
 		}
+		if !l.keep(conn) {
+			_ = conn.Close()
+			continue
+		}
 		go func() { _ = establish(l.id, conn) }()
 	}
 }
 
-func (l *listener) Close(closeClients listeners.CloseFn) {
-	if l.closed.CompareAndSwap(false, true) {
-		closeClients(l.id)
-		_ = l.ln.Close()
+// keep remembers conn so Close can end it; it reports false once closed.
+func (l *listener) keep(conn net.Conn) bool {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if l.closed {
+		return false
+	}
+	l.conns = append(l.conns, conn)
+	return true
+}
+
+func (l *listener) Close(listeners.CloseFn) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if l.closed {
+		return
+	}
+	l.closed = true
+	_ = l.ln.Close()
+	for _, c := range l.conns {
+		_ = c.Close()
 	}
 }
 

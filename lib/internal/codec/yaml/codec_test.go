@@ -6,10 +6,12 @@ import (
 	"bytes"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/githugt/flowi-lib/diag"
+	"github.com/githugt/flowi-lib/model"
 	"github.com/githugt/flowi-lib/settings"
 )
 
@@ -48,6 +50,9 @@ func TestDecodeManifest_should_round_trip_canonical_fixture(t *testing.T) {
 	}
 	if !bytes.Equal(out, data) {
 		t.Fatalf("round trip differs:\n--- got\n%s\n--- want\n%s", out, data)
+	}
+	if len(m.Variables) != 2 || m.Variables[0].Key != "region" || m.Variables[1].Value != "https://api.example.com" {
+		t.Fatalf("variables %+v", m.Variables)
 	}
 	if m.Format != 1 || len(m.DependsOn) != 2 || m.Settings["http.max_redirects"] != int64(5) {
 		t.Fatalf("unexpected manifest %+v", m)
@@ -326,5 +331,74 @@ func TestEncodeEnvironment_should_round_trip_its_colour(t *testing.T) {
 	}
 	if !bytes.Equal(out, data) {
 		t.Fatalf("round trip differs:\n%s", out)
+	}
+}
+
+func TestEncodeEnvironment_should_round_trip_extends(t *testing.T) {
+	c := newCodec()
+	data := []byte("id: 01J9ZE3M4N5P6Q7R8S9T0VWXYZ\nname: staging\nextends: base\nvars:\n  host: example.com\n")
+
+	env, diags := c.DecodeEnvironment("staging.yaml", data)
+	requireNoDiagnostics(t, diags)
+	out, err := c.EncodeEnvironment(env)
+
+	if err != nil || env.Extends != "base" || !bytes.Equal(out, data) {
+		t.Fatalf("extends %q err %v\n%s", env.Extends, err, out)
+	}
+}
+
+func TestTags_should_round_trip_on_a_flow_a_request_and_a_folder(t *testing.T) {
+	c := newCodec()
+	flow := []byte("id: 01J9ZE3M4N5P6Q7R8S9T0VWXYZ\nname: login\ntags:\n  - smoke\n  - auth\nnodes: []\n")
+	req := []byte("id: 01J9ZE3M4N5P6Q7R8S9T0VWXY0\nname: login\ntags:\n  - smoke\nversions:\n  \"1\":\n    method: GET\n    url: https://example.test\n")
+	folder := []byte("tags:\n  - slow\n")
+
+	f, fd := c.DecodeFlow("login.flow.yaml", "login", flow)
+	r, rd := c.DecodeRequest("login.req.yaml", "login", req)
+	fo, od := c.DecodeFolder("_folder.yaml", "flows", folder)
+
+	requireNoDiagnostics(t, fd)
+	requireNoDiagnostics(t, rd)
+	requireNoDiagnostics(t, od)
+	if len(f.Tags) != 2 || f.Tags[1] != "auth" || len(r.Tags) != 1 || len(fo.Tags) != 1 {
+		t.Fatalf("flow %v request %v folder %v", f.Tags, r.Tags, fo.Tags)
+	}
+	out, err := c.EncodeFolder(fo)
+	if err != nil || !bytes.Equal(out, folder) {
+		t.Fatalf("folder round trip: %q (%v)", out, err)
+	}
+}
+
+func TestEnvironment_Given_typed_values_Then_they_keep_their_type_through_a_round_trip(t *testing.T) {
+	c := newCodec()
+	data := []byte("id: 01J9ZE3M4N5P6Q7R8S9T0VWXYZ\nname: typed\nvars:\n  count: 5\n  ratio: 1.5\n  enabled: true\n  text: \"5\"\n  limits:\n    max: 3\n    tags:\n      - a\n  password:\n    secret: true\n")
+
+	env, diags := c.DecodeEnvironment("typed.yaml", data)
+	requireNoDiagnostics(t, diags)
+	out, err := c.EncodeEnvironment(env)
+
+	kinds := map[string]model.VarKind{}
+	for _, v := range env.Vars {
+		kinds[v.Name] = v.Kind
+	}
+	want := map[string]model.VarKind{"count": model.VarNumber, "ratio": model.VarNumber, "enabled": model.VarBoolean, "text": model.VarString, "limits": model.VarJSON, "password": model.VarString}
+	for name, kind := range want {
+		if kinds[name] != kind {
+			t.Errorf("%s: kind %q, want %q", name, kinds[name], kind)
+		}
+	}
+	if err != nil || !bytes.Equal(out, data) {
+		t.Fatalf("round trip differs (%v):\n%s", err, out)
+	}
+}
+
+func TestEnvironment_Given_a_typed_value_that_does_not_fit_Then_it_is_written_as_text_not_lost(t *testing.T) {
+	c := newCodec()
+	env := model.Environment{Meta: model.Meta{ID: "01J9ZE3M4N5P6Q7R8S9T0VWXYZ", Name: "x"}, Vars: []model.EnvVar{{Name: "count", Value: "five", Kind: model.VarNumber}}}
+
+	out, err := c.EncodeEnvironment(env)
+
+	if err != nil || !strings.Contains(string(out), "count: five") {
+		t.Fatalf("%v\n%s", err, out)
 	}
 }

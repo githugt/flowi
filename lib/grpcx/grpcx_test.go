@@ -117,15 +117,30 @@ func TestRun_should_send_metadata_and_return_the_response_header_and_trailer(t *
 	}
 }
 
-func TestRun_should_refuse_binary_metadata(t *testing.T) {
+func TestRun_should_send_and_return_binary_metadata_as_base64(t *testing.T) {
+	f := startServer(t, true, nil)
+	c := call(f, "acme.orders.v1.Orders/Echo", `{"id": "1"}`)
+	c.Metadata = []transport.Header{{Name: "X-Blob-Bin", Value: "AAEC/w=="}} // the bytes 00 01 02 ff
+
+	res, err := grpcx.Run(t.Context(), c)
+
+	if err != nil || res.Code != codes.OK {
+		t.Fatalf("code %v, err %v", res.Code, err)
+	}
+	if got := header(res.Header, "x-blob-bin"); got != "AAEC/w==" {
+		t.Fatalf("the server should see the bytes and send them back, got %q in %+v", got, res.Header)
+	}
+}
+
+func TestRun_should_refuse_binary_metadata_that_is_not_base64(t *testing.T) {
 	f := startServer(t, true, nil)
 	c := call(f, "acme.orders.v1.Orders/Get", `{"id": "1"}`)
-	c.Metadata = []transport.Header{{Name: "trace-bin", Value: "x"}}
+	c.Metadata = []transport.Header{{Name: "trace-bin", Value: "not base64!"}}
 
 	_, err := grpcx.Run(t.Context(), c)
 
-	if err == nil || !strings.Contains(err.Error(), "-bin") {
-		t.Fatalf("err %v, want one naming -bin metadata", err)
+	if err == nil || !strings.Contains(err.Error(), "base64") {
+		t.Fatalf("err %v, want one naming base64", err)
 	}
 }
 
@@ -308,13 +323,102 @@ func TestRun_should_name_a_missing_import(t *testing.T) {
 	}
 }
 
-func TestRun_should_refuse_a_client_streaming_method(t *testing.T) {
+func TestRun_should_send_an_array_to_a_client_streaming_method_as_many_messages(t *testing.T) {
 	f := startServer(t, true, nil)
 
-	_, err := grpcx.Run(t.Context(), call(f, "acme.orders.v1.Orders/Upload", `{}`))
+	res, err := grpcx.Run(t.Context(), call(f, "acme.orders.v1.Orders/Upload", `[{"id":"a"},{"id":"b"},{"id":"c"}]`))
 
-	if err == nil || !strings.Contains(err.Error(), "streaming") {
-		t.Fatalf("err %v, want a refusal that names client streaming", err)
+	if err != nil || res.Code != codes.OK {
+		t.Fatalf("code %v, err %v", res.Code, err)
+	}
+	var sent, received []transport.Message
+	for _, m := range res.Messages {
+		if m.Direction == "sent" {
+			sent = append(sent, m)
+		} else {
+			received = append(received, m)
+		}
+	}
+	if len(sent) != 3 || len(received) != 1 || !strings.Contains(string(received[0].Body), `"id":"c"`) || !strings.Contains(string(received[0].Body), `"seq":3`) {
+		t.Fatalf("sent %d, received %v", len(sent), received)
+	}
+}
+
+func TestRun_should_send_one_message_to_a_client_streaming_method_when_the_body_is_an_object(t *testing.T) {
+	f := startServer(t, true, nil)
+
+	res, err := grpcx.Run(t.Context(), call(f, "acme.orders.v1.Orders/Upload", `{"id":"only"}`))
+
+	if err != nil || len(res.Messages) != 2 || !strings.Contains(string(res.Messages[1].Body), `"seq":1`) {
+		t.Fatalf("messages %v, err %v", res.Messages, err)
+	}
+}
+
+func TestRun_should_send_no_messages_for_an_empty_array(t *testing.T) {
+	f := startServer(t, true, nil)
+
+	res, err := grpcx.Run(t.Context(), call(f, "acme.orders.v1.Orders/Upload", `[]`))
+
+	if err != nil || len(res.Messages) != 1 || !strings.Contains(string(res.Messages[0].Body), `"seq":0`) {
+		t.Fatalf("messages %v, err %v", res.Messages, err)
+	}
+}
+
+func TestRun_should_name_the_message_of_an_array_that_does_not_fit(t *testing.T) {
+	f := startServer(t, true, nil)
+
+	_, err := grpcx.Run(t.Context(), call(f, "acme.orders.v1.Orders/Upload", `[{"id":"a"},{"id":5}]`))
+
+	var bad *grpcx.BadBodyError
+	if !errors.As(err, &bad) || !strings.Contains(err.Error(), "message 2") {
+		t.Fatalf("err %v, want message 2 named", err)
+	}
+}
+
+func TestRun_should_collect_the_replies_of_a_bidirectional_call(t *testing.T) {
+	f := startServer(t, true, nil)
+	c := call(f, "acme.orders.v1.Orders/Chat", `[{"id":"a"},{"id":"b"}]`)
+	c.Receive = &transport.Receive{Count: 2, Timeout: 3 * time.Second}
+
+	res, err := grpcx.Run(t.Context(), c)
+
+	if err != nil || res.Code != codes.OK {
+		t.Fatalf("code %v, err %v", res.Code, err)
+	}
+	var ids []string
+	for _, m := range res.Messages {
+		if m.Direction == "received" {
+			ids = append(ids, string(m.Body))
+		}
+	}
+	if len(ids) != 2 || !strings.Contains(ids[0], `"id":"a"`) || !strings.Contains(ids[1], `"id":"b"`) {
+		t.Fatalf("received %v", ids)
+	}
+}
+
+func TestRun_should_read_a_bidirectional_call_until_the_server_ends_it(t *testing.T) {
+	f := startServer(t, true, nil)
+
+	res, err := grpcx.Run(t.Context(), call(f, "acme.orders.v1.Orders/Chat", `[{"id":"a"},{"id":"b"},{"id":"c"}]`))
+
+	received := 0
+	for _, m := range res.Messages {
+		if m.Direction == "received" {
+			received++
+		}
+	}
+	if err != nil || res.Code != codes.OK || received != 3 {
+		t.Fatalf("code %v, received %d, err %v", res.Code, received, err)
+	}
+}
+
+func TestRun_should_report_the_status_that_ends_a_bidirectional_call(t *testing.T) {
+	f := startServer(t, true, nil)
+
+	res, err := grpcx.Run(t.Context(), call(f, "acme.orders.v1.Orders/Chat", `[{"id":"a"},{"id":"stop"}]`))
+
+	if err != nil || res.Code != codes.FailedPrecondition || res.Message != "told to stop" {
+		t.Fatalf("code %v %q, err %v", res.Code, res.Message, err)
 	}
 }
 
@@ -353,7 +457,7 @@ func TestMethods_should_list_the_methods_from_files_and_from_reflection(t *testi
 				upload = m
 			}
 		}
-		if len(got) != 8 || !list.ServerStream || list.ClientStream || !upload.ClientStream || list.Service != "acme.orders.v1.Orders" || list.Output != "acme.orders.v1.Order" {
+		if len(got) != 9 || !list.ServerStream || list.ClientStream || !upload.ClientStream || list.Service != "acme.orders.v1.Orders" || list.Output != "acme.orders.v1.Order" {
 			t.Errorf("%s: %d methods, List %+v, Upload %+v", name, len(got), list, upload)
 		}
 	}

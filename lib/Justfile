@@ -1,4 +1,4 @@
-# Flow-I core library. Run `just` to list recipes.
+# Flowi core library. Run `just` to list recipes.
 
 set shell := ["bash", "-euo", "pipefail", "-c"]
 

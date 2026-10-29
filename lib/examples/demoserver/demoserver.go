@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 // Package demoserver is a small API matching the user-creation example
-// collection, so the collection (and Flow-I) can be tried without a real
+// collection, so the collection (and Flowi) can be tried without a real
 // backend. It also has helper routes for exercising HTTP behaviour:
 // redirects, cookies, status codes, compression and large bodies.
 //

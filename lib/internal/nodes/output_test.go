@@ -160,7 +160,7 @@ func TestDigest_webhook_should_shape_the_payload_for_each_style(t *testing.T) {
 		{style: "text", want: `{"text":"# Leaky `},
 		{style: "slack", want: `{"text":"# Leaky `},
 		{style: "discord", want: `{"content":"# Leaky `},
-		{style: "teams", want: `{"@context":"https://schema.org/extensions","@type":"MessageCard","summary":"Flow-I digest","text":"# Leaky `},
+		{style: "teams", want: `{"@context":"https://schema.org/extensions","@type":"MessageCard","summary":"Flowi digest","text":"# Leaky `},
 		{style: "email", params: []any{"to", "ops@example.com", "subject", "Nightly"}, want: `{"subject":"Nightly","text":"# Leaky `},
 	}
 	for _, tt := range tests {

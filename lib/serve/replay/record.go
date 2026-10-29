@@ -37,7 +37,7 @@ const (
 // Recorder turns the replayer into a recording proxy: every call is
 // forwarded to Upstream and answered with the real response. The response is
 // also saved as a saved response (<status>.json and last.json in the workspace
-// data dir, where Flow-I keeps responses it receives) under the saved request
+// data dir, where Flowi keeps responses it receives) under the saved request
 // the call matches. A call that matches none is turned into a new request by
 // Capture, when it is set, and saved under that; without Capture it is only
 // forwarded. Nothing else is written into a collection: pin an example from a
@@ -56,6 +56,8 @@ type Recorder struct {
 	// returns it, so the response is saved under it and the next such call
 	// matches it. Calls are captured one at a time.
 	Capture Capture
+	// Tape, when set, keeps every forwarded call in a HAR file (see Tape).
+	Tape *Tape
 }
 
 // Call is a call the replayer forwarded that no saved request matches.
@@ -187,7 +189,18 @@ func (h *Handler) serveRecording(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	h.relay(w, r, a, res)
+	h.keepOnTape(r, body, res, time.Since(start))
 	h.record(r, a, time.Since(start))
+}
+
+// keepOnTape adds the call to the tape; a tape that cannot be written is a warning, never a failed call.
+func (h *Handler) keepOnTape(r *http.Request, body []byte, res upstreamResponse, took time.Duration) {
+	if h.rec.Tape == nil {
+		return
+	}
+	if err := h.rec.Tape.add(h.tapeRecord(r, body, res, took)); err != nil {
+		h.opts.Logger.Warn("call not kept on the tape", "Event", "ReplayTapeFailed", "Error", err)
+	}
 }
 
 // routeForRecording is the saved request a call is recorded under: the one it

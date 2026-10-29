@@ -16,6 +16,7 @@ const (
 	MatchBad        = "bad-request" // a malformed X-Flowi-* header
 	MatchRecorded   = "recorded"    // forwarded upstream and saved
 	MatchForwarded  = "forwarded"   // forwarded upstream, not saved
+	MatchFault      = "fault"       // an error or a dropped connection made on purpose
 )
 
 // Entry is one call the replayer handled.

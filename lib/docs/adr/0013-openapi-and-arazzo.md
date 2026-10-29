@@ -5,10 +5,10 @@
 
 ## Context
 
-Flow-I has to meet the OpenAPI ecosystem: import operations as requests, use response
+Flowi has to meet the OpenAPI ecosystem: import operations as requests, use response
 schemas as contracts for impact analysis, and move flows to and from Arazzo (design §9,
-§11; roadmap M5). Arazzo and Flow-I overlap but do not match. Arazzo has AsyncAPI steps,
-step actions and replacements; Flow-I has delays, branches, generators and its own
+§11; roadmap M5). Arazzo and Flowi overlap but do not match. Arazzo has AsyncAPI steps,
+step actions and replacements; Flowi has delays, branches, generators and its own
 template language. The risk is a converter that guesses, and produces flows that look
 right and run wrong.
 
@@ -46,7 +46,7 @@ right and run wrong.
     also choose the version.
 - **The expression mapping is a closed table** (`arazzo/expr.go`):
 
-  | Arazzo | Flow-I |
+  | Arazzo | Flowi |
   |---|---|
   | `$inputs.x` | `inputs.x` |
   | `$steps.s.outputs.o` | `vars.s_o`, written by the step's extract node |

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-// Package names checks names that become file names inside Flow-I's own
+// Package names checks names that become file names inside Flowi's own
 // directories (pinned examples, saved values, digests), so content from a
 // collection can never choose a path outside them.
 package names

@@ -6,6 +6,7 @@ import (
 	"context"
 	"io"
 	"log/slog"
+	"math/rand/v2"
 	"net"
 	"net/http"
 	"net/url"
@@ -28,9 +29,13 @@ type Options struct {
 	// live. Nil serves pinned examples only.
 	DataDir func(model.ID) string
 
-	Latency  time.Duration // delay for every answer unless X-Flowi-Latency says otherwise
-	Sequence bool          // walk a request's responses one call at a time
-	CORS     bool          // answer browsers: Access-Control-* headers and preflights
+	Latency time.Duration // delay for every answer unless X-Flowi-Latency says otherwise
+	// Faults make a share of the calls fail on purpose; the zero value injects nothing. Not applied in record mode.
+	Faults Faults
+	// Rand returns a number in [0, 1) for each roll (default: math/rand/v2). Tests inject a fixed one.
+	Rand     func() float64
+	Sequence bool // walk a request's responses one call at a time
+	CORS     bool // answer browsers: Access-Control-* headers and preflights
 
 	// Hosts, when set, are the host names (without port) a call may use in
 	// its Host header; others are refused with 403. A listener on loopback
@@ -67,6 +72,9 @@ type Handler struct {
 func New(opts Options) *Handler {
 	if opts.Sleep == nil {
 		opts.Sleep = sleepContext
+	}
+	if opts.Rand == nil {
+		opts.Rand = rand.Float64
 	}
 	if opts.Logger == nil {
 		opts.Logger = slog.New(slog.NewTextHandler(io.Discard, nil))
@@ -126,7 +134,7 @@ const controlPrefix = "/__flowi/"
 // another origin. The Host check stops DNS rebinding but not a page that
 // calls 127.0.0.1 by its address: such a page cannot read the answer (the
 // control routes send no CORS headers), yet a "simple" POST to /__flowi/reset
-// would still run. Browsers always label these calls; curl and Flow-I send
+// would still run. Browsers always label these calls; curl and Flowi send
 // neither header and pass.
 func crossSite(r *http.Request) bool {
 	if site := r.Header.Get("Sec-Fetch-Site"); site != "" && site != "same-origin" && site != "none" {
@@ -164,14 +172,50 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	start := time.Now()
-	a := h.decide(r)
+	a, dropped := h.applyFaults(r, h.decide(r))
 	if a.wait > 0 {
 		if err := h.opts.Sleep(r.Context(), a.wait); err != nil {
 			return // the caller went away
 		}
 	}
+	if dropped {
+		h.record(r, a, time.Since(start))
+		// ErrAbortHandler is how a handler closes the connection without an answer: net/http ends the
+		// connection (or resets an HTTP/2 stream) and logs nothing.
+		panic(http.ErrAbortHandler)
+	}
 	h.deliver(w, r, a)
 	h.record(r, a, time.Since(start))
+}
+
+// applyFaults adds the jitter and turns the answer into an injected error, or marks it to be dropped,
+// when the call's roll or its X-Flowi-Fault header says so. A call that did not match anything keeps its
+// own answer: a fault is for calls the replayer would have answered.
+func (h *Handler) applyFaults(r *http.Request, a answer) (answer, bool) {
+	chosen, set, err := readFault(r.Header)
+	if err != nil {
+		return problem(r, http.StatusBadRequest, MatchBad, err.Error()), false
+	}
+	if !set && !h.opts.Faults.Active() || a.route == nil {
+		return a, false
+	}
+	if !set {
+		chosen = h.opts.Faults.roll(h.opts.Rand())
+	}
+	if j := h.opts.Faults.Jitter; j > 0 {
+		a.wait += time.Duration(h.opts.Rand() * float64(j))
+	}
+	switch chosen.kind {
+	case faultError:
+		wait := a.wait
+		a = errorAnswer(r, chosen.status)
+		a.wait = wait
+	case faultDrop:
+		a.status, a.match = 0, MatchFault
+		return a, true
+	case faultNone:
+	}
+	return a, false
 }
 
 // answer is what the replayer decided to say, before any I/O.
@@ -270,7 +314,7 @@ func (h *Handler) preflight(w http.ResponseWriter, r *http.Request) bool {
 	if r.Method != http.MethodOptions || r.Header.Get("Access-Control-Request-Method") == "" {
 		return false
 	}
-	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, HEAD, OPTIONS")
+	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, HEAD, OPTIONS, QUERY")
 	if want := r.Header.Get("Access-Control-Request-Headers"); want != "" {
 		w.Header().Set("Access-Control-Allow-Headers", want)
 	}

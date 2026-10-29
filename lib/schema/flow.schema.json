@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/githugt/flowi-lib/schema/flow.schema.json",
-  "title": "Flow-I flow (*.flow.yaml)",
+  "title": "Flowi flow (*.flow.yaml)",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -31,15 +31,50 @@
         "properties": {
           "default": {
             "type": "string"
+          },
+          "type": {
+            "enum": [
+              "string",
+              "number",
+              "boolean",
+              "object",
+              "array"
+            ],
+            "description": "What the input holds; shown on the Start card."
           }
         }
       }
     },
     "outputs": {
       "type": "object",
-      "description": "Values a subflow returns: name → template rendered when the flow ends.",
+      "description": "Values the flow returns: name \u2192 template rendered when the flow ends, or {type, value}.",
       "additionalProperties": {
-        "type": "string"
+        "oneOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "object",
+            "required": [
+              "value"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "type": {
+                "enum": [
+                  "string",
+                  "number",
+                  "boolean",
+                  "object",
+                  "array"
+                ]
+              },
+              "value": {
+                "type": "string"
+              }
+            }
+          }
+        ]
       }
     },
     "execution": {
@@ -96,6 +131,14 @@
     },
     "nodes": {
       "$ref": "common.schema.json#/$defs/nodes"
+    },
+    "tags": {
+      "type": "array",
+      "description": "Labels for `flowi run --tag`. A folder's tags apply to everything under it.",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
     }
   }
 }

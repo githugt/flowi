@@ -3,6 +3,7 @@
 package engine
 
 import (
+	"cmp"
 	"context"
 	"time"
 
@@ -35,12 +36,19 @@ func (rt *nodeRuntime) Request(ctx context.Context, c nodes.RequestCall) nodes.O
 	if with == nil {
 		with = map[string]any{} // non-nil: already rendered, never re-rendered as templates
 	}
+	overlay, diags := overlayOfCall(coll, req, cmp.Or(c.Overlay, rt.r.overlay))
+	if diags.HasErrors() {
+		return nodes.Outcome{Diags: diags}
+	}
 	inner := rt.r.execute(ctx, call{
 		collection: coll, request: req, pinned: c.Version, flowPrefer: rt.f.fs.prefer, withValues: with, hooks: c.Hooks,
-		depth: rt.f.depth, path: rt.path, headers: c.Headers, jar: rt.f.jar, noJar: rt.f.noJar,
+		depth: rt.f.depth, path: rt.path, headers: c.Headers, jar: rt.f.jar, noJar: rt.f.noJar, overlay: overlay,
+		conn: connUse{open: c.Open, over: c.Over, closeAfter: c.Close}, bodyOver: c.Body,
 	})
 	if inner.record != nil {
-		rt.r.emit(RecordCaptured{RunID: rt.r.runID, Path: rt.path, Node: rt.node.ID, Depth: rt.f.depth, Record: inner.record.Masked(rt.r.secrets.current())})
+		masked := inner.record.Masked(rt.r.secrets.current())
+		rt.r.addCaptured(masked)
+		rt.r.emit(RecordCaptured{RunID: rt.r.runID, Path: rt.path, Node: rt.node.ID, Depth: rt.f.depth, Record: masked})
 	}
 	return nodes.Outcome{Outputs: nodeOutputs(inner), Status: requestNodeStatus(inner), Diags: inner.diags}
 }
@@ -131,4 +139,55 @@ func (rt *nodeRuntime) Report(of string) (report.Run, bool) {
 		return r, true
 	}
 	return b.find(of)
+}
+
+// CheckSchema checks what request step `step` received against the response
+// schema kept for its request. It finds nothing (Found false) when the step
+// is not a request step of this flow, has not run, or no schema is kept.
+func (rt *nodeRuntime) CheckSchema(step string) nodes.SchemaCheck {
+	matcher, ok := rt.r.deps.Schemas.(SchemaMatcher)
+	flow := rt.f.fs.flow
+	if !ok || flow == nil {
+		return nodes.SchemaCheck{}
+	}
+	n, ok := findStep(flow.Nodes, step)
+	if !ok || n.Request == nil {
+		return nodes.SchemaCheck{}
+	}
+	got, ok := rt.f.outputs.snapshot()[step].(map[string]any)
+	if !ok {
+		return nodes.SchemaCheck{}
+	}
+	status, _ := got["status"].(int)
+	coll, req, ok := rt.r.deps.Lookup.Request(n.Request.Request, rt.f.fs.collection.Manifest.ID)
+	if !ok {
+		return nodes.SchemaCheck{}
+	}
+	// The version the step used: resolved as the send resolved it (pinned, run preference, flow preference, default).
+	chosen, _, diags := resolveVersion(call{request: req, pinned: n.Request.Version, flowPrefer: rt.f.fs.prefer}, rt.r.prefer)
+	if diags.HasErrors() {
+		return nodes.SchemaCheck{}
+	}
+	version := chosen.Label
+	violations, found := matcher.Match(coll, req, version, status, got["body"])
+	out := nodes.SchemaCheck{Found: found, Request: req.Path, Status: status}
+	for _, v := range violations {
+		out.Violations = append(out.Violations, nodes.SchemaViolation{Path: v.Path, Message: v.Message})
+	}
+	return out
+}
+
+// findStep is the node with id among list and everything nested in it.
+func findStep(list []model.Node, id string) (model.Node, bool) {
+	for _, n := range list {
+		if n.ID == id {
+			return n, true
+		}
+		for _, child := range n.Children() {
+			if found, ok := findStep(child, id); ok {
+				return found, true
+			}
+		}
+	}
+	return model.Node{}, false
 }

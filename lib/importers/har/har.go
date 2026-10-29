@@ -115,6 +115,7 @@ type importer struct {
 	order   []*group
 	skipped []importers.Item
 	nodes   []model.Node
+	calls   []*callRecord
 	taken   importers.Names
 	nodeIDs importers.Names
 	left    map[string]int // left-out reason → count
@@ -162,6 +163,7 @@ func (im *importer) entry(e entry, pos diag.Position) {
 		g.example = im.example(e, g)
 	}
 	im.addNode(e.Request.Method, g.req.Path, tpl, ids)
+	im.remember(g, e, ids)
 }
 
 func (im *importer) skip(loc diag.Location, name, detail string) {
@@ -366,6 +368,7 @@ func (im *importer) addNode(method, reqPath, tpl string, ids []string) {
 }
 
 func (im *importer) result() importers.Result {
+	im.wire()
 	var r importers.Result
 	for _, g := range im.order {
 		r.Requests = append(r.Requests, g.req)

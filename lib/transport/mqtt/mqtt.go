@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
-// Package mqtt is the MQTT 5 transport. MQTT 3.1.1 brokers are not supported.
+// Package mqtt is the MQTT transport: MQTT 5 by default, and MQTT 3.1.1 or 3.1
+// when the binding version asks for it (for brokers and devices that speak
+// only those).
 package mqtt
 
 import (
@@ -30,12 +32,23 @@ func New() Transport { return Transport{} }
 
 // Run connects, subscribes (before publishing, with no-local set so a message
 // published on the same topic does not come back), publishes, collects, and
-// disconnects. Binding names: qos, retain, client_id, username, password.
+// disconnects. Binding names: version (5, 3.1.1 or 3.1; default 5), qos, retain,
+// client_id, username, password.
 //
 // Goroutine ownership: the paho client owns its read and keep-alive
 // goroutines; Run ends them with Disconnect and waits for Done.
 func (Transport) Run(ctx context.Context, op transport.Operation) (transport.Result, error) {
 	started := op.Now()
+	version, err := versionOf(op.Binding)
+	if err != nil {
+		return transport.Result{}, err
+	}
+	switch version {
+	case version311:
+		return run311(ctx, op, level311)
+	case version31:
+		return run311(ctx, op, level31)
+	}
 	qos, retain, err := publishOptions(op.Binding)
 	if err != nil {
 		return transport.Result{}, err

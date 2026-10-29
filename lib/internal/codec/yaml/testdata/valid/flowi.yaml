@@ -8,6 +8,9 @@ depends_on:
     repo: https://github.com/acme/identity-api
   - id: 01JB13K3M4N5P6Q7R8S9T0VWXY
     name: payments
+variables:
+  region: eu-west-1
+  api_base: https://api.example.com
 settings:
   timeout: 30s
   responses:

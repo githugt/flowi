@@ -277,6 +277,25 @@ func (s schemaChecker) Check(c model.Collection, r model.Request, version string
 	return out
 }
 
+// Match checks body against the response schema kept for status of version of
+// request r, without learning from it. found is false when none is kept.
+func (s schemaChecker) Match(c model.Collection, r model.Request, version string, status int, body any) ([]engine.SchemaViolation, bool) {
+	t := RequestTarget{Collection: c.Manifest.ID, Request: r.ID}
+	schema, _, ok := s.w.SchemaFor(t, version, SchemaPart{Kind: "response", Status: status})
+	if !ok {
+		return nil, false
+	}
+	vs, err := schemainfer.Validate(schema, body)
+	if err != nil {
+		return nil, false // an unusable stored schema checks nothing
+	}
+	out := make([]engine.SchemaViolation, 0, len(vs))
+	for _, v := range vs {
+		out = append(out, engine.SchemaViolation{Path: v.Path, Message: v.Message})
+	}
+	return out, true
+}
+
 func (s schemaChecker) violations(t RequestTarget, version string, part SchemaPart, sample any, request string, status int, code diag.Code) diag.List {
 	if sample == nil {
 		return nil
@@ -345,4 +364,15 @@ func (w *Workspace) ListSchemas(t RequestTarget, version string) []SchemaPart {
 		return a.Status - b.Status
 	})
 	return parts
+}
+
+// RequestSchema is the schema kept for the body a request version sends, for a fuzz step to read its bounds
+// from. ok is false when none is kept.
+func (s schemaChecker) RequestSchema(_ model.Collection, r model.Request, version string) (map[string]any, bool) {
+	file, err := schemaFile(r.File, version, SchemaPart{Kind: "request"})
+	if err != nil {
+		return nil, false
+	}
+	schema, _, found := readSchema(file)
+	return schema, found
 }

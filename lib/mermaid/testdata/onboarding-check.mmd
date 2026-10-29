@@ -1,12 +1,12 @@
 flowchart LR
-  %% Flow-I flow onboarding-check; labels follow Flow-I's Mermaid conventions
+  %% Flowi flow onboarding-check; labels follow Flowi's Mermaid conventions
   %% containers are drawn as subgraphs; importing them back gives placeholders
   session["subflow: shared/login"]
-  who["extract who"]
-  profile["generate profile"]
+  who["set who"]
+  profile["set profile"]
   subgraph checks ["batch checks"]
     config["fetch config"]
-    double["calc double"]
+    double["set: twice={{index * 2}}"]
     config --> double
   end
   subgraph both ["parallel both"]
@@ -20,7 +20,7 @@ flowchart LR
     ready["note: Onboarding of {{vars.subject}} ({{vars.nickname}}) is ready after {{nodes.poll.iterations}} polls."]
     stuck["log: Onboarding is still pending."]
   end
-  passed["transform passed"]
+  passed["set: checked={{nodes.checks.passed}}"]
   all-checked["assert: vars.checked == 3"]
   keep["save keep"]
   summary["digest summary"]

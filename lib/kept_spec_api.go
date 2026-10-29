@@ -25,9 +25,24 @@ type KeptSpec struct {
 	File     string   // absolute
 	Rel      string   // slash-separated, relative to the collection root
 	Overlays []string // absolute, in the order they apply: <name>.overlay.yaml, <name>.overlay-2.yaml, …
-	// Edits is the overlay Flow-I saves request edits to,
+	// Edits is the overlay Flowi saves request edits to,
 	// <name>.edits.overlay.yaml. It applies last. It may not exist yet.
 	Edits string
+}
+
+// FilesDir is where the files the spec refers to are kept, beside it:
+// <name>.files/, with the paths the spec writes them with.
+func (k KeptSpec) FilesDir() string {
+	return filepath.Join(filepath.Dir(k.File), k.Name+".files")
+}
+
+// refFiles is where a re-import of the kept spec reads the files it refers
+// to, nil when none were kept.
+func (k KeptSpec) refFiles() fs.FS {
+	if info, err := os.Stat(k.FilesDir()); err != nil || !info.IsDir() {
+		return nil
+	}
+	return os.DirFS(k.FilesDir())
 }
 
 var (
@@ -36,7 +51,7 @@ var (
 )
 
 // KeptSpecs lists the OpenAPI descriptions kept in the collection's
-// descriptions/ folder, by name. The description Flow-I generates
+// descriptions/ folder, by name. The description Flowi generates
 // (requests.openapi.yaml) is not one.
 func (w *Workspace) KeptSpecs(collection model.ID) ([]KeptSpec, error) {
 	w.mu.RLock()
@@ -175,7 +190,7 @@ func importKept(kept KeptSpec) (openapi.Result, error) {
 	if diags.HasErrors() {
 		return openapi.Result{}, diags.Err()
 	}
-	r, diags := openapi.Import(data, openapi.Options{NewID: func() model.ID { return "" }})
+	r, diags := openapi.Import(data, openapi.Options{NewID: func() model.ID { return "" }, Files: kept.refFiles()})
 	if diags.HasErrors() {
 		return openapi.Result{}, diags.Err()
 	}
@@ -225,7 +240,8 @@ func (w *Workspace) PreviewSpecUpdate(collection model.ID, name string, data []b
 	}
 	// The kept file's own name keeps the copy, its overlays and the merge
 	// base under the same name.
-	return w.previewIn(c, ImportSource{Kind: ImportOpenAPI, Name: kept.File, Data: data, Overlays: overlays})
+	// The files the spec refers to are read from the copies kept beside it.
+	return w.previewIn(c, ImportSource{Kind: ImportOpenAPI, Name: kept.File, Data: data, Overlays: overlays, RefDir: kept.FilesDir()})
 }
 
 // ErrNoKeptSpec is returned for a kept spec name the collection does not have.

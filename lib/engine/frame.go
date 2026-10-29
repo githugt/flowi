@@ -98,7 +98,7 @@ func (f *frame) scope(r *runner) template.Scope {
 	values := map[string]any{
 		"env": fs.env.values, "secret": r.secrets.namespace(fs.collection.Manifest.ID, fs.env),
 		"inputs": fs.inputs, "vars": f.vars.Snapshot(), "nodes": f.outputs.snapshot(),
-		"run": map[string]any{"id": r.runID, "iteration": fs.iteration},
+		"run": map[string]any{"id": r.runID, "iteration": fs.iteration}, "collection_var": collectionVariables(fs.collection, fs.env.values),
 	}
 	if fs.inputs == nil {
 		values["inputs"] = map[string]any{}

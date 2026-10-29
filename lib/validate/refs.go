@@ -4,6 +4,7 @@ package validate
 
 import (
 	"github.com/githugt/flowi-lib/diag"
+	"github.com/githugt/flowi-lib/flowioverlay"
 	"github.com/githugt/flowi-lib/internal/sites"
 	"github.com/githugt/flowi-lib/internal/yamlpath"
 	"github.com/githugt/flowi-lib/model"
@@ -47,9 +48,31 @@ func refSites(c model.Collection) []refSite {
 	return out
 }
 
+// checkOverlayNames reports request steps that name a flowi overlay their
+// request's collection does not have (FLW-OVL-002).
+func checkOverlayNames(ix *index, c model.Collection) diag.List {
+	var out diag.List
+	for _, n := range sites.AllNodes(c) {
+		call := n.Value.Request
+		if call == nil || call.Overlay == "" || call.Request.ID == "" {
+			continue
+		}
+		target, code, _ := ix.targetCollection(c, call.Request.Collection)
+		if code != "" {
+			continue // the reference is reported by checkRef
+		}
+		if _, missing := flowioverlay.Resolve(ix.collections[ix.byID[target]].Overlays, call.Overlay, ""); missing != "" {
+			out = append(out, diag.New(diag.CodeOverlayNotFound, diag.Location{File: n.File, Path: yamlpath.Key(n.Path, "overlay")}, map[string]string{"name": missing}))
+		}
+	}
+	return out
+}
+
 func checkRefs(ix *index) diag.List {
 	var out diag.List
 	for _, c := range ix.collections {
+		out = append(out, checkOverlayNames(ix, c)...)
+		out = append(out, checkConnections(ix, c)...)
 		for _, site := range refSites(c) {
 			if site.ref.ID == "" {
 				continue // the codec already reported the missing id

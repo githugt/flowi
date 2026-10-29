@@ -49,6 +49,9 @@ func HookSteps(c model.Collection) []Located[model.HookStep] {
 		for i, s := range scope.Value.Post {
 			out = append(out, Located[model.HookStep]{scope.File, yamlpath.Index(yamlpath.Key(hooks, "post"), i), s})
 		}
+		for i, s := range scope.Value.Message {
+			out = append(out, Located[model.HookStep]{scope.File, yamlpath.Index(yamlpath.Key(hooks, "message"), i), s})
+		}
 	}
 	return out
 }

@@ -11,6 +11,7 @@ import (
 
 	"github.com/githugt/flowi-lib/arazzo"
 	"github.com/githugt/flowi-lib/diag"
+	"github.com/githugt/flowi-lib/flowioverlay"
 	"github.com/githugt/flowi-lib/model"
 )
 
@@ -68,6 +69,11 @@ func fileBase(file string) string { return filepath.Base(file) }
 // EncodeRequest is the canonical file content of r.
 func (s *Store) EncodeRequest(r model.Request) ([]byte, error) { return s.codec.EncodeRequest(r) }
 
+// DecodeEnvironment reads the content of an environment file.
+func (s *Store) DecodeEnvironment(file string, data []byte) (model.Environment, diag.List) {
+	return s.codec.DecodeEnvironment(file, data)
+}
+
 // EncodeEnvironment is the canonical file content of e. A name equal to
 // the file stem is left out, as Load derives it.
 func (s *Store) EncodeEnvironment(e model.Environment) ([]byte, error) {
@@ -100,3 +106,9 @@ func (s *Store) EncodeBlueprint(b model.Blueprint) ([]byte, error) { return s.co
 
 // EncodeFolder is the canonical _folder.yaml for f.
 func (s *Store) EncodeFolder(f model.Folder) ([]byte, error) { return s.codec.EncodeFolder(f) }
+
+// EncodeOverlay encodes a flowi overlay as its file.
+func (s *Store) EncodeOverlay(o model.Overlay) ([]byte, error) { return flowioverlay.Encode(o) }
+
+// EncodeManifest encodes a collection's flowi.yaml.
+func (s *Store) EncodeManifest(m model.Manifest) ([]byte, error) { return s.codec.EncodeManifest(m) }

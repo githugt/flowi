@@ -30,7 +30,7 @@ func DataDir(p settings.Paths, name string, collection model.ID) string {
 }
 
 // ExpandPath replaces a leading "~" or "~/" with home. "~user" forms are
-// left alone: Flow-I does not look up other users' home directories.
+// left alone: Flowi does not look up other users' home directories.
 func ExpandPath(path, home string) string {
 	if path == "~" {
 		return home

@@ -53,7 +53,7 @@ func signed(t *testing.T, priv ed25519.PrivateKey, p payload) []byte {
 }
 
 func sampleItems() []Item {
-	return []Item{{ID: "welcome", Title: "Welcome to 1.0", Body: "Thanks for trying Flow-I.", URL: "https://example.com/news/welcome", Level: "info"}}
+	return []Item{{ID: "welcome", Title: "Welcome to 1.0", Body: "Thanks for trying Flowi.", URL: "https://example.com/news/welcome", Level: "info"}}
 }
 
 // feedServer serves doc and counts requests.

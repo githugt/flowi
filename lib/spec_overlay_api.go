@@ -25,7 +25,7 @@ import (
 // colleague's import or another tool reading the spec sees them too. Only
 // what the importer reads back is written: the operation's description
 // (the version's docs), the JSON request body's example, and query and
-// header parameters added or removed. The rest stays in Flow-I, which a
+// header parameters added or removed. The rest stays in Flowi, which a
 // re-import keeps (mergeReimport); OverlayPlan.NotCarried says why for each.
 
 // ErrNotFromSpec is returned for a request no kept spec makes.
@@ -110,7 +110,7 @@ func (w *Workspace) PreviewSpecOverlay(t RequestTarget, v model.RequestVersion) 
 	if err != nil {
 		return OverlayPlan{}, err
 	}
-	base, op, err := versionIn(baseDoc, req.Path, v.Label)
+	base, op, err := versionIn(baseDoc, m.kept.refFiles(), req.Path, v.Label)
 	if err != nil {
 		return OverlayPlan{}, err
 	}
@@ -180,7 +180,7 @@ func markSaved(m specMatch, requestPath string, v model.RequestVersion, target s
 	if err != nil {
 		return // nothing can be told saved: all are offered
 	}
-	now, op, err := versionIn(doc, requestPath, v.Label)
+	now, op, err := versionIn(doc, m.kept.refFiles(), requestPath, v.Label)
 	if err != nil {
 		return
 	}
@@ -269,8 +269,8 @@ func (m specMatch) overlaid(edits []overlayAction) ([]byte, error) {
 	return out, nil
 }
 
-// editsInfo heads the overlay Flow-I writes.
-func editsInfo() overlayInfo { return overlayInfo{Title: "Edits saved from Flow-I", Version: "1.0.0"} }
+// editsInfo heads the overlay Flowi writes.
+func editsInfo() overlayInfo { return overlayInfo{Title: "Edits saved from Flowi", Version: "1.0.0"} }
 
 func encodeOverlay(actions []overlayAction) ([]byte, error) {
 	data, err := yaml.Marshal(overlayDoc{Overlay: "1.0.0", Info: editsInfo(), Actions: actions})
@@ -282,8 +282,8 @@ func encodeOverlay(actions []overlayAction) ([]byte, error) {
 
 // versionIn imports doc and returns the request's version and the
 // operation it comes from.
-func versionIn(doc []byte, requestPath, label string) (model.RequestVersion, openapi.OperationRef, error) {
-	r, diags := openapi.Import(doc, openapi.Options{NewID: func() model.ID { return "" }})
+func versionIn(doc []byte, files fs.FS, requestPath, label string) (model.RequestVersion, openapi.OperationRef, error) {
+	r, diags := openapi.Import(doc, openapi.Options{NewID: func() model.ID { return "" }, Files: files})
 	if diags.HasErrors() {
 		return model.RequestVersion{}, openapi.OperationRef{}, diags.Err()
 	}
@@ -317,7 +317,7 @@ func quoted(s string) string {
 	return "'" + strings.NewReplacer(`\`, `\\`, `'`, `\'`).Replace(s) + "'"
 }
 
-const flowiOnly = "only Flow-I fills in {{…}} values; Flow-I keeps it"
+const flowiOnly = "only Flowi fills in {{…}} values; Flowi keeps it"
 
 // diffForOverlay compares the version being saved with what the spec
 // makes of it and says what the overlay can carry.
@@ -326,7 +326,7 @@ func diffForOverlay(base, v model.RequestVersion, op openapi.OperationRef, targe
 	var notes []OverlayNote
 	note := func(what, why string) { notes = append(notes, OverlayNote{What: what, Why: why}) }
 	if v.Method != base.Method || v.URL != base.URL {
-		note("the method or URL", "that makes it another operation: change the spec itself; Flow-I keeps it")
+		note("the method or URL", "that makes it another operation: change the spec itself; Flowi keeps it")
 	}
 	if v.Docs != base.Docs {
 		if strings.Contains(v.Docs, "{{") {
@@ -370,22 +370,22 @@ func bodyChange(b model.Body, op openapi.OperationRef, target string) (OverlayCh
 	var parsed any
 	switch {
 	case b.JSON == "":
-		return OverlayChange{}, "only a JSON body can be saved to the spec; Flow-I keeps it"
+		return OverlayChange{}, "only a JSON body can be saved to the spec; Flowi keeps it"
 	case strings.Contains(b.JSON, "{{"):
 		return OverlayChange{}, flowiOnly
 	case json.Unmarshal([]byte(b.JSON), &parsed) != nil:
-		return OverlayChange{}, "it is not valid JSON; Flow-I keeps it"
+		return OverlayChange{}, "it is not valid JSON; Flowi keeps it"
 	}
 	rb, _ := op.Op["requestBody"].(map[string]any)
 	content, _ := rb["content"].(map[string]any)
 	mt, hasJSON := content["application/json"].(map[string]any)
 	switch {
 	case rb["$ref"] != nil:
-		return OverlayChange{}, "the spec shares this request body with other operations ($ref); Flow-I keeps it"
+		return OverlayChange{}, "the spec shares this request body with other operations ($ref); Flowi keeps it"
 	case !hasJSON:
-		return OverlayChange{}, "the spec has no JSON request body for this operation; Flow-I keeps it"
+		return OverlayChange{}, "the spec has no JSON request body for this operation; Flowi keeps it"
 	case mt["examples"] != nil:
-		return OverlayChange{}, "the spec gives named examples, and Flow-I sets only one; Flow-I keeps it"
+		return OverlayChange{}, "the spec gives named examples, and Flowi sets only one; Flowi keeps it"
 	}
 	return OverlayChange{What: "the body example", Target: target + ".requestBody.content['application/json']", Update: map[string]any{"example": parsed}}, ""
 }
@@ -404,10 +404,10 @@ func paramChanges(in string, old, ours []model.KeyValue, op openapi.OperationRef
 		oldValue, had := pairValue(old, p.Key)
 		switch {
 		case had && oldValue != p.Value:
-			notes = append(notes, OverlayNote{What: label, Why: "the spec says which parameters there are, not their values; Flow-I keeps the value"})
+			notes = append(notes, OverlayNote{What: label, Why: "the spec says which parameters there are, not their values; Flowi keeps the value"})
 		case had:
 		case in == "header" && slices.Contains(ignoredHeaders(), strings.ToLower(p.Key)):
-			notes = append(notes, OverlayNote{What: label, Why: "the spec says it through its media types or security; Flow-I keeps it"})
+			notes = append(notes, OverlayNote{What: label, Why: "the spec says it through its media types or security; Flowi keeps it"})
 		default:
 			param := map[string]any{"name": p.Key, "in": in, "schema": map[string]any{"type": "string"}}
 			if p.Value != "" && !strings.Contains(p.Value, "{{") {
@@ -439,9 +439,9 @@ func removable(op openapi.OperationRef, name, in string) string {
 		return ""
 	}
 	if slices.ContainsFunc(op.PathParams, func(p any) bool { return isParam(p, name, in) }) {
-		return "the spec gives it to every operation on the path; Flow-I keeps it removed"
+		return "the spec gives it to every operation on the path; Flowi keeps it removed"
 	}
-	return "the spec shares it with other operations ($ref); Flow-I keeps it removed"
+	return "the spec shares it with other operations ($ref); Flowi keeps it removed"
 }
 
 func isParam(p any, name, in string) bool {
@@ -453,7 +453,7 @@ func isParam(p any, name, in string) bool {
 
 // flowiOnlyParts are the parts of a version a spec has no place for.
 func flowiOnlyParts(v model.RequestVersion) []OverlayNote {
-	why := "the spec has no place for it; Flow-I keeps it"
+	why := "the spec has no place for it; Flowi keeps it"
 	parts := []struct {
 		what string
 		has  bool

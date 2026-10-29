@@ -166,7 +166,7 @@ func (b *builder) short(w token) {
 	for _, c := range w.text[1:] {
 		f := "-" + string(c)
 		if spec, ok := flags()[f]; !ok || spec.arg {
-			b.it.UnmappedAt(b.at(w.offset), "flag "+first, "ignored", "it is not a curl flag Flow-I knows")
+			b.it.UnmappedAt(b.at(w.offset), "flag "+first, "ignored", "it is not a curl flag Flowi knows")
 			return
 		}
 	}
@@ -178,7 +178,7 @@ func (b *builder) short(w token) {
 func (b *builder) apply(name string, w token, value string, inline bool) {
 	spec, ok := flags()[name]
 	if !ok {
-		b.it.Unmapped("flag "+name, "ignored", "it is not a curl flag Flow-I knows")
+		b.it.Unmapped("flag "+name, "ignored", "it is not a curl flag Flowi knows")
 		return
 	}
 	arg := token{text: value, offset: w.offset + len(w.text) - len(value)}
@@ -198,7 +198,7 @@ func (b *builder) apply(name string, w token, value string, inline bool) {
 func (b *builder) setURL(w token) {
 	switch {
 	case !looksLikeURL(w.text):
-		b.it.UnmappedAt(b.at(w.offset), "an argument", "ignored", "it is neither a URL nor the value of a flag Flow-I knows")
+		b.it.UnmappedAt(b.at(w.offset), "an argument", "ignored", "it is neither a URL nor the value of a flag Flowi knows")
 	case b.req.url.text != "":
 		b.it.UnmappedAt(b.at(w.offset), "another URL", "ignored", "one request per command; the first URL is used")
 	default:
@@ -221,7 +221,7 @@ func looksLikeURL(s string) bool {
 
 var bodyFlags = regexp.MustCompile(`^(-d|--data|--data-ascii|--data-binary)$`)
 
-// addData records -d style data; "@file" reads a file, which Flow-I does
+// addData records -d style data; "@file" reads a file, which Flowi does
 // not do at import.
 func (b *builder) addData(flag string, w token) {
 	if bodyFlags.MatchString(flag) && strings.HasPrefix(w.text, "@") {

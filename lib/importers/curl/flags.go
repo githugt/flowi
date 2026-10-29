@@ -37,7 +37,7 @@ func flags() map[string]flagSpec {
 	}}
 	cookie := flagSpec{arg: true, set: func(b *builder, v token) {
 		if !strings.Contains(v.text, "=") {
-			b.it.Unmapped("cookies from file "+v.text, "left out", "Flow-I keeps cookies in its own jar")
+			b.it.Unmapped("cookies from file "+v.text, "left out", "Flowi keeps cookies in its own jar")
 			return
 		}
 		b.req.headers = append(b.req.headers, header{name: "Cookie", value: v.text, at: v})
@@ -50,7 +50,7 @@ func flags() map[string]flagSpec {
 	// unsupported reports the flag, never its value (it may be a secret).
 	unsupported := func(what string) flagSpec {
 		return flagSpec{arg: true, set: func(b *builder, v token) {
-			b.it.UnmappedAt(b.at(v.offset), what, "ignored", "set it in Flow-I's settings instead")
+			b.it.UnmappedAt(b.at(v.offset), what, "ignored", "set it in Flowi's settings instead")
 		}}
 	}
 	bearer := flagSpec{arg: true, set: func(b *builder, _ token) {

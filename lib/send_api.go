@@ -39,6 +39,11 @@ type SendOptions struct {
 	With          map[string]string // values for the request's bare names ({{email}}), as templates
 	Hooks         model.HookControl
 	Seed          uint64 // 0 picks a random seed (reported in the result)
+	Overlay       string // name of a flowi overlay to lay over the version; "" sends the version as it is
+	// OverlayLabel names the overlay a send already has laid on (an editor
+	// sends its working copy, which shows the overlay), so the response is
+	// kept and listed under it. Nothing is applied; Overlay wins if both are set.
+	OverlayLabel string
 
 	// UseEdit sends the request's dirty edit (see StoreEdit) in place of
 	// the saved version it started from, when the version asked for
@@ -138,16 +143,43 @@ func (w *Workspace) SendRequest(ctx context.Context, t RequestTarget, o SendOpti
 	if err := w.unlockFor(c, o.Env); err != nil {
 		return nil, err
 	}
-	return engine.StartSend(ctx, w.engineDeps(), sendInput(c, r, o)), nil
+	in, err := sendInput(c, r, o)
+	if err != nil {
+		return nil, err
+	}
+	return engine.StartSend(ctx, w.engineDeps(), in), nil
 }
 
-// sendInput builds the engine input for sending r with o.
-func sendInput(c model.Collection, r model.Request, o SendOptions) engine.SendInput {
+// sendInput builds the engine input for sending r with o. An unknown
+// overlay is FLW-OVL-002.
+func sendInput(c model.Collection, r model.Request, o SendOptions) (engine.SendInput, error) {
+	overlay, err := overlayFor(c, r, o.Overlay)
+	if err != nil {
+		return engine.SendInput{}, err
+	}
+	if overlay == nil {
+		label := o.OverlayLabel
+		if label == "" && editApplies(r, o) {
+			label = r.EditOverlay // the edit already shows the overlay it was made with
+		}
+		if label != "" {
+			overlay = &engine.Overlay{Name: label}
+		}
+	}
 	r, pinned := withEditApplied(r, o)
 	return engine.SendInput{
 		Collection: c, Request: r, Env: o.Env, PinnedVersion: pinned, PreferVersion: o.PreferVersion,
-		With: o.With, Hooks: o.Hooks, Seed: o.Seed, Save: o.Save,
+		With: o.With, Hooks: o.Hooks, Seed: o.Seed, Save: o.Save, Overlay: overlay,
+	}, nil
+}
+
+// editApplies reports whether a send takes r's dirty edit: o asks for it, the
+// edit belongs to the version being sent and that version still exists.
+func editApplies(r model.Request, o SendOptions) bool {
+	if !o.UseEdit || r.Edit == nil || (o.Version != "" && o.Version != r.EditBase) {
+		return false
 	}
+	return slices.ContainsFunc(r.Versions, func(v model.RequestVersion) bool { return v.Label == r.EditBase })
 }
 
 // withEditApplied returns r with its dirty edit standing in for the
@@ -157,13 +189,10 @@ func sendInput(c model.Collection, r model.Request, o SendOptions) engine.SendIn
 // o.Version are returned unchanged. The edit keeps the base's label, so
 // history and records name the version the user was working on.
 func withEditApplied(r model.Request, o SendOptions) (model.Request, string) {
-	if !o.UseEdit || r.Edit == nil || (o.Version != "" && o.Version != r.EditBase) {
+	if !editApplies(r, o) {
 		return r, o.Version
 	}
 	i := slices.IndexFunc(r.Versions, func(v model.RequestVersion) bool { return v.Label == r.EditBase })
-	if i < 0 {
-		return r, o.Version
-	}
 	r.Versions = slices.Clone(r.Versions)
 	r.Versions[i] = *r.Edit
 	r.Versions[i].Label = r.EditBase
@@ -193,7 +222,11 @@ func (w *Workspace) PreviewRequest(t RequestTarget, v model.RequestVersion, o Se
 		r.Versions = append(r.Versions, v)
 	}
 	o.Version, o.UseEdit = v.Label, false
-	return engine.PreviewSend(w.engineDeps(), sendInput(c, r, o), includeSecrets), nil
+	in, err := sendInput(c, r, o)
+	if err != nil {
+		return engine.Preview{}, err
+	}
+	return engine.PreviewSend(w.engineDeps(), in, includeSecrets), nil
 }
 
 // GRPCMethods lists the methods of the schema the gRPC version v of request t
@@ -216,7 +249,11 @@ func (w *Workspace) GRPCMethods(ctx context.Context, t RequestTarget, v model.Re
 		r.Versions = append(r.Versions, v)
 	}
 	o.Version, o.UseEdit = v.Label, false
-	call, diags := engine.GRPCCallOf(w.engineDeps(), sendInput(c, r, o), true)
+	in, err := sendInput(c, r, o)
+	if err != nil {
+		return nil, err
+	}
+	call, diags := engine.GRPCCallOf(w.engineDeps(), in, true)
 	if diags.HasErrors() {
 		return nil, &diag.ListError{List: diags}
 	}
@@ -264,6 +301,11 @@ func (w *Workspace) sendable(c model.Collection, env string) error {
 // passphrase prompt never interrupts live output. (Secrets of other
 // collections, read inside hook flows, still unlock on first use.)
 func (w *Workspace) unlockFor(c model.Collection, env string) error {
+	return w.unlockWith(c, env, w.opts.Environ)
+}
+
+// unlockWith is unlockFor for a run whose process environment differs from the workspace's.
+func (w *Workspace) unlockWith(c model.Collection, env string, environ []string) error {
 	if env == "" {
 		v, _ := w.Settings(Scope{Collection: c.Manifest.ID}).Get("defaults.environment")
 		env, _ = v.Value.(string)
@@ -273,7 +315,7 @@ func (w *Workspace) unlockFor(c model.Collection, env string) error {
 			continue
 		}
 		for _, v := range e.Vars {
-			if v.Secret && !overridden(w.opts.Environ, e.Name, v.Name) {
+			if v.Secret && !overridden(environ, e.Name, v.Name) {
 				return vaultErr(w.secrets().Unlock())
 			}
 		}
@@ -300,7 +342,7 @@ func (w *Workspace) engineDeps() engine.Deps {
 	return engine.Deps{
 		Lookup: engineLookup{w}, Schemas: schemaChecker{w}, Vault: w.secrets(), Environ: w.opts.Environ,
 		DataDir: w.DataDir, Clock: time.Now, NewID: func() string { return string(w.newID()) },
-		Observe: w.opts.Observe, Traceparent: w.opts.Traceparent, UserAgent: w.opts.UserAgent,
+		Observe: w.opts.Observe, Traceparent: w.opts.Traceparent, UserAgent: w.opts.UserAgent, AuthTokens: w.authTokens,
 	}
 }
 

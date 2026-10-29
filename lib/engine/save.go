@@ -17,7 +17,19 @@ import (
 
 // saveDir is where this request version's responses are kept.
 func (x *execution) saveDir() string {
-	return filepath.Join(x.r.deps.DataDir(x.c.collection.Manifest.ID), "responses", string(x.c.request.ID), x.version.Label)
+	key := ResponseKey(x.version.Label, x.c.overlayName())
+	return filepath.Join(x.r.deps.DataDir(x.c.collection.Manifest.ID), "responses", string(x.c.request.ID), key)
+}
+
+// ResponseKey names the folder that keeps a version's saved responses. A send
+// with a flowi overlay keeps its own, so a VIP response never overwrites the
+// base one: "1" for the plain version, "1--vip" with the overlay vip. Version
+// labels are numbers, so the double hyphen cannot be part of one.
+func ResponseKey(version, overlay string) string {
+	if overlay == "" {
+		return version
+	}
+	return version + "--" + overlay
 }
 
 // saveRecord writes the masked record per the saving policy: none, last,

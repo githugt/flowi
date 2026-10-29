@@ -22,8 +22,11 @@ func grpcDiags(file, path string, alsoAsync bool, g model.GRPC) diag.List {
 	if alsoAsync {
 		problem(path, "a version is either a gRPC call or an async request, not both")
 	}
-	if detail := grpcServerProblem(g.Server); detail != "" {
+	if detail := grpcServerProblem(g.Server, g.Web); detail != "" {
 		problem(yamlpath.Key(path, "server"), detail)
+	}
+	if g.Web && len(g.Proto) == 0 {
+		problem(yamlpath.Key(path, "proto"), "a gRPC-Web call needs the service's .proto files: its proxy does not offer reflection")
 	}
 	if !templated(g.Method) && g.Method != "" {
 		if _, _, ok := model.SplitMethod(g.Method); !ok {
@@ -47,8 +50,14 @@ func grpcDiags(file, path string, alsoAsync bool, g model.GRPC) diag.List {
 
 // grpcServerProblem is what is wrong with a server, "" when it is fine. A
 // templated server is only known when it runs.
-func grpcServerProblem(server string) string {
+func grpcServerProblem(server string, web bool) string {
 	if server == "" || strings.HasPrefix(strings.TrimSpace(server), "{{") {
+		return ""
+	}
+	if web {
+		if scheme, _, found := strings.Cut(server, "://"); found && !strings.EqualFold(scheme, "http") && !strings.EqualFold(scheme, "https") {
+			return "a gRPC-Web server is an http:// or https:// address"
+		}
 		return ""
 	}
 	if scheme, _, found := strings.Cut(server, "://"); found &&

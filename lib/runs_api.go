@@ -4,11 +4,14 @@ package flowi
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"slices"
 	"strings"
 	"time"
+
+	"github.com/githugt/flowi-lib/report"
 )
 
 // RunSummary is one saved run of a flow, as much as a history list and a
@@ -99,4 +102,39 @@ func readRunSummary(file string) (RunSummary, bool) {
 			Duration: time.Duration(n.DurationMS) * time.Millisecond})
 	}
 	return s, true
+}
+
+// RunDetail is what a saved run held at each top-level node, and the
+// variables the flow ended with, for comparing two runs in depth.
+type RunDetail struct {
+	ID      string
+	Outputs map[string]map[string]any // by node id
+	Vars    map[string]any
+}
+
+// FlowRunDetail reads the saved run id of flow t. The id is a report's file
+// name without ".json": letters and digits only, so it cannot name a file
+// outside the flow's runs folder.
+func (w *Workspace) FlowRunDetail(t FlowTarget, id string) (RunDetail, error) {
+	if id == "" || strings.IndexFunc(id, func(r rune) bool { return !isIDRune(r) }) >= 0 {
+		return RunDetail{}, fmt.Errorf("%q is not a run id", id)
+	}
+	file := filepath.Join(w.DataDir(t.Collection), "runs", string(t.Flow), id+".json")
+	data, err := os.ReadFile(file)
+	if err != nil {
+		return RunDetail{}, fmt.Errorf("reading run %s: %w", id, err)
+	}
+	var raw report.Run
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return RunDetail{}, fmt.Errorf("reading run %s: %w", id, err)
+	}
+	out := RunDetail{ID: raw.ID, Outputs: map[string]map[string]any{}, Vars: raw.Vars}
+	for _, n := range raw.Nodes {
+		out.Outputs[n.ID] = n.Outputs
+	}
+	return out, nil
+}
+
+func isIDRune(r rune) bool {
+	return r >= '0' && r <= '9' || r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z'
 }

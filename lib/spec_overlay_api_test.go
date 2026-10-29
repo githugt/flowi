@@ -77,7 +77,7 @@ func TestPreviewSpecOverlay_should_say_what_the_overlay_carries_and_what_stays_i
 			wantWhat: []string{"the body example"},
 		},
 		{
-			name:      "a body with values only Flow-I fills in",
+			name:      "a body with values only Flowi fills in",
 			request:   "pets/createPet",
 			edit:      func(v *model.RequestVersion) { v.Body = model.Body{JSON: `{"name": "{{name}}", "tag": "dog"}`} },
 			wantNotes: []string{"the body"},

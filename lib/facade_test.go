@@ -85,7 +85,7 @@ func TestOpenWorkspace_should_create_default_and_load_mounted_collections(t *tes
 
 	again := e.open(t)
 
-	if again.Model().Name != "Default" || len(again.Collections()) != 2 {
+	if again.Model().Name != "default-workspace" || len(again.Collections()) != 2 {
 		t.Fatalf("got %+v with %d collections", again.Model(), len(again.Collections()))
 	}
 	if diags := again.Validate(); len(diags) != 0 {
@@ -338,7 +338,7 @@ func TestReload_should_update_collection_after_file_change(t *testing.T) {
 }
 
 // arazzoFlow wraps a flow's own YAML (id, name, nodes, …) in the minimal
-// Arazzo document a flow file is: Flow-I reads the flow from x-flowi-flow.
+// Arazzo document a flow file is: Flowi reads the flow from x-flowi-flow.
 func arazzoFlow(body string) string {
 	var sb strings.Builder
 	sb.WriteString("arazzo: 1.1.0\nworkflows:\n  - workflowId: w\n    x-flowi-flow:\n")

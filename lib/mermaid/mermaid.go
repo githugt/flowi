@@ -121,7 +121,7 @@ func reportUnused(it *importers.Item, g *graph) {
 		it.Unmapped("subgraph "+s, "left out", "its nodes are imported; the grouping is not")
 	}
 	if labels := slices.Compact(slices.Sorted(slices.Values(g.edgeLabels))); len(labels) > 0 {
-		it.Unmapped("edge labels ("+strings.Join(labels, ", ")+")", "left out", "Flow-I edges have no labels; use a condition node for branches")
+		it.Unmapped("edge labels ("+strings.Join(labels, ", ")+")", "left out", "Flowi edges have no labels; use a condition node for branches")
 	}
 }
 
@@ -189,7 +189,7 @@ func (m *mapper) nodes(n *gnode) []model.Node {
 		}
 	case "set":
 		if name, value, ok := strings.Cut(rest, "="); has && ok && identifier(strings.TrimSpace(name)) {
-			return []model.Node{{Type: "set", Params: []model.Field{{Key: "target", Value: "vars." + strings.TrimSpace(name)}, {Key: "value", Value: strings.TrimSpace(value)}}}}
+			return []model.Node{{Type: "set", Values: []model.SetValue{{Name: strings.TrimSpace(name), Value: strings.TrimSpace(value)}}}}
 		}
 	case "assert":
 		if has && rest != "" {
@@ -229,7 +229,7 @@ func (m *mapper) delay(n *gnode, rest string) []model.Node {
 	return []model.Node{{Type: "delay", Params: []model.Field{{Key: "duration", Value: rest}}}}
 }
 
-// extract maps "name=$.path, …" to one single-form extract per pair.
+// extract maps "name=$.path, …" to one set node per pair that reads the response body.
 func (m *mapper) extract(n *gnode, rest string) []model.Node {
 	var out []model.Node
 	for _, pair := range strings.Split(rest, ",") {
@@ -238,7 +238,7 @@ func (m *mapper) extract(n *gnode, rest string) []model.Node {
 		if !ok || !identifier(name) || !strings.HasPrefix(jsonPath, "$") {
 			return m.placeholder(n, "write extract: name=$.json.path, separated by commas")
 		}
-		out = append(out, model.Node{Type: "extract", Params: []model.Field{{Key: "name", Value: name}, {Key: "from", Value: "body"}, {Key: "path", Value: jsonPath}}})
+		out = append(out, model.Node{Type: "set", Values: []model.SetValue{{Name: name, From: "response", Where: "body", Path: jsonPath}}})
 	}
 	return out
 }
@@ -262,7 +262,7 @@ func identifier(s string) bool { return identifierRE.MatchString(s) }
 func Export(f model.Flow) string {
 	e := &exporter{ids: map[string]string{}}
 	var b strings.Builder
-	fmt.Fprintf(&b, "flowchart LR\n  %%%% Flow-I flow %s; labels follow Flow-I's Mermaid conventions\n", f.Path)
+	fmt.Fprintf(&b, "flowchart LR\n  %%%% Flowi flow %s; labels follow Flowi's Mermaid conventions\n", f.Path)
 	if slices.ContainsFunc(f.Nodes, func(n model.Node) bool { return len(n.Children()) > 0 }) {
 		b.WriteString("  %% containers are drawn as subgraphs; importing them back gives placeholders\n")
 	}
@@ -441,6 +441,11 @@ func label(n model.Node) string {
 		}
 		return ""
 	}
+	if n.Type == "set" && len(n.Values) == 1 && len(n.Params) == 0 {
+		if l := setLabel(n.Values[0]); l != "" {
+			return l
+		}
+	}
 	switch {
 	case n.Type == "request" && n.Request != nil:
 		out := "req: " + cmp.Or(n.Request.Request.Path, string(n.Request.Request.ID))
@@ -452,8 +457,6 @@ func label(n model.Node) string {
 		return "subflow: " + cmp.Or(n.Subflow.Flow.Path, string(n.Subflow.Flow.ID))
 	case n.Type == "delay":
 		return "delay: " + p("duration")
-	case n.Type == "extract" && p("from") == "body" && p("path") != "" && len(n.Params) == 3:
-		return "extract: " + p("name") + "=" + p("path")
 	case n.Type == "set" && strings.HasPrefix(p("target"), "vars.") && len(n.Params) == 2:
 		return "set: " + strings.TrimPrefix(p("target"), "vars.") + "=" + p("value")
 	case n.Type == "assert" && len(n.Params) == 1:
@@ -464,6 +467,20 @@ func label(n model.Node) string {
 		return "note: " + p("text")
 	}
 	return string(n.Type) + " " + n.ID
+}
+
+// setLabel is the convention label of a set node with one value that the
+// convention can say: an expression ("set: name=value") or a read of the
+// response body ("extract: name=$.path"); "" for anything else.
+func setLabel(v model.SetValue) string {
+	text, isText := v.Value.(string)
+	switch {
+	case v.From == "response" && v.Where == "body" && v.Path != "" && v.Regex == "":
+		return "extract: " + v.Name + "=" + v.Path
+	case (v.From == "" || v.From == "expr") && isText:
+		return "set: " + v.Name + "=" + text
+	}
+	return ""
 }
 
 // escape writes a label for a quoted Mermaid shape.

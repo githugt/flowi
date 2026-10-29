@@ -1,0 +1,90 @@
+openapi: 3.0.3
+info: {title: my-example-app, version: 1.0.0}
+servers: [{url: http://localhost:8080}]
+components:
+  securitySchemes:
+    basic: {type: http, scheme: basic}
+    apiKey: {type: apiKey, in: header, name: X-API-Key}
+  schemas:
+    Example:
+      type: object
+      required: [id, name]
+      properties:
+        id: {type: string}
+        name: {type: string}
+        tags: {type: array, items: {type: string}}
+    NewExample:
+      type: object
+      required: [name]
+      properties:
+        name: {type: string}
+        tags: {type: array, items: {type: string}}
+paths:
+  /examples:
+    post:
+      operationId: createExample
+      summary: Create an example
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/NewExample'}
+      responses:
+        "201":
+          description: created
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Example'}
+  /examples/{id}:
+    parameters:
+      - {name: id, in: path, required: true, schema: {type: string}}
+    get:
+      operationId: getExample
+      summary: Get an example
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Example'}
+        "404": {description: not found}
+    put:
+      operationId: replaceExample
+      summary: Replace an example
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/NewExample'}
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Example'}
+    patch:
+      operationId: updateExample
+      summary: Update an example
+      requestBody:
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/NewExample'}
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Example'}
+  /secure/examples/{id}:
+    get:
+      operationId: getSecureExample
+      summary: Get an example, signed in
+      security: [{basic: []}, {apiKey: []}]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string}}
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Example'}

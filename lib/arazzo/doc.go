@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
-// Package arazzo imports Arazzo 1.0/1.1 workflows as Flow-I flows and
+// Package arazzo imports Arazzo 1.0/1.1 workflows as Flowi flows and
 // exports flows as Arazzo 1.0.1. Both are pure transforms over model
-// values. Flow-I and Arazzo overlap but do not match: every element that
+// values. Flowi and Arazzo overlap but do not match: every element that
 // does not carry over is reported (FLW-IMPORT-001, FLW-EXPORT-001/002)
 // and, on import, kept visible as a note node — nothing is guessed.
 package arazzo
@@ -85,7 +85,7 @@ const FlowVersion = "1.1.0"
 
 // BuiltinOperation is the operation a custom step calls: a step for a node
 // Arazzo has no word for. The generated description declares it, so the step
-// resolves in any Arazzo tool, which cannot run it; Flow-I runs the node it
+// resolves in any Arazzo tool, which cannot run it; Flowi runs the node it
 // stands for.
 const BuiltinOperation = "flowiCustomStep"
 

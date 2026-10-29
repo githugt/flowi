@@ -63,3 +63,24 @@ func TestWait_should_report_each_message_as_it_is_kept(t *testing.T) {
 		t.Fatalf("err %v kept %d seen %v", err, len(got), seen)
 	}
 }
+
+func TestWait_should_stop_at_the_message_the_keeper_refuses_and_return_what_it_had(t *testing.T) {
+	// Arrange
+	stop := errors.New("stop here")
+	var seen []string
+	r := transport.Receive{Count: 5, Timeout: time.Second, OnKept: func(m transport.Message) error {
+		seen = append(seen, string(m.Body))
+		if string(m.Body) == "b" {
+			return stop
+		}
+		return nil
+	}}
+
+	// Act
+	got, err := transport.Wait(t.Context(), r, feed("a", "b", "c"), nil)
+
+	// Assert
+	if !errors.Is(err, stop) || len(got) != 2 || len(seen) != 2 {
+		t.Fatalf("err %v kept %d seen %v (the refused message is kept, the later one is not read)", err, len(got), seen)
+	}
+}

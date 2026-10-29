@@ -19,7 +19,7 @@ func nightly() model.Schedule {
 }
 
 func workspaceFile(e env) string {
-	return filepath.Join(e.opts.Paths.ConfigDir, "workspaces", "default", "workspace.yaml")
+	return filepath.Join(e.opts.Paths.ConfigDir, "workspaces", "default-workspace", "workspace.yaml")
 }
 
 func TestAddSchedule_should_save_to_workspace_yaml_and_survive_reopening(t *testing.T) {

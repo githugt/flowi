@@ -44,7 +44,10 @@ workflows:
           with:
             email: "{{inputs.email}}"
         - id: session
-          type: extract
-          token: "{{nodes.login.token}}"
-          subject: "{{nodes.login.subject}}"
+          type: set
+          values:
+            - name: token
+              value: "{{nodes.login.token}}"
+            - name: subject
+              value: "{{nodes.login.subject}}"
 x-flowi-version: 1

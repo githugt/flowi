@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-// Package settings defines every Flow-I setting, parses values, and
+// Package settings defines every Flowi setting, parses values, and
 // resolves them across layers (built-in default → user → workspace →
 // collection → folder → request → node → environment variable → flag).
 //
@@ -223,7 +223,7 @@ func Schema() []Key {
 		{Name: "telemetry_endpoint", Kind: KindString, Default: "", FileLayers: personal,
 			Description: "URL that receives telemetry reports; empty sends nothing even when telemetry is on."},
 		{Name: "announcements", Kind: KindBool, Default: true, FileLayers: personal,
-			Description: "Show Flow-I announcements at startup."},
+			Description: "Show Flowi announcements at startup."},
 		{Name: "announcements_url", Kind: KindString, Default: "", FileLayers: personal,
 			Description: "Address of the signed announcements feed; empty fetches nothing."},
 		{Name: "announcements_keys", Kind: KindStringList, Default: []any{}, FileLayers: personal,

@@ -26,7 +26,7 @@ func digestSpec() Spec {
 			{Name: "url", Kind: ParamText, Doc: `For sink webhook: receives {"text": …}, or the report itself for format json.`},
 			{Name: "style", Kind: ParamEnum, Enum: digestStyles(), Doc: "For sink webhook: the payload shape: text and slack send {\"text\"}, discord {\"content\"}, teams a MessageCard, email {to, subject, text}. Default text. Ignored for format json."},
 			{Name: "to", Kind: ParamText, Doc: "For style email: the recipient."},
-			{Name: "subject", Kind: ParamText, Doc: `For style email: the subject. Default "Flow-I digest".`},
+			{Name: "subject", Kind: ParamText, Doc: `For style email: the subject. Default "Flowi digest".`},
 		},
 		Run: runDigest,
 	}
@@ -103,7 +103,7 @@ func stringOf(v any) string {
 // digestStyles are the webhook payload shapes, in the order they are listed.
 func digestStyles() []string { return []string{"text", "slack", "discord", "teams", "email"} }
 
-const defaultDigestSubject = "Flow-I digest"
+const defaultDigestSubject = "Flowi digest"
 
 // Message limits of the receivers, in characters (Discord answers 400 above
 // its limit; the others are kept safely below theirs).

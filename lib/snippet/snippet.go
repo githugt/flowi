@@ -122,12 +122,21 @@ func wget(r engine.PreviewRequest) string {
 	return strings.Join(args, shellContinuation)
 }
 
-func powerShell(r engine.PreviewRequest) string {
-	method := "Get"
-	if r.Method != "" {
-		method = strings.ToUpper(r.Method[:1]) + strings.ToLower(r.Method[1:])
+// psMethod is the method parameter: -Method takes only the methods PowerShell knows by name; any other (QUERY, PROPFIND, …)
+// goes in -CustomMethod, which sends the name as written.
+func psMethod(method string) string {
+	switch strings.ToUpper(method) {
+	case "", "GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS", "TRACE":
+		if method == "" {
+			return "-Method Get"
+		}
+		return "-Method " + strings.ToUpper(method[:1]) + strings.ToLower(method[1:])
 	}
-	args := []string{"Invoke-RestMethod -Method " + method + " -Uri " + psQuote(r.URL)}
+	return "-CustomMethod " + psQuote(method)
+}
+
+func powerShell(r engine.PreviewRequest) string {
+	args := []string{"Invoke-RestMethod " + psMethod(r.Method) + " -Uri " + psQuote(r.URL)}
 	var others []string
 	for _, h := range r.Headers {
 		if strings.EqualFold(h.Name, "Content-Type") {

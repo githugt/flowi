@@ -1,0 +1,26 @@
+arazzo: 1.1.0
+info: {title: examples, version: 1.0.0}
+sourceDescriptions:
+  - {name: api, url: ./openapi-3.0.yaml, type: openapi}
+workflows:
+  - workflowId: createGetUpdate
+    summary: Create an example, read it back and update it
+    steps:
+      - stepId: create
+        operationId: createExample
+        successCriteria:
+          - condition: $statusCode == 201
+        outputs:
+          id: $response.body#/id
+      - stepId: read
+        operationId: getExample
+        parameters:
+          - {name: id, in: path, value: $steps.create.outputs.id}
+        successCriteria:
+          - condition: $statusCode == 200
+      - stepId: update
+        operationId: updateExample
+        parameters:
+          - {name: id, in: path, value: $steps.create.outputs.id}
+        successCriteria:
+          - condition: $statusCode == 200

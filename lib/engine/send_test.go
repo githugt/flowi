@@ -803,3 +803,64 @@ func TestAutoPin_Given_a_record_without_a_status_Then_pins_nothing(t *testing.T)
 		t.Fatalf("pinned %q %v", file, err)
 	}
 }
+
+func TestSend_Given_overlay_adds_a_hook_flow_Then_the_hook_runs_for_that_send_only(t *testing.T) {
+	// Arrange
+	f, _ := hookFlowFixture(t, false, false)
+	flow := f.coll().Flows[0]
+	plain := f.addRequest("plain", get("/echo/"))
+	add := []model.OverlayOp{{Verb: model.OverlayAdd, Path: "hooks.pre", Value: string(flow.ID)}}
+	withOverlay := f.input(plain)
+	withOverlay.Overlay = &Overlay{Name: "configured", Ops: add}
+
+	// Act
+	laid, _ := f.send(withOverlay)
+	bare, _ := f.send(f.input(plain))
+
+	// Assert
+	if laid.Status != StatusPassed || laid.Vars["cfg"] != "cfg-token" {
+		t.Fatalf("status %s vars %v diags %v", laid.Status, laid.Vars, laid.Diags)
+	}
+	if _, ran := bare.Vars["cfg"]; ran {
+		t.Fatal("the hook must not run without the overlay")
+	}
+}
+
+func TestSend_should_read_collection_variables_and_let_the_environment_override_one_of_the_same_name(t *testing.T) {
+	// Arrange
+	f := newFixture(t)
+	v := get("/echo/")
+	v.Headers = []model.KeyValue{{Key: "X-Region", Value: "{{collection_var.region}}"}, {Key: "X-Plan", Value: "{{collection_var.plan}}"}}
+	r := f.addRequest("echo", v)
+	f.update(func(c *model.Collection) {
+		c.Manifest.Variables = []model.KeyValue{{Key: "region", Value: "eu"}, {Key: "plan", Value: "free"}}
+		c.Environments[0].Vars = append(c.Environments[0].Vars, model.EnvVar{Name: "plan", Value: "gold"})
+	})
+
+	// Act
+	res, _ := f.send(f.input(r))
+
+	// Assert
+	if res.Status != StatusPassed {
+		t.Fatalf("status %s diags %v", res.Status, res.Diags)
+	}
+	if got := f.lastEcho()["X-Region"]; got != "eu" {
+		t.Errorf("X-Region = %q: a collection variable is its own value", got)
+	}
+	if got := f.lastEcho()["X-Plan"]; got != "gold" {
+		t.Errorf("X-Plan = %q: the environment's variable of the same name wins", got)
+	}
+}
+
+func TestRun_should_read_collection_variables_in_a_flow(t *testing.T) {
+	f := newFixture(t)
+	f.addFlow("uses-collection-var", assertNode("a", `collection_var.region == "eu"`))
+	f.update(func(c *model.Collection) { c.Manifest.Variables = []model.KeyValue{{Key: "region", Value: "eu"}} })
+	fl := f.coll().Flows[0]
+
+	_, res := runFlow(context.Background(), t, f.deps(), f.runInput(fl))
+
+	if res.Status != StatusPassed {
+		t.Fatalf("run %s (%v)", res.Status, res.Diags)
+	}
+}

@@ -7,6 +7,7 @@ import (
 	"slices"
 
 	"github.com/goccy/go-yaml"
+	"github.com/goccy/go-yaml/ast"
 
 	"github.com/githugt/flowi-lib/diag"
 	"github.com/githugt/flowi-lib/model"
@@ -27,11 +28,13 @@ func (c *Codec) DecodeRequest(file, path string, data []byte) (model.Request, di
 		return r, d.diags
 	}
 	r.Meta = m.meta()
+	r.Tags = m.stringList("tags")
 	r.Operation = m.str("operation")
 	r.Default = m.versionLabel("default")
 	r.Versions = c.versions(d, m)
 	r.Edit = c.editVersion(d, m)
 	r.EditBase = m.versionLabel("edit_base")
+	r.EditOverlay = m.str("edit_overlay")
 	r.Hooks = m.hooks()
 	m.closeStrict()
 	return r, d.diags
@@ -93,12 +96,29 @@ func (c *Codec) requestVersion(d *decoder, m *mapping, label string) model.Reque
 		Docs:    m.str("docs"), Variables: m.keyValues("variables"),
 	}
 	m.describe(&v)
+	v.Auth = m.auth()
 	v.Async = m.async()
 	v.GRPC = m.grpc()
 	v.Settings = c.settingsChild(d, m, settings.LayerRequest)
 	v.Hooks = m.hooks()
 	m.closeStrict()
 	return v
+}
+
+// auth reads the auth: block of a version, nil when there is none: its type,
+// then its parameters in file order.
+func (m *mapping) auth() *model.Auth {
+	am, ok := m.child("auth")
+	if !ok {
+		return nil
+	}
+	a := &model.Auth{Type: am.str("type")}
+	for _, e := range am.rest() {
+		am.used[e.key] = true
+		a.Params = append(a.Params, model.KeyValue{Key: e.key, Value: am.d.scalarString(e.value, e.path, e.key, true)})
+	}
+	am.closeStrict()
+	return a
 }
 
 // async reads the async: block of a version, nil when there is none.
@@ -129,7 +149,7 @@ func (m *mapping) grpc() *model.GRPC {
 	if !ok {
 		return nil
 	}
-	g := &model.GRPC{Server: gm.str("server"), Method: gm.str("method"), Body: gm.body(), Proto: gm.strings("proto"), Import: gm.strings("import")}
+	g := &model.GRPC{Server: gm.str("server"), Method: gm.str("method"), Body: gm.body(), Proto: gm.strings("proto"), Import: gm.strings("import"), Web: gm.boolean("web")}
 	if rm, ok := gm.child("receive"); ok {
 		g.Receive = &model.AsyncReceive{Count: int(rm.integer("count")), Timeout: rm.duration("timeout"), Match: rm.str("match")}
 		rm.closeStrict()
@@ -145,14 +165,44 @@ func (m *mapping) body() model.Body {
 		return model.Body{}
 	}
 	b := model.Body{JSON: bm.str("json"), Text: bm.str("text"), File: bm.str("file"), Form: bm.keyValues("form")}
-	if mp, ok := bm.child("multipart"); ok {
-		b.Multipart = m.d.rawFields(mp)
+	if e, ok := bm.take("multipart"); ok {
+		b.Multipart = m.d.multipartParts(e)
 	}
 	bm.closeStrict()
 	if countBodyKinds(b) > 1 {
 		m.d.typeError(bm.path, bm.startNode(), "body", "one body kind")
 	}
 	return b
+}
+
+// multipartParts reads the parts of a multipart body: a mapping of names to
+// values, or, when a name repeats (several files sent as "files"), a list of
+// one-entry mappings in order.
+func (d *decoder) multipartParts(e entry) []model.Field {
+	if e.value.Type() != ast.SequenceType {
+		mp, ok := d.mapping(e.value, e.path, "multipart")
+		if !ok {
+			return nil
+		}
+		return d.rawFields(mp)
+	}
+	items, ok := d.sequence(e.value, e.path, "multipart")
+	if !ok {
+		return nil
+	}
+	var out []model.Field
+	for i, item := range items {
+		pm, ok := d.mapping(item, indexPath(e.path, i), "multipart")
+		if !ok {
+			continue
+		}
+		if len(pm.entries) != 1 {
+			d.typeError(indexPath(e.path, i), item, "multipart", "a part with one name")
+			continue
+		}
+		out = append(out, d.rawFields(pm)...)
+	}
+	return out
 }
 
 func countBodyKinds(b model.Body) int {
@@ -191,6 +241,7 @@ func (m *mapping) extractions() []model.Extraction {
 func (c *Codec) EncodeRequest(r model.Request) ([]byte, error) {
 	var o omap
 	putMeta(&o, r.Meta)
+	o.put("tags", r.Tags)
 	o.put("operation", r.Operation)
 	o.put("default", r.Default)
 	var versions yaml.MapSlice
@@ -201,6 +252,7 @@ func (c *Codec) EncodeRequest(r model.Request) ([]byte, error) {
 	if r.Edit != nil {
 		o.put("edit", c.encodeVersion(*r.Edit))
 		o.put("edit_base", r.EditBase)
+		o.put("edit_overlay", r.EditOverlay)
 	}
 	o.put("hooks", encodeHooks(r.Hooks))
 	return marshal(o.items)
@@ -234,6 +286,9 @@ func (c *Codec) encodeVersion(v model.RequestVersion) yaml.MapSlice {
 	}
 	o.put("query", keyValues(v.Query))
 	o.put("headers", keyValues(v.Headers))
+	if v.Auth != nil {
+		o.putAlways("auth", encodeAuth(*v.Auth))
+	}
 	if v.GRPC != nil {
 		o.putAlways("grpc", encodeGRPC(v.GRPC))
 	}
@@ -258,7 +313,7 @@ func encodeBody(b model.Body) yaml.MapSlice {
 	o.put("text", b.Text)
 	o.put("file", b.File)
 	o.put("form", keyValues(b.Form))
-	o.put("multipart", fieldsToYAML(b.Multipart))
+	o.put("multipart", multipartToYAML(b.Multipart))
 	return o.items
 }
 
@@ -353,6 +408,7 @@ func encodeGRPC(g *model.GRPC) yaml.MapSlice {
 	o.put("body", encodeBody(g.Body))
 	o.put("proto", stringsToYAML(g.Proto))
 	o.put("import", stringsToYAML(g.Import))
+	o.put("web", g.Web)
 	if g.Receive != nil {
 		var r omap
 		if g.Receive.Count != 0 {
@@ -374,4 +430,13 @@ func presentMap(items yaml.MapSlice) yaml.MapSlice {
 		return yaml.MapSlice{}
 	}
 	return items
+}
+
+// encodeAuth writes the scheme first, then its parameters.
+func encodeAuth(a model.Auth) yaml.MapSlice {
+	out := yaml.MapSlice{{Key: "type", Value: a.Type}}
+	for _, kv := range a.Params {
+		out = append(out, yaml.MapItem{Key: kv.Key, Value: kv.Value})
+	}
+	return out
 }

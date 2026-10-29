@@ -24,6 +24,19 @@ type nodeResult struct {
 	handled bool // failed, but on_error lets its list go on
 	outputs map[string]any
 	diags   diag.List
+	reason  string // why a node was skipped, when it was not by its when
+}
+
+// skippedByYou is the reason of a node the person chose not to run.
+const skippedByYou = "skipped by you"
+
+// skipSet is the set of node ids and paths in a RunInput's Skip.
+func skipSet(ids []string) map[string]bool {
+	set := make(map[string]bool, len(ids))
+	for _, id := range ids {
+		set[id] = true
+	}
+	return set
 }
 
 // runNode runs one node instance and reports it: NodeStarted, the node,
@@ -39,13 +52,16 @@ func (r *runner) runNode(ctx context.Context, f *frame, n model.Node) nodeResult
 	r.emit(NodeFinished{
 		RunID: r.runID, Path: path, Parent: f.parentPath, Lane: f.lane, Node: n.ID, Type: string(n.Type),
 		Status: res.status, Handled: res.handled, Duration: elapsed(r.deps.Clock, start), Depth: f.depth,
-		Outputs: r.shownOutputs(n.Type, res.outputs), Diags: maskDiags(res.diags, r.secrets.current()),
+		Outputs: r.shownOutputs(n.Type, res.outputs), Diags: maskDiags(res.diags, r.secrets.current()), Reason: res.reason,
 	})
 	return res
 }
 
-// execNode checks when, applies the node's timeout and runs it.
+// execNode checks skip and when, applies the node's timeout and runs it.
 func (r *runner) execNode(ctx context.Context, f *frame, n model.Node, path string) nodeResult {
+	if r.skip[n.ID] || r.skip[path] {
+		return nodeResult{status: StatusSkipped, reason: skippedByYou, outputs: r.prior[n.ID]}
+	}
 	run, diags := shouldRun(n, f.scope(r))
 	if diags.HasErrors() {
 		return nodeResult{status: StatusFailed, diags: diags}

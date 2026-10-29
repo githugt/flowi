@@ -50,7 +50,7 @@ func Export(flows []model.Flow, o ExportOptions) ([]byte, diag.List) {
 	}
 	doc := yaml.MapSlice{
 		{Key: "arazzo", Value: version},
-		{Key: "info", Value: yaml.MapSlice{{Key: "title", Value: cmp.Or(title, "Flow-I export")}, {Key: "version", Value: "1.0.0"}}},
+		{Key: "info", Value: yaml.MapSlice{{Key: "title", Value: cmp.Or(title, "Flowi export")}, {Key: "version", Value: "1.0.0"}}},
 		{Key: "sourceDescriptions", Value: sources},
 		{Key: "workflows", Value: workflows},
 	}
@@ -168,7 +168,7 @@ func (ex *exporter) node(n model.Node, st *workflowState) {
 		ok = ex.subflow(n, st)
 	case n.Type == "assert" && st.open != nil:
 		ok = ex.criterion(n, st.open, st.vars)
-	case n.Type == "extract" && st.open != nil && !hasParam(n, "from"):
+	case n.Type == "set" && st.open != nil && exprValuesOnly(n):
 		ok = ex.outputs(n, st.open, st.vars)
 	}
 	if !ok {
@@ -199,7 +199,7 @@ func (ex *exporter) request(n model.Node, st *workflowState) bool {
 	op, ok := ex.o.Resolve.OperationOf(*n.Request)
 	if ok && op.GRPC {
 		ex.limits = append(ex.limits, Limit{Node: n.ID, What: "gRPC call"})
-		return false // a custom step: Flow-I runs the call from x-flowi-flow
+		return false // a custom step: Flowi runs the call from x-flowi-flow
 	}
 	if !ok || op.ID == "" {
 		return false
@@ -209,6 +209,16 @@ func (ex *exporter) request(n model.Node, st *workflowState) bool {
 	s.action, s.receiveMS = op.Action, op.Timeout.Milliseconds()
 	ex.usedAsync = ex.usedAsync || op.Source == AsyncSource
 	ex.noteLimits(n, op)
+	if n.Request.Overlay != "" {
+		// Arazzo has no such idea: the step is the base request, said so.
+		ex.lossyValue("flowi overlay", n.ID, n.Request.Overlay)
+	}
+	for _, use := range []struct{ what, name string }{{"open connection", n.Request.Open}, {"over connection", n.Request.Over}} {
+		if use.name != "" {
+			// Arazzo has no connection kept between steps: each step stands alone.
+			ex.lossyValue(use.what, n.ID, use.name)
+		}
+	}
 	for _, kv := range n.Request.With {
 		value, ok := unmapTemplate(kv.Value, "", st.vars)
 		if !ok {
@@ -274,33 +284,44 @@ func (ex *exporter) criterion(n model.Node, s *step, vars map[string]string) boo
 	return true
 }
 
-// outputs turns a map-form extract after a request into its outputs.
+// exprValuesOnly reports whether a set node is a list of plain expressions,
+// the only kind an Arazzo step output can say.
+func exprValuesOnly(n model.Node) bool {
+	for _, v := range n.Values {
+		if _, isText := v.Value.(string); !isText || (v.From != "" && v.From != "expr") {
+			return false
+		}
+	}
+	return len(n.Values) > 0
+}
+
+// outputs turns a set node of expressions after a request into its outputs.
 // Keys written by Import (<step>_<name>) get their name back.
 func (ex *exporter) outputs(n model.Node, s *step, vars map[string]string) bool {
 	prefix := varName(s.id, "")
-	for _, f := range n.Params {
-		text, _ := f.Value.(string)
+	for _, v := range n.Values {
+		text, _ := v.Value.(string)
 		value, ok := unmapTemplate(text, s.id, vars)
 		if !ok {
-			ex.lossyValue("extract "+f.Key, n.ID, fmt.Sprint(f.Value))
+			ex.lossyValue("value "+v.Name, n.ID, fmt.Sprint(v.Value))
 			continue
 		}
-		name := cmp.Or(strings.TrimPrefix(f.Key, prefix), f.Key)
+		name := cmp.Or(strings.TrimPrefix(v.Name, prefix), v.Name)
 		s.outputs = append(s.outputs, yaml.MapItem{Key: name, Value: value})
-		vars[f.Key] = "$steps." + s.id + ".outputs." + name
+		vars[v.Name] = "$steps." + s.id + ".outputs." + name
 	}
 	return true
 }
 
 func (ex *exporter) flowOutputs(f model.Flow, vars map[string]string) yaml.MapSlice {
 	var out yaml.MapSlice
-	for _, kv := range f.Outputs {
-		value, ok := unmapTemplate(kv.Value, "", vars)
+	for _, o := range f.Outputs {
+		value, ok := unmapTemplate(o.Value, "", vars)
 		if !ok {
-			ex.lossyValue("output "+kv.Key, f.Path, kv.Value)
+			ex.lossyValue("output "+o.Name, f.Path, o.Value)
 			continue
 		}
-		out = append(out, yaml.MapItem{Key: kv.Key, Value: value})
+		out = append(out, yaml.MapItem{Key: o.Name, Value: value})
 	}
 	return out
 }
@@ -375,13 +396,4 @@ func inputsSchema(inputs []model.Input) yaml.MapSlice {
 		props = append(props, yaml.MapItem{Key: in.Name, Value: p})
 	}
 	return yaml.MapSlice{{Key: "type", Value: "object"}, {Key: "properties", Value: props}}
-}
-
-func hasParam(n model.Node, key string) bool {
-	for _, f := range n.Params {
-		if f.Key == key {
-			return true
-		}
-	}
-	return false
 }

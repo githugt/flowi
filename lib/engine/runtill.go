@@ -20,7 +20,7 @@ const defaultRunIterations = 10
 // runIterations repeats a whole flow (flow-level run:, design §7.5): each
 // iteration gets fresh nodes.<id> under "[i]/", variables carry over;
 // until is checked after each iteration, which runs at least once.
-func (r *runner) runIterations(ctx context.Context, fs *flowScope, vars *nodes.Vars, fl model.Flow) listOutcome {
+func (r *runner) runIterations(ctx context.Context, fs *flowScope, vars *nodes.Vars, fl model.Flow, prior map[string]map[string]any) listOutcome {
 	till := fl.Run
 	limit := cmpOrInt(till.MaxIterations, defaultRunIterations)
 	start := r.deps.Clock()
@@ -28,6 +28,7 @@ func (r *runner) runIterations(ctx context.Context, fs *flowScope, vars *nodes.V
 		fs.iteration = i + 1 // iterations run one after another; nothing reads fs concurrently here
 		label := "[" + strconv.Itoa(i) + "]"
 		f := &frame{fs: fs, vars: vars, outputs: newOutputs(nil), jar: r.jar, prefix: label + "/", lane: label}
+		seedPrior(f.outputs, prior, fl.Nodes)
 		out := r.runList(ctx, f, fl.Nodes)
 		if out.status != StatusPassed || r.stop.Load() {
 			return out

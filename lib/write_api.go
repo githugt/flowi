@@ -93,16 +93,16 @@ const grpcFolder = "grpc"
 // GenerateGRPCRequests creates a gRPC request for each method, at
 // grpc/<Service>/<Method> of collection, with the server, proto files and
 // import roots of base, the method's example message as its body, and the
-// starting hooks. A client-streaming method is skipped (not supported yet) and
-// so is one whose request already exists; every skip is reported.
+// starting hooks. A method that streams from the client starts with an array of
+// one example message. A method whose request already exists is skipped and reported.
 func (w *Workspace) GenerateGRPCRequests(collection model.ID, base model.GRPC, methods []grpcx.Method) (GeneratedGRPC, error) {
 	var out GeneratedGRPC
 	for _, m := range methods {
+		body := m.Example
 		if m.ClientStream {
-			out.Skipped = append(out.Skipped, m.Full()+": client streaming is not supported yet")
-			continue
+			body = "[" + m.Example + "]" // one example message; add more elements to send more
 		}
-		g := model.GRPC{Server: base.Server, Method: m.Full(), Body: model.Body{JSON: m.Example},
+		g := model.GRPC{Server: base.Server, Method: m.Full(), Body: model.Body{JSON: body},
 			Proto: slices.Clone(base.Proto), Import: slices.Clone(base.Import)}
 		path := grpcFolder + "/" + shortName(m.Service) + "/" + m.Name
 		target, err := w.newRequestWith(collection, path, model.RequestVersion{Label: "1", GRPC: &g})

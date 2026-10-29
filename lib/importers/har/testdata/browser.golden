@@ -5,12 +5,12 @@ item "har/api.example.com/post-v1-login" imported at 19:7
 item "har/api.example.com/get-v1-users-id" imported at 39:7
   warning FLW-IMPORT-006 39:7 header authorization looked like a credential and was replaced by {{secret.authorization}}
 item "har/api.example.com/put-v1-users-id-avatar" imported at 74:7
-  warning FLW-IMPORT-001 74:7 file part file has no Flow-I equivalent and was kept with its file name: the recording does not hold the file
+  warning FLW-IMPORT-001 74:7 file part file has no Flowi equivalent and was kept with its file name: the recording does not hold the file
 item "entry at line 85" skipped at 85:7
   error FLW-IMPORT-005 85:7 entry at line 85 was skipped: the entry has no request method or URL
 item "left out of the recording" imported at 0:0
-  warning FLW-IMPORT-001 0:0 static resources (3) has no Flow-I equivalent and was left out: only HTTP API calls are imported
-  warning FLW-IMPORT-001 0:0 wss traffic (1) has no Flow-I equivalent and was left out: only HTTP API calls are imported
+  warning FLW-IMPORT-001 0:0 static resources (3) has no Flowi equivalent and was left out: only HTTP API calls are imported
+  warning FLW-IMPORT-001 0:0 wss traffic (1) has no Flowi equivalent and was left out: only HTTP API calls are imported
 --- request har/api.example.com/post-v1-login
 name: POST /v1/login
 versions:
@@ -58,7 +58,7 @@ nodes:
     request:
       path: har/api.example.com/get-v1-users-id
     with:
-      id: "42"
+      id: "{{nodes.post-login.body.user.id}}"
   - id: get-users-2
     type: request
     request:
@@ -70,7 +70,7 @@ nodes:
     request:
       path: har/api.example.com/put-v1-users-id-avatar
     with:
-      id: "42"
+      id: "{{nodes.post-login.body.user.id}}"
 --- example har/api.example.com/post-v1-login har-200
 {
   "version": "1",

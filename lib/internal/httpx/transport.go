@@ -50,7 +50,7 @@ func newHTTP3Transport(o Options) (*http3.Transport, error) {
 		return nil, err
 	}
 	return &http3.Transport{
-		TLSClientConfig:    &tls.Config{RootCAs: roots, MinVersion: tls.VersionTLS13}, // QUIC requires TLS 1.3
+		TLSClientConfig:    withClientCert(&tls.Config{RootCAs: roots, MinVersion: tls.VersionTLS13}, o), // QUIC requires TLS 1.3
 		QUICConfig:         &quic.Config{HandshakeIdleTimeout: dialTimeout},
 		DisableCompression: true, // decoded by receive, like the other transports
 	}, nil
@@ -69,7 +69,7 @@ func newTransport(o Options) (*http.Transport, error) {
 	return &http.Transport{
 		Proxy:               proxyFunc(o),
 		DialContext:         dialer.DialContext,
-		TLSClientConfig:     &tls.Config{RootCAs: roots, MinVersion: tls.VersionTLS12},
+		TLSClientConfig:     clientTLS(roots, o),
 		TLSHandshakeTimeout: tlsHandshakeWait,
 		DisableCompression:  true, // decoded by receive, which also records raw sizes
 		MaxIdleConns:        maxIdleConns,
@@ -135,4 +135,17 @@ func TLSConfig(caFiles []string) (*tls.Config, error) {
 		return nil, err
 	}
 	return &tls.Config{RootCAs: roots, MinVersion: tls.VersionTLS12}, nil
+}
+
+// clientTLS is the TLS configuration of the transport: the roots, and the
+// client certificate when the request asked for mutual TLS.
+func clientTLS(roots *x509.CertPool, o Options) *tls.Config {
+	return withClientCert(&tls.Config{RootCAs: roots, MinVersion: tls.VersionTLS12}, o)
+}
+
+func withClientCert(cfg *tls.Config, o Options) *tls.Config {
+	if o.ClientCert != nil {
+		cfg.Certificates = []tls.Certificate{*o.ClientCert}
+	}
+	return cfg
 }

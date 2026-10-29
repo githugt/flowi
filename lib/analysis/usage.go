@@ -42,6 +42,7 @@ type Consumer struct {
 	Fills        []string `json:"fills,omitempty"` // the node's with keys
 	Reads        []Read   `json:"reads,omitempty"`
 	Status       Status   `json:"status"`
+	Reason       string   `json:"reason,omitempty"` // why the whole consumer is broken, when no single read is
 }
 
 // consumers lists every consumer of version v of request r (in

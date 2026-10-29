@@ -152,7 +152,7 @@ func TestNewUntitledFlow_should_pick_the_next_free_name_without_asking_for_a_pat
 	}
 }
 
-// Steps only Flow-I can run are told to the person editing, not raised by
+// Steps only Flowi can run are told to the person editing, not raised by
 // Validate: the example flows are full of them and must stay clean.
 func TestFlowCompatibility_should_name_the_steps_other_Arazzo_tools_cannot_run(t *testing.T) {
 	w := demoWorkspace(t)
@@ -161,7 +161,7 @@ func TestFlowCompatibility_should_name_the_steps_other_Arazzo_tools_cannot_run(t
 	got := w.FlowCompatibility(target)
 
 	if len(got) == 0 {
-		t.Fatal("the example flow has Flow-I-only steps")
+		t.Fatal("the example flow has Flowi-only steps")
 	}
 	for _, d := range got {
 		if d.Code != diag.CodeArazzoCustom || d.Severity != diag.SeverityWarning || d.Pos.Line == 0 || !strings.HasSuffix(d.File, "user-creation.arazzo.yaml") {
@@ -198,7 +198,7 @@ func TestFlowCompatibility_should_name_what_an_async_step_loses_in_arazzo(t *tes
 func TestFlowSource_should_show_the_draft_as_flow_text_and_as_the_arazzo_file(t *testing.T) {
 	w := demoWorkspace(t)
 	target, f := userCreation(t, w)
-	f.Outputs = append(f.Outputs, model.KeyValue{Key: "added", Value: "1"}) // an unsaved edit
+	f.Outputs = append(f.Outputs, model.Output{Name: "added", Value: "1"}) // an unsaved edit
 
 	src, err := w.FlowSource(target, f)
 
@@ -239,5 +239,38 @@ func TestParseFlowSource_Given_unknown_key_Then_diagnostic(t *testing.T) {
 
 	if len(diags) == 0 {
 		t.Fatal("an unknown key should be reported")
+	}
+}
+
+func TestCheckFlowDraft_should_report_what_is_wrong_with_the_flow_and_nothing_else(t *testing.T) {
+	// Arrange
+	w := demoWorkspace(t)
+	target, f := userCreation(t, w)
+	f.Nodes = append(f.Nodes, model.Node{ID: "ghost", Type: "request", Request: &model.RequestCall{Request: model.Ref{ID: "01JZZZZZZZZZZZZZZZZZZZZZZZ"}}})
+	before := w.Validate()
+
+	// Act
+	got := w.CheckFlowDraft(target, f)
+
+	// Assert
+	if !slices.ContainsFunc(got, func(d diag.Diagnostic) bool { return d.Code == diag.CodeRefUnknownRequest }) {
+		t.Fatalf("a step that calls a request that does not exist must be reported, got %v", got)
+	}
+	for _, d := range got {
+		if d.File != f.File {
+			t.Errorf("%v is about another file than the flow being edited", d)
+		}
+	}
+	if len(w.Validate()) != len(before) {
+		t.Error("checking a draft must not change the workspace")
+	}
+}
+
+func TestCheckFlowDraft_Given_a_sound_flow_Then_nothing_is_reported(t *testing.T) {
+	w := demoWorkspace(t)
+	target, f := userCreation(t, w)
+
+	if got := w.CheckFlowDraft(target, f); len(got) != 0 {
+		t.Fatalf("got %v", got)
 	}
 }

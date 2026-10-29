@@ -22,6 +22,11 @@ func flowNode(id string, t model.NodeType, params ...any) model.Node {
 	return n
 }
 
+// setValues is a set node that writes the given values.
+func setValues(id string, values ...model.SetValue) model.Node {
+	return model.Node{ID: id, Type: "set", Values: values}
+}
+
 func (f *fixture) runInput(fl model.Flow) RunInput {
 	return RunInput{Collection: f.coll(), Flow: fl, Env: "local"}
 }
@@ -101,7 +106,7 @@ func TestStartRun_should_emit_started_node_events_and_finished_in_order(t *testi
 
 func TestStartRun_Given_when_false_Then_node_skipped_and_has_no_outputs(t *testing.T) {
 	f := newFixture(t)
-	skipped := flowNode("a", "transform", "value", "{{1}}")
+	skipped := setValues("a", model.SetValue{Name: "one", Value: "{{1}}"})
 	skipped.When = "env.base_url == ''"
 	fl := f.addFlow("skip", skipped, flowNode("b", "note", "text", "{{nodes.a ?? 'none'}}"))
 
@@ -145,12 +150,12 @@ func TestStartRun_Given_node_timeout_Then_FLW_RUN_007_failed(t *testing.T) {
 
 func TestStartRun_should_mask_secret_outputs_in_NodeFinished(t *testing.T) {
 	f := newFixture(t)
-	fl := f.addFlow("secret", flowNode("a", "transform", "value", "pw={{secret.password}}"))
+	fl := f.addFlow("secret", setValues("a", model.SetValue{Name: "out", Value: "pw={{secret.password}}"}))
 
 	events, res := runFlow(context.Background(), t, f.deps(), f.runInput(fl))
 
 	a, _ := finishedNode(events, "a")
-	if res.Status != StatusPassed || a.Outputs["value"] != vault.Mask {
+	if res.Status != StatusPassed || a.Outputs["out"] != vault.Mask {
 		t.Fatalf("result %+v outputs %v", res, a.Outputs)
 	}
 }

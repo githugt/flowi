@@ -13,8 +13,11 @@ workflows:
       name: Local login
       nodes:
         - id: gen
-          type: generate
-          email: "{{$email}}"
+          type: set
+          values:
+            - name: email
+              from: generate
+              value: "{{$email}}"
         - id: login
           type: request
           request:

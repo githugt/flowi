@@ -22,6 +22,7 @@ func requiredFields() map[model.NodeType]requiredField {
 	noBody := requiredField{"body", func(n model.Node) bool { return len(n.Body) == 0 }}
 	return map[model.NodeType]requiredField{
 		"request":   {"request", func(n model.Node) bool { return n.Request == nil || n.Request.Request == (model.Ref{}) }},
+		"fuzz":      {"request", func(n model.Node) bool { return n.Request == nil || n.Request.Request == (model.Ref{}) }},
 		"subflow":   {"flow", func(n model.Node) bool { return n.Subflow == nil || n.Subflow.Flow == (model.Ref{}) }},
 		"batch":     noBody,
 		"run_till":  noBody,
@@ -51,6 +52,10 @@ func checkNodes(ix *index) diag.List {
 // checkNodeShape reports the first missing required field of a node.
 func checkNodeShape(n sites.Located[model.Node], known []model.NodeType, required map[model.NodeType]requiredField) diag.List {
 	t := n.Value.Type
+	if use, removed := model.RemovedNodeTypes()[t]; removed {
+		loc := diag.Location{File: n.File, Path: yamlpath.Key(n.Path, "type")}
+		return diag.List{diag.New(diag.CodeNodeRemovedType, loc, map[string]string{"type": string(t), "use": use})}
+	}
 	if !slices.Contains(known, t) {
 		loc := diag.Location{File: n.File, Path: yamlpath.Key(n.Path, "type")}
 		return diag.List{diag.New(diag.CodeNodeUnknownType, loc, map[string]string{"type": string(t)})}

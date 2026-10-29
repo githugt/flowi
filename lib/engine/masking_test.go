@@ -11,6 +11,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/githugt/flowi-lib/model"
 	"github.com/githugt/flowi-lib/report"
 )
 
@@ -27,7 +28,7 @@ func TestRun_secret_should_be_masked_everywhere(t *testing.T) {
 		flowNode("out", "digest", "format", "markdown"),
 		flowNode("file", "digest", "sink", "file", "file", "d.md"),
 		flowNode("hook", "digest", "sink", "webhook", "url", "{{env.base_url}}/echo/digest"),
-		flowNode("dump", "transform", "value", "{{ {'pw': vars.pw} }}"))
+		setValues("dump", model.SetValue{Name: "dumped", Value: "{{ {'pw': vars.pw} }}"}))
 
 	events, res := runFlow(testCtx(t), t, f.deps(), f.runInput(fl))
 

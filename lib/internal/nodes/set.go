@@ -13,12 +13,14 @@ import (
 
 func setSpec() Spec {
 	return Spec{
-		Type: "set", Group: "Data", Summary: "Insert or override a variable or (in pre-hooks) a request field.",
+		Type: "set", Group: "Data",
+		Summary: "Write variables. `values` is a list run in order, each `{name, from, value}` where `from` is `expr` (the default; `value` is a template), `literal` (`value` as written), `generate` (`value` uses generators such as `{{$uuid-v4}}`; optional `seed`) or `response` (post-hooks; `in` is `body`, `header`, `cookie` or `status`, with `path`, `header`, `cookie` or `regex`). Or `target` and `value` for one variable or, in pre-hooks, a request field.",
 		Params: []Param{
-			{Name: "target", Kind: ParamString, Required: true, Doc: "`vars.<name>`; in pre-hooks also `request.method`, `request.url`, `request.headers.<Name>`, `request.query.<name>`, `request.body[.<path>]`, `cookies.<name>`."},
-			{Name: "value", Kind: ParamAny, Required: true},
+			{Name: "target", Kind: ParamString, Doc: "Without `values`: `vars.<name>`; in pre-hooks also `request.method`, `request.url`, `request.headers.<Name>`, `request.query.<name>`, `request.body[.<path>]`, `cookies.<name>`."},
+			{Name: "value", Kind: ParamAny, Doc: "Without `values`: what `target` is set to."},
 		},
-		Run: runSet,
+		Typed: []string{"values"},
+		Run:   runSet,
 	}
 }
 
@@ -27,6 +29,9 @@ func setSpec() Spec {
 // request.query.<name>, request.body, request.body.<dot.path>, or
 // cookies.<name>.
 func runSet(_ context.Context, n model.Node, s *State) Outcome {
+	if len(n.Values) > 0 {
+		return runValues(n, s)
+	}
 	target := stringParam(n, "target")
 	raw, _ := param(n, "value")
 	v, err := eval(raw, s)

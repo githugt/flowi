@@ -8,12 +8,14 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/githugt/flowi-lib/arazzo"
 	"github.com/githugt/flowi-lib/diag"
 	"github.com/githugt/flowi-lib/model"
 	"github.com/githugt/flowi-lib/store"
+	"github.com/githugt/flowi-lib/validate"
 )
 
 // layoutFile is the layout next to a flow: user-creation.arazzo.yaml →
@@ -165,7 +167,7 @@ func (w *Workspace) NewFlow(collection model.ID, path string) (FlowTarget, error
 	return FlowTarget{Collection: collection, Flow: f.ID}, nil
 }
 
-// FlowCompatibility lists the steps of flow t that only Flow-I can run
+// FlowCompatibility lists the steps of flow t that only Flowi can run
 // (FLW-ARAZZO-002): in the Arazzo file they call the built-in operation, and
 // other Arazzo tools cannot run them; and the steps whose reply or match
 // filter Arazzo cannot say (FLW-ARAZZO-003). It is for the person editing the flow;
@@ -201,7 +203,7 @@ func nodePath(f model.Flow, id string) string {
 }
 
 // FlowText is a flow shown as text: Flow is its own data (what the code view
-// edits), File the Arazzo document Flow-I would save for it.
+// edits), File the Arazzo document Flowi would save for it.
 type FlowText struct {
 	Flow string
 	File string
@@ -237,4 +239,25 @@ func (w *Workspace) ParseFlowSource(t FlowTarget, text string) (model.Flow, diag
 	f, diags := w.store.DecodeFlowBody(current.File, current.Path, []byte(text))
 	f.ID, f.File, f.Path = current.ID, current.File, current.Path
 	return f, diags, nil
+}
+
+// CheckFlowDraft validates f in place of the flow t names, with the rest of
+// the workspace as it is, and returns the problems in that flow's own file.
+// It is what a draft not yet saved would be reported for; nothing is changed.
+func (w *Workspace) CheckFlowDraft(t FlowTarget, f model.Flow) diag.List {
+	c, current, err := w.flowFor(t)
+	if err != nil {
+		return nil
+	}
+	f.ID, f.File, f.Path = current.ID, current.File, current.Path
+	c.Flows = slices.Clone(c.Flows)
+	for i := range c.Flows {
+		if c.Flows[i].ID == f.ID {
+			c.Flows[i] = f
+		}
+	}
+	w.mu.RLock()
+	defer w.mu.RUnlock()
+	all := validate.Validate(validate.Target{Collections: withCollection(w.collections, c)})
+	return w.positioned(slices.DeleteFunc(all, func(d diag.Diagnostic) bool { return d.File != f.File }))
 }

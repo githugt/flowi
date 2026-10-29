@@ -7,6 +7,7 @@ import (
 	"github.com/githugt/flowi-lib/model"
 	"github.com/githugt/flowi-lib/transport"
 	"github.com/githugt/flowi-lib/transport/amqp"
+	"github.com/githugt/flowi-lib/transport/amqp10"
 	"github.com/githugt/flowi-lib/transport/kafka"
 	"github.com/githugt/flowi-lib/transport/mqtt"
 	"github.com/githugt/flowi-lib/transport/nats"
@@ -27,6 +28,7 @@ func New() transport.Registry {
 		model.ProtocolMQTT:       mqtt.New(),
 		model.ProtocolKafka:      kafka.New(),
 		model.ProtocolAMQP:       amqp.New(),
+		model.ProtocolAMQP10:     amqp10.New(),
 		model.ProtocolNATS:       nats.New(),
 		model.ProtocolRedis:      redis.New(),
 		model.ProtocolPubSub:     pubsub.New(),

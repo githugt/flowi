@@ -59,13 +59,19 @@ workflows:
             id: 01JA0000000000000000000022
             path: shared/login
         - id: who
-          type: extract
-          token: "{{nodes.session.token}}"
-          subject: "{{nodes.session.subject}}"
+          type: set
+          values:
+            - name: token
+              value: "{{nodes.session.token}}"
+            - name: subject
+              value: "{{nodes.session.subject}}"
         - id: profile
-          type: generate
-          seed: 42
-          nickname: "{{$first-name}}"
+          type: set
+          values:
+            - name: nickname
+              from: generate
+              value: "{{$first-name}}"
+              seed: 42
         - id: checks
           type: batch
           times: 3
@@ -76,8 +82,10 @@ workflows:
               url: "{{env.base_url}}/v1/config"
               transform: "{{response.body.client_id}}"
             - id: double
-              type: calc
-              twice: "{{index * 2}}"
+              type: set
+              values:
+                - name: twice
+                  value: "{{index * 2}}"
         - id: both
           type: parallel
           wait: all
@@ -120,9 +128,10 @@ workflows:
               type: log
               value: Onboarding is still pending.
         - id: passed
-          type: transform
-          value: "{{nodes.checks.passed}}"
-          into: checked
+          type: set
+          values:
+            - name: checked
+              value: "{{nodes.checks.passed}}"
         - id: all-checked
           type: assert
           check: vars.checked == 3

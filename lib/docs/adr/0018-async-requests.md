@@ -6,7 +6,7 @@
 
 ## Context
 
-Flow-I is moving from "an HTTP tool" to defining what requests are (HTTP, async, later gRPC)
+Flowi is moving from "an HTTP tool" to defining what requests are (HTTP, async, later gRPC)
 with hooks around each, and stitching them with Arazzo. Arazzo 1.1 can call AsyncAPI operations
 with `action: send|receive`. The owner asked for WebSocket, SSE and MQTT first "and any more you
 need": the engine, record, hooks, schemas, descriptions and UI all had to learn a second kind of
@@ -36,7 +36,7 @@ request without disturbing the first.
   that reads a secret) are never written to it.
 - **Flows call async requests with Arazzo 1.1 steps**: `operationId` in the `flowi-async` source,
   `action`, and `timeout` (milliseconds) from the receive timeout. A reply and a match filter have
-  no place in a step, so Flow-I keeps them (the flow's own data is whole in `x-flowi-flow`) and
+  no place in a step, so Flowi keeps them (the flow's own data is whole in `x-flowi-flow`) and
   warns that other tools do not see them (`FLW-ARAZZO-003`, from `FlowCompatibility`).
 
 ## Consequences

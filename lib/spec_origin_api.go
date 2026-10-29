@@ -96,7 +96,7 @@ func versionAfter(m specMatch, layers []overlayLayer, requestPath, label string)
 	if err != nil {
 		return model.RequestVersion{}, false
 	}
-	v, _, err := versionIn(doc, requestPath, label)
+	v, _, err := versionIn(doc, m.kept.refFiles(), requestPath, label)
 	return v, err == nil
 }
 

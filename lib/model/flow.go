@@ -4,10 +4,27 @@ package model
 
 import "time"
 
-// Input is a declared flow input with an optional default template.
+// InputTypes are the types a flow input or output may declare; "" means any.
+func InputTypes() []string {
+	return []string{"string", "number", "boolean", "object", "array"}
+}
+
+// Input is a declared flow input with an optional type and default template.
+// A flow keeps its inputs in the order they were written: the Start card shows
+// them in that order.
 type Input struct {
 	Name    string
+	Type    string
 	Default string
+}
+
+// Output is a value a flow hands back when it ends: a subflow's caller reads
+// it as nodes.<id>.<name>, and the End card shows it. Value is a template
+// rendered in the flow's final scope.
+type Output struct {
+	Name  string
+	Type  string
+	Value string
 }
 
 // Execution controls where concurrency is allowed to go. RateLimit
@@ -31,10 +48,12 @@ type RunTill struct {
 // .flow.yaml suffix.
 type Flow struct {
 	Meta
+	// Tags label the flow for `flowi run --tag`; the tags of its folders apply as well.
+	Tags          []string
 	Path          string
 	PreferVersion string
 	Inputs        []Input
-	Outputs       []KeyValue // name → template rendered when the flow ends (subflows)
+	Outputs       []Output // rendered when the flow ends, in this order
 	Execution     Execution
 	Run           *RunTill
 	Nodes         []Node

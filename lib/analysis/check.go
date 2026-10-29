@@ -32,12 +32,26 @@ func worst(a, b Status) Status {
 // consumer's to the worst of them. A consumer that reads nothing is
 // compatible: nothing it relies on can be missing.
 func checked(c Consumer, contract Contract) Consumer {
+	if contract.Removed {
+		return removed(c)
+	}
 	c.Reads = slices.Clone(c.Reads)
 	c.Status = Compatible
 	for i, r := range c.Reads {
 		c.Reads[i] = checkRead(r, contract)
 		c.Status = worst(c.Status, c.Reads[i].Status)
 	}
+	return c
+}
+
+// removed marks a consumer of a request version the API no longer has: broken as a whole, and each read says so.
+func removed(c Consumer) Consumer {
+	const why = "the API description no longer has this request"
+	c.Reads = slices.Clone(c.Reads)
+	for i := range c.Reads {
+		c.Reads[i].Status, c.Reads[i].Reason = Broken, why
+	}
+	c.Status, c.Reason = Broken, why
 	return c
 }
 

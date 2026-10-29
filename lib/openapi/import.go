@@ -4,6 +4,7 @@ package openapi
 
 import (
 	"fmt"
+	"io/fs"
 	"maps"
 	"path"
 	"regexp"
@@ -16,6 +17,7 @@ import (
 	"github.com/githugt/flowi-lib/diag"
 	"github.com/githugt/flowi-lib/importers"
 	"github.com/githugt/flowi-lib/internal/jsonschema"
+	"github.com/githugt/flowi-lib/internal/textenc"
 	"github.com/githugt/flowi-lib/internal/yamldoc"
 	"github.com/githugt/flowi-lib/model"
 	"github.com/githugt/flowi-lib/version"
@@ -24,6 +26,10 @@ import (
 // Options configure Import.
 type Options struct {
 	NewID func() model.ID // ids for new requests and flows
+	// Files is where references to other files ("$ref: ./schemas/pet.yaml")
+	// are read from, rooted at the folder of the document. Nil: they are
+	// reported and left out.
+	Files fs.FS
 }
 
 // Result is what an OpenAPI document becomes.
@@ -33,11 +39,24 @@ type Result struct {
 	// status code → JSON schema with references inlined.
 	Schemas map[string]map[string]map[string]any
 	Flows   []model.Flow // suggested from links; Path is relative to flows/
+	// Files are the files the document's references were followed into: path
+	// (relative to the folder of the document, slash-separated) → content. They
+	// are what a later import of a kept copy needs beside it.
+	Files map[string][]byte
 }
 
 // methods in the order operations are read.
 func methods() []string {
-	return []string{"get", "put", "post", "delete", "options", "head", "patch", "trace"}
+	return []string{"get", "put", "post", "delete", "options", "head", "patch", "trace", "query"}
+}
+
+// verb is the HTTP method as sent: the fixed fields of a path item are written in lower case, so they are upper-cased;
+// a name from additionalOperations is a case-sensitive token and is kept as written.
+func (o operation) verb() string {
+	if slices.Contains(methods(), o.method) {
+		return strings.ToUpper(o.method)
+	}
+	return o.method
 }
 
 var versionPrefix = regexp.MustCompile(`^/v(\d+)(/.*)?$`)
@@ -52,6 +71,7 @@ type operation struct {
 // Import maps an OpenAPI 3.0/3.1 or Swagger 2.0 document (YAML or JSON; Swagger is converted to 3.0 first) to requests,
 // response schemas and suggested flows.
 func Import(data []byte, o Options) (Result, diag.List) {
+	data = textenc.ToUTF8(data)
 	if isSwagger2(data) {
 		upgraded, err := upgradeSwagger2(data)
 		if err != nil {
@@ -66,7 +86,8 @@ func Import(data []byte, o Options) (Result, diag.List) {
 	if err != nil {
 		return Result{}, invalid(err.Error())
 	}
-	res := &resolver{root: root}
+	res := newResolver(root, o.Files)
+	res.expandPathItems()
 	groups := groupOperations(operations(root))
 	out := Result{Schemas: map[string]map[string]map[string]any{}}
 	byOperation := map[string]model.Request{}
@@ -86,7 +107,24 @@ func Import(data []byte, o Options) (Result, diag.List) {
 	}
 	flows, linkDiags := suggestedFlows(groups, byOperation, o.NewID)
 	out.Flows = flows
-	return out, slices.Concat(diags, linkDiags, externalRefs(res))
+	out.Files = res.fileContents()
+	return out, slices.Concat(diags, linkDiags, externalRefs(res), missingOperationIDs(groups, paths))
+}
+
+// missingOperationIDs warns about each operation without an operationId: its
+// request is named from the method and path, which is fine for Flowi, but an
+// Arazzo step refers to an operation only by its operationId.
+func missingOperationIDs(groups [][]operation, paths []string) diag.List {
+	var out diag.List
+	for i, g := range groups {
+		for _, op := range g {
+			if id, _ := op.op["operationId"].(string); id == "" {
+				out = append(out, diag.New(diag.CodeImportNoOpID, diag.Location{}, map[string]string{
+					"operation": op.verb() + " " + op.path, "name": paths[i]}))
+			}
+		}
+	}
+	return out
 }
 
 // requestPaths names the request of each group, unique in group order: the
@@ -118,11 +156,25 @@ func invalid(detail string) diag.List {
 
 func externalRefs(r *resolver) diag.List {
 	var out diag.List
-	for _, ref := range r.external {
+	for _, ref := range r.order {
 		out = append(out, diag.New(diag.CodeImportUnmapped, diag.Location{},
-			map[string]string{"what": "external reference " + ref, "how": "left out", "detail": "only references within the document are followed"}))
+			map[string]string{"what": "external reference " + ref, "how": "left out", "detail": r.external[ref]}))
 	}
 	return out
+}
+
+// expandPathItems replaces each path item that is a reference to another file
+// (`/pets: {$ref: ./paths/pets.yaml}`) with the item it names, so that its
+// operations are imported like any other.
+func (r *resolver) expandPathItems() {
+	paths, _ := r.main.root["paths"].(map[string]any)
+	for p, item := range paths {
+		if m, ok := item.(map[string]any); ok {
+			if ref, _ := m["$ref"].(string); ref != "" && !strings.HasPrefix(ref, "#") {
+				paths[p] = r.resolve(m)
+			}
+		}
+	}
 }
 
 // operations lists every operation, paths sorted.
@@ -144,6 +196,14 @@ func operations(root map[string]any) []operation {
 			if op, ok := item[method].(map[string]any); ok {
 				out = append(out, operation{method: method, path: p, stripped: stripped, label: label, op: op, pathParams: shared})
 			}
+		}
+		extra, _ := item["additionalOperations"].(map[string]any)
+		for _, name := range slices.Sorted(maps.Keys(extra)) {
+			op, ok := extra[name].(map[string]any)
+			if !ok || slices.Contains(methods(), strings.ToLower(name)) {
+				continue // OpenAPI keeps the fixed fields for the fixed methods
+			}
+			out = append(out, operation{method: name, path: p, stripped: stripped, label: label, op: op, pathParams: shared})
 		}
 	}
 	return out
@@ -249,14 +309,14 @@ func nameOf(op operation) string {
 	if id, _ := op.op["operationId"].(string); id != "" {
 		return id
 	}
-	return strings.ToUpper(op.method) + " " + op.stripped
+	return op.verb() + " " + op.stripped
 }
 
 var pathParam = regexp.MustCompile(`\{([^}]+)\}`)
 
 func versionOf(op operation, res *resolver) model.RequestVersion {
 	url := pathParam.ReplaceAllStringFunc(op.path, func(m string) string { return "{{" + ParamKey(m[1:len(m)-1]) + "}}" })
-	v := model.RequestVersion{Label: op.label, Method: strings.ToUpper(op.method), URL: "{{env.base_url}}" + url}
+	v := model.RequestVersion{Label: op.label, Method: op.verb(), URL: "{{env.base_url}}" + url}
 	v.Docs, _ = op.op["description"].(string) // the operation's description is the version's documentation
 	for _, p := range append(slices.Clone(op.pathParams), paramsOf(op.op)...) {
 		pm, _ := res.resolve(p).(map[string]any)
@@ -285,7 +345,7 @@ func bodyOf(op map[string]any, res *resolver) model.Body {
 	content, _ := rb["content"].(map[string]any)
 	if mt, ok := content["application/json"].(map[string]any); ok {
 		// The media type's example wins over the schema's, as OpenAPI says; a
-		// spec overlay saved from Flow-I puts the edited body there.
+		// spec overlay saved from Flowi puts the edited body there.
 		if ex, ok := mt["example"]; ok {
 			return model.Body{JSON: jsonValue{raw: ex}.text()}
 		}
@@ -320,7 +380,7 @@ func responseSchemas(op operation, res *resolver) (map[string]any, diag.List) {
 		case schema == nil:
 		case !statusCode.MatchString(code):
 			diags = append(diags, diag.New(diag.CodeImportUnmapped, diag.Location{}, map[string]string{
-				"what": fmt.Sprintf("response %q of %s %s", code, strings.ToUpper(op.method), op.path), "how": "left out",
+				"what": fmt.Sprintf("response %q of %s %s", code, op.verb(), op.path), "how": "left out",
 				"detail": "only exact status codes are kept as contracts"}))
 		default:
 			out[code] = schema
@@ -395,7 +455,7 @@ func linkFlow(from, to model.Request, link map[string]any, id model.ID) (model.F
 		if !ok {
 			diags = append(diags, diag.New(diag.CodeImportUnmapped, diag.Location{}, map[string]string{
 				"what": fmt.Sprintf("link parameter %s from %s to %s", k, fromID, toID), "how": "left out",
-				"detail": fmt.Sprintf("expression %q has no Flow-I equivalent", fmt.Sprint(params[k]))}))
+				"detail": fmt.Sprintf("expression %q has no Flowi equivalent", fmt.Sprint(params[k]))}))
 			continue
 		}
 		with = append(with, model.KeyValue{Key: ParamKey(k), Value: value})

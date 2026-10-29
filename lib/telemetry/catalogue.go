@@ -67,7 +67,7 @@ func CommandNames() []string {
 	return []string{
 		"send", "run", "ls", "validate", "fmt", "serve", "import", "export", "new", "config", "secret", "env",
 		"workspace", "init", "schedule", "news", "changelog", "telemetry", "version", "impact", "cookies",
-		"blueprint", "other",
+		"blueprint", "overlay", "access", "coverage", "drift", "other",
 	}
 }
 

@@ -244,3 +244,25 @@ func TestBuild_Given_an_empty_header_Then_the_default_is_not_added(t *testing.T)
 		t.Fatalf("headers %v", b.request.Header)
 	}
 }
+
+// A multipart file part written in a request file decodes as an ordered
+// mapping ([]model.Field), not a Go map: both must send the file.
+func TestBuild_should_send_a_multipart_file_part_the_way_a_request_file_decodes_it(t *testing.T) {
+	// Arrange
+	root := t.TempDir()
+	if err := os.WriteFile(filepath.Join(root, "doc.txt"), []byte("hi there"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	in := baseInput(model.RequestVersion{Method: "POST", URL: "http://x", Body: model.Body{Multipart: []model.Field{
+		{Key: "doc", Value: []model.Field{{Key: "file", Value: "doc.txt"}, {Key: "content_type", Value: "text/plain"}}},
+	}}}, map[string]any{})
+	in.root = root
+
+	// Act
+	body, diags := build(in)
+
+	// Assert
+	if text := bodyText(t, body); len(diags) != 0 || !strings.Contains(text, "hi there") || !strings.Contains(text, "text/plain") {
+		t.Fatalf("diags %v body %q", diags, text)
+	}
+}

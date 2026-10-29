@@ -35,9 +35,10 @@ func (h HookRef) Label() string {
 
 // HookChain is every hook step for one request version, in run order:
 // Pre outermost first (collection → folders → request → version), Post
-// the exact reverse.
+// the exact reverse, and Message (run for each message a message request
+// keeps) outermost first like Pre.
 type HookChain struct {
-	Pre, Post []HookRef
+	Pre, Post, Message []HookRef
 }
 
 // ChainFor collects the hooks that apply to version v of request r in
@@ -53,6 +54,7 @@ func ChainFor(c model.Collection, r model.Request, v model.RequestVersion) HookC
 	var chain HookChain
 	for _, l := range levels {
 		chain.Pre = append(chain.Pre, refs(l.level, l.hooks.Pre)...)
+		chain.Message = append(chain.Message, refs(l.level, l.hooks.Message)...)
 	}
 	for _, l := range slices.Backward(levels) {
 		chain.Post = append(chain.Post, refs(l.level, l.hooks.Post)...)
@@ -100,6 +102,9 @@ func (c HookChain) Filter(ctl model.HookControl) HookChain {
 	}
 	if slices.Contains(ctl.Skip, "post") {
 		out.Post = nil
+	}
+	if slices.Contains(ctl.Skip, "message") {
+		out.Message = nil
 	}
 	return out
 }

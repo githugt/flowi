@@ -12,7 +12,7 @@ import (
 // proxy.http setting is used for both HTTP and HTTPS. Otherwise the
 // conventional HTTP_PROXY, HTTPS_PROXY and NO_PROXY variables (or their
 // lower-case forms) are read from environ, so a machine's usual proxy
-// setup works without Flow-I-specific configuration. NO_PROXY applies in
+// setup works without Flowi-specific configuration. NO_PROXY applies in
 // both cases.
 func ProxyConfig(proxySetting string, environ []string) *httpproxy.Config {
 	get := environLookup(environ)

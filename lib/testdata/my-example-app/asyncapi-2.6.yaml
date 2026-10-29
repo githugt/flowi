@@ -1,0 +1,22 @@
+asyncapi: 2.6.0
+info: {title: my-example-app events, version: 1.0.0}
+servers:
+  nats: {url: 'nats://localhost:4222', protocol: nats}
+channels:
+  examples.created:
+    publish:
+      operationId: publishExample
+      message:
+        payload:
+          type: object
+          properties:
+            name: {type: string}
+        examples:
+          - payload: {name: first}
+    subscribe:
+      operationId: onExample
+      message:
+        payload:
+          type: object
+          properties:
+            name: {type: string}

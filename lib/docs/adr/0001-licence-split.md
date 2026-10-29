@@ -5,7 +5,7 @@
 
 ## Context
 
-Flow-I is free and open source and aims at outside users. The core engine should be easy for
+Flowi is free and open source and aims at outside users. The core engine should be easy for
 others to embed (CI tools, internal test harnesses), while the end-user applications should
 stay copyleft. AGPL on a library forces every program that imports it to be AGPL too, which
 would block embedding.

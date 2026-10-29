@@ -20,7 +20,7 @@ type DataLink struct {
 
 // DataLinks lists the values the nodes of f pass to each other, in the order
 // the readers appear. A variable counts as made by the last node before the
-// reader that writes it, except a `generate` node: its values are fresh, not
+// reader that writes it, except a value made by a generator: it is fresh, not
 // taken from another step. A node reading its own output is not a link.
 func DataLinks(f model.Flow) []DataLink {
 	flat := flattenNodes(f.Nodes, nil)
@@ -77,12 +77,12 @@ func joinFrom(path []string, n int) string {
 	return out
 }
 
-// writerOf is the last node in earlier that writes variable name; generate
-// nodes are skipped on purpose (see DataLinks).
+// writerOf is the last node in earlier that writes variable name; generated
+// values are skipped on purpose (see DataLinks).
 func writerOf(name string, earlier []model.Node) string {
 	for i := len(earlier) - 1; i >= 0; i-- {
 		n := earlier[i]
-		if n.Type == "generate" {
+		if sites.GeneratedVars(n)[name] {
 			continue
 		}
 		for _, target := range sites.OwnWrites(n) {

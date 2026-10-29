@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/githugt/flowi-lib/schema/blueprint.schema.json",
-  "title": "Flow-I blueprint (*.blueprint.yaml)",
+  "title": "Flowi blueprint (*.blueprint.yaml)",
   "description": "A flow template with declared parameters. Nodes are checked only for id and type here; the flow made from the blueprint is checked in full against flow.schema.json. A request or subflow reference may be {param: name}.",
   "type": "object",
   "additionalProperties": false,

@@ -14,6 +14,7 @@ import (
 
 	"github.com/githugt/flowi-lib/arazzo"
 	"github.com/githugt/flowi-lib/diag"
+	"github.com/githugt/flowi-lib/flowioverlay"
 	"github.com/githugt/flowi-lib/internal/migrate"
 	"github.com/githugt/flowi-lib/model"
 )
@@ -32,7 +33,7 @@ func (s *Store) Load(root string) (model.Collection, diag.List, error) {
 	}
 	c.Manifest = manifest
 	if slices.ContainsFunc(diags, func(d diag.Diagnostic) bool { return d.Code == diag.CodeFormatTooNew }) {
-		// Files written by a newer Flow-I may use syntax this version
+		// Files written by a newer Flowi may use syntax this version
 		// misreads, so nothing else is decoded.
 		return c, diags, nil
 	}
@@ -141,6 +142,12 @@ func (s *Store) decodeInto(c model.Collection, f discovered, data []byte) (model
 		if bp.ID != "" {
 			c.Blueprints = append(c.Blueprints, bp)
 		}
+	case kindOverlay:
+		var ov model.Overlay
+		ov, diags = flowioverlay.Decode(f.abs, strings.TrimSuffix(path.Base(f.rel), flowioverlay.Suffix), data)
+		if !unparsed(diags) {
+			c.Overlays = append(c.Overlays, ov)
+		}
 	case kindFolder:
 		var fo model.Folder
 		fo, diags = s.codec.DecodeFolder(f.abs, path.Dir(f.rel), data)
@@ -200,6 +207,7 @@ func withoutFile(c model.Collection, file string) model.Collection {
 	c.Flows = slices.DeleteFunc(slices.Clone(c.Flows), func(f model.Flow) bool { return f.File == file })
 	c.Folders = slices.DeleteFunc(slices.Clone(c.Folders), func(f model.Folder) bool { return f.File == file })
 	c.Blueprints = slices.DeleteFunc(slices.Clone(c.Blueprints), func(b model.Blueprint) bool { return b.File == file })
+	c.Overlays = slices.DeleteFunc(slices.Clone(c.Overlays), func(o model.Overlay) bool { return o.File == file })
 	return c
 }
 
@@ -211,6 +219,7 @@ func withoutPrefix(c model.Collection, dir string) model.Collection {
 	c.Flows = slices.DeleteFunc(slices.Clone(c.Flows), func(f model.Flow) bool { return under(f.File) })
 	c.Folders = slices.DeleteFunc(slices.Clone(c.Folders), func(f model.Folder) bool { return under(f.File) })
 	c.Blueprints = slices.DeleteFunc(slices.Clone(c.Blueprints), func(b model.Blueprint) bool { return under(b.File) })
+	c.Overlays = slices.DeleteFunc(slices.Clone(c.Overlays), func(o model.Overlay) bool { return under(o.File) })
 	return c
 }
 
@@ -221,6 +230,7 @@ func sortEntities(c model.Collection) model.Collection {
 	slices.SortFunc(c.Flows, func(a, b model.Flow) int { return strings.Compare(a.File, b.File) })
 	slices.SortFunc(c.Folders, func(a, b model.Folder) int { return strings.Compare(a.File, b.File) })
 	slices.SortFunc(c.Blueprints, func(a, b model.Blueprint) int { return strings.Compare(a.File, b.File) })
+	slices.SortFunc(c.Overlays, func(a, b model.Overlay) int { return strings.Compare(a.File, b.File) })
 	return c
 }
 

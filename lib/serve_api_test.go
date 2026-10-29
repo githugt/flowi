@@ -19,6 +19,7 @@ import (
 	"time"
 
 	"github.com/githugt/flowi-lib/model"
+	"github.com/githugt/flowi-lib/serve/replay"
 	"github.com/githugt/flowi-lib/serve/shared/sharedtest"
 )
 
@@ -309,16 +310,19 @@ func TestServe_should_fail_fast_on_a_port_in_use_and_on_bad_options(t *testing.T
 	spareAddr := spare.Addr().String()
 	_ = spare.Close() // free again: the replayer binds it and a --record URL points back at it
 	invalid := map[string]bool{"bad address": true, "record not a URL": true, "record not http": true, "record to itself": true,
-		"nothing to serve": true, "negative latency": true, "negative shutdown": true}
+		"nothing to serve": true, "negative latency": true, "negative shutdown": true, "fault rate over one": true, "faults with record": true, "tape without record": true}
 	cases := map[string]ServeOptions{
-		"port in use":       {ReplayAddr: taken.Addr().String()},
-		"bad address":       {ReplayAddr: "not an address"},
-		"record not a URL":  {ReplayAddr: "127.0.0.1:0", Record: "::"},
-		"record not http":   {ReplayAddr: "127.0.0.1:0", Record: "ftp://example.com"},
-		"record to itself":  {ReplayAddr: spareAddr, Record: "http://" + spareAddr},
-		"nothing to serve":  {NoReplay: true, NoTriggers: true, NoSchedules: true},
-		"negative latency":  {ReplayAddr: "127.0.0.1:0", Latency: -time.Second},
-		"negative shutdown": {ReplayAddr: "127.0.0.1:0", ShutdownTimeout: -time.Second},
+		"port in use":         {ReplayAddr: taken.Addr().String()},
+		"bad address":         {ReplayAddr: "not an address"},
+		"record not a URL":    {ReplayAddr: "127.0.0.1:0", Record: "::"},
+		"record not http":     {ReplayAddr: "127.0.0.1:0", Record: "ftp://example.com"},
+		"record to itself":    {ReplayAddr: spareAddr, Record: "http://" + spareAddr},
+		"nothing to serve":    {NoReplay: true, NoTriggers: true, NoSchedules: true},
+		"negative latency":    {ReplayAddr: "127.0.0.1:0", Latency: -time.Second},
+		"negative shutdown":   {ReplayAddr: "127.0.0.1:0", ShutdownTimeout: -time.Second},
+		"tape without record": {ReplayAddr: "127.0.0.1:0", RecordHAR: "x.har"},
+		"fault rate over one": {ReplayAddr: "127.0.0.1:0", Faults: replay.Faults{ErrorRate: 1.5}},
+		"faults with record":  {ReplayAddr: "127.0.0.1:0", Record: "http://127.0.0.1:1", Faults: replay.Faults{DropRate: 0.5}},
 	}
 	for name, o := range cases {
 		t.Run(name, func(t *testing.T) {

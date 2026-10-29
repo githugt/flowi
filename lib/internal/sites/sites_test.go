@@ -22,7 +22,7 @@ func TestNodeTemplates_should_carry_the_owning_node_id(t *testing.T) {
 }
 
 func TestFlowTemplates_should_have_no_owning_node(t *testing.T) {
-	f := model.Flow{File: "f.yaml", Outputs: []model.KeyValue{{Key: "token", Value: "{{nodes.a.b}}"}}}
+	f := model.Flow{File: "f.yaml", Outputs: []model.Output{{Name: "token", Value: "{{nodes.a.b}}"}}}
 
 	got := sites.FlowTemplates(f)
 
@@ -45,7 +45,7 @@ func TestResolvedVersion_Given_pin_prefer_default_Then_pin_wins(t *testing.T) {
 
 func TestWrittenVars_should_include_nested_writers(t *testing.T) {
 	list := []model.Node{{ID: "p", Type: "parallel", Branches: []model.Branch{{ID: "b", Nodes: []model.Node{
-		{ID: "g", Type: "generate", Params: []model.Field{{Key: "city", Value: "{{$city-name}}"}}},
+		{ID: "g", Type: "set", Values: []model.SetValue{{Name: "city", From: "generate", Value: "{{$city-name}}"}}},
 	}}}}}
 
 	got := sites.WrittenVars(list)

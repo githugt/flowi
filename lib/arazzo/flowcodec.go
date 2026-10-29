@@ -22,7 +22,7 @@ const flowiSource = "flowi"
 // parts (steps, success criteria, outputs, inputs) are derived for other
 // Arazzo tools; a node Arazzo cannot express becomes a custom step. The flow's
 // own data is kept whole in the workflow's x-flowi-flow, which is what
-// Flow-I reads back, so the round trip loses nothing.
+// Flowi reads back, so the round trip loses nothing.
 func EncodeFlow(f model.Flow, o FlowOptions) ([]byte, diag.List, error) {
 	body, err := o.Body.EncodeFlow(f)
 	if err != nil {
@@ -58,12 +58,12 @@ func sourceList(sources []SourceDescription) []any {
 	return out
 }
 
-// DecodeFlow reads a flow from an Arazzo document. A document Flow-I wrote
+// DecodeFlow reads a flow from an Arazzo document. A document Flowi wrote
 // carries x-flowi-flow, which is trusted; if the standard part of a step no
 // longer matches what that data derives, the step was edited elsewhere:
-// FLW-ARAZZO-001, and Flow-I's data is used. A foreign document (no
+// FLW-ARAZZO-001, and Flowi's data is used. A foreign document (no
 // extension) is read through the importer: its first workflow becomes the
-// flow, and what has no Flow-I equivalent is reported by Import.
+// flow, and what has no Flowi equivalent is reported by Import.
 func DecodeFlow(file, path string, data []byte, o FlowOptions) (model.Flow, diag.List) {
 	var root map[string]any
 	if err := yaml.Unmarshal(data, &root); err != nil {
@@ -98,7 +98,7 @@ func decodeForeign(file, path string, data []byte, o FlowOptions) (model.Flow, d
 }
 
 // driftDiags reports a workflow whose standard steps no longer match the
-// digest Flow-I wrote beside them: someone edited them in another tool. A
+// digest Flowi wrote beside them: someone edited them in another tool. A
 // file without a digest (written by hand) is not checked.
 func driftDiags(f model.Flow, fileWorkflow map[string]any, file string) diag.List {
 	want, _ := fileWorkflow["x-flowi-digest"].(string)
@@ -128,7 +128,7 @@ func stepsDigest(steps any) string {
 }
 
 // CustomStep is a node of a flow that Arazzo cannot express: its step calls
-// the built-in operation and only Flow-I can run it.
+// the built-in operation and only Flowi can run it.
 type CustomStep struct {
 	Node  string // the node's id
 	Type  string // the node's type
@@ -186,7 +186,7 @@ func valueOf(m yaml.MapSlice, key string) any {
 
 // Limit is something an otherwise standard Arazzo step cannot say: What is
 // "reply" (the request also waits for a reply) or "match" (it filters the
-// messages it counts). Flow-I keeps both; other Arazzo tools do not see them.
+// messages it counts). Flowi keeps both; other Arazzo tools do not see them.
 type Limit struct {
 	Node string // the node's id
 	What string

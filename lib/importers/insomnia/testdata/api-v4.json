@@ -1,0 +1,33 @@
+{
+  "_type": "export",
+  "__export_format": 4,
+  "resources": [
+    {"_id": "wrk_1", "_type": "workspace", "name": "Shop API"},
+    {"_id": "env_base", "_type": "environment", "parentId": "wrk_1", "name": "Base Environment",
+      "data": {"base_url": "https://shop.example.com", "api_token": "sk-live-123", "nested": {"a": 1}}},
+    {"_id": "env_prod", "_type": "environment", "parentId": "env_base", "name": "Production", "data": {"base_url": "https://prod.example.com"}},
+    {"_id": "fld_1", "_type": "request_group", "parentId": "wrk_1", "name": "Orders"},
+    {"_id": "fld_2", "_type": "request_group", "parentId": "fld_1", "name": "Admin"},
+    {"_id": "req_1", "_type": "request", "parentId": "fld_1", "name": "List orders", "method": "GET",
+      "url": "{{ _.base_url }}/orders?status=open",
+      "parameters": [{"name": "page", "value": "1"}, {"name": "debug", "value": "1", "disabled": true}],
+      "headers": [{"name": "Accept", "value": "application/json"}, {"name": "X-Api-Key", "value": "literal-key"}],
+      "authentication": {"type": "bearer", "token": "{{ _.api_token }}"}},
+    {"_id": "req_2", "_type": "request", "parentId": "fld_2", "name": "Create order", "method": "POST",
+      "url": "{{ _.base_url }}/orders",
+      "body": {"mimeType": "application/json", "text": "{\"sku\": \"abc\", \"password\": \"hunter2\"}"},
+      "authentication": {"type": "basic", "username": "ada", "password": "pw"}},
+    {"_id": "req_3", "_type": "request", "parentId": "fld_1", "name": "Form post", "method": "POST", "url": "{{ _.base_url }}/forms",
+      "body": {"mimeType": "application/x-www-form-urlencoded", "params": [{"name": "a", "value": "1"}, {"name": "secret", "value": "s3"}]}},
+    {"_id": "req_4", "_type": "request", "parentId": "fld_1", "name": "Token", "method": "POST", "url": "{{ _.base_url }}/token",
+      "authentication": {"type": "oauth2", "grantType": "client_credentials", "accessTokenUrl": "{{ _.base_url }}/oauth/token", "clientId": "abc", "clientSecret": "shh", "scope": "read"},
+      "preRequestScript": "insomnia.environment.set('x', 1)"},
+    {"_id": "req_4b", "_type": "request", "parentId": "fld_1", "name": "Browser sign-in", "method": "GET", "url": "{{ _.base_url }}/me",
+      "authentication": {"type": "oauth2", "grantType": "authorization_code", "authorizationUrl": "{{ _.base_url }}/oauth/authorize", "accessTokenUrl": "{{ _.base_url }}/oauth/token",
+        "clientId": "abc", "clientSecret": "shh", "scope": "read", "usePkce": true, "redirectUrl": "https://app.insomnia.rest/oauth/redirect"}},
+    {"_id": "req_5", "_type": "request", "parentId": "fld_1", "name": "Tagged", "method": "GET", "url": "{{ _.base_url }}/{% uuid 'v4' %}",
+      "authentication": {"type": "ntlm", "username": "u", "password": "p"}},
+    {"_id": "req_6", "_type": "request", "parentId": "wrk_1", "name": "No URL", "method": "GET", "url": ""},
+    {"_id": "greq_1", "_type": "grpc_request", "parentId": "wrk_1", "name": "Stream"}
+  ]
+}

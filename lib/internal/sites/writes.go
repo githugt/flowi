@@ -11,34 +11,32 @@ import (
 
 // OwnWrites are the targets one node writes itself.
 func OwnWrites(n model.Node) []string {
-	switch n.Type {
-	case "set":
-		if t, _ := ParamValue(n, "target").(string); t != "" {
-			return []string{t}
+	if n.Type != "set" {
+		return nil
+	}
+	if len(n.Values) > 0 {
+		out := make([]string, 0, len(n.Values))
+		for _, v := range n.Values {
+			if v.Name != "" {
+				out = append(out, "vars."+v.Name)
+			}
 		}
-	case "transform":
-		if into, _ := ParamValue(n, "into").(string); into != "" {
-			return []string{"vars." + into}
-		}
-	case "extract", "generate", "calc":
-		return mapFormWrites(n)
+		return out
+	}
+	if t, _ := ParamValue(n, "target").(string); t != "" {
+		return []string{t}
 	}
 	return nil
 }
 
-func mapFormWrites(n model.Node) []string {
-	if n.Type == "extract" && SingleExtract(n) {
-		if name, _ := ParamValue(n, "name").(string); name != "" {
-			return []string{"vars." + name}
+// GeneratedVars are the variables a node fills with generated values: fresh
+// data, not taken from another step.
+func GeneratedVars(n model.Node) map[string]bool {
+	out := map[string]bool{}
+	for _, v := range n.Values {
+		if v.From == "generate" {
+			out[v.Name] = true
 		}
-		return nil
-	}
-	var out []string
-	for _, f := range n.Params {
-		if n.Type == "generate" && f.Key == "seed" {
-			continue
-		}
-		out = append(out, "vars."+f.Key)
 	}
 	return out
 }
@@ -58,23 +56,6 @@ func WrittenVars(list []model.Node) map[string]bool {
 		}
 	}
 	return out
-}
-
-// singleExtractKeys mark the single form of extract ({name, from, …}); an
-// extract without any of them is the map form (var: template).
-func singleExtractKeys() []string {
-	return []string{"name", "from", "path", "header", "cookie", "regex"}
-}
-
-// SingleExtract reports whether an extract node uses the single form
-// (name, from, path…) rather than the map form.
-func SingleExtract(n model.Node) bool {
-	for _, k := range singleExtractKeys() {
-		if HasParam(n, k) {
-			return true
-		}
-	}
-	return false
 }
 
 // HasParam reports whether n sets the parameter key.

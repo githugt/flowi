@@ -10,16 +10,16 @@ import (
 )
 
 // Expression mapping (plan Decision 4). Arazzo runtime expressions become
-// Flow-I references and back:
+// Flowi references and back:
 //
 //	$inputs.x                 inputs.x
-//	$steps.s.outputs.o        vars.s_o (written by the step's extract node)
+//	$steps.s.outputs.o        vars.s_o (written by the step's set node)
 //	$statusCode               nodes.<step>.status
 //	$response.body#/a/0       nodes.<step>.body.a[0]
 //	$response.header.X-Rate   nodes.<step>.headers["x-rate"]
 //
 // Anything else ($message, $outputs, $request, $components, …) has no
-// Flow-I equivalent and is reported by the caller, never guessed.
+// Flowi equivalent and is reported by the caller, never guessed.
 
 var (
 	identifier = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
@@ -155,7 +155,7 @@ func unmapTemplate(tmpl, step string, vars map[string]string) (string, bool) {
 	return out, ok
 }
 
-// unmapRef maps one Flow-I reference back to a runtime expression.
+// unmapRef maps one Flowi reference back to a runtime expression.
 func unmapRef(ref, step string, vars map[string]string) (string, bool) {
 	segs, ok := splitRef(ref)
 	if !ok || len(segs) < 2 {
@@ -221,7 +221,7 @@ func splitRef(ref string) ([]string, bool) {
 }
 
 // isConditionWord reports the bare words an exported check may contain:
-// Arazzo's literals. Words like and, not and nil are Flow-I-only.
+// Arazzo's literals. Words like and, not and nil are Flowi-only.
 func isConditionWord(s string) bool {
 	return slices.Contains([]string{"true", "false", "null"}, s)
 }

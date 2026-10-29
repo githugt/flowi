@@ -13,7 +13,7 @@ import (
 func requestSpec() Spec {
 	return Spec{
 		Type: "request", Group: "Call", Summary: "Run a saved request, with its version resolution and API hooks.",
-		Typed: []string{"request", "version", "hooks", "with", "headers"},
+		Typed: []string{"request", "version", "overlay", "open", "over", "close", "hooks", "with", "headers"},
 		Run:   runRequest,
 	}
 }
@@ -30,7 +30,7 @@ func runRequest(ctx context.Context, n model.Node, s *State) Outcome {
 	if diags = append(diags, headerDiags...); diags.HasErrors() {
 		return Outcome{Diags: diags}
 	}
-	return s.Runtime.Request(ctx, RequestCall{Ref: call.Request, Version: call.Version, Hooks: call.Hooks, With: with, Headers: headers})
+	return s.Runtime.Request(ctx, RequestCall{Ref: call.Request, Version: call.Version, Overlay: call.Overlay, Open: call.Open, Over: call.Over, Close: call.Close, Hooks: call.Hooks, With: with, Headers: headers})
 }
 
 // renderValues renders templates keeping the type of single expressions.

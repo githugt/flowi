@@ -26,10 +26,10 @@ func TestNode_Children_should_return_only_non_empty_child_lists(t *testing.T) {
 	}
 }
 
-func TestNodeTypes_should_list_20_types_in_spec_order(t *testing.T) {
+func TestNodeTypes_should_list_17_types_in_spec_order(t *testing.T) {
 	want := []NodeType{
-		"request", "fetch", "webhook", "subflow", "extract", "set", "generate", "transform", "calc",
-		"assert", "condition", "delay", "batch", "run_till", "parallel", "stop", "log", "note", "digest", "save",
+		"request", "fetch", "webhook", "subflow", "set",
+		"assert", "fuzz", "condition", "delay", "batch", "run_till", "parallel", "stop", "log", "note", "digest", "save",
 	}
 
 	got := NodeTypes()

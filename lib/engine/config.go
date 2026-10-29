@@ -6,6 +6,7 @@ import (
 	"errors"
 	"net/http"
 	"path"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -116,7 +117,7 @@ func (x *execution) clientOptions(b built) httpx.Options {
 // resolved settings, the cookie jar and the run's HTTP limits.
 func (r *runner) baseOptions(cfg config, jar *httpx.Jar, downloadDir string) httpx.Options {
 	return httpx.Options{
-		Version: cfg.httpVersion, FollowRedirects: cfg.follow, MaxRedirects: cfg.maxRedirects,
+		Transport: r.deps.Transport, Version: cfg.httpVersion, FollowRedirects: cfg.follow, MaxRedirects: cfg.maxRedirects,
 		RedirectCredentials: cfg.redirectCreds, RedirectKeepHeaders: cfg.redirectKeep, Timeout: cfg.timeout,
 		Proxy: settings.ProxyConfig(cfg.proxy, r.deps.Environ), CAFiles: cfg.caFiles, RequestCompression: cfg.compression,
 		Jar: cookieJarOf(jar), StreamThreshold: cfg.streamThreshold, Retry: cfg.retry, Clock: r.deps.Clock,
@@ -176,21 +177,41 @@ func selectEnvironment(c model.Collection, name, fallback string) (environment, 
 	if name == "" {
 		return env, nil
 	}
-	for _, e := range c.Environments {
-		if e.Name != name {
+	if !slices.ContainsFunc(c.Environments, func(e model.Environment) bool { return e.Name == name }) {
+		return env, diag.List{diag.New(diag.CodeRequestEnvUnknown, diag.Location{}, map[string]string{"env": name, "collection": c.Manifest.Name})}
+	}
+	chain, err := model.EnvironmentChain(c.Environments, name)
+	if err != nil {
+		return env, diag.List{diag.New(diag.CodeRequestEnvExtends, diag.Location{}, map[string]string{"env": name, "detail": err.Error()})}
+	}
+	own := chain[len(chain)-1]
+	env.name, env.id, env.scope = own.Name, own.ID, own.Scope
+	for _, e := range chain {
+		if err := applyEnvironment(&env, e, e.Name == own.Name); err != nil {
+			return env, diag.List{diag.New(diag.CodeRequestEnvExtends, diag.Location{File: e.File}, map[string]string{"env": name, "detail": err.Error()})}
+		}
+	}
+	return env, nil
+}
+
+// applyEnvironment lays e's variables over env. A secret counts only for the selected environment itself.
+func applyEnvironment(env *environment, e model.Environment, selected bool) error {
+	for _, v := range e.Vars {
+		if v.Secret {
+			if selected {
+				env.secrets[v.Name] = true
+				delete(env.values, v.Name)
+			}
 			continue
 		}
-		env.name, env.id, env.scope = e.Name, e.ID, e.Scope
-		for _, v := range e.Vars {
-			if v.Secret {
-				env.secrets[v.Name] = true
-			} else {
-				env.values[v.Name] = v.Value
-			}
+		typed, err := v.Typed()
+		if err != nil {
+			return err
 		}
-		return env, nil
+		env.values[v.Name] = typed
+		delete(env.secrets, v.Name)
 	}
-	return env, diag.List{diag.New(diag.CodeRequestEnvUnknown, diag.Location{}, map[string]string{"env": name, "collection": c.Manifest.Name})}
+	return nil
 }
 
 // resolveVersion applies design §4.4: pin, run preference, flow

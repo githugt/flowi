@@ -15,6 +15,7 @@ import (
 	"github.com/githugt/flowi-lib/internal/httpx"
 	"github.com/githugt/flowi-lib/internal/nodes"
 	"github.com/githugt/flowi-lib/model"
+	"github.com/githugt/flowi-lib/report"
 	"github.com/githugt/flowi-lib/template"
 )
 
@@ -28,6 +29,7 @@ type runner struct {
 	in      SendInput // standalone sends only
 	kind    string    // "send" or "flow"
 	env     string    // requested environment name ("" → defaults.environment)
+	overlay string    // run-level flowi overlay for request steps that name none
 	prefer  string    // run version preference
 	events  chan<- Event
 	runID   string
@@ -37,9 +39,15 @@ type runner struct {
 	jar     *httpx.Jar // sends: the persistent jar; flows: the run's in-memory jar
 	jarFile string     // "" for flow runs (their jar is not saved)
 
+	// skip and prior come from RunInput; they are set before any node starts
+	// and only read afterwards.
+	skip  map[string]bool
+	prior map[string]map[string]any
+
 	stop     atomic.Bool // a stop node ended the run: no list starts another node
 	mu       sync.Mutex
 	saved    []string
+	captured []Record
 	err      error
 	warnings diag.List
 
@@ -56,6 +64,13 @@ type runner struct {
 
 	inflight inflight       // top-level leaf nodes running, for RunAborted
 	builder  *reportBuilder // flow runs: the report, fed by emit
+
+	// rootVars are the flow's variables (the top-level layer), kept so the report can say what they ended as.
+	rootVars *nodes.Vars
+	// outputs are the flow's declared outputs as the run ended (see keepOutputs).
+	outputs []report.OutputValue
+
+	conns connections // connections kept open between steps, closed when the run ends
 
 	limit    int     // run-wide concurrency limit (plan Decision 2)
 	limits   *limits // in-flight HTTP cap and rate limits, for every attempt
@@ -141,6 +156,13 @@ func (r *runner) nodeRunner(t model.NodeType) (nodes.Runner, bool) {
 	return nodes.Lookup(t)
 }
 
+// addCaptured keeps a masked record for the run's result.
+func (r *runner) addCaptured(rec Record) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.captured = append(r.captured, rec)
+}
+
 // addSaved records files the run wrote; the first error is kept.
 func (r *runner) addSaved(files []string, err error) {
 	r.mu.Lock()
@@ -163,10 +185,7 @@ func (r *runner) run(ctx context.Context) SendResult {
 	r.ctx = ctx
 	start := r.deps.Clock()
 	r.emit(RunStarted{RunID: r.runID, Kind: "send", Env: r.in.Env, Seed: r.seed, At: start})
-	out := r.execute(ctx, call{
-		collection: r.in.Collection, request: r.in.Request, pinned: r.in.PinnedVersion,
-		with: r.in.With, hooks: r.in.Hooks, save: r.in.Save,
-	})
+	out := r.execute(ctx, sendCall(r.in))
 	// Background webhooks started by hooks belong to the send: it waits
 	// for them (they end with their call or with ctx) before its stream
 	// closes, so none emits after the close.
@@ -255,6 +274,9 @@ type call struct {
 	headers    map[string]string // a request node's headers
 	jar        *httpx.Jar        // the node's frame jar; nil → the run's
 	noJar      bool              // the node's lane has cookies off
+	overlay    *Overlay          // a standalone send's flowi overlay
+	bodyOver   *any              // a fuzz case: sent in place of the request's own body
+	conn       connUse           // a request node's use of a connection kept open
 }
 
 // outcome is what executing one request produced.

@@ -8,10 +8,13 @@ import (
 	"fmt"
 
 	"github.com/goccy/go-yaml"
+
+	"github.com/githugt/flowi-lib/internal/textenc"
 )
 
 // Decode parses data and normalises it; the root must be a mapping.
 func Decode(data []byte) (map[string]any, error) {
+	data = textenc.ToUTF8(data)
 	var raw any
 	if err := yaml.Unmarshal(data, &raw); err != nil {
 		return nil, err

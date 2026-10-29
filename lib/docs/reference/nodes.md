@@ -10,7 +10,7 @@ Every node also takes the common fields `id`, `name`, `description`, `needs`, `w
 
 Run a saved request, with its version resolution and API hooks.
 
-Fields: `request`, `version`, `hooks`, `with`, `headers`.
+Fields: `request`, `version`, `overlay`, `open`, `over`, `close`, `hooks`, `with`, `headers`.
 
 ### `fetch`
 
@@ -46,66 +46,40 @@ Fields: `flow`, `with`.
 
 ## Data
 
-### `extract`
-
-JSONPath / header / cookie / regex from a response (post-hooks), or templates (map form), into variables.
-
-Other keys are `<variable>: template`; each result is stored in `vars.<variable>` and output as `nodes.<id>.<variable>`.
-
-| Parameter | Kind | Required | Notes |
-|---|---|---|---|
-| `name` | string |  | The variable the value is saved in. |
-| `from` | one of `body`, `header`, `cookie`, `status` |  | Where in the response to read. |
-| `path` | string |  | JSONPath (RFC 9535) into the body. |
-| `header` | string |  |  |
-| `cookie` | string |  |  |
-| `regex` | string |  | First capture group, or the whole match. |
-
 ### `set`
 
-Insert or override a variable or (in pre-hooks) a request field.
+Write variables. `values` is a list run in order, each `{name, from, value}` where `from` is `expr` (the default; `value` is a template), `literal` (`value` as written), `generate` (`value` uses generators such as `{{$uuid-v4}}`; optional `seed`) or `response` (post-hooks; `in` is `body`, `header`, `cookie` or `status`, with `path`, `header`, `cookie` or `regex`). Or `target` and `value` for one variable or, in pre-hooks, a request field.
+
+Fields: `values`.
 
 | Parameter | Kind | Required | Notes |
 |---|---|---|---|
-| `target` | string | yes | `vars.<name>`; in pre-hooks also `request.method`, `request.url`, `request.headers.<Name>`, `request.query.<name>`, `request.body[.<path>]`, `cookies.<name>`. |
-| `value` | any | yes |  |
-
-### `generate`
-
-Generate values ($first-name, $uuid-v4, …) into variables; seedable.
-
-Other keys are `<variable>: template`; each result is stored in `vars.<variable>` and output as `nodes.<id>.<variable>`.
-
-| Parameter | Kind | Required | Notes |
-|---|---|---|---|
-| `seed` | integer ≥ 1 |  | Seed for this node only, so its values do not change with the run seed. |
-
-### `transform`
-
-Reshape data with an expression.
-
-| Parameter | Kind | Required | Notes |
-|---|---|---|---|
-| `value` | template | yes | The result, e.g. "{{map(nodes.list.body.items, .id)}}". |
-| `into` | string |  | Also store the result in `vars.<into>`. |
-
-### `calc`
-
-Arithmetic on variables (+ - * / %, min, max) into variables.
-
-Other keys are `<variable>: template`; each result is stored in `vars.<variable>` and output as `nodes.<id>.<variable>`.
+| `target` | string |  | Without `values`: `vars.<name>`; in pre-hooks also `request.method`, `request.url`, `request.headers.<Name>`, `request.query.<name>`, `request.body[.<path>]`, `cookies.<name>`. |
+| `value` | any |  | Without `values`: what `target` is set to. |
 
 ## Check
 
 ### `assert`
 
-Check a condition; on_fail: error stops, warn continues.
+Check a condition, or that an earlier request's response matches its kept schema; on_fail: error stops, warn continues.
 
 | Parameter | Kind | Required | Notes |
 |---|---|---|---|
-| `check` | expression | yes |  |
+| `check` | expression |  | True or false, written without braces. Give check, schema or both. |
+| `schema` | string |  | The id of an earlier request step: passes when what it received matches the response schema kept for its request. |
 | `on_fail` | one of `error`, `warn` |  |  |
 | `message` | template |  |  |
+
+### `fuzz`
+
+Send a request with bad bodies made from its good one, and fail when the server breaks.
+
+Fields: `request`, `version`, `overlay`, `hooks`, `with`, `headers`.
+
+| Parameter | Kind | Required | Notes |
+|---|---|---|---|
+| `count` | integer 1–200 |  | How many bad bodies to send (default 20). They are spread over the fields, in a fixed order. |
+| `expect` | one of `no_server_error`, `rejected` |  | What passes: no_server_error (default) fails on a 5xx or no answer; rejected also fails when the server accepts a bad body (a 2xx or 3xx). |
 
 ### `condition`
 
@@ -203,7 +177,7 @@ A summary of the run so far, or of a finished node, sent to stdout, a file or a 
 | `url` | template |  | For sink webhook: receives {"text": …}, or the report itself for format json. |
 | `style` | one of `text`, `slack`, `discord`, `teams`, `email` |  | For sink webhook: the payload shape: text and slack send {"text"}, discord {"content"}, teams a MessageCard, email {to, subject, text}. Default text. Ignored for format json. |
 | `to` | template |  | For style email: the recipient. |
-| `subject` | template |  | For style email: the subject. Default "Flow-I digest". |
+| `subject` | template |  | For style email: the subject. Default "Flowi digest". |
 
 ### `save`
 

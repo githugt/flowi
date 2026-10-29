@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/githugt/flowi-lib/schema/environment.schema.json",
-  "title": "Flow-I environment",
+  "title": "Flowi environment",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -30,10 +30,14 @@
         "gray"
       ]
     },
+    "extends": {
+      "type": "string",
+      "description": "The environment this one builds on. Its plain variables apply unless this one sets the same name; secrets are not inherited."
+    },
     "vars": {
       "type": "object",
       "additionalProperties": {
-        "oneOf": [
+        "anyOf": [
           {
             "type": [
               "string",
@@ -53,9 +57,13 @@
                 "const": true
               }
             }
+          },
+          {
+            "type": "array"
           }
         ]
-      }
+      },
+      "description": "A scalar keeps its type: 5 is a number, true a boolean, \"5\" text. An object or a list is an object value; {secret: true} marks a secret whose value is in the vault."
     }
   }
 }

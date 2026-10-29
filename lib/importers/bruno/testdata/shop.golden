@@ -1,5 +1,5 @@
 item "collection" imported at 1:1
-  warning FLW-IMPORT-001 1:1 collection script:pre-request has no Flow-I equivalent and was left out: scripts are JavaScript; use hooks and extract or assert nodes instead
+  warning FLW-IMPORT-001 1:1 collection script:pre-request has no Flowi equivalent and was left out: scripts are JavaScript; use hooks and extract or assert nodes instead
 item "auth/login" imported at 1:1
 item "broken/bad-block" skipped at 1:1
   error FLW-IMPORT-004 9:1 Bruno syntax error: expected name: value in block get
@@ -10,11 +10,11 @@ item "graph" imported at 1:1
   warning FLW-IMPORT-006 1:1 basic auth password looked like a credential and was replaced by {{secret.password}}
 item "users/create-user" imported at 1:1
   warning FLW-IMPORT-006 1:1 API key X-Api-Key looked like a credential and was replaced by {{secret.x_api_key}}
-  warning FLW-IMPORT-001 1:1 file part avatar has no Flow-I equivalent and was kept with its path: the path is on the machine that exported the collection
+  warning FLW-IMPORT-001 1:1 file part avatar has no Flowi equivalent and was kept with its path: the path is on the machine that exported the collection
 item "users/get-user" imported at 1:1
-  warning FLW-IMPORT-001 25:3 assert res.body.roles: isArray has no Flow-I equivalent and was left out: only comparisons and isDefined/isUndefined/isNull map to Flow-I checks
-  warning FLW-IMPORT-001 32:3 post-response var computed has no Flow-I equivalent and was left out: only res.body paths, res.headers.x and res.status map to extracts
-  warning FLW-IMPORT-001 1:1 request tests has no Flow-I equivalent and was left out: scripts are JavaScript; use hooks and extract or assert nodes instead
+  warning FLW-IMPORT-001 25:3 assert res.body.roles: isArray has no Flowi equivalent and was left out: only comparisons and isDefined/isUndefined/isNull map to Flowi checks
+  warning FLW-IMPORT-001 32:3 post-response var computed has no Flowi equivalent and was left out: only res.body paths, res.headers.x and res.status map to extracts
+  warning FLW-IMPORT-001 1:1 request tests has no Flowi equivalent and was left out: scripts are JavaScript; use hooks and extract or assert nodes instead
 item "environment local" imported at 1:1
   warning FLW-IMPORT-006 1:1 variable password looked like a credential and was replaced by a secret declaration
   warning FLW-IMPORT-006 1:1 variable token looked like a credential and was replaced by a secret declaration

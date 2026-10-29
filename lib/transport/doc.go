@@ -5,5 +5,6 @@
 // for, and disconnects. Each protocol is a subpackage that implements
 // Transport; transport/all wires them together.
 //
-// Connections are one-shot: nothing is kept between two Run calls.
+// Connections are one-shot unless the transport also implements Opener: then
+// a flow can keep a Session open across steps (WebSocket, MQTT 5, core NATS).
 package transport

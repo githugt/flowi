@@ -55,6 +55,7 @@ func (b *reportBuilder) add(ev Event) {
 	switch e := ev.(type) {
 	case RunStarted:
 		b.run.ID, b.run.Kind, b.run.FlowID, b.run.FlowPath, b.run.Env, b.run.Seed, b.run.Started = e.RunID, e.Kind, e.FlowID, e.FlowPath, e.Env, e.Seed, e.At
+		b.run.Overlay = e.Overlay
 		b.run.Status = "running"
 	case NodeStarted:
 		b.nodeStarted(e)
@@ -100,6 +101,7 @@ func (b *reportBuilder) nodeFinished(e NodeFinished) {
 	}
 	n := &bn.node
 	n.Status, n.Handled, n.Duration, n.Outputs, n.Diagnostics = string(e.Status), e.Handled, e.Duration, e.Outputs, reportDiags(e.Diags)
+	n.Reason = e.Reason
 	if e.Type == "note" && e.Status == StatusPassed {
 		text, _ := e.Outputs["text"].(string)
 		b.run.Notes = append(b.run.Notes, report.Note{Path: e.Path, Text: text})

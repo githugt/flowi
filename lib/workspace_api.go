@@ -15,6 +15,7 @@ import (
 
 	"github.com/githugt/flowi-lib/diag"
 	"github.com/githugt/flowi-lib/engine"
+	"github.com/githugt/flowi-lib/internal/authx"
 	yamlcodec "github.com/githugt/flowi-lib/internal/codec/yaml"
 	"github.com/githugt/flowi-lib/internal/ids"
 	"github.com/githugt/flowi-lib/model"
@@ -38,7 +39,7 @@ const (
 	ChangeRescan   = store.ChangeRescan
 )
 
-// BlocksRewrite reports whether a load diagnostic means Flow-I must not
+// BlocksRewrite reports whether a load diagnostic means Flowi must not
 // rewrite that file: errors (content was not understood) and unknown
 // settings (which a rewrite would drop).
 func BlocksRewrite(d diag.Diagnostic) bool {
@@ -87,6 +88,10 @@ type Workspace struct {
 	vaultOnce sync.Once
 	vault     *vault.Vault
 
+	// authTokens keeps OAuth 2.0 tokens between sends for as long as the
+	// workspace is open.
+	authTokens *authx.TokenCache
+
 	// draftsMu serialises draft operations (Scratch's check-then-create,
 	// picking a free untitled name, save, discard). It is taken before mu,
 	// never while holding it.
@@ -97,8 +102,13 @@ type Workspace struct {
 	collections []model.Collection
 	missing     []model.ID
 	globalEnvs  []model.Environment // the workspace's environments, shared by every collection
-	loadDiags   diag.List
-	user        settings.LayerValues
+	// replays are the collections opened from run bundles, with the options that make every run in them a
+	// replay of the recording (see KeepBundle).
+	replays map[model.ID]replayOf
+	// documentEnvs is, for each collection opened from an Arazzo document, the environment made from its server.
+	documentEnvs map[model.ID]string
+	loadDiags    diag.List
+	user         settings.LayerValues
 	// Problems found when reading workspace.yaml and settings.yaml. While
 	// either is non-empty that file is never rewritten: it may not be in
 	// git, so overwriting it could lose the user's data for good.
@@ -117,7 +127,7 @@ func OpenWorkspace(ctx context.Context, o WorkspaceOptions) (*Workspace, diag.Li
 	codec := yamlcodec.New(schema)
 	w := &Workspace{
 		opts: o, schema: schema, codec: codec, store: store.New(codec),
-		ids: ids.NewSource(time.Now, rand.Reader),
+		ids: ids.NewSource(time.Now, rand.Reader), authTokens: authx.NewTokenCache(),
 	}
 	ws, diags, err := workspace.LoadOrCreate(o.Paths, o.Name, codec, w.ids)
 	if err != nil {

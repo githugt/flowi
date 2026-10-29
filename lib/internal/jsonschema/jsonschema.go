@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-// Package jsonschema reads the JSON Schemas Flow-I keeps from OpenAPI
+// Package jsonschema reads the JSON Schemas Flowi keeps from OpenAPI
 // documents (already decoded, references inlined): types, allOf merging,
 // and whether a path of steps exists in a schema.
 package jsonschema

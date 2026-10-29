@@ -1,0 +1,23 @@
+openapi: 3.0.3
+info: {title: my-example-app, version: 1.0.0}
+paths:
+  /examples:
+    post:
+      requestBody:
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/Missing'}
+      responses:
+        "201": {description: created}
+  /examples/{id}:
+    parameters:
+      - {name: id, in: path, required: true, schema: {type: string}}
+    get:
+      responses:
+        "200": {description: ok}
+  /Examples/{id}:
+    parameters:
+      - {name: id, in: path, required: true, schema: {type: string}}
+    get:
+      responses:
+        "200": {description: ok}

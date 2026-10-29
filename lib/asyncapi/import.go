@@ -27,7 +27,7 @@ type Result struct {
 }
 
 // Import maps the operations of an AsyncAPI 3.x (or 2.x) document to async
-// requests. An operation whose server speaks a protocol Flow-I has no client
+// requests. An operation whose server speaks a protocol Flowi has no client
 // for is left out and reported (FLW-IMPORT-001); nothing else stops the import.
 func Import(data []byte, o Options) (Result, diag.List) {
 	root, err := yamldoc.Decode(data)
@@ -73,6 +73,7 @@ type operation struct {
 	channel            channel
 	server             server
 	message            map[string]any // the message this operation sends or receives
+	bindings           bindingSources
 }
 
 type channel struct {
@@ -120,12 +121,32 @@ func operationsV3(root map[string]any) []operation {
 		op.channel = channel{address: str(ch, "address")}
 		op.server = firstServerV3(root, ch, servers)
 		op.message = firstMessage(root, od["messages"], ch["messages"], channels)
+		op.bindings = bindingSources{server: bindingsMap(root, firstServerRawV3(root, ch, servers)), channel: bindingsMap(root, ch), operation: bindingsMap(root, od), message: bindingsMap(root, op.message)}
 		if od["reply"] != nil {
 			op.send, op.receive = true, true
 		}
 		out = append(out, op)
 	}
 	return out
+}
+
+// bindingsMap is the `bindings` object of a document node (nil for none).
+func bindingsMap(root, node map[string]any) map[string]any {
+	if node == nil {
+		return nil
+	}
+	return ref(root, node["bindings"])
+}
+
+// firstServerRawV3 is firstServerV3's pick as the document wrote it.
+func firstServerRawV3(root, ch, servers map[string]any) map[string]any {
+	if list, _ := ch["servers"].([]any); len(list) > 0 {
+		return ref(root, list[0])
+	}
+	if names := slices.Sorted(maps.Keys(servers)); len(names) > 0 {
+		return ref(root, servers[names[0]])
+	}
+	return nil
 }
 
 // firstServerV3 is the first server the channel lists, else the first of the
@@ -168,8 +189,10 @@ func operationsV2(root map[string]any) []operation {
 	servers, _ := root["servers"].(map[string]any)
 	channels, _ := root["channels"].(map[string]any)
 	var first server
+	var firstRaw map[string]any
 	if names := slices.Sorted(maps.Keys(servers)); len(names) > 0 {
 		s := ref(root, servers[names[0]])
+		firstRaw = s
 		host, path, _ := strings.Cut(strings.TrimPrefix(strings.TrimPrefix(str(s, "url"), str(s, "protocol")+"://"), "//"), "/")
 		first = server{protocol: str(s, "protocol"), host: host, extension: str(s, "x-flowi-protocol")}
 		if path != "" {
@@ -190,11 +213,13 @@ func operationsV2(root map[string]any) []operation {
 			}
 			op := operation{id: id, title: str(od, "summary"), summary: str(od, "description"), send: kind == "publish", receive: kind == "subscribe",
 				channel: channel{address: address}, server: first}
+			op.bindings = bindingSources{server: bindingsMap(root, firstRaw), channel: bindingsMap(root, ch), operation: bindingsMap(root, od)}
 			if m := ref(root, od["message"]); m != nil {
 				op.message = m
 				if one, _ := m["oneOf"].([]any); len(one) > 0 {
 					op.message = ref(root, one[0])
 				}
+				op.bindings.message = bindingsMap(root, op.message)
 			}
 			out = append(out, op)
 		}
@@ -202,11 +227,14 @@ func operationsV2(root map[string]any) []operation {
 	return out
 }
 
-// protocolOf maps an AsyncAPI server protocol to Flow-I's protocol and the
+// protocolOf maps an AsyncAPI server protocol to Flowi's protocol and the
 // URL scheme its server is written with.
 func protocolOf(s server) (protocol, scheme string, ok bool) {
 	if s.extension == model.ProtocolServiceBus {
 		return model.ProtocolServiceBus, "sb", true
+	}
+	if s.extension == model.ProtocolAMQP10 {
+		return model.ProtocolAMQP10, map[bool]string{true: "amqps", false: "amqp"}[strings.ToLower(s.protocol) == "amqps"], true
 	}
 	switch strings.ToLower(s.protocol) {
 	case "ws", "wss":
@@ -250,7 +278,7 @@ func requestOf(op operation, id model.ID) (*model.Request, diag.List) {
 	protocol, scheme, ok := protocolOf(op.server)
 	if !ok {
 		what := "operation " + op.id
-		detail := fmt.Sprintf("its server protocol is %q, which Flow-I has no client for", op.server.protocol)
+		detail := fmt.Sprintf("its server protocol is %q, which Flowi has no client for", op.server.protocol)
 		return nil, diag.List{diag.New(diag.CodeImportUnmapped, diag.Location{}, map[string]string{"what": what, "how": "skipped", "detail": detail})}
 	}
 	server := ""
@@ -258,6 +286,11 @@ func requestOf(op operation, id model.ID) (*model.Request, diag.List) {
 		server = scheme + "://" + templated(op.server.host, "env.") + op.server.pathname
 	}
 	a := model.Async{Protocol: protocol, Server: server, Channel: templated(op.channel.address, "")}
+	binding, topic, left := bindingsOf(protocol, op.bindings)
+	a.Binding = binding
+	if topic != "" {
+		a.Channel = templated(topic, "")
+	}
 	if op.send {
 		a.Send = &model.AsyncSend{Body: model.Body{JSON: exampleOf(op.message)}}
 	}
@@ -270,7 +303,7 @@ func requestOf(op operation, id model.ID) (*model.Request, diag.List) {
 	}
 	r := model.Request{Meta: model.Meta{ID: id, Name: name, Description: op.summary}, Path: importers.FileName(op.id), Operation: op.id,
 		Versions: []model.RequestVersion{{Label: "1", Async: &a}}}
-	return &r, nil
+	return &r, unmappedBindings(op.id, left)
 }
 
 // exampleOf is the first example payload of a message, else a skeleton of its

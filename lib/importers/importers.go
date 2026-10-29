@@ -63,7 +63,7 @@ func (it *Item) Report(d diag.Diagnostic) {
 	it.Diags = append(it.Diags, d)
 }
 
-// Unmapped reports something with no Flow-I equivalent (FLW-IMPORT-001).
+// Unmapped reports something with no Flowi equivalent (FLW-IMPORT-001).
 func (it *Item) Unmapped(what, how, detail string) {
 	it.UnmappedAt(diag.Location{}, what, how, detail)
 }
@@ -268,7 +268,7 @@ func (r Result) Skipped() int {
 	return n
 }
 
-// Literal makes imported text safe as a Flow-I template: each "{{" is
+// Literal makes imported text safe as a Flowi template: each "{{" is
 // written as {{ "{{" }}, which renders back to "{{". Other tools' values
 // are literal text; without this a "{{" in them would become a template.
 func Literal(s string) string {

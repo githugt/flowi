@@ -40,7 +40,10 @@ func FlowTemplates(f model.Flow) []Site {
 		at := yamlpath.Key(yamlpath.Key(yamlpath.Key("$", "inputs"), in.Name), "default")
 		sites = append(sites, Site{File: f.File, Path: at, Field: "default of input " + in.Name, Src: in.Default})
 	}
-	sites = append(sites, keyValueSites(f.File, yamlpath.Key("$", "outputs"), "output ", f.Outputs)...)
+	for _, out := range f.Outputs {
+		at := yamlpath.Key(yamlpath.Key("$", "outputs"), out.Name)
+		sites = append(sites, Site{File: f.File, Path: at, Field: "output " + out.Name, Src: out.Value})
+	}
 	if f.Run != nil && f.Run.Until != "" {
 		sites = append(sites, Site{File: f.File, Path: yamlpath.Key(yamlpath.Key("$", "run"), "until"), Field: "run.until", Src: f.Run.Until, Expression: true})
 	}
@@ -137,6 +140,7 @@ func NodeTemplates(n Located[model.Node]) []Site {
 	if node.Subflow != nil {
 		sites = append(sites, keyValueSites(n.File, yamlpath.Key(n.Path, "with"), "with ", node.Subflow.With)...)
 	}
+	sites = append(sites, valueTemplates(n.File, n.Path, node)...)
 	for _, p := range node.Params {
 		kind, isTemplate := templateParam(node, p.Key)
 		if !isTemplate {
@@ -149,6 +153,20 @@ func NodeTemplates(n Located[model.Node]) []Site {
 		sites[i].Node = node.ID
 	}
 	return sites
+}
+
+// valueTemplates are the templates of a set node's values; a literal is not
+// evaluated, and a response value holds none.
+func valueTemplates(file, path string, node model.Node) []Site {
+	var out []Site
+	for i, v := range node.Values {
+		if v.From == "literal" || v.From == "response" {
+			continue
+		}
+		at := yamlpath.Key(yamlpath.Index(yamlpath.Key(path, "values"), i), "value")
+		out = append(out, valueSites(file, at, "value "+v.Name+" of node "+node.ID, v.Value, false)...)
+	}
+	return out
 }
 
 // valueSites are the templates in a parameter value: the string itself,
@@ -190,7 +208,7 @@ func templateParam(n model.Node, key string) (paramKind, bool) {
 	p, known := spec.Param(key)
 	switch {
 	case !known:
-		return textParam, spec.MapForm && (n.Type != "extract" || !SingleExtract(n))
+		return textParam, spec.MapForm
 	case p.Kind == nodes.ParamExpr:
 		return expressionParam, true
 	case p.Kind == nodes.ParamText || p.Kind == nodes.ParamAny || p.Kind == nodes.ParamMap:

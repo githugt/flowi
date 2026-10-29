@@ -166,35 +166,28 @@ func TestExtract_from_body_jsonpath_header_cookie_status_and_regex(t *testing.T)
 	}
 }
 
-func TestExtract_Given_no_match_Then_FLW_RUN_005(t *testing.T) {
+func TestSet_Given_a_response_value_with_no_match_Then_FLW_RUN_005(t *testing.T) {
 	s, _ := newState(PhasePost)
 	s.Response = sampleResponse()
 
-	diags := run(t, node("extract", "name", "missing", "from", "body", "path", "$.nope"), s)
+	diags := run(t, setNode(model.SetValue{Name: "missing", From: "response", Where: "body", Path: "$.nope"}), s)
 
 	if len(diags) != 1 || diags[0].Code != diag.CodeRunExtractEmpty || diags[0].Args["name"] != "missing" {
 		t.Fatalf("diags %v", diags)
 	}
 }
 
-func TestExtract_single_form_should_write_var(t *testing.T) {
+func TestSet_Given_values_in_a_post_hook_Then_they_read_the_response(t *testing.T) {
 	s, _ := newState(PhasePost)
 	s.Response = sampleResponse()
 
-	diags := run(t, node("extract", "name", "token", "from", "body", "path", "$.data.token"), s)
+	diags := run(t, setNode(
+		model.SetValue{Name: "token", From: "response", Where: "body", Path: "$.data.token"},
+		model.SetValue{Name: "copy", Value: "{{response.body.data.token}}"},
+		model.SetValue{Name: "code", Value: "{{status}}"},
+	), s)
 
-	if len(diags) != 0 || varOf(s, "token") != "t-1" {
-		t.Fatalf("diags %v vars %v", diags, s.Vars.Snapshot())
-	}
-}
-
-func TestExtract_map_form_should_render_each_key_into_vars(t *testing.T) {
-	s, _ := newState(PhasePost)
-	s.Response = sampleResponse()
-
-	diags := run(t, node("extract", "token", "{{response.body.data.token}}", "code", "{{status}}"), s)
-
-	if len(diags) != 0 || varOf(s, "token") != "t-1" || varOf(s, "code") != 201 {
+	if len(diags) != 0 || varOf(s, "token") != "t-1" || varOf(s, "copy") != "t-1" || varOf(s, "code") != 201 {
 		t.Fatalf("diags %v vars %v", diags, s.Vars.Snapshot())
 	}
 }
@@ -257,7 +250,7 @@ func TestLog_Given_message_built_from_secret_Then_whole_message_masked(t *testin
 }
 
 func TestLookup_should_know_registered_types_only(t *testing.T) {
-	for _, nt := range []model.NodeType{"set", "extract", "assert", "log", "generate", "transform", "calc", "note"} {
+	for _, nt := range []model.NodeType{"set", "assert", "log", "note"} {
 		if _, ok := Lookup(nt); !ok {
 			t.Errorf("%s missing", nt)
 		}

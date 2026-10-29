@@ -3,12 +3,13 @@
 package bruno
 
 import (
-	"bytes"
 	"fmt"
 	"regexp"
 	"slices"
 	"strings"
 	"unicode/utf8"
+
+	"github.com/githugt/flowi-lib/internal/textenc"
 )
 
 // block is one top-level block of a .bru file: a dictionary of entries
@@ -180,5 +181,5 @@ func (b block) enabled() []entry {
 	return slices.DeleteFunc(slices.Clone(b.entries), func(e entry) bool { return e.disabled })
 }
 
-// trimBOM drops a UTF-8 byte order mark.
-func trimBOM(src []byte) []byte { return bytes.TrimPrefix(src, []byte("\xEF\xBB\xBF")) }
+// trimBOM drops a byte order mark and converts UTF-16 text.
+func trimBOM(src []byte) []byte { return textenc.ToUTF8(src) }

@@ -39,6 +39,15 @@ services:
       RABBITMQ_DEFAULT_PASS: flowi
     ports: ["5672:5672"]
 
+  # AMQP 1.0 (the amqp10 transport); RabbitMQ above speaks 0-9-1. Queues are created on first use.
+  artemis:
+    image: docker.io/apache/activemq-artemis:latest-alpine
+    environment:
+      ARTEMIS_USER: flowi
+      ARTEMIS_PASSWORD: flowi
+      ANONYMOUS_LOGIN: "false"
+    ports: ["5673:5672"]
+
   redis:
     image: docker.io/library/redis:7
     ports: ["6379:6379"]

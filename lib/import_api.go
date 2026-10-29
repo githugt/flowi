@@ -26,9 +26,14 @@ import (
 	"github.com/githugt/flowi-lib/importers/bruno"
 	"github.com/githugt/flowi-lib/importers/curl"
 	"github.com/githugt/flowi-lib/importers/har"
+	"github.com/githugt/flowi-lib/importers/hoppscotch"
 	"github.com/githugt/flowi-lib/importers/httpfile"
+	"github.com/githugt/flowi-lib/importers/insomnia"
+	"github.com/githugt/flowi-lib/importers/openrpc"
 	"github.com/githugt/flowi-lib/importers/postman"
+	"github.com/githugt/flowi-lib/importers/thunderclient"
 	"github.com/githugt/flowi-lib/internal/names"
+	"github.com/githugt/flowi-lib/internal/textenc"
 	"github.com/githugt/flowi-lib/mermaid"
 	"github.com/githugt/flowi-lib/model"
 	"github.com/githugt/flowi-lib/openapi"
@@ -37,7 +42,7 @@ import (
 	"github.com/githugt/flowi-lib/workspace"
 )
 
-// ImportKind names a document kind Flow-I imports.
+// ImportKind names a document kind Flowi imports.
 type ImportKind string
 
 // Import kinds.
@@ -54,6 +59,14 @@ const (
 	ImportHTTP    ImportKind = "http"    // a .http / .rest file (REST Client, JetBrains)
 	ImportPostman ImportKind = "postman" // a collection or an environment file
 	ImportBruno   ImportKind = "bruno"   // a collection folder: ImportSource.Dir
+	// ImportInsomnia is an Insomnia export (JSON format 4 or the YAML of Insomnia 10).
+	ImportInsomnia ImportKind = "insomnia"
+	// ImportThunderClient is a Thunder Client collection or environment export.
+	ImportThunderClient ImportKind = "thunderclient"
+	// ImportHoppscotch is a Hoppscotch collection or environment export.
+	ImportHoppscotch ImportKind = "hoppscotch"
+	// ImportOpenRPC is an OpenRPC document: one JSON-RPC request per method.
+	ImportOpenRPC ImportKind = "openrpc"
 	ImportMermaid ImportKind = "mermaid" // a flowchart sketch, resolved against the collection
 )
 
@@ -65,6 +78,11 @@ type ImportSource struct {
 	Name string
 	Data []byte
 	Dir  string
+	// RefDir is the folder the files that an OpenAPI document refers to
+	// ("$ref: ./schemas/pet.yaml") are read from: the folder of a local source
+	// file. Empty for a document from a URL or standard input: its references
+	// to files are reported and left out.
+	RefDir string
 	// Overlays are OpenAPI Overlay documents applied, in order, to an OpenAPI
 	// or AsyncAPI document before it is imported. The document itself is kept
 	// as it was, with the overlays beside it in descriptions/.
@@ -154,6 +172,9 @@ func (w *Workspace) PreviewImportSourceNew(src ImportSource, dir string) (Import
 }
 
 func (w *Workspace) previewIn(c model.Collection, src ImportSource) (ImportPlan, error) {
+	// Some Windows tools put a byte order mark at the start of a file, or save
+	// it as UTF-16; no JSON parser accepts either, so every source is plain UTF-8 from here.
+	src.Data = textenc.ToUTF8(src.Data)
 	if transform, ok := importerFor(src.Kind); ok {
 		r, fatal := transform(src, c)
 		if fatal.HasErrors() {
@@ -174,7 +195,7 @@ func (w *Workspace) previewIn(c model.Collection, src ImportSource) (ImportPlan,
 	case ImportProto:
 		files, diags, err = w.planProto(c, src)
 	case ImportArazzo:
-		files, diags, err = w.planArazzo(c, src.Data)
+		files, diags, err = w.planArazzo(c, src)
 	default:
 		return ImportPlan{}, fmt.Errorf("unknown import kind %q", src.Kind)
 	}
@@ -291,17 +312,17 @@ func importChanges(p ImportPlan) ([]store.FileChange, []string, error) {
 // flows to flows/<path>.arazzo.yaml.
 func (w *Workspace) planOpenAPI(c model.Collection, src ImportSource) (map[string][]byte, diag.List, error) {
 	kept, hasKept := keptSpecNamed(c.Root, specBaseName(src))
-	// The overlay Flow-I saves request edits to always applies, after the
+	// The overlay Flowi saves request edits to always applies, after the
 	// overlays the import names: it is part of the kept spec.
 	overlays, err := withEdits(src.Overlays, kept, hasKept)
 	if err != nil {
 		return nil, nil, err
 	}
-	data, overlayDiags := specoverlay.Apply(src.Data, overlays)
+	data, overlayDiags := specoverlay.ApplyTo(src.Data, overlayTarget(src), overlays)
 	if overlayDiags.HasErrors() {
 		return nil, nil, overlayDiags.Err()
 	}
-	r, diags := openapi.Import(data, openapi.Options{NewID: w.newID})
+	r, diags := openapi.Import(data, openapi.Options{NewID: w.newID, Files: specFolder(src)})
 	if diags.HasErrors() {
 		return nil, nil, diags.Err()
 	}
@@ -320,13 +341,36 @@ func (w *Workspace) planOpenAPI(c model.Collection, src ImportSource) (map[strin
 		return nil, nil, err
 	}
 	planSpecCopy(c, src, "openapi", files)
+	planRefFiles(c, src, r.Files, files)
 	return files, diags, nil
+}
+
+// specFolder is where the files an OpenAPI document refers to are read from:
+// only a folder the caller named, never one guessed from the document's name,
+// so a document fetched from a URL cannot pull local files into a collection.
+func specFolder(src ImportSource) fs.FS {
+	if src.RefDir == "" {
+		return nil
+	}
+	if info, err := os.Stat(src.RefDir); err != nil || !info.IsDir() {
+		return nil
+	}
+	return os.DirFS(src.RefDir)
+}
+
+// planRefFiles keeps the files the document's references were followed into
+// beside the kept copy, in descriptions/<name>.files/, under the paths the
+// document writes them with, so a later import of the kept copy finds them.
+func planRefFiles(c model.Collection, src ImportSource, refs map[string][]byte, files map[string][]byte) {
+	for name, data := range refs {
+		files[filepath.Join(c.Root, "descriptions", specBaseName(src)+".files", filepath.FromSlash(name))] = data
+	}
 }
 
 // planAsyncAPI maps the operations of an AsyncAPI document to async requests
 // under requests/, keeping the document in descriptions/.
 func (w *Workspace) planAsyncAPI(c model.Collection, src ImportSource) (map[string][]byte, diag.List, error) {
-	data, overlayDiags := specoverlay.Apply(src.Data, src.Overlays)
+	data, overlayDiags := specoverlay.ApplyTo(src.Data, overlayTarget(src), src.Overlays)
 	if overlayDiags.HasErrors() {
 		return nil, nil, overlayDiags.Err()
 	}
@@ -346,10 +390,11 @@ func (w *Workspace) planAsyncAPI(c model.Collection, src ImportSource) (map[stri
 	return files, diags, nil
 }
 
-// planProto maps each unary or server-streaming method of a .proto file to a
+// planProto maps each method of a .proto file to a
 // gRPC request under requests/<Service>/<Method>, and keeps the .proto file and
-// the local files it imports under protos/ for the requests to compile. Client
-// and bidirectional streaming have no request kind yet: they are reported.
+// the local files it imports under protos/ for the requests to compile. A
+// method that streams from the client starts with an array holding one example
+// message.
 func (w *Workspace) planProto(c model.Collection, src ImportSource) (map[string][]byte, diag.List, error) {
 	dir := ""
 	if src.Name != "" {
@@ -367,15 +412,13 @@ func (w *Workspace) planProto(c model.Collection, src ImportSource) (map[string]
 	ids := map[model.ID]model.ID{}
 	var diags diag.List
 	for _, m := range p.Methods {
-		if m.ClientStream {
-			diags = append(diags, diag.New(diag.CodeImportUnmapped, diag.Location{}, map[string]string{
-				"what": "method " + m.Full(), "how": "skipped", "detail": "client and bidirectional streaming are not supported"}))
-			continue
-		}
 		service := m.Service[strings.LastIndex(m.Service, ".")+1:]
 		g := model.GRPC{Server: "{{env.grpc_server}}", Method: m.Full(), Body: model.Body{JSON: m.Example}, Proto: []string{main}, Import: []string{"protos"}}
 		if m.ServerStream {
 			g.Receive = &model.AsyncReceive{}
+		}
+		if m.ClientStream {
+			g.Body = model.Body{JSON: "[" + m.Example + "]"}
 		}
 		req := model.Request{Meta: model.Meta{ID: w.newID(), Name: service + "." + m.Name}, Path: service + "/" + m.Name,
 			Versions: []model.RequestVersion{{Label: "1", GRPC: &g}}}
@@ -413,7 +456,7 @@ func specBaseName(src ImportSource) string {
 	base := ""
 	if src.Name != "" {
 		base = strings.TrimSuffix(filepath.Base(src.Name), filepath.Ext(src.Name))
-		base = importers.FileName(strings.TrimSuffix(strings.TrimSuffix(base, ".openapi"), ".asyncapi"))
+		base = importers.FileName(strings.TrimSuffix(strings.TrimSuffix(strings.TrimSuffix(base, ".openapi"), ".asyncapi"), ".arazzo"))
 	}
 	if base == "" || base == "requests" { // "requests" is the generated description's name
 		base = "imported"
@@ -453,7 +496,7 @@ func (w *Workspace) planRequestFile(c model.Collection, req model.Request, ids m
 	}
 	if i := slices.IndexFunc(c.Requests, func(x model.Request) bool { return x.File == req.File }); i >= 0 {
 		ids[req.ID], req.ID = c.Requests[i].ID, c.Requests[i].ID
-		req.Edit, req.EditBase = c.Requests[i].Edit, c.Requests[i].EditBase // the user's dirty edit survives a re-import
+		req.Edit, req.EditBase, req.EditOverlay = c.Requests[i].Edit, c.Requests[i].EditBase, c.Requests[i].EditOverlay // the user's dirty edit survives a re-import
 	}
 	data, err := w.store.EncodeRequest(req)
 	if err != nil {
@@ -529,17 +572,38 @@ func keptRefs(nodes []model.Node, ids map[model.ID]model.ID) []model.Node {
 }
 
 // planArazzo maps workflows to flows/arazzo/<workflowId>.arazzo.yaml,
-// calling the collection's requests by operation.
-func (w *Workspace) planArazzo(c model.Collection, data []byte) (map[string][]byte, diag.List, error) {
+// calling the collection's requests by operation. OpenAPI Overlays given
+// with the document fix it first, as for an OpenAPI description (the overlay
+// format works on any YAML or JSON); the document and its overlays are then
+// kept in descriptions/, so the fixes stay visible and repeatable. Without
+// overlays nothing is kept, as before.
+func (w *Workspace) planArazzo(c model.Collection, src ImportSource) (map[string][]byte, diag.List, error) {
+	data, overlayDiags := specoverlay.ApplyTo(src.Data, overlayTarget(src), src.Overlays)
+	if overlayDiags.HasErrors() {
+		return nil, nil, overlayDiags.Err()
+	}
 	r, diags := arazzo.Import(data, arazzo.Options{NewID: w.newID, Resolve: collectionResolver{c: c}})
 	if diags.HasErrors() {
 		return nil, nil, diags.Err()
 	}
+	diags = append(overlayDiags, diags...)
 	files := map[string][]byte{}
 	if err := w.planFlows(c, r.Flows, map[model.ID]model.ID{}, files); err != nil {
 		return nil, nil, err
 	}
+	if len(src.Overlays) > 0 {
+		planSpecCopy(c, src, "arazzo", files)
+	}
 	return files, diags, nil
+}
+
+// overlayTarget is the name an overlay's "extends" is checked against: the
+// document's own name, or nothing when it came from standard input.
+func overlayTarget(src ImportSource) string {
+	if src.Name == "stdin" {
+		return ""
+	}
+	return src.Name
 }
 
 // importerFor returns the transform for kinds that produce an
@@ -560,6 +624,18 @@ func importerFor(kind ImportKind) (importer, bool) {
 		},
 		ImportBruno: func(s ImportSource, _ model.Collection) (importers.Result, diag.List) {
 			return bruno.Import(os.DirFS(s.Dir), cmp.Or(s.Name, s.Dir))
+		},
+		ImportInsomnia: func(s ImportSource, _ model.Collection) (importers.Result, diag.List) {
+			return insomnia.Import(s.Data, s.Name)
+		},
+		ImportThunderClient: func(s ImportSource, _ model.Collection) (importers.Result, diag.List) {
+			return thunderclient.Import(s.Data, s.Name)
+		},
+		ImportHoppscotch: func(s ImportSource, _ model.Collection) (importers.Result, diag.List) {
+			return hoppscotch.Import(s.Data, s.Name)
+		},
+		ImportOpenRPC: func(s ImportSource, _ model.Collection) (importers.Result, diag.List) {
+			return openrpc.Import(s.Data, s.Name)
 		},
 		ImportMermaid: func(s ImportSource, c model.Collection) (importers.Result, diag.List) {
 			return mermaid.Import(s.Data, s.Name, pathResolver{c: c})

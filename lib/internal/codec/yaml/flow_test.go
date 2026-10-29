@@ -38,6 +38,22 @@ func TestDecodeFlow_should_round_trip_canonical_fixture(t *testing.T) {
 	}
 }
 
+func TestDecodeFlow_should_round_trip_the_flowi_overlay_of_a_request_step(t *testing.T) {
+	// Arrange
+	data := []byte("id: 01J9ZB3M4N5P6Q7R8S9T0VWXYZ\nnodes:\n  - id: call\n    type: request\n    request:\n      id: 01J9ZB3M4N5P6Q7R8S9T0VW000\n    overlay: vip\n")
+	c := newCodec()
+
+	// Act
+	f, diags := c.DecodeFlow("f.flow.yaml", "f", data)
+	requireNoDiagnostics(t, diags)
+	out, err := c.EncodeFlow(f)
+
+	// Assert
+	if err != nil || f.Nodes[0].Request.Overlay != "vip" || !bytes.Contains(out, []byte("overlay: vip")) {
+		t.Fatalf("err %v overlay %+v, output:\n%s", err, f.Nodes[0].Request, out)
+	}
+}
+
 func TestDecodeFlow_should_keep_unknown_node_keys_as_ordered_params(t *testing.T) {
 	data := []byte("id: 01J9ZB3M4N5P6Q7R8S9T0VWXYZ\nnodes:\n  - id: d\n    type: delay\n    duration: 2s\n    jitter: 500ms\n    tags: [a, b]\n")
 
@@ -95,7 +111,7 @@ func TestDecodeFlow_should_read_outputs_and_rate_limit_scalar_and_per_host(t *te
 			f, diags := newCodec().DecodeFlow("f.flow.yaml", "f", data)
 
 			requireNoDiagnostics(t, diags)
-			if len(f.Outputs) != 1 || f.Outputs[0] != (model.KeyValue{Key: "token", Value: "{{vars.token}}"}) {
+			if len(f.Outputs) != 1 || f.Outputs[0] != (model.Output{Name: "token", Value: "{{vars.token}}"}) {
 				t.Fatalf("outputs %+v", f.Outputs)
 			}
 			if f.Execution.RateLimit != tt.wantAll || !slices.Equal(f.Execution.HostRateLimits, tt.wantHosts) {
@@ -126,7 +142,7 @@ func TestEncodeFlow_should_round_trip_outputs_and_host_rate_limits(t *testing.T)
 }
 
 func TestFlowNode_attach_should_round_trip_and_stay_out_of_params(t *testing.T) {
-	data := []byte("id: 01J9ZB3M4N5P6Q7R8S9T0VWXYZ\nnodes:\n  - id: pick\n    type: extract\n    attach: login\n")
+	data := []byte("id: 01J9ZB3M4N5P6Q7R8S9T0VWXYZ\nnodes:\n  - id: pick\n    type: set\n    attach: login\n")
 
 	f, diags := newCodec().DecodeFlow("f.flow.yaml", "f", data)
 	requireNoDiagnostics(t, diags)
@@ -137,5 +153,30 @@ func TestFlowNode_attach_should_round_trip_and_stay_out_of_params(t *testing.T) 
 	}
 	if f.Nodes[0].Attach != "login" || len(f.Nodes[0].Params) != 0 || !bytes.Contains(out, []byte("attach: login")) {
 		t.Fatalf("attach %q, params %+v, output:\n%s", f.Nodes[0].Attach, f.Nodes[0].Params, out)
+	}
+}
+
+func TestDecodeFlow_should_round_trip_the_connection_a_request_step_opens_uses_and_closes(t *testing.T) {
+	// Arrange
+	data := []byte("id: 01J9ZB3M4N5P6Q7R8S9T0VWXYZ\nnodes:\n  - id: join\n    type: request\n    request:\n      id: 01J9ZB3M4N5P6Q7R8S9T0VW000\n    open: chat\n  - id: ask\n    type: request\n    request:\n      id: 01J9ZB3M4N5P6Q7R8S9T0VW001\n    over: chat\n    close: true\n")
+
+	c := newCodec()
+
+	// Act
+	f, diags := c.DecodeFlow("f.flow.yaml", "f", data)
+	requireNoDiagnostics(t, diags)
+	out, err := c.EncodeFlow(f)
+
+	// Assert
+	if err != nil {
+		t.Fatal(err)
+	}
+	if f.Nodes[0].Request.Open != "chat" || f.Nodes[1].Request.Over != "chat" || !f.Nodes[1].Request.Close {
+		t.Fatalf("nodes %+v %+v", f.Nodes[0].Request, f.Nodes[1].Request)
+	}
+	for _, want := range []string{"open: chat", "over: chat", "close: true"} {
+		if !bytes.Contains(out, []byte(want)) {
+			t.Errorf("missing %q in:\n%s", want, out)
+		}
 	}
 }

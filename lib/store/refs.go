@@ -76,7 +76,7 @@ func mapHooks(h model.Hooks, fix func(model.Ref) model.Ref) model.Hooks {
 		s.Inline = mapNodes(s.Inline, fix)
 		return s
 	}
-	return model.Hooks{Pre: mapSlice(h.Pre, step), Post: mapSlice(h.Post, step)}
+	return model.Hooks{Pre: mapSlice(h.Pre, step), Post: mapSlice(h.Post, step), Message: mapSlice(h.Message, step)}
 }
 
 func mapNodes(nodes []model.Node, fix func(model.Ref) model.Ref) []model.Node {

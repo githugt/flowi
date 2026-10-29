@@ -4,9 +4,11 @@ package engine
 
 import (
 	"context"
+	"net/http"
 	"time"
 
 	"github.com/githugt/flowi-lib/diag"
+	"github.com/githugt/flowi-lib/internal/authx"
 	"github.com/githugt/flowi-lib/internal/nodes"
 	"github.com/githugt/flowi-lib/model"
 	"github.com/githugt/flowi-lib/settings"
@@ -39,6 +41,22 @@ type SendInput struct {
 	Hooks         model.HookControl
 	Seed          uint64 // 0 → a random seed, reported in the result
 	Save          string // "" → the responses.save setting
+
+	// Overlay, when set, is laid over the resolved version before anything is
+	// rendered or sent. What does not fit is reported as warnings.
+	Overlay *Overlay
+}
+
+// Overlay is a flowi overlay chosen for a send: its name and the operations
+// that apply to the request (shared part first).
+type Overlay struct {
+	Name string
+	Ops  []model.OverlayOp
+}
+
+// sendCall is the call a standalone send makes.
+func sendCall(in SendInput) call {
+	return call{collection: in.Collection, request: in.Request, pinned: in.PinnedVersion, with: in.With, hooks: in.Hooks, save: in.Save, overlay: in.Overlay}
 }
 
 // SchemaChecker validates a response against the schemas stored for its
@@ -46,6 +64,19 @@ type SendInput struct {
 // notes on the send: they never change its status.
 type SchemaChecker interface {
 	Check(c model.Collection, r model.Request, version string, rec Record) diag.List
+}
+
+// SchemaMatcher is a SchemaChecker that can also check one body against the
+// response schema kept for a request, for a flow's schema check. found is
+// false when no schema is kept for that status.
+type SchemaMatcher interface {
+	Match(c model.Collection, r model.Request, version string, status int, body any) (violations []SchemaViolation, found bool)
+}
+
+// SchemaViolation is one place a body does not match its schema.
+type SchemaViolation struct {
+	Path    string
+	Message string
 }
 
 // Deps are the engine's collaborators.
@@ -79,6 +110,12 @@ type Deps struct {
 	// the call made by node path ("" for a standalone send) of run runID.
 	// It is added to outgoing requests that do not carry one already.
 	Traceparent func(runID, path string) string
+	// AuthTokens keeps OAuth 2.0 tokens between sends (nil: every send asks
+	// the token endpoint again).
+	AuthTokens *authx.TokenCache
+	// Transport, when set, sends every HTTP attempt instead of the network (nil: the real one). A run played
+	// back from a recording uses it.
+	Transport http.RoundTripper
 }
 
 // Observers combines observers into one for Deps.Observe, calling each in
