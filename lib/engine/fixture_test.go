@@ -95,6 +95,7 @@ type fixture struct {
 
 	transports transport.Registry // injected into Deps; nil → every real protocol
 	grpc       GRPCRunner         // injected into Deps; nil → the real gRPC client
+	dataset    DatasetRunner      // injected into Deps; nil → the real stores
 
 	hold chan struct{} // /hold answers once this is closed
 	held chan struct{} // /hold reports each arrival here
@@ -168,6 +169,26 @@ func (f *fixture) handler() http.Handler {
 		f.echoHeaders = headers
 		f.echoMu.Unlock()
 		writeJSON(w, map[string]any{"path": r.URL.Path, "query": r.URL.RawQuery, "headers": headers, "body": string(body)})
+	})
+	mux.HandleFunc("/legacy", func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Deprecation", "@1688169599") // 2023-06-30T23:59:59Z
+		w.Header().Set("Sunset", "Sat, 31 Dec 2033 23:59:59 GMT")
+		w.Header().Set("Link", `</v2/legacy>; rel="successor-version"`)
+		writeJSON(w, map[string]any{"ok": true})
+	})
+	mux.HandleFunc("/limited", func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("RateLimit-Policy", `"default";q=100;w=60`)
+		w.Header().Set("RateLimit", `"default";r=0;t=30`)
+		writeJSON(w, map[string]any{"ok": true})
+	})
+	mux.HandleFunc("/roomy", func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("RateLimit", `"default";r=7;t=30`)
+		writeJSON(w, map[string]any{"ok": true})
+	})
+	mux.HandleFunc("/dav", func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/xml")
+		w.WriteHeader(http.StatusMultiStatus)
+		_, _ = io.WriteString(w, `<D:multistatus xmlns:D="DAV:"><D:response><D:href>/files/a.txt</D:href></D:response><D:response><D:href>/files/b.txt</D:href></D:response></D:multistatus>`)
 	})
 	mux.HandleFunc("/echo-secret", func(w http.ResponseWriter, _ *http.Request) { _, _ = io.WriteString(w, "you sent "+secretV) })
 	mux.HandleFunc("/status/{code}", func(w http.ResponseWriter, r *http.Request) {
@@ -295,7 +316,7 @@ func (f *fixture) deps() Deps {
 	return Deps{
 		Lookup: f.lookup, Vault: f.vault, Environ: f.environ,
 		DataDir: func(id model.ID) string { return filepath.Join(f.dataDir, string(id)) },
-		Clock:   time.Now, Transports: f.transports, GRPC: f.grpc,
+		Clock:   time.Now, Transports: f.transports, GRPC: f.grpc, Dataset: f.dataset,
 		NewID: func() string { return fmt.Sprintf("01JC%022d", f.seq.Add(1)) },
 	}
 }

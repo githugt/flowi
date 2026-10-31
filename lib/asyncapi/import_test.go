@@ -213,3 +213,31 @@ operations:
 		t.Fatalf("channel %q diags %v", res.Requests[0].Versions[0].Async.Channel, diags)
 	}
 }
+
+// AsyncAPI 3.1.0 only adds a ROS 2 binding to 3.0.0: a 3.1 document with an operation must import like a 3.0 one, and the
+// ROS 2 binding on a channel (a protocol Flowi has no transport for) must not stop it or change the request.
+func TestImport_Given_an_asyncapi_3_1_document_Then_it_imports_like_3_0(t *testing.T) {
+	// Arrange
+	doc := `asyncapi: 3.1.0
+info: {title: t, version: 1.0.0}
+servers:
+  broker: {host: "broker:1883", protocol: mqtt}
+channels:
+  readings:
+    address: sensors/readings
+    bindings:
+      ros2: {node: sensor_node}
+operations:
+  publishReading:
+    action: send
+    channel: {$ref: '#/channels/readings'}
+`
+
+	// Act
+	got, diags := Import([]byte(doc), Options{NewID: func() model.ID { return "ID000000000000000000000001" }})
+
+	// Assert
+	if diags.HasErrors() || len(got.Requests) != 1 || got.Requests[0].Versions[0].Async == nil || got.Requests[0].Versions[0].Async.Protocol != "mqtt" {
+		t.Fatalf("diags %v requests %+v", diags, got.Requests)
+	}
+}

@@ -135,6 +135,7 @@ type RecordMessage struct {
 const (
 	KindAsync      = "async"
 	KindGRPC       = "grpc"
+	KindDataset    = "dataset"
 	OutcomeOK      = "ok"
 	OutcomeTimeout = "timeout"
 	OutcomeError   = "error"

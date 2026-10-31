@@ -48,7 +48,7 @@ type listRun struct {
 	r       *runner
 	f       *frame
 	list    []model.Node
-	deps    [][]int
+	deps    [][]arrowDep
 	state   []nodeState
 	results []nodeResult
 	blocked []bool // a dependency failed (or was blocked): never runs
@@ -106,21 +106,29 @@ func newListRun(ctx context.Context, r *runner, f *frame, list []model.Node) *li
 	return lr
 }
 
-// dependencies are each node's needs, or the previous node without them.
-func dependencies(list []model.Node) [][]int {
+// arrowDep is a line into a node: the node it leaves (an index in the list) and the outcomes that take it.
+type arrowDep struct {
+	from  int
+	arrow model.Arrow
+}
+
+// dependencies are the lines into each node: its needs (taken on success), its after_failure_of (taken on
+// failure), or, with neither, the node before it on success.
+func dependencies(list []model.Node) [][]arrowDep {
 	index := make(map[string]int, len(list))
 	for i, n := range list {
 		index[n.ID] = i
 	}
-	out := make([][]int, len(list))
+	out := make([][]arrowDep, len(list))
 	for i, n := range list {
-		for _, id := range n.Needs {
-			if j, ok := index[id]; ok {
-				out[i] = append(out[i], j)
-			}
+		previous := ""
+		if i > 0 {
+			previous = list[i-1].ID
 		}
-		if len(n.Needs) == 0 && i > 0 {
-			out[i] = []int{i - 1}
+		for _, a := range n.Arrows(previous) {
+			if j, ok := index[a.From]; ok {
+				out[i] = append(out[i], arrowDep{from: j, arrow: a})
+			}
 		}
 	}
 	return out
@@ -152,7 +160,7 @@ func (lr *listRun) advance(g *errgroup.Group) bool {
 func (lr *listRun) ready(i int) bool {
 	if !lr.forced[i] {
 		for _, d := range lr.deps[i] {
-			if lr.state[d] != stateFinished {
+			if lr.state[d.from] != stateFinished {
 				return false
 			}
 		}
@@ -173,8 +181,41 @@ func (lr *listRun) dependencyBlocked(i int) bool {
 		return false
 	}
 	for _, d := range lr.deps[i] {
-		if lr.blocked[d] || (lr.state[d] == stateFinished && lr.unhandledFailure(lr.results[d])) {
+		if lr.blocked[d.from] || (lr.state[d.from] == stateFinished && !lr.arrowTaken(d)) {
 			return true
+		}
+	}
+	return false
+}
+
+// arrowTaken says whether what the node an arrow leaves ended with takes the arrow. A cancelled node takes
+// none; a skipped one takes the success arrows (a step skipped by its when does not hold up the ones after
+// it); otherwise the arrow is taken when it is for any outcome the node has. A failure that on_error let the
+// list go on from also counts as a success.
+func (lr *listRun) arrowTaken(d arrowDep) bool {
+	res := lr.results[d.from]
+	switch res.status {
+	case StatusCancelled:
+		return false
+	case StatusSkipped:
+		return d.arrow.OnSuccess
+	}
+	return slices.ContainsFunc(res.outcomes, d.arrow.Takes) || (res.handled && d.arrow.OnSuccess)
+}
+
+// isFailure: the node failed and nothing in on_error handled it.
+func (lr *listRun) isFailure(res nodeResult) bool {
+	return !res.handled && (res.status == StatusFailed || res.status == StatusError)
+}
+
+// failureTaken says whether some node waits on one of the outcomes node i failed with, which makes that
+// failure handled.
+func (lr *listRun) failureTaken(i int, res nodeResult) bool {
+	for _, deps := range lr.deps {
+		for _, d := range deps {
+			if d.from == i && slices.ContainsFunc(res.outcomes, d.arrow.Takes) {
+				return true
+			}
 		}
 	}
 	return false
@@ -210,6 +251,8 @@ func (lr *listRun) finish(c completion) {
 		lr.jump(c.i, n.OnError)
 	case c.res.status == StatusCancelled && lr.ctx.Err() != nil:
 		lr.interrupted = true
+	case lr.isFailure(c.res) && lr.failureTaken(c.i, c.res):
+		lr.r.warn(diag.New(diag.CodeRunHandled, diag.Location{}, map[string]string{"node": n.ID, "on_error": "an arrow for its outcome"}))
 	case lr.unhandledFailure(c.res):
 		lr.failed = append(lr.failed, c.res)
 		lr.applyPolicy()

@@ -4,6 +4,7 @@ package nodes
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"reflect"
 	"strings"
@@ -281,5 +282,39 @@ func TestSet_Given_value_built_from_secret_Then_registered_as_secret(t *testing.
 
 	if len(got) != 1 || got[0] != varOf(s, "basic") {
 		t.Fatalf("registered %v", got)
+	}
+}
+
+func TestExtract_Given_an_xml_body_and_a_path_that_starts_with_a_slash_Then_it_is_read_as_an_xml_path(t *testing.T) {
+	// Arrange
+	resp := &Response{Status: 207, Header: http.Header{"Content-Type": {"application/xml"}}, Text: `<D:multistatus xmlns:D="DAV:"><D:response><D:href>/a</D:href></D:response><D:response><D:href>/b</D:href></D:response></D:multistatus>`}
+	tests := []struct {
+		name, path string
+		want       any
+	}{
+		{"one match is the value", "/multistatus/response[2]/href", "/b"},
+		{"several are a list", "//href", []any{"/a", "/b"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Act
+			got, err := Extract(model.Extraction{From: "body", Path: tt.path}, resp, nil)
+
+			// Assert
+			if err != nil || !reflect.DeepEqual(got, tt.want) {
+				t.Fatalf("got %#v, %v", got, err)
+			}
+		})
+	}
+}
+
+func TestExtract_Given_an_xml_path_that_matches_nothing_or_is_wrong_Then_an_error_says_so(t *testing.T) {
+	resp := &Response{Status: 200, Text: `<a><b>1</b></a>`}
+
+	_, nothing := Extract(model.Extraction{From: "body", Path: "/a/c"}, resp, nil)
+	_, bad := Extract(model.Extraction{From: "body", Path: "//a[0]"}, resp, nil)
+
+	if !errors.Is(nothing, errNothing) || bad == nil || !strings.Contains(bad.Error(), "from 1") {
+		t.Fatalf("nothing %v bad %v", nothing, bad)
 	}
 }

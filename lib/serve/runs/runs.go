@@ -267,15 +267,27 @@ func (m *Manager) Find(ctx context.Context, id string) (Record, bool) {
 
 func (m *Manager) await(id, key string, h Handle) {
 	out := h.Wait()
-	rec := m.finish(id, key, out)
+	rec := m.ended(id, out)
+	// Published before done closes: whoever Awaits or Shuts down then sees
+	// the shared store already hold the final state, not a stale "running".
 	m.publish(rec)
+	m.finish(id, key, rec)
 }
 
-func (m *Manager) finish(id, key string, out Outcome) Record {
+// ended is the record of run id once it has out, without recording it yet.
+func (m *Manager) ended(id string, out Outcome) Record {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	rec := m.runs[id].rec
+	rec.Outcome, rec.Status, rec.Finished = out, out.Status, m.opts.Now()
+	return rec
+}
+
+func (m *Manager) finish(id, key string, rec Record) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	e := m.runs[id]
-	e.rec.Outcome, e.rec.Status, e.rec.Finished = out, out.Status, m.opts.Now()
+	e.rec = rec
 	close(e.done)
 	m.inflight--
 	if key != "" {
@@ -287,7 +299,6 @@ func (m *Manager) finish(id, key string, out Outcome) Record {
 		m.finished = m.finished[1:]
 	}
 	m.signalIdle()
-	return e.rec
 }
 
 // signalIdle closes idle once shutdown has begun and nothing is in flight.

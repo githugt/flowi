@@ -64,16 +64,15 @@ func PreviewSend(d Deps, in SendInput, includeSecrets bool) Preview {
 		root: x.c.collection.Root, secretVars: x.env.secrets, missingSecret: x.r.secrets.isMissing(x.env.name),
 		memo: x.memo, secret: x.r.secrets.derived, verbatim: true, defaults: x.r.defaultHeaders(x.cfg),
 	}
-	if x.version.GRPC != nil {
-		return previewGRPC(in2, includeSecrets)
-	}
-	if x.version.Async != nil {
-		return previewAsync(in2, includeSecrets)
-	}
-	b, diags := build(in2)
-	out := Preview{Masked: previewOf(x.version.Body, b, false), Diags: diags}
+	return x.exchange().preview(in2, includeSecrets)
+}
+
+// previewHTTP is the preview of an HTTP request.
+func previewHTTP(in buildInput, includeSecrets bool) Preview {
+	b, diags := build(in)
+	out := Preview{Masked: previewOf(in.version.Body, b, false), Diags: diags}
 	if includeSecrets {
-		exact := previewOf(x.version.Body, b, true)
+		exact := previewOf(in.version.Body, b, true)
 		out.Real = &exact
 	}
 	return out

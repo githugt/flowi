@@ -121,3 +121,37 @@ func TestCases_Given_a_body_that_is_not_an_object_or_list_Then_it_still_gets_cas
 		t.Fatal("a plain value should still be mutated")
 	}
 }
+
+// A stored schema that names a registered format (OpenAPI Format Registry) gives a case that breaks that format
+// and nothing else, which tells a server that validates it from one that does not.
+func TestCases_Given_a_schema_with_registered_formats_Then_each_gets_a_value_that_does_not_fit_it(t *testing.T) {
+	// Arrange
+	schema := map[string]any{"type": "object", "properties": map[string]any{
+		"when":  map[string]any{"type": "string", "format": "date-time"},
+		"id":    map[string]any{"type": "string", "format": "uuid"},
+		"phone": map[string]any{"type": "string", "format": "phone-number"}, // not registered: no case
+		"count": map[string]any{"type": "integer", "format": "int8"},
+	}}
+	b := map[string]any{"when": "2026-10-29T12:00:00Z", "id": "3f2a4b7e-5c1d-4e9a-8b6f-0a1b2c3d4e5f", "phone": "555", "count": json.Number("5")}
+
+	// Act
+	cs := Cases(b, schema, 500)
+
+	// Assert
+	got := map[string]any{}
+	for _, c := range cs {
+		got[c.Name] = c.Body
+	}
+	if m, _ := got["when: not a date-time"].(map[string]any); m["when"] != "not-a-date-time" || m["id"] != b["id"] {
+		t.Errorf("date-time: %v", got["when: not a date-time"])
+	}
+	if m, _ := got["id: not a uuid"].(map[string]any); m["id"] != "not-a-uuid" {
+		t.Errorf("uuid: %v", got["id: not a uuid"])
+	}
+	if _, ok := got["phone: not a phone-number"]; ok {
+		t.Error("an unregistered format must not get a case")
+	}
+	if m, _ := got["count: past the range of int8"].(map[string]any); m["count"] != json.Number("128") {
+		t.Errorf("int8: %v", got["count: past the range of int8"])
+	}
+}

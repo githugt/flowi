@@ -270,8 +270,11 @@ func (h *Handler) nextInSequence(rt route) int {
 	return n
 }
 
+// problem is an error the replayer makes itself, as a problem details document (RFC 9457). "flowi", "error", "method"
+// and "path" are the replayer's own members from before the RFC members were added, and stay.
 func problem(r *http.Request, status int, match, msg string) answer {
 	return answer{status: status, match: match, problem: map[string]any{
+		"type": "about:blank", "title": http.StatusText(status), "status": status, "detail": msg, "instance": r.URL.Path,
 		"flowi": true, "error": msg, "method": r.Method, "path": r.URL.Path,
 	}}
 }
@@ -314,7 +317,7 @@ func (h *Handler) preflight(w http.ResponseWriter, r *http.Request) bool {
 	if r.Method != http.MethodOptions || r.Header.Get("Access-Control-Request-Method") == "" {
 		return false
 	}
-	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, HEAD, OPTIONS, QUERY")
+	w.Header().Set("Access-Control-Allow-Methods", strings.Join(append(model.StandardMethods(), model.MoreMethods()...), ", "))
 	if want := r.Header.Get("Access-Control-Request-Headers"); want != "" {
 		w.Header().Set("Access-Control-Allow-Headers", want)
 	}

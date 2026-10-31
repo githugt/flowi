@@ -108,6 +108,9 @@ func (o *oauth2) authorizeURLFor(redirect, state, verifier string) string {
 	if o.audience != "" {
 		q.Set("audience", o.audience)
 	}
+	if o.details != "" {
+		q.Set("authorization_details", o.details)
+	}
 	if o.pkce == "on" {
 		sum := sha256.Sum256([]byte(verifier))
 		q.Set("code_challenge", base64.RawURLEncoding.EncodeToString(sum[:]))
@@ -178,6 +181,9 @@ func (o *oauth2) requestDeviceCode(ctx context.Context) (deviceAuthorization, er
 	}
 	if o.audience != "" {
 		form.Set("audience", o.audience)
+	}
+	if o.details != "" {
+		form.Set("authorization_details", o.details)
 	}
 	data, status, err := o.post(ctx, o.deviceURL, form)
 	if err != nil {

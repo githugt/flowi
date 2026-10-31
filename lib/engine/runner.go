@@ -275,6 +275,7 @@ type call struct {
 	jar        *httpx.Jar        // the node's frame jar; nil → the run's
 	noJar      bool              // the node's lane has cookies off
 	overlay    *Overlay          // a standalone send's flowi overlay
+	outcomes   []model.Outcome   // the step's own, in place of the version's; none: the version's
 	bodyOver   *any              // a fuzz case: sent in place of the request's own body
 	conn       connUse           // a request node's use of a connection kept open
 }
@@ -285,6 +286,8 @@ type outcome struct {
 	record *Record
 	vars   map[string]any
 	diags  diag.List
+	// outcomes are the outcomes of the request that held when it finished (see matchOutcomes).
+	outcomes []string
 }
 
 func maskDiags(l diag.List, m interface{ String(string) string }) diag.List {

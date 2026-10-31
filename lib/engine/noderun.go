@@ -22,9 +22,12 @@ var errNodeTimeout = errors.New("node timeout")
 type nodeResult struct {
 	status  Status
 	handled bool // failed, but on_error lets its list go on
-	outputs map[string]any
-	diags   diag.List
-	reason  string // why a node was skipped, when it was not by its when
+	// outcomes are what the node ended with, for the arrows that leave it: the outcomes of a request, else
+	// success or failure by its status. Empty for a skipped or cancelled node.
+	outcomes []string
+	outputs  map[string]any
+	diags    diag.List
+	reason   string // why a node was skipped, when it was not by its when
 }
 
 // skippedByYou is the reason of a node the person chose not to run.
@@ -117,7 +120,21 @@ func classify(runCtx, nodeCtx context.Context, n model.Node, out nodes.Outcome) 
 		status = StatusError
 	}
 	handled := (status == StatusFailed || status == StatusError) && handlesErrors(n.OnError)
-	return nodeResult{status: status, handled: handled, outputs: out.Outputs, diags: diags}
+	return nodeResult{status: status, handled: handled, outcomes: outcomesOf(status, out.Outcomes), outputs: out.Outputs, diags: diags}
+}
+
+// outcomesOf are the outcomes a node ended with: those its runner reported (a request does), else success
+// or failure from the status. A node that timed out failed, whatever its request had matched.
+func outcomesOf(status Status, reported []string) []string {
+	switch {
+	case status == StatusSkipped || status == StatusCancelled:
+		return nil
+	case reported != nil:
+		return reported
+	case status == StatusFailed || status == StatusError:
+		return []string{model.OutcomeFailure}
+	}
+	return []string{model.OutcomeSuccess}
 }
 
 func hasTransportError(l diag.List) bool {

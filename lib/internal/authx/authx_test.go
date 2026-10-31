@@ -356,3 +356,60 @@ func TestSigV4_should_add_an_authorization_with_the_credential_scope(t *testing.
 		t.Errorf("applied %+v: the Authorization is a secret, the date is not", applied)
 	}
 }
+
+// Rich Authorization Requests (RFC 9396): what the token is for, in authorization_details.
+func TestOAuth2_Given_authorization_details_Then_the_token_request_carries_them_and_a_different_request_is_a_different_token(t *testing.T) {
+	// Arrange
+	var seen []string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_ = r.ParseForm()
+		seen = append(seen, r.Form.Get("authorization_details"))
+		_ = json.NewEncoder(w).Encode(map[string]any{"access_token": "tok-" + string(rune('0'+len(seen))), "expires_in": 3600})
+	}))
+	defer srv.Close()
+	env := Env{Now: func() time.Time { return time.Unix(1000, 0) }, Tokens: NewTokenCache()}
+	pay := `[{"type":"payment_initiation","actions":["initiate"],"instructedAmount":{"currency":"EUR","amount":"123.50"}}]`
+	read := `[{"type":"account_information","actions":["read"]}]`
+
+	// Act
+	first, second, again := request("GET", "http://api/a"), request("GET", "http://api/b"), request("GET", "http://api/c")
+	mustApply(t, auth("oauth2", "token_url", srv.URL, "client_id", "id", "client_secret", "sec", "authorization_details", pay), env, first)
+	mustApply(t, auth("oauth2", "token_url", srv.URL, "client_id", "id", "client_secret", "sec", "authorization_details", read), env, second)
+	mustApply(t, auth("oauth2", "token_url", srv.URL, "client_id", "id", "client_secret", "sec", "authorization_details", pay), env, again)
+
+	// Assert
+	if len(seen) != 2 || seen[0] != pay || seen[1] != read {
+		t.Fatalf("token requests carried %q", seen)
+	}
+	if first.Header.Get("Authorization") != "Bearer tok-1" || second.Header.Get("Authorization") != "Bearer tok-2" || again.Header.Get("Authorization") != "Bearer tok-1" {
+		t.Fatalf("tokens %q %q %q", first.Header.Get("Authorization"), second.Header.Get("Authorization"), again.Header.Get("Authorization"))
+	}
+}
+
+func TestOAuth2_should_refuse_authorization_details_that_are_not_a_json_array_of_objects_with_a_type(t *testing.T) {
+	for name, details := range map[string]string{
+		"not json":         "payment",
+		"an object":        `{"type":"x"}`,
+		"no type":          `[{"actions":["read"]}]`,
+		"a number in list": `[1]`,
+	} {
+		t.Run(name, func(t *testing.T) {
+			_, err := New(auth("oauth2", "token_url", "http://t", "client_id", "id", "client_secret", "s", "authorization_details", details), Env{})
+
+			if err == nil || !strings.Contains(err.Error(), "authorization_details") {
+				t.Fatalf("err %v", err)
+			}
+		})
+	}
+}
+
+func TestOAuth2_Given_authorization_details_Then_the_authorization_and_device_requests_carry_them_too(t *testing.T) {
+	o := &oauth2{clientID: "id", authorizeURL: "http://as/authorize", pkce: "off", details: `[{"type":"x"}]`}
+
+	got := o.authorizeURLFor("http://127.0.0.1:1/callback", "st", "v")
+
+	parsed, _ := url.Parse(got)
+	if parsed.Query().Get("authorization_details") != `[{"type":"x"}]` {
+		t.Fatalf("authorize URL %s", got)
+	}
+}

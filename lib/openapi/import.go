@@ -3,6 +3,7 @@
 package openapi
 
 import (
+	"encoding/json"
 	"fmt"
 	"io/fs"
 	"maps"
@@ -11,11 +12,13 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/pb33f/libopenapi"
 
 	"github.com/githugt/flowi-lib/diag"
 	"github.com/githugt/flowi-lib/importers"
+	"github.com/githugt/flowi-lib/internal/formats"
 	"github.com/githugt/flowi-lib/internal/jsonschema"
 	"github.com/githugt/flowi-lib/internal/textenc"
 	"github.com/githugt/flowi-lib/internal/yamldoc"
@@ -66,6 +69,7 @@ type operation struct {
 	method, path, stripped, label string
 	op                            map[string]any
 	pathParams                    []any
+	tagParents                    map[string]string // 3.2 nested tags: a tag's name to its parent's
 }
 
 // Import maps an OpenAPI 3.0/3.1 or Swagger 2.0 document (YAML or JSON; Swagger is converted to 3.0 first) to requests,
@@ -108,7 +112,7 @@ func Import(data []byte, o Options) (Result, diag.List) {
 	flows, linkDiags := suggestedFlows(groups, byOperation, o.NewID)
 	out.Flows = flows
 	out.Files = res.fileContents()
-	return out, slices.Concat(diags, linkDiags, externalRefs(res), missingOperationIDs(groups, paths))
+	return out, slices.Concat(diags, linkDiags, externalRefs(res), missingOperationIDs(groups, paths), unregisteredFormats(root))
 }
 
 // missingOperationIDs warns about each operation without an operationId: its
@@ -181,6 +185,7 @@ func (r *resolver) expandPathItems() {
 func operations(root map[string]any) []operation {
 	paths, _ := root["paths"].(map[string]any)
 	major := infoMajor(root)
+	parents := tagParents(root)
 	var out []operation
 	for _, p := range slices.Sorted(maps.Keys(paths)) {
 		item, _ := paths[p].(map[string]any)
@@ -194,7 +199,7 @@ func operations(root map[string]any) []operation {
 		}
 		for _, method := range methods() {
 			if op, ok := item[method].(map[string]any); ok {
-				out = append(out, operation{method: method, path: p, stripped: stripped, label: label, op: op, pathParams: shared})
+				out = append(out, operation{method: method, path: p, stripped: stripped, label: label, op: op, pathParams: shared, tagParents: parents})
 			}
 		}
 		extra, _ := item["additionalOperations"].(map[string]any)
@@ -203,7 +208,7 @@ func operations(root map[string]any) []operation {
 			if !ok || slices.Contains(methods(), strings.ToLower(name)) {
 				continue // OpenAPI keeps the fixed fields for the fixed methods
 			}
-			out = append(out, operation{method: name, path: p, stripped: stripped, label: label, op: op, pathParams: shared})
+			out = append(out, operation{method: name, path: p, stripped: stripped, label: label, op: op, pathParams: shared, tagParents: parents})
 		}
 	}
 	return out
@@ -264,9 +269,42 @@ func requestPath(op operation) string {
 		name = importers.FileName(op.method + "-" + slug(op.stripped))
 	}
 	if tags := stringList(op.op["tags"]); len(tags) > 0 && slug(tags[0]) != "" {
-		return importers.FileName(slug(tags[0])) + "/" + name
+		return tagFolder(tags[0], op.tagParents) + "/" + name
 	}
 	return name
+}
+
+// tagParents maps each tag of the document to its parent (OpenAPI 3.2 nests tags with "parent").
+func tagParents(root map[string]any) map[string]string {
+	out := map[string]string{}
+	tags, _ := root["tags"].([]any)
+	for _, t := range tags {
+		tag, _ := t.(map[string]any)
+		name, _ := tag["name"].(string)
+		parent, _ := tag["parent"].(string)
+		if name != "" && parent != "" {
+			out[name] = parent
+		}
+	}
+	return out
+}
+
+// tagFolder is the folder a tag stands for: the names of its parents, outermost first, then its own. A tag that
+// names itself again through its parents ends the chain there: the spec forbids a loop, and a loop must not hang the import.
+func tagFolder(tag string, parents map[string]string) string {
+	chain := []string{tag}
+	seen := map[string]bool{tag: true}
+	for p, ok := parents[tag]; ok && !seen[p]; p, ok = parents[p] {
+		seen[p] = true
+		chain = append(chain, p)
+	}
+	var folders []string
+	for i := len(chain) - 1; i >= 0; i-- {
+		if s := slug(chain[i]); s != "" {
+			folders = append(folders, importers.FileName(s))
+		}
+	}
+	return strings.Join(folders, "/")
 }
 
 var nonSlug = regexp.MustCompile(`[^A-Za-z0-9]+`)
@@ -327,10 +365,44 @@ func versionOf(op operation, res *resolver) model.RequestVersion {
 			v.Query = append(v.Query, kv)
 		case "header":
 			v.Headers = append(v.Headers, kv)
+		case "querystring":
+			// OpenAPI 3.2: the whole query string is one value (the media type in "content" says how it is written).
+			if !strings.Contains(v.URL, "?") {
+				v.URL += "?" + kv.Value
+			}
 		}
+	}
+	if isEventStream(op.op, res) {
+		return serverSentEvents(v)
 	}
 	v.Body = bodyOf(op.op, res)
 	return v
+}
+
+// isEventStream says whether an operation answers with text/event-stream and nothing JSON: a stream to listen to, not
+// a response to read (OpenAPI 3.2 describes each event with itemSchema).
+func isEventStream(op map[string]any, res *resolver) bool {
+	responses, _ := op["responses"].(map[string]any)
+	for code, r := range responses {
+		if !strings.HasPrefix(code, "2") {
+			continue
+		}
+		rm, _ := res.resolve(r).(map[string]any)
+		content, _ := rm["content"].(map[string]any)
+		_, stream := content["text/event-stream"]
+		if stream && jsonSchemaOf(rm) == nil {
+			return true
+		}
+	}
+	return false
+}
+
+// serverSentEvents turns v into a message request that listens to the stream at v's address.
+func serverSentEvents(v model.RequestVersion) model.RequestVersion {
+	return model.RequestVersion{
+		Label: v.Label, Docs: v.Docs, Headers: v.Headers,
+		Async: &model.Async{Protocol: "sse", Server: v.URL, Receive: &model.AsyncReceive{Count: 1, Timeout: 30 * time.Second}},
+	}
 }
 
 func paramsOf(op map[string]any) []any {
@@ -349,6 +421,9 @@ func bodyOf(op map[string]any, res *resolver) model.Body {
 		if ex, ok := mt["example"]; ok {
 			return model.Body{JSON: jsonValue{raw: ex}.text()}
 		}
+		if text, ok := namedExample(mt, res); ok {
+			return model.Body{JSON: text}
+		}
 		return model.Body{JSON: skeleton(mt["schema"], "body", 0).text()}
 	}
 	if mt, ok := content["application/x-www-form-urlencoded"].(map[string]any); ok {
@@ -361,6 +436,24 @@ func bodyOf(op map[string]any, res *resolver) model.Body {
 		return model.Body{Form: form}
 	}
 	return model.Body{}
+}
+
+// namedExample is the JSON of the first example (by name) of a media type that has a usable value: 3.2's dataValue,
+// 3.1's value, or a serializedValue that is JSON text. dataValue and value come before serializedValue.
+func namedExample(mt map[string]any, res *resolver) (string, bool) {
+	examples, _ := mt["examples"].(map[string]any)
+	for _, name := range slices.Sorted(maps.Keys(examples)) {
+		ex, _ := res.resolve(examples[name]).(map[string]any)
+		for _, key := range []string{"dataValue", "value"} {
+			if v, ok := ex[key]; ok {
+				return jsonValue{raw: v}.text(), true
+			}
+		}
+		if text, _ := ex["serializedValue"].(string); json.Valid([]byte(text)) {
+			return text, true
+		}
+	}
+	return "", false
 }
 
 // statusCode is a response key kept as a contract. It becomes part of a
@@ -511,4 +604,45 @@ func refSegment(s string) string {
 		return "[" + s + "]"
 	}
 	return "[" + strconv.Quote(s) + "]"
+}
+
+// unregisteredFormats warns once about the schema formats of the document that the OpenAPI Format Registry does not
+// list. A format that is not registered is legal: it annotates and nothing checks it, so a value of that format is not
+// validated (here or by most tools). What is walked are the places schemas live; examples and constants are data and may
+// hold a word "format" that is not one.
+func unregisteredFormats(root map[string]any) diag.List {
+	found := map[string]bool{}
+	var walk func(v any)
+	walk = func(v any) {
+		switch x := v.(type) {
+		case map[string]any:
+			for key, child := range x {
+				switch key {
+				case "example", "examples", "default", "enum", "const", "dataValue", "value", "serializedValue", "externalValue":
+					continue
+				case "format":
+					if name, isString := child.(string); isString {
+						if _, registered := formats.Lookup(name); !registered {
+							found[name] = true
+						}
+						continue
+					}
+				}
+				walk(child)
+			}
+		case []any:
+			for _, child := range x {
+				walk(child)
+			}
+		}
+	}
+	walk(root)
+	if len(found) == 0 {
+		return nil
+	}
+	names := slices.Sorted(maps.Keys(found))
+	return diag.List{diag.New(diag.CodeImportUnmapped, diag.Location{}, map[string]string{
+		"what": "schema format " + strings.Join(names, ", "), "how": "kept as an annotation",
+		"detail": "not in the OpenAPI Format Registry (" + formats.RegistryDate + "): values of this format are not checked",
+	})}
 }

@@ -42,6 +42,9 @@ type Blueprint struct {
 	// make a flow.
 	Phase  string
 	Params []Param
-	Body   Flow
-	File   string
+	// Outcomes are the outcomes a request starts with when it is seeded from the blueprint (see Outcome): the
+	// same list for the request's opening version, unless that already writes its own.
+	Outcomes []Outcome
+	Body     Flow
+	File     string
 }

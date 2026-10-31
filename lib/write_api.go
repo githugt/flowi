@@ -80,6 +80,29 @@ func (w *Workspace) NewGRPCRequest(collection model.ID, path string) (RequestTar
 	return w.newRequestWith(collection, path, model.RequestVersion{Label: "1", GRPC: &model.GRPC{}})
 }
 
+// NewDatasetRequest is NewRequest for a dataset request of the given driver (any of model.DatasetDrivers): its version
+// "1" has a server and a query that run as they are on any store of that driver, and one param to show how a value
+// is passed. An unknown driver is FLW-DATA-001.
+func (w *Workspace) NewDatasetRequest(collection model.ID, path, driver string) (RequestTarget, error) {
+	starter, ok := datasetStarters()[driver]
+	if !ok {
+		return RequestTarget{}, diagErr(diag.CodeDatasetRequest, map[string]string{"detail": "the driver is one of " + strings.Join(model.DatasetDrivers(), ", ")})
+	}
+	d := model.Dataset{Driver: driver, Server: starter.server, Query: starter.query, Params: []string{"hello"}}
+	return w.newRequestWith(collection, path, model.RequestVersion{Label: "1", Dataset: &d})
+}
+
+// datasetStarters is the server and query a new dataset request of each driver starts with. The server has no
+// password: the owner adds it as {{secret.name}}.
+func datasetStarters() map[string]struct{ server, query string } {
+	return map[string]struct{ server, query string }{
+		model.DriverPostgres: {"postgres://postgres@localhost:5432/postgres", "SELECT $1::text AS greeting"},
+		model.DriverMySQL:    {"mysql://root@localhost:3306/mysql", "SELECT ? AS greeting"},
+		model.DriverMariaDB:  {"mariadb://root@localhost:3306/mysql", "SELECT ? AS greeting"},
+		model.DriverSQLite:   {"data.db", "SELECT ? AS greeting"},
+	}
+}
+
 // GeneratedGRPC is what GenerateGRPCRequests did.
 type GeneratedGRPC struct {
 	Created []RequestTarget

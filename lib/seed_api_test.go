@@ -352,3 +352,117 @@ func TestSeedRequestHooks_Given_a_grpc_request_Then_it_logs_the_call_and_checks_
 		t.Fatalf("errors after seeding: %v", diags)
 	}
 }
+
+func TestSeedRequestHooks_Given_a_dataset_request_Then_it_logs_the_query_and_checks_the_outcome(t *testing.T) {
+	w := demoWorkspace(t)
+	target, err := w.NewRequest(w.Collections()[0].Manifest.ID, "seeded/query")
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, r, _ := w.requestFor(target)
+	r.Versions = []model.RequestVersion{{Label: "1", Dataset: &model.Dataset{Driver: "sqlite", Server: "shop.db", Query: "SELECT 1"}}}
+	if err := w.SaveRequest(target, r, SaveOptions{}); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := w.SeedRequestHooks(target); err != nil {
+		t.Fatal(err)
+	}
+
+	_, r, _ = w.requestFor(target)
+	post := r.Hooks.Post
+	if len(post) != 1 || len(post[0].Inline) != 2 || post[0].Inline[1].Type != "assert" {
+		t.Fatalf("post hooks %+v", post)
+	}
+	check, _ := post[0].Inline[1].Params[0].Value.(string)
+	if !strings.Contains(check, "outcome") || strings.Contains(check, "status") {
+		t.Fatalf("the assert must read the outcome, not an HTTP status: %q", check)
+	}
+	if diags := w.Validate(); diags.HasErrors() {
+		t.Fatalf("errors after seeding: %v", diags)
+	}
+}
+
+func openingOutcomes(t *testing.T, w *Workspace, rt RequestTarget) []model.Outcome {
+	t.Helper()
+	_, r, err := w.requestFor(rt)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return r.Versions[0].Outcomes
+}
+
+// New requests used to start with no outcomes written, so success and failure were implied and could not be
+// described or recoloured until the person wrote the list by hand.
+func TestSeedRequestHooks_Given_the_default_setting_Then_the_request_starts_with_success_and_failure_described(t *testing.T) {
+	w := demoWorkspace(t)
+	rt := newSeedRequest(t, w, "seeded/outcomes")
+	dataset := saveDataset(t, w, "seeded/rows")
+
+	err := w.SeedRequestHooks(rt)
+	derr := w.SeedRequestHooks(dataset)
+
+	got := openingOutcomes(t, w, rt)
+	rows := openingOutcomes(t, w, dataset)
+	if err != nil || derr != nil || len(got) != 2 || got[0].Name != "success" || got[1].Name != "failure" || got[0].Description == "" || got[1].Description == "" {
+		t.Fatalf("err %v/%v, http outcomes %+v", err, derr, got)
+	}
+	if len(rows) != 2 || !strings.Contains(rows[0].Description, "query") {
+		t.Fatalf("dataset outcomes %+v: a query has its own words for ending well", rows)
+	}
+	if diags := w.Validate(); diags.HasErrors() {
+		t.Fatalf("errors after seeding: %v", diags)
+	}
+}
+
+func TestSeedRequestHooks_Given_a_blueprint_with_outcomes_Then_the_request_starts_with_them(t *testing.T) {
+	w := demoWorkspace(t)
+	flow, _ := onboardingFlow(t, w)
+	writeBlueprint(t, w, flow.Collection, "with-outcomes", model.Blueprint{
+		Meta:     model.Meta{Name: "With outcomes"},
+		Outcomes: []model.Outcome{{Name: "success"}, {Name: "gone", When: "response.status == 410", Color: "amber", Description: "Removed"}, {Name: "failure"}},
+		Body:     model.Flow{Nodes: []model.Node{{ID: "only", Type: "log", Params: []model.Field{{Key: "value", Value: "done"}}}}},
+	})
+	if err := w.SetSetting(settings.LayerWorkspace, "requests.seed_blueprint", "with-outcomes"); err != nil {
+		t.Fatal(err)
+	}
+	rt := newSeedRequest(t, w, "seeded/blueprint-outcomes")
+
+	err := w.SeedRequestHooks(rt)
+
+	got := openingOutcomes(t, w, rt)
+	if err != nil || len(got) != 3 || got[1].Name != "gone" || got[1].Color != "amber" || got[1].Description != "Removed" {
+		t.Fatalf("err %v, outcomes %+v", err, got)
+	}
+}
+
+func TestSeedRequestHooks_Given_outcomes_already_written_Then_they_are_left_alone(t *testing.T) {
+	w := demoWorkspace(t)
+	rt := newSeedRequest(t, w, "seeded/kept-outcomes")
+	_, r, _ := w.requestFor(rt)
+	r.Versions[0].Outcomes = []model.Outcome{{Name: "failure"}, {Name: "mine", When: "response.status == 1"}}
+	if err := w.SaveRequest(rt, r, SaveOptions{}); err != nil {
+		t.Fatal(err)
+	}
+
+	err := w.SeedRequestHooks(rt)
+
+	got := openingOutcomes(t, w, rt)
+	if err != nil || len(got) != 2 || got[1].Name != "mine" {
+		t.Fatalf("err %v, outcomes %+v", err, got)
+	}
+}
+
+func saveDataset(t *testing.T, w *Workspace, path string) RequestTarget {
+	t.Helper()
+	target, err := w.NewRequest(w.Collections()[0].Manifest.ID, path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, r, _ := w.requestFor(target)
+	r.Versions = []model.RequestVersion{{Label: "1", Dataset: &model.Dataset{Driver: "sqlite", Server: "shop.db", Query: "SELECT 1"}}}
+	if err := w.SaveRequest(target, r, SaveOptions{}); err != nil {
+		t.Fatal(err)
+	}
+	return target
+}

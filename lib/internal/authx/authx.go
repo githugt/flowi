@@ -128,6 +128,10 @@ func New(a model.Auth, env Env) (Signer, error) {
 		return newHawk(p, env)
 	case model.AuthNTLM:
 		return newNTLM(p, env)
+	case model.AuthHTTPSig:
+		return newHTTPSig(p, env)
+	case model.AuthDPoP:
+		return newDPoP(p, env)
 	case "":
 		return nil, fmt.Errorf("the auth block has no type (one of %s)", strings.Join(model.AuthTypes(), ", "))
 	}

@@ -72,6 +72,19 @@ func VersionTemplates(file string, v model.RequestVersion) []Site {
 	if v.GRPC != nil {
 		sites = append(sites, grpcTemplates(file, yamlpath.Key(base, "grpc"), *v.GRPC)...)
 	}
+	if v.Dataset != nil {
+		sites = append(sites, datasetTemplates(file, yamlpath.Key(base, "dataset"), *v.Dataset)...)
+	}
+	return sites
+}
+
+// datasetTemplates are the templates of a dataset version: the server and the params. The query is not one: a value
+// belongs in a param, where it is sent apart from the statement.
+func datasetTemplates(file, base string, d model.Dataset) []Site {
+	sites := []Site{{File: file, Path: yamlpath.Key(base, "server"), Field: "server", Src: d.Server}}
+	for i, p := range d.Params {
+		sites = append(sites, Site{File: file, Path: yamlpath.Index(yamlpath.Key(base, "params"), i), Field: "param", Src: p})
+	}
 	return sites
 }
 

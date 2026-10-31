@@ -101,6 +101,9 @@ type step struct {
 	criteria                    []string
 	outputs                     yaml.MapSlice
 	needs                       []string
+	afterFailureOf              []string
+	afterOutcome                []string
+	unlinked                    bool
 	timeoutMS                   int64
 	customNode                  string // the node a custom step stands for
 	action                      string // send or receive (AsyncAPI steps)
@@ -197,8 +200,8 @@ func (ex *exporter) lossyValue(what, node, value string) {
 
 func (ex *exporter) request(n model.Node, st *workflowState) bool {
 	op, ok := ex.o.Resolve.OperationOf(*n.Request)
-	if ok && op.GRPC {
-		ex.limits = append(ex.limits, Limit{Node: n.ID, What: "gRPC call"})
+	if ok && op.Custom != "" {
+		ex.limits = append(ex.limits, Limit{Node: n.ID, What: op.Custom})
 		return false // a custom step: Flowi runs the call from x-flowi-flow
 	}
 	if !ok || op.ID == "" {
@@ -327,7 +330,7 @@ func (ex *exporter) flowOutputs(f model.Flow, vars map[string]string) yaml.MapSl
 }
 
 func newStep(n model.Node) *step {
-	return &step{id: n.ID, values: map[string]string{}, needs: n.Needs, timeoutMS: n.Timeout.Milliseconds()}
+	return &step{id: n.ID, values: map[string]string{}, needs: n.Needs, afterFailureOf: n.AfterFailureOf, afterOutcome: n.AfterOutcome, unlinked: n.Unlinked, timeoutMS: n.Timeout.Milliseconds()}
 }
 
 func (s *step) yaml() yaml.MapSlice {
@@ -366,6 +369,15 @@ func (s *step) yaml() yaml.MapSlice {
 	}
 	if len(s.needs) > 0 {
 		out = append(out, yaml.MapItem{Key: "x-flowi-depends-on", Value: s.needs})
+	}
+	if len(s.afterFailureOf) > 0 {
+		out = append(out, yaml.MapItem{Key: "x-flowi-after-failure-of", Value: s.afterFailureOf})
+	}
+	if s.unlinked {
+		out = append(out, yaml.MapItem{Key: "x-flowi-unlinked", Value: true})
+	}
+	if len(s.afterOutcome) > 0 {
+		out = append(out, yaml.MapItem{Key: "x-flowi-after-outcome", Value: s.afterOutcome})
 	}
 	if s.timeoutMS > 0 {
 		out = append(out, yaml.MapItem{Key: "x-flowi-timeout", Value: s.timeoutMS})

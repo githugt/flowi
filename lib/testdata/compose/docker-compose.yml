@@ -87,3 +87,33 @@ services:
     volumes:
       - ./servicebus-config.json:/ServiceBus_Emulator/ConfigFiles/Config.json:ro
     ports: ["5672:5672"]
+
+  # WebDAV on 8890, no login, held in the container: PROPFIND, PROPPATCH, MKCOL, COPY, MOVE, LOCK and UNLOCK, for
+  # trying the custom methods by hand (docs/testing-guide-core.md, section on WebDAV). Not run when this was written: the
+  # same handler (golang.org/x/net/webdav) is checked in-process by internal/httpx/webdav_test.go.
+  webdav:
+    image: docker.io/rclone/rclone:1.75.2
+    command: ["serve", "webdav", "/data", "--addr", ":8890"]
+    ports: ["8890:8890"]
+
+  # CalDAV on 5232 for MKCALENDAR and REPORT. Not run when this was written, and the login the image expects was not
+  # checked: read its README before the first request.
+  radicale:
+    image: docker.io/tomsquest/docker-radicale:3.9.0.0
+    ports: ["5232:5232"]
+
+  # The stores of the dataset requests (dataset/integration_test.go). One user and database each, flowi / flowi.
+  postgres:
+    image: docker.io/library/postgres:17
+    environment: {POSTGRES_USER: flowi, POSTGRES_PASSWORD: flowi, POSTGRES_DB: flowi}
+    ports: ["5433:5432"]
+
+  mysql:
+    image: docker.io/library/mysql:8.4
+    environment: {MYSQL_USER: flowi, MYSQL_PASSWORD: flowi, MYSQL_ROOT_PASSWORD: root, MYSQL_DATABASE: flowi}
+    ports: ["3307:3306"]
+
+  mariadb:
+    image: docker.io/library/mariadb:11.4
+    environment: {MARIADB_USER: flowi, MARIADB_PASSWORD: flowi, MARIADB_ROOT_PASSWORD: root, MARIADB_DATABASE: flowi}
+    ports: ["3308:3306"]

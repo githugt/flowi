@@ -38,6 +38,7 @@ func (w *Workspace) SeedRequestHooks(t RequestTarget) error {
 		return nil // "off" turns seeding off only on its own; in a list it names nothing
 	}
 	hooks := r.Hooks
+	var outcomes []model.Outcome
 	for _, name := range names {
 		if name == seedOff {
 			continue
@@ -50,6 +51,9 @@ func (w *Workspace) SeedRequestHooks(t RequestTarget) error {
 			if len(bp.Params) > 0 {
 				return diagErr(diag.CodeBlueprintUse, map[string]string{"blueprint": name, "detail": "it declares parameters, which a request's hooks cannot be given"})
 			}
+			if outcomes == nil && len(bp.Outcomes) > 0 {
+				outcomes = slices.Clone(bp.Outcomes) // the first blueprint that lists outcomes decides them
+			}
 			step := model.HookStep{Inline: slices.Clone(bp.Body.Nodes)}
 			if bp.Phase == "pre" && len(r.Hooks.Pre) == 0 {
 				hooks.Pre = append(hooks.Pre, step)
@@ -58,7 +62,8 @@ func (w *Workspace) SeedRequestHooks(t RequestTarget) error {
 			}
 		}
 	}
-	if len(hooks.Pre) == len(r.Hooks.Pre) && len(hooks.Post) == len(r.Hooks.Post) {
+	seeded := seedOutcomes(&r, outcomes)
+	if len(hooks.Pre) == len(r.Hooks.Pre) && len(hooks.Post) == len(r.Hooks.Post) && !seeded {
 		return nil
 	}
 	r.Hooks = hooks
@@ -122,6 +127,9 @@ func (w *Workspace) seedBlueprints(which string, collection model.ID, kind reque
 	case which == seedDefault && kind == kindGRPC:
 		// A gRPC call has a status code, not an HTTP status.
 		return []model.Blueprint{blueprint.DefaultGRPCPre(), blueprint.DefaultGRPC()}, nil
+	case which == seedDefault && kind == kindDataset:
+		// A query has an outcome and rows, not an HTTP status.
+		return []model.Blueprint{blueprint.DefaultAsyncPre(), blueprint.DefaultDataset()}, nil
 	case which == seedDefault && kind == kindAsync:
 		// The built-in default checks the HTTP status, which a message request lacks.
 		return []model.Blueprint{blueprint.DefaultAsyncPre(), blueprint.DefaultAsync()}, nil
@@ -132,13 +140,14 @@ func (w *Workspace) seedBlueprints(which string, collection model.ID, kind reque
 	return []model.Blueprint{bp}, err
 }
 
-// requestKind is what a request's opening version is: HTTP, async or gRPC.
+// requestKind is what a request's opening version is: HTTP, async, gRPC or a dataset query.
 type requestKind int
 
 const (
 	kindHTTP requestKind = iota
 	kindAsync
 	kindGRPC
+	kindDataset
 )
 
 // kindOf is the kind of the version a request opens on.
@@ -153,10 +162,12 @@ func kindOf(r model.Request) requestKind {
 			break
 		}
 	}
-	switch {
-	case opening.GRPC != nil:
+	switch opening.Family() {
+	case model.FamilyDataset:
+		return kindDataset
+	case model.FamilyRPC:
 		return kindGRPC
-	case opening.Async != nil:
+	case model.FamilyMessaging:
 		return kindAsync
 	}
 	return kindHTTP
@@ -171,4 +182,24 @@ func (w *Workspace) seedBlueprint(which string, collection model.ID) (model.Blue
 		return model.Blueprint{}, err
 	}
 	return w.Blueprint(target)
+}
+
+// seedOutcomes gives the opening version of r the outcomes, unless it writes its own, and says whether it did.
+func seedOutcomes(r *model.Request, outcomes []model.Outcome) bool {
+	if len(outcomes) == 0 || len(r.Versions) == 0 {
+		return false
+	}
+	i := 0
+	for k, v := range r.Versions {
+		if r.Default == "" || v.Label == r.Default {
+			i = k
+			break
+		}
+	}
+	if len(r.Versions[i].Outcomes) > 0 {
+		return false
+	}
+	r.Versions = slices.Clone(r.Versions)
+	r.Versions[i].Outcomes = slices.Clone(outcomes)
+	return true
 }

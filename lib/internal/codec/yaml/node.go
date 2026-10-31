@@ -38,18 +38,21 @@ func (d *decoder) nodeList(n ast.Node, path, key string) []model.Node {
 // validation needs are typed; every other key is kept in Params, in order.
 func (m *mapping) flowNode() model.Node {
 	n := model.Node{
-		ID:          m.str("id"),
-		Type:        model.NodeType(m.str("type")),
-		Name:        m.str("name"),
-		Description: m.str("description"),
-		Needs:       m.strings("needs"),
-		When:        m.str("when"),
-		Concurrent:  m.boolean("concurrent"),
-		OnError:     m.str("on_error"),
-		Timeout:     m.duration("timeout"),
-		Attach:      m.str("attach"),
-		AttachAt:    m.str("attach_at"),
-		Color:       m.str("color"),
+		ID:             m.str("id"),
+		Type:           model.NodeType(m.str("type")),
+		Name:           m.str("name"),
+		Description:    m.str("description"),
+		Needs:          m.strings("needs"),
+		AfterFailureOf: m.strings("after_failure_of"),
+		AfterOutcome:   m.strings("after_outcome"),
+		Unlinked:       m.boolean("unlinked"),
+		When:           m.str("when"),
+		Concurrent:     m.boolean("concurrent"),
+		OnError:        m.str("on_error"),
+		Timeout:        m.duration("timeout"),
+		Attach:         m.str("attach"),
+		AttachAt:       m.str("attach_at"),
+		Color:          m.str("color"),
 	}
 	switch n.Type {
 	case "request", "fuzz":
@@ -107,14 +110,15 @@ func (m *mapping) setValue() model.SetValue {
 
 func (m *mapping) requestCall() *model.RequestCall {
 	call := &model.RequestCall{
-		Version: m.versionLabel("version"),
-		Overlay: m.str("overlay"),
-		Open:    m.str("open"),
-		Over:    m.str("over"),
-		Close:   m.boolean("close"),
-		Hooks:   m.hookControl(),
-		With:    m.keyValues("with"),
-		Headers: m.keyValues("headers"),
+		Version:  m.versionLabel("version"),
+		Overlay:  m.str("overlay"),
+		Open:     m.str("open"),
+		Over:     m.str("over"),
+		Close:    m.boolean("close"),
+		Hooks:    m.hookControl(),
+		With:     m.keyValues("with"),
+		Headers:  m.keyValues("headers"),
+		Outcomes: m.outcomes(),
 	}
 	call.Request, _ = m.ref("request")
 	return call
@@ -198,6 +202,9 @@ func encodeNode(n model.Node) any {
 	o.put("name", n.Name)
 	o.put("description", n.Description)
 	o.put("needs", stringsToYAML(n.Needs))
+	o.put("after_failure_of", stringsToYAML(n.AfterFailureOf))
+	o.put("after_outcome", stringsToYAML(n.AfterOutcome))
+	o.put("unlinked", n.Unlinked)
 	o.put("when", n.When)
 	o.put("concurrent", n.Concurrent)
 	o.put("on_error", n.OnError)
@@ -256,6 +263,7 @@ func encodeRequestCall(o *omap, c *model.RequestCall) {
 	o.put("hooks", encodeHookControl(c.Hooks))
 	o.put("with", keyValues(c.With))
 	o.put("headers", keyValues(c.Headers))
+	o.put("outcomes", encodeOutcomes(c.Outcomes))
 }
 
 func encodeSubflowCall(o *omap, c *model.SubflowCall) {

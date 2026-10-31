@@ -18,7 +18,7 @@ func StandardMethods() []string {
 func MoreMethods() []string {
 	return []string{
 		"PROPFIND", "PROPPATCH", "MKCOL", "COPY", "MOVE", "LOCK", "UNLOCK", "REPORT", "SEARCH", "MKCALENDAR",
-		"LINK", "UNLINK", "PURGE",
+		"VERSION-CONTROL", "LINK", "UNLINK", "PURGE",
 	}
 }
 

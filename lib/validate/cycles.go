@@ -98,17 +98,14 @@ func needsCycles(l sites.NodeList) diag.List {
 }
 
 func effectiveNeeds(nodes []model.Node, i int, position map[string]int) []string {
-	n := nodes[i]
-	if len(n.Needs) == 0 {
-		if i == 0 {
-			return nil
-		}
-		return []string{nodes[i-1].ID}
+	previous := ""
+	if i > 0 {
+		previous = nodes[i-1].ID
 	}
 	var deps []string
-	for _, target := range n.Needs {
-		if _, sibling := position[target]; sibling { // non-siblings are reported by checkNodes
-			deps = append(deps, target)
+	for _, arrow := range nodes[i].Arrows(previous) {
+		if _, sibling := position[arrow.From]; sibling { // non-siblings are reported by checkNodes
+			deps = append(deps, arrow.From)
 		}
 	}
 	return deps

@@ -87,12 +87,12 @@ func dependencyClosure(list []model.Node, j int) map[int]bool {
 	seen := map[int]bool{}
 	var visit func(k int)
 	visit = func(k int) {
-		deps := list[k].Needs
-		if len(deps) == 0 && k > 0 {
-			deps = []string{list[k-1].ID}
+		previous := ""
+		if k > 0 {
+			previous = list[k-1].ID
 		}
-		for _, d := range deps {
-			if i, ok := index[d]; ok && !seen[i] {
+		for _, arrow := range list[k].Arrows(previous) {
+			if i, ok := index[arrow.From]; ok && !seen[i] {
 				seen[i] = true
 				visit(i)
 			}

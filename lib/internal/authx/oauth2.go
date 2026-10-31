@@ -74,6 +74,7 @@ type oauth2 struct {
 	grant, tokenURL, clientID, clientSecret, scope, audience string
 	user, password, refresh, clientAuth, prefix              string
 	authorizeURL, deviceURL, redirectPort, pkce              string
+	details                                                  string // authorization_details (RFC 9396), a JSON array
 	env                                                      Env
 }
 
@@ -87,7 +88,7 @@ func newOAuth2(p params, env Env) (Signer, error) {
 		user: p.values["username"], password: p.values["password"], refresh: p.values["refresh_token"],
 		clientAuth: strings.ToLower(p.get("client_auth", "basic")), prefix: p.get("prefix", "Bearer"), env: env,
 		authorizeURL: p.values["authorization_url"], deviceURL: p.values["device_url"], redirectPort: p.values["redirect_port"],
-		pkce: strings.ToLower(p.get("pkce", "on")),
+		pkce: strings.ToLower(p.get("pkce", "on")), details: strings.TrimSpace(p.values["authorization_details"]),
 	}
 	if err := o.check(p); err != nil {
 		return nil, err
@@ -97,6 +98,9 @@ func newOAuth2(p params, env Env) (Signer, error) {
 
 func (o *oauth2) check(p params) error {
 	if err := p.need("token_url", "client_id"); err != nil {
+		return err
+	}
+	if err := checkAuthorizationDetails(o.details); err != nil {
 		return err
 	}
 	if o.clientAuth != "basic" && o.clientAuth != "body" {
@@ -119,10 +123,28 @@ func (o *oauth2) check(p params) error {
 	return fmt.Errorf("oauth2 auth: grant must be client_credentials, password, refresh_token, authorization_code or device_code, got %q", o.grant)
 }
 
+// checkAuthorizationDetails refuses authorization_details (RFC 9396) that is not a JSON array of objects that each have a
+// "type": a server would answer with an error that does not say what was wrong with the value.
+func checkAuthorizationDetails(details string) error {
+	if details == "" {
+		return nil
+	}
+	var list []map[string]any
+	if err := json.Unmarshal([]byte(details), &list); err != nil {
+		return fmt.Errorf("oauth2 auth: authorization_details must be a JSON array of objects: %w", err)
+	}
+	for i, item := range list {
+		if t, _ := item["type"].(string); t == "" {
+			return fmt.Errorf("oauth2 auth: authorization_details item %d has no \"type\"", i+1)
+		}
+	}
+	return nil
+}
+
 // key identifies the token this block asks for: everything that changes
 // what the endpoint answers, but not the secrets themselves.
 func (o *oauth2) key() string {
-	sum := sha256.Sum256([]byte(strings.Join([]string{o.grant, o.tokenURL, o.clientID, o.clientSecret, o.scope, o.audience, o.user, o.password}, "\x00")))
+	sum := sha256.Sum256([]byte(strings.Join([]string{o.grant, o.tokenURL, o.clientID, o.clientSecret, o.scope, o.audience, o.user, o.password, o.details}, "\x00")))
 	return hex.EncodeToString(sum[:])
 }
 
@@ -198,6 +220,9 @@ func (o *oauth2) form() url.Values {
 	}
 	if o.audience != "" {
 		f.Set("audience", o.audience)
+	}
+	if o.details != "" {
+		f.Set("authorization_details", o.details)
 	}
 	return f
 }

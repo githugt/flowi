@@ -5,9 +5,11 @@ package engine
 import (
 	"context"
 	"strconv"
+	"time"
 
 	"github.com/githugt/flowi-lib/diag"
 	"github.com/githugt/flowi-lib/internal/nodes"
+	"github.com/githugt/flowi-lib/ratelimit"
 )
 
 // runPhase runs hook steps in order and stops at the first that fails.
@@ -73,7 +75,7 @@ func (x *execution) hookFrame(fs *flowScope, label string) *frame {
 }
 
 // nodeOutputs are a request node's outputs: extracted values, then
-// status, headers, body, time and the vars its hooks set.
+// status, headers, body, time, the quota the server reported (ratelimit) and the vars its hooks set.
 func nodeOutputs(o outcome) map[string]any {
 	out := map[string]any{"vars": o.vars}
 	if o.record == nil {
@@ -91,5 +93,8 @@ func nodeOutputs(o outcome) map[string]any {
 		body = scopeValue(o.record.Body.JSON)
 	}
 	out["status"], out["headers"], out["body"], out["time"] = o.record.Status, headers, body, o.record.Timings.Total
+	if quota, found := ratelimit.Read(headerOf(o.record), time.Now()); found {
+		out["ratelimit"] = quota.Values()
+	}
 	return out
 }

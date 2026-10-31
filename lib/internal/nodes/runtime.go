@@ -13,6 +13,7 @@ import (
 	"github.com/githugt/flowi-lib/diag"
 	"github.com/githugt/flowi-lib/internal/httpx"
 	"github.com/githugt/flowi-lib/model"
+	"github.com/githugt/flowi-lib/ratelimit"
 	"github.com/githugt/flowi-lib/report"
 	"github.com/githugt/flowi-lib/template"
 )
@@ -56,6 +57,9 @@ type Outcome struct {
 	Outputs map[string]any
 	Diags   diag.List
 	Status  Status
+	// Outcomes are the names of the outcomes a request ended with (success, failure, the ones its version
+	// names); empty for a step that is not a request, whose outcome follows its status.
+	Outcomes []string
 }
 
 // Runtime is what the engine does for nodes: everything that needs the
@@ -159,6 +163,8 @@ type RequestCall struct {
 	Hooks      model.HookControl
 	With       map[string]any
 	Headers    map[string]string
+	// Outcomes are the step's own outcomes, in place of the version's (see model.RequestCall).
+	Outcomes []model.Outcome
 	// Body, when set, is sent in place of the request's own body (a fuzz case). A string is sent as text and
 	// anything else as JSON.
 	Body *any
@@ -233,7 +239,7 @@ type Response struct {
 }
 
 // Values is the response scope for templates: status, headers (by lower-
-// case name), body, text, time and cookies (by name).
+// case name), body, text, time, cookies (by name) and, when the server reports one, ratelimit.
 func (r *Response) Values() map[string]any {
 	headers := map[string]any{}
 	for name, values := range r.Header {
@@ -243,7 +249,11 @@ func (r *Response) Values() map[string]any {
 	for _, c := range r.cookies() {
 		cookies[c.Name] = c.Value
 	}
-	return map[string]any{"status": r.Status, "headers": headers, "body": r.Body, "text": r.Text, "time": r.Time, "cookies": cookies}
+	out := map[string]any{"status": r.Status, "headers": headers, "body": r.Body, "text": r.Text, "time": r.Time, "cookies": cookies}
+	if quota, found := ratelimit.Read(r.Header, time.Now()); found {
+		out["ratelimit"] = quota.Values()
+	}
+	return out
 }
 
 func (r *Response) cookies() []*http.Cookie {

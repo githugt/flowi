@@ -14,6 +14,8 @@ const (
 	AuthHawk      = "hawk"
 	AuthMutualTLS = "mtls"
 	AuthNTLM      = "ntlm"
+	AuthHTTPSig   = "httpsig" // RFC 9421 HTTP Message Signatures
+	AuthDPoP      = "dpop"    // RFC 9449 proof of possession
 )
 
 // Auth is a version's authentication scheme and its parameters, in file
@@ -26,7 +28,7 @@ type Auth struct {
 
 // AuthTypes lists the schemes in documentation order.
 func AuthTypes() []string {
-	return []string{AuthAPIKey, AuthDigest, AuthOAuth2, AuthOAuth1, AuthAWSSigV4, AuthJWT, AuthHawk, AuthMutualTLS, AuthNTLM}
+	return []string{AuthAPIKey, AuthDigest, AuthOAuth2, AuthOAuth1, AuthAWSSigV4, AuthJWT, AuthHawk, AuthMutualTLS, AuthNTLM, AuthHTTPSig, AuthDPoP}
 }
 
 // AuthParams lists the parameter names a scheme understands, in the order a
@@ -38,7 +40,7 @@ func AuthParams(authType string) []string {
 	case AuthDigest:
 		return []string{"username", "password"}
 	case AuthOAuth2:
-		return []string{"grant", "token_url", "client_id", "client_secret", "scope", "audience", "username", "password", "refresh_token", "client_auth", "prefix", "authorization_url", "device_url", "redirect_port", "pkce"}
+		return []string{"grant", "token_url", "client_id", "client_secret", "scope", "audience", "username", "password", "refresh_token", "client_auth", "prefix", "authorization_url", "device_url", "redirect_port", "pkce", "authorization_details"}
 	case AuthOAuth1:
 		return []string{"consumer_key", "consumer_secret", "token", "token_secret", "signature_method", "realm", "verifier", "callback"}
 	case AuthAWSSigV4:
@@ -51,6 +53,10 @@ func AuthParams(authType string) []string {
 		return []string{"cert", "key"}
 	case AuthNTLM:
 		return []string{"username", "password", "domain", "workstation"}
+	case AuthHTTPSig:
+		return []string{"algorithm", "key_id", "secret", "private_key", "components", "label", "include_alg", "expires_in", "nonce", "tag", "digest"}
+	case AuthDPoP:
+		return []string{"private_key", "algorithm", "access_token", "nonce"}
 	}
 	return nil
 }
@@ -75,6 +81,10 @@ func AuthSecretParams(authType string) []string {
 		return []string{"key"}
 	case AuthNTLM:
 		return []string{"password"}
+	case AuthHTTPSig:
+		return []string{"secret", "private_key"}
+	case AuthDPoP:
+		return []string{"private_key", "access_token"}
 	}
 	return nil
 }

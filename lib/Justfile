@@ -21,7 +21,8 @@ fuzz target pkg time="20s":
 
 # Needs a running container engine; for podman on macOS: `podman machine init` and `podman machine start`.
 # Uses `podman compose` when podman is installed, else `docker compose`.
-# Run the MQTT, NATS, Kafka, AMQP, Redis, SQS/SNS (LocalStack) and Pub/Sub integration tests against throwaway containers.
+# Run the MQTT, NATS, Kafka, AMQP, Redis, SQS/SNS (LocalStack), Pub/Sub and PostgreSQL/MySQL/MariaDB integration tests
+# against throwaway containers.
 test-integration:
     #!/usr/bin/env bash
     set -euo pipefail
@@ -29,7 +30,7 @@ test-integration:
     file=testdata/compose/docker-compose.yml
     $compose -f "$file" up -d
     trap '$compose -f "$file" down -v' EXIT
-    go test -tags integration -count=1 -v ./transport/
+    go test -tags integration -count=1 -v ./transport/ ./dataset/
 
 # Serve the demo API the example collection talks to (default 127.0.0.1:8080, password "demo").
 demo-server *args:

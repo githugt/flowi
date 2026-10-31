@@ -10,13 +10,13 @@ import (
 
 // checkMethods reports an HTTP method that cannot be sent (anything that is not a token), and a known method written
 // in the wrong case. Any other token is allowed: a method of your own (PURGE, X-CUSTOM) is a normal thing to send.
-// gRPC and async versions keep their method elsewhere, so they are not judged here.
+// gRPC, async and dataset versions keep theirs elsewhere (or have none), so they are not judged here.
 func checkMethods(ix *index) diag.List {
 	var out diag.List
 	for _, c := range ix.collections {
 		for _, r := range c.Requests {
 			for _, v := range r.Versions {
-				if v.Method == "" || v.GRPC != nil || v.Async != nil {
+				if v.Method == "" || v.Family() != model.FamilyHTTP {
 					continue
 				}
 				out = append(out, methodDiags(r, v)...)

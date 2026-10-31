@@ -10,6 +10,8 @@ import (
 	"maps"
 	"slices"
 	"strings"
+
+	"github.com/githugt/flowi-lib/internal/formats"
 )
 
 // Case is a body with one thing wrong, and a name that says what.
@@ -118,6 +120,11 @@ func stringCases(set func(string, any), schema map[string]any) {
 	if enum, ok := schema["enum"].([]any); ok && len(enum) > 0 {
 		set("not one of the allowed values", "__not_an_allowed_value__")
 	}
+	if name, _ := schema["format"].(string); name != "" {
+		if sample, ok := formats.Invalid(name); ok {
+			set("not a "+name, sample)
+		}
+	}
 }
 
 func numberCases(set func(string, any), schema map[string]any) {
@@ -132,6 +139,18 @@ func numberCases(set func(string, any), schema map[string]any) {
 	if highest, ok := number(schema["maximum"]); ok {
 		set("above the maximum", json.Number(fmt.Sprint(int64(highest)+1)))
 	}
+	if name, _ := schema["format"].(string); name != "" {
+		if past, ok := pastFormatRange(name); ok {
+			set("past the range of "+name, json.Number(past))
+		}
+	}
+}
+
+// pastFormatRange is the first integer outside the range of a registered integer format (int8, uint16 …).
+func pastFormatRange(name string) (string, bool) {
+	past := map[string]string{"int8": "128", "uint8": "256", "int16": "32768", "uint16": "65536", "int32": "2147483648", "uint32": "4294967296"}
+	v, ok := past[name]
+	return v, ok
 }
 
 func number(v any) (float64, bool) {

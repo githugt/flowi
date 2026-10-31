@@ -47,6 +47,8 @@ func checks() []check {
 		checkHeaderNames,
 		checkMethods,
 		checkAsync,
+		checkDataset,
+		checkOutcomes,
 		checkAuth,
 		checkBlueprints,
 	}

@@ -104,3 +104,29 @@ nodes:
 		t.Fatalf("inputs %+v outputs %+v", f.Inputs, f.Outputs)
 	}
 }
+
+func TestNode_Given_a_step_that_runs_after_a_failure_When_saved_and_loaded_Then_it_round_trips(t *testing.T) {
+	const src = "id: 01J9ZB3M4N5P6Q7R8S9T0VWXYZ\nnodes:\n  - id: login\n    type: delay\n    duration: 1s\n  - id: alert\n    type: delay\n    needs:\n      - login\n    after_failure_of:\n      - login\n    duration: 1s\n"
+	c := newCodec()
+
+	f, diags := c.DecodeFlow("f.flow.yaml", "f", []byte(src))
+	requireNoDiagnostics(t, diags)
+	out, err := c.EncodeFlow(f)
+
+	if err != nil || len(f.Nodes[1].AfterFailureOf) != 1 || f.Nodes[1].AfterFailureOf[0] != "login" || !bytes.Equal(out, []byte(src)) {
+		t.Fatalf("err %v after_failure_of %v, output:\n%s", err, f.Nodes[1].AfterFailureOf, out)
+	}
+}
+
+func TestNode_Given_an_unlinked_step_When_saved_and_loaded_Then_it_round_trips(t *testing.T) {
+	const src = "id: 01J9ZB3M4N5P6Q7R8S9T0VWXYZ\nnodes:\n  - id: a\n    type: delay\n    duration: 1s\n  - id: b\n    type: delay\n    unlinked: true\n    duration: 1s\n"
+	c := newCodec()
+
+	f, diags := c.DecodeFlow("f.flow.yaml", "f", []byte(src))
+	requireNoDiagnostics(t, diags)
+	out, err := c.EncodeFlow(f)
+
+	if err != nil || !f.Nodes[1].Unlinked || !bytes.Equal(out, []byte(src)) {
+		t.Fatalf("err %v unlinked %v, output:\n%s", err, f.Nodes[1].Unlinked, out)
+	}
+}

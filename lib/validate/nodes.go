@@ -41,6 +41,7 @@ func checkNodes(ix *index) diag.List {
 		}
 		for _, l := range sites.NodeLists(c) {
 			out = append(out, checkSiblingNeeds(l)...)
+			out = append(out, checkStepOutcomes(l)...)
 		}
 		for _, root := range sites.RootLists(c) {
 			out = append(out, checkUniqueNodeIDs(root)...)
@@ -82,12 +83,21 @@ func checkSiblingNeeds(l sites.NodeList) diag.List {
 	}
 	var out diag.List
 	for i, n := range l.Value {
-		for k, target := range n.Needs {
-			if siblings[target] {
-				continue
+		for _, arrows := range []struct {
+			key     string
+			targets []string
+		}{{"needs", n.Needs}, {"after_failure_of", n.AfterFailureOf}, {"after_outcome", n.AfterOutcome}} {
+			for k, target := range arrows.targets {
+				if arrows.key == "after_outcome" {
+					out = append(out, afterOutcomeDiags(l, i, k, target, siblings)...)
+					continue
+				}
+				if siblings[target] {
+					continue
+				}
+				path := yamlpath.Index(yamlpath.Key(yamlpath.Index(l.Path, i), arrows.key), k)
+				out = append(out, diag.New(diag.CodeNodeNeedsSibling, diag.Location{File: l.File, Path: path}, map[string]string{"target": target}))
 			}
-			path := yamlpath.Index(yamlpath.Key(yamlpath.Index(l.Path, i), "needs"), k)
-			out = append(out, diag.New(diag.CodeNodeNeedsSibling, diag.Location{File: l.File, Path: path}, map[string]string{"target": target}))
 		}
 	}
 	return out

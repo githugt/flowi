@@ -137,3 +137,59 @@ func TestRun_concurrent_batch_iterations_isolated_and_race_free(t *testing.T) {
 		t.Fatal("iteration nodes must be namespaced by iteration")
 	}
 }
+
+func TestRequestNode_Given_named_outcomes_Then_the_arrow_for_the_one_that_holds_is_taken(t *testing.T) {
+	for _, tc := range []struct {
+		code                   string
+		wantStatus             Status
+		notFoundRuns, downRuns bool
+	}{
+		{"404", StatusPassed, true, false},
+		{"503", StatusPassed, false, true},
+		{"401", StatusFailed, false, false}, // fails, and no arrow is for an outcome it has
+		{"200", StatusPassed, false, false},
+	} {
+		t.Run(tc.code, func(t *testing.T) {
+			f := newFixture(t)
+			r := f.addRequest("probe", model.RequestVersion{
+				Method: "GET", URL: "{{env.base_url}}/status/" + tc.code, Assert: []string{"response.status < 400"},
+				Outcomes: []model.Outcome{
+					{Name: "success"}, {Name: "failure"},
+					{Name: "not-found", When: "response.status == 404"},
+					{Name: "server-down", When: "response.status in [500, 503]"},
+				},
+			})
+			notFound := flowNode("on-404", "note", "text", "x")
+			notFound.AfterOutcome = []string{"call:not-found"}
+			down := flowNode("on-down", "note", "text", "x")
+			down.AfterOutcome = []string{"call:server-down"}
+			fl := f.addFlow("outcomes", requestNode("call", r), notFound, down)
+
+			events, res := runFlow(testCtx(t), t, f.deps(), f.runInput(fl))
+
+			ran := func(id string) bool { n, _ := finishedNode(events, id); return n.Status == StatusPassed }
+			if res.Status != tc.wantStatus || ran("on-404") != tc.notFoundRuns || ran("on-down") != tc.downRuns {
+				t.Fatalf("status %s (want %s); on-404 ran %v (want %v), on-down ran %v (want %v); diags %v",
+					res.Status, tc.wantStatus, ran("on-404"), tc.notFoundRuns, ran("on-down"), tc.downRuns, res.Diags)
+			}
+		})
+	}
+}
+
+func TestRequestNode_Given_outcomes_on_the_step_Then_they_replace_the_requests_own(t *testing.T) {
+	f := newFixture(t)
+	r := f.addRequest("probe", model.RequestVersion{Method: "GET", URL: "{{env.base_url}}/status/410", Assert: []string{"response.status < 400"},
+		Outcomes: []model.Outcome{{Name: "success"}, {Name: "failure"}}}) // the request knows nothing of 410
+	gone := flowNode("on-gone", "note", "text", "x")
+	gone.AfterOutcome = []string{"call:gone"}
+	call := requestNode("call", r)
+	call.Request.Outcomes = []model.Outcome{{Name: "success"}, {Name: "failure"}, {Name: "gone", When: "response.status == 410"}}
+	fl := f.addFlow("own-outcomes", call, gone)
+
+	events, res := runFlow(testCtx(t), t, f.deps(), f.runInput(fl))
+
+	n, _ := finishedNode(events, "on-gone")
+	if res.Status != StatusPassed || n.Status != StatusPassed {
+		t.Fatalf("run %s, on-gone %s, diags %v", res.Status, n.Status, res.Diags)
+	}
+}

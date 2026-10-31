@@ -2,7 +2,7 @@
 
 Generated from the node registry (`go test ./internal/nodes/ -run Reference -update`). Do not edit.
 
-Every node also takes the common fields `id`, `name`, `description`, `needs`, `when`, `concurrent`, `on_error` (`fail`, `continue`, `goto:<id>`), `timeout` and `attach` (the id of a request or subflow node right next to it that the canvas shows it with; a view only, the run order is the list order) and `attach_at` (`above` or `below`: draw it in a stack above or below that request, not beside it).
+Every node also takes the common fields `id`, `name`, `description`, `needs` (steps this one waits for, taken when they succeed), `after_failure_of` (steps whose failure starts this one; a step in both lists runs either way), `after_outcome` (`step:outcome` entries: the step starts this one when its request ends with that outcome, one of the `outcomes` its version names; a step with no arrows follows the one before it), `when`, `concurrent`, `on_error` (`fail`, `continue`, `goto:<id>`), `timeout` and `attach` (the id of a request or subflow node right next to it that the canvas shows it with; a view only, the run order is the list order) and `attach_at` (`above` or `below`: draw it in a stack above or below that request, not beside it).
 
 ## Call
 
@@ -65,8 +65,9 @@ Check a condition, or that an earlier request's response matches its kept schema
 
 | Parameter | Kind | Required | Notes |
 |---|---|---|---|
-| `check` | expression |  | True or false, written without braces. Give check, schema or both. |
+| `check` | expression |  | True or false, written without braces. Give check, schema, problem or any of them. |
 | `schema` | string |  | The id of an earlier request step: passes when what it received matches the response schema kept for its request. |
+| `problem` | string |  | The id of an earlier request step: passes when what it received is a problem details document (RFC 9457): application/problem+json, a JSON object whose type, title, status, detail and instance are used as the RFC says. |
 | `on_fail` | one of `error`, `warn` |  |  |
 | `message` | template |  |  |
 

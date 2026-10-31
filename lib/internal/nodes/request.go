@@ -30,7 +30,7 @@ func runRequest(ctx context.Context, n model.Node, s *State) Outcome {
 	if diags = append(diags, headerDiags...); diags.HasErrors() {
 		return Outcome{Diags: diags}
 	}
-	return s.Runtime.Request(ctx, RequestCall{Ref: call.Request, Version: call.Version, Overlay: call.Overlay, Open: call.Open, Over: call.Over, Close: call.Close, Hooks: call.Hooks, With: with, Headers: headers})
+	return s.Runtime.Request(ctx, RequestCall{Ref: call.Request, Version: call.Version, Overlay: call.Overlay, Open: call.Open, Over: call.Over, Close: call.Close, Hooks: call.Hooks, With: with, Headers: headers, Outcomes: call.Outcomes})
 }
 
 // renderValues renders templates keeping the type of single expressions.

@@ -29,14 +29,16 @@ type RequestVersion struct {
 	Label string
 	// Name is a short title for the version ("Before the tax change"); the label
 	// ("1.1") stays what it is called everywhere else. Docs is its description.
-	Name     string
-	Method   string
-	URL      string
-	Query    []KeyValue
-	Headers  []KeyValue
-	Body     Body
-	Extract  []Extraction
-	Assert   []string
+	Name    string
+	Method  string
+	URL     string
+	Query   []KeyValue
+	Headers []KeyValue
+	Body    Body
+	Extract []Extraction
+	Assert  []string
+	// Outcomes are the named ways the request can end (see Outcome). None (or an empty list): success and failure.
+	Outcomes []Outcome
 	Settings Settings
 	Hooks    Hooks
 	// Variables are the version's default values for {{var.name}}; the
@@ -56,6 +58,9 @@ type RequestVersion struct {
 	// version's Headers are the call's metadata; Method, URL, Query and Body
 	// are unused.
 	GRPC *GRPC
+	// Dataset, when set, makes this a query of a data store instead of an HTTP
+	// request. The version's Headers, Method, URL, Query and Body are unused.
+	Dataset *Dataset
 }
 
 // Async is what an async request version does: it sends a message to a

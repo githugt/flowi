@@ -184,3 +184,16 @@ func TestBlueprint_Given_no_phase_Then_the_encoding_has_none(t *testing.T) {
 		t.Fatalf("a phase appeared:\n%s", out)
 	}
 }
+
+func TestBlueprint_Given_outcomes_When_saved_and_loaded_Then_they_round_trip(t *testing.T) {
+	const src = "id: 01J9ZB3M4N5P6Q7R8S9T0VWXYZ\nname: With outcomes\noutcomes:\n  - name: success\n    description: Fine\n  - name: gone\n    when: response.status == 410\n    color: amber\nnodes:\n  - id: only\n    type: log\n    value: done\n"
+	c := newCodec()
+
+	bp, diags := c.DecodeBlueprint("b.blueprint.yaml", "b", []byte(src))
+	requireNoDiagnostics(t, diags)
+	out, err := c.EncodeBlueprint(bp)
+
+	if err != nil || len(bp.Outcomes) != 2 || bp.Outcomes[1].Color != "amber" || string(out) != src {
+		t.Fatalf("err %v outcomes %+v, output:\n%s", err, bp.Outcomes, out)
+	}
+}

@@ -122,6 +122,9 @@ func (im *importer) step(s map[string]any) []model.Node {
 		return []model.Node{n}
 	}
 	n.Needs = append(stringsOf(s["dependsOn"]), stringsOf(s["x-flowi-depends-on"])...)
+	n.AfterFailureOf = stringsOf(s["x-flowi-after-failure-of"])
+	n.AfterOutcome = stringsOf(s["x-flowi-after-outcome"])
+	n.Unlinked, _ = s["x-flowi-unlinked"].(bool)
 	n.Timeout = timeoutOf(s)
 	im.stepLosses(id, s)
 	nodes := []model.Node{n}

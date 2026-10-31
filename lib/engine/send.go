@@ -87,7 +87,9 @@ type Deps struct {
 	// build speaks); tests pass fakes.
 	Transports transport.Registry
 	// GRPC makes gRPC calls (nil → the real client, grpcx.Run); tests pass fakes.
-	GRPC    GRPCRunner
+	GRPC GRPCRunner
+	// Dataset runs dataset queries (nil → the real stores, dataset.Default); tests pass fakes.
+	Dataset DatasetRunner
 	Vault   *vault.Vault
 	Environ []string // for the proxy fallback (HTTP_PROXY, …)
 	DataDir func(collection model.ID) string

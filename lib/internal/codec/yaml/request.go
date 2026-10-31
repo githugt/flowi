@@ -84,21 +84,23 @@ func (c *Codec) editVersion(d *decoder, m *mapping) *model.RequestVersion {
 
 func (c *Codec) requestVersion(d *decoder, m *mapping, label string) model.RequestVersion {
 	v := model.RequestVersion{
-		Label:   label,
-		Name:    m.str("name"),
-		Method:  m.str("method"),
-		URL:     m.str("url"),
-		Query:   m.keyValues("query"),
-		Headers: m.keyValues("headers"),
-		Body:    m.body(),
-		Extract: m.extractions(),
-		Assert:  m.strings("assert"),
-		Docs:    m.str("docs"), Variables: m.keyValues("variables"),
+		Label:    label,
+		Name:     m.str("name"),
+		Method:   m.str("method"),
+		URL:      m.str("url"),
+		Query:    m.keyValues("query"),
+		Headers:  m.keyValues("headers"),
+		Body:     m.body(),
+		Extract:  m.extractions(),
+		Assert:   m.strings("assert"),
+		Outcomes: m.outcomes(),
+		Docs:     m.str("docs"), Variables: m.keyValues("variables"),
 	}
 	m.describe(&v)
 	v.Auth = m.auth()
 	v.Async = m.async()
 	v.GRPC = m.grpc()
+	v.Dataset = m.dataset()
 	v.Settings = c.settingsChild(d, m, settings.LayerRequest)
 	v.Hooks = m.hooks()
 	m.closeStrict()
@@ -158,6 +160,34 @@ func (m *mapping) grpc() *model.GRPC {
 	return g
 }
 
+// dataset reads the dataset: block of a version, nil when there is none. Params are text whatever they are written
+// as: `- 42` means the text "42", which the store reads back as a number where the column is one.
+func (m *mapping) dataset() *model.Dataset {
+	dm, ok := m.child("dataset")
+	if !ok {
+		return nil
+	}
+	d := &model.Dataset{Driver: dm.str("driver"), Server: dm.str("server"), Query: dm.str("query"), Limit: int(dm.integer("limit"))}
+	if e, ok := dm.take("params"); ok {
+		d.Params = dm.d.lenientStrings(e)
+	}
+	dm.closeStrict()
+	return d
+}
+
+// lenientStrings reads a list of scalars as text, numbers and booleans as written.
+func (d *decoder) lenientStrings(e entry) []string {
+	items, ok := d.sequence(e.value, e.path, e.key)
+	if !ok {
+		return nil
+	}
+	out := make([]string, 0, len(items))
+	for i, item := range items {
+		out = append(out, d.scalarString(item, indexPath(e.path, i), e.key, true))
+	}
+	return out
+}
+
 // body reads exactly one of json, text, file, form or multipart.
 func (m *mapping) body() model.Body {
 	bm, ok := m.child("body")
@@ -214,6 +244,42 @@ func countBodyKinds(b model.Body) int {
 		}
 	}
 	return n
+}
+
+// outcomes reads the outcomes: list of a version, nil when there is none (success and failure then).
+func (m *mapping) outcomes() []model.Outcome {
+	e, ok := m.take("outcomes")
+	if !ok {
+		return nil
+	}
+	items, ok := m.d.sequence(e.value, e.path, "outcomes")
+	if !ok || items == nil {
+		return nil
+	}
+	out := make([]model.Outcome, 0, len(items))
+	for i, item := range items {
+		om, ok := m.d.mapping(item, indexPath(e.path, i), "outcomes")
+		if !ok {
+			continue
+		}
+		out = append(out, model.Outcome{Name: om.str("name"), When: om.str("when"), Disabled: om.boolean("disabled"), Color: om.str("color"), Description: om.str("description")})
+		om.closeStrict()
+	}
+	return out
+}
+
+func encodeOutcomes(os []model.Outcome) []any {
+	var out []any
+	for _, x := range os {
+		var o omap
+		o.put("name", x.Name)
+		o.put("when", x.When)
+		o.put("disabled", x.Disabled)
+		o.put("color", x.Color)
+		o.put("description", x.Description)
+		out = append(out, o.items)
+	}
+	return out
 }
 
 func (m *mapping) extractions() []model.Extraction {
@@ -292,9 +358,13 @@ func (c *Codec) encodeVersion(v model.RequestVersion) yaml.MapSlice {
 	if v.GRPC != nil {
 		o.putAlways("grpc", encodeGRPC(v.GRPC))
 	}
+	if v.Dataset != nil {
+		o.putAlways("dataset", encodeDataset(v.Dataset))
+	}
 	o.put("body", encodeBody(v.Body))
 	o.put("extract", encodeExtractions(v.Extract))
 	o.put("assert", stringsToYAML(v.Assert))
+	o.put("outcomes", encodeOutcomes(v.Outcomes))
 	o.put("variables", keyValues(v.Variables))
 	o.put("docs", v.Docs)
 	o.put("notes", encodeNotes(v))
@@ -419,6 +489,19 @@ func encodeGRPC(g *model.GRPC) yaml.MapSlice {
 		}
 		r.put("match", g.Receive.Match)
 		o.putAlways("receive", presentMap(r.items))
+	}
+	return presentMap(o.items)
+}
+
+// encodeDataset is the dataset mapping of a version.
+func encodeDataset(d *model.Dataset) yaml.MapSlice {
+	var o omap
+	o.put("driver", d.Driver)
+	o.put("server", d.Server)
+	o.put("query", d.Query)
+	o.put("params", stringsToYAML(d.Params))
+	if d.Limit != 0 {
+		o.put("limit", d.Limit)
 	}
 	return presentMap(o.items)
 }

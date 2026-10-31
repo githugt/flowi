@@ -7,10 +7,12 @@ import (
 	"fmt"
 	"net/http"
 	"regexp"
+	"strings"
 
 	"github.com/theory/jsonpath"
 
 	"github.com/githugt/flowi-lib/internal/httpx"
+	"github.com/githugt/flowi-lib/internal/xmlpath"
 	"github.com/githugt/flowi-lib/model"
 )
 
@@ -41,6 +43,9 @@ func fromBody(x model.Extraction, resp *Response) (any, error) {
 	if x.Regex != "" {
 		return match(x.Regex, resp.Text)
 	}
+	if strings.HasPrefix(x.Path, "/") {
+		return fromXML(x, resp) // a JSONPath starts with $, so a path that starts with / is for an XML body
+	}
 	p, err := jsonpath.Parse(x.Path)
 	if err != nil {
 		return nil, fmt.Errorf("invalid JSONPath %s: %w", x.Path, err)
@@ -53,6 +58,25 @@ func fromBody(x model.Extraction, resp *Response) (any, error) {
 		return found[0], nil
 	}
 	return []any(found), nil
+}
+
+// fromXML reads a value from an XML body with a path (see package xmlpath): one match is the value, several are a list.
+func fromXML(x model.Extraction, resp *Response) (any, error) {
+	found, err := xmlpath.Select(resp.Text, x.Path)
+	if err != nil {
+		return nil, fmt.Errorf("invalid XML path %s: %w", x.Path, err)
+	}
+	switch len(found) {
+	case 0:
+		return nil, fmt.Errorf("%w at %s", errNothing, x.Path)
+	case 1:
+		return found[0], nil
+	}
+	values := make([]any, len(found))
+	for i, v := range found {
+		values[i] = v
+	}
+	return values, nil
 }
 
 func fromHeader(x model.Extraction, h http.Header) (any, error) {

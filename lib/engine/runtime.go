@@ -43,14 +43,14 @@ func (rt *nodeRuntime) Request(ctx context.Context, c nodes.RequestCall) nodes.O
 	inner := rt.r.execute(ctx, call{
 		collection: coll, request: req, pinned: c.Version, flowPrefer: rt.f.fs.prefer, withValues: with, hooks: c.Hooks,
 		depth: rt.f.depth, path: rt.path, headers: c.Headers, jar: rt.f.jar, noJar: rt.f.noJar, overlay: overlay,
-		conn: connUse{open: c.Open, over: c.Over, closeAfter: c.Close}, bodyOver: c.Body,
+		conn: connUse{open: c.Open, over: c.Over, closeAfter: c.Close}, bodyOver: c.Body, outcomes: c.Outcomes,
 	})
 	if inner.record != nil {
 		masked := inner.record.Masked(rt.r.secrets.current())
 		rt.r.addCaptured(masked)
 		rt.r.emit(RecordCaptured{RunID: rt.r.runID, Path: rt.path, Node: rt.node.ID, Depth: rt.f.depth, Record: masked})
 	}
-	return nodes.Outcome{Outputs: nodeOutputs(inner), Status: requestNodeStatus(inner), Diags: inner.diags}
+	return nodes.Outcome{Outputs: nodeOutputs(inner), Status: requestNodeStatus(inner), Diags: inner.diags, Outcomes: inner.outcomes}
 }
 
 // requestNodeStatus maps an execution's status to the node's (plan

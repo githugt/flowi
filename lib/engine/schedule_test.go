@@ -190,3 +190,148 @@ func TestRunList_Given_a_need_on_a_later_node_Then_the_run_fails_with_the_cycle(
 		t.Fatalf("status %s order %v", res.Status, p.order)
 	}
 }
+
+func TestRunList_Given_arrows_with_conditions(t *testing.T) {
+	tests := []struct {
+		name       string
+		aFails     bool
+		alert      func(n *model.Node) // how the handler step is wired to a
+		wantStatus Status
+		ran        []string
+		skipped    []string
+	}{
+		{name: "failure arrow runs when the step fails", aFails: true, alert: func(n *model.Node) { n.AfterFailureOf = []string{"a"} },
+			wantStatus: StatusPassed, ran: []string{"a", "alert"}, skipped: []string{"b"}},
+		{name: "failure arrow is skipped when the step succeeds", alert: func(n *model.Node) { n.AfterFailureOf = []string{"a"} },
+			wantStatus: StatusPassed, ran: []string{"a", "b"}, skipped: []string{"alert"}},
+		{name: "an arrow taken either way runs after a failure", aFails: true, alert: func(n *model.Node) { n.Needs = []string{"a"}; n.AfterFailureOf = []string{"a"} },
+			wantStatus: StatusPassed, ran: []string{"a", "alert"}, skipped: []string{"b"}},
+		{name: "an arrow taken either way runs after a success", alert: func(n *model.Node) { n.Needs = []string{"a"}; n.AfterFailureOf = []string{"a"} },
+			wantStatus: StatusPassed, ran: []string{"a", "b", "alert"}},
+		{name: "a failure nobody handles still fails the run", aFails: true, alert: func(*model.Node) {},
+			wantStatus: StatusFailed, ran: []string{"a"}, skipped: []string{"b", "alert"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			f := newFixture(t)
+			p := newProbe()
+			if tt.aFails {
+				p.behave["a"] = failing
+			}
+			alert := probeNode("alert")
+			tt.alert(&alert)
+			fl := f.addFlow("arrows", probeNode("a"), probeNode("b"), alert)
+
+			events, res := runFlow(testCtx(t), t, p.deps(f.deps()), f.runInput(fl))
+
+			if res.Status != tt.wantStatus {
+				t.Fatalf("status %s, want %s; diags %v; ran %v", res.Status, tt.wantStatus, res.Diags, p.order)
+			}
+			for _, id := range tt.ran {
+				if !p.started(id) {
+					t.Errorf("%s did not run (%v)", id, p.order)
+				}
+			}
+			for _, id := range tt.skipped {
+				if nf, _ := finishedNode(events, id); p.started(id) || nf.Status != StatusSkipped {
+					t.Errorf("%s should be skipped: %+v", id, nf)
+				}
+			}
+		})
+	}
+}
+
+func TestRunList_Given_named_outcomes(t *testing.T) {
+	failedWith := func(outcomes ...string) func(context.Context, *nodes.State) nodes.Outcome {
+		return func(context.Context, *nodes.State) nodes.Outcome {
+			return nodes.Outcome{Status: nodes.StatusFailed, Diags: assertDiag(), Outcomes: outcomes}
+		}
+	}
+	passedWith := func(outcomes ...string) func(context.Context, *nodes.State) nodes.Outcome {
+		return func(context.Context, *nodes.State) nodes.Outcome { return nodes.Outcome{Outcomes: outcomes} }
+	}
+	tests := []struct {
+		name       string
+		a          func(context.Context, *nodes.State) nodes.Outcome
+		handler    func(n *model.Node)
+		wantStatus Status
+		ran        []string
+		skipped    []string
+	}{
+		{name: "an arrow for an outcome the step has is taken, and handles its failure",
+			a: failedWith("failure", "not-found"), handler: func(n *model.Node) { n.AfterOutcome = []string{"a:not-found"} },
+			wantStatus: StatusPassed, ran: []string{"a", "handler"}, skipped: []string{"b"}},
+		{name: "an arrow for another outcome is not taken, and the failure stops the run",
+			a: failedWith("failure", "auth"), handler: func(n *model.Node) { n.AfterOutcome = []string{"a:not-found"} },
+			wantStatus: StatusFailed, ran: []string{"a"}, skipped: []string{"b", "handler"}},
+		{name: "a success arrow follows a step that passed with a named outcome too",
+			a: passedWith("success", "ok"), handler: func(n *model.Node) { n.AfterOutcome = []string{"a:ok"} },
+			wantStatus: StatusPassed, ran: []string{"a", "b", "handler"}},
+		{name: "a named outcome that is not matched takes nothing",
+			a: passedWith("success"), handler: func(n *model.Node) { n.AfterOutcome = []string{"a:ok"} },
+			wantStatus: StatusPassed, ran: []string{"a", "b"}, skipped: []string{"handler"}},
+		{name: "with success removed from the request nothing follows on success",
+			a: passedWith("ok"), handler: func(n *model.Node) { n.AfterOutcome = []string{"a:ok"} },
+			wantStatus: StatusPassed, ran: []string{"a", "handler"}, skipped: []string{"b"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			f := newFixture(t)
+			p := newProbe()
+			p.behave["a"] = tt.a
+			handler := probeNode("handler")
+			tt.handler(&handler)
+			fl := f.addFlow("outcomes", probeNode("a"), probeNode("b"), handler)
+
+			events, res := runFlow(testCtx(t), t, p.deps(f.deps()), f.runInput(fl))
+
+			if res.Status != tt.wantStatus {
+				t.Fatalf("status %s, want %s; diags %v; ran %v", res.Status, tt.wantStatus, res.Diags, p.order)
+			}
+			for _, id := range tt.ran {
+				if !p.started(id) {
+					t.Errorf("%s did not run (%v)", id, p.order)
+				}
+			}
+			for _, id := range tt.skipped {
+				if nf, _ := finishedNode(events, id); p.started(id) || nf.Status != StatusSkipped {
+					t.Errorf("%s should be skipped: %+v", id, nf)
+				}
+			}
+		})
+	}
+}
+
+// With no arrow into it, a step does not wait for the step before to succeed: the arrow from it was taken away
+// on purpose (a failure of that step is handled elsewhere, and this one should still run).
+func TestRunList_Given_an_unlinked_step_Then_it_runs_although_the_step_before_failed(t *testing.T) {
+	f := newFixture(t)
+	p := newProbe()
+	p.behave["a"] = failing
+	a := probeNode("a")
+	a.OnError = "continue"
+	unlinked := probeNode("b")
+	unlinked.Unlinked = true
+	fl := f.addFlow("unlinked", a, unlinked, probeNode("c"))
+
+	_, res := runFlow(testCtx(t), t, p.deps(f.deps()), f.runInput(fl))
+
+	if res.Status != StatusPassed || !p.started("b") || !p.started("c") {
+		t.Fatalf("status %s, ran %v", res.Status, p.order)
+	}
+}
+
+func TestRunList_Given_a_failure_nothing_takes_Then_an_unlinked_step_after_it_is_still_stopped(t *testing.T) {
+	f := newFixture(t)
+	p := newProbe()
+	p.behave["a"] = failing
+	unlinked := probeNode("b")
+	unlinked.Unlinked = true
+	fl := f.addFlow("unlinked-stop", probeNode("a"), unlinked)
+
+	_, res := runFlow(testCtx(t), t, p.deps(f.deps()), f.runInput(fl))
+
+	if res.Status != StatusFailed || p.started("b") {
+		t.Fatalf("an unhandled failure still stops the list: status %s, ran %v", res.Status, p.order)
+	}
+}

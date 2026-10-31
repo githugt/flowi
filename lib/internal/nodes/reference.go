@@ -14,7 +14,7 @@ func Reference() []byte {
 	var b strings.Builder
 	b.WriteString("# Node reference\n\n")
 	b.WriteString("Generated from the node registry (`go test ./internal/nodes/ -run Reference -update`). Do not edit.\n\n")
-	b.WriteString("Every node also takes the common fields `id`, `name`, `description`, `needs`, `when`, `concurrent`, `on_error` (`fail`, `continue`, `goto:<id>`), `timeout` and `attach` (the id of a request or subflow node right next to it that the canvas shows it with; a view only, the run order is the list order) and `attach_at` (`above` or `below`: draw it in a stack above or below that request, not beside it).\n")
+	b.WriteString("Every node also takes the common fields `id`, `name`, `description`, `needs` (steps this one waits for, taken when they succeed), `after_failure_of` (steps whose failure starts this one; a step in both lists runs either way), `after_outcome` (`step:outcome` entries: the step starts this one when its request ends with that outcome, one of the `outcomes` its version names; a step with no arrows follows the one before it), `when`, `concurrent`, `on_error` (`fail`, `continue`, `goto:<id>`), `timeout` and `attach` (the id of a request or subflow node right next to it that the canvas shows it with; a view only, the run order is the list order) and `attach_at` (`above` or `below`: draw it in a stack above or below that request, not beside it).\n")
 	specs := Specs()
 	for _, group := range groupsOf(specs) {
 		fmt.Fprintf(&b, "\n## %s\n", group)

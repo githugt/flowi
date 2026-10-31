@@ -81,6 +81,12 @@ const (
 	CodeGRPCStatus  Code = "FLW-GRPC-005"
 	CodeGRPCField   Code = "FLW-GRPC-006"
 
+	CodeDatasetRequest Code = "FLW-DATA-001"
+	CodeDatasetQuery   Code = "FLW-DATA-002"
+	CodeDatasetTimeout Code = "FLW-DATA-003"
+
+	CodeOutcome Code = "FLW-OUT-001"
+
 	CodeExportLossy Code = "FLW-EXPORT-001"
 	CodeExportValue Code = "FLW-EXPORT-002"
 
@@ -180,6 +186,9 @@ const (
 	CodeRunSkipRead       Code = "FLW-RUN-022"
 	CodeRunAssertNoSchema Code = "FLW-RUN-023"
 	CodeRunFuzzFailed     Code = "FLW-RUN-024"
+	CodeRunNotProblem     Code = "FLW-RUN-025"
+	CodeRunNoResponse     Code = "FLW-RUN-026"
+	CodeRunDeprecated     Code = "FLW-RUN-027"
 
 	CodeHTTPFailed  Code = "FLW-HTTP-001"
 	CodeHTTPTimeout Code = "FLW-HTTP-002"
@@ -275,6 +284,11 @@ func codeTable() map[Code]codeInfo {
 		CodeGRPCBody:    {e, "the message does not fit {method}: {detail}"},
 		CodeGRPCStatus:  {e, "the call ended with {code}: {message}"},
 		CodeGRPCField:   {w, "{detail}"},
+
+		CodeOutcome:        {e, "{detail}"},
+		CodeDatasetRequest: {e, "{detail}"},
+		CodeDatasetQuery:   {e, "the query failed: {detail}"},
+		CodeDatasetTimeout: {e, "the query did not finish in {timeout}"},
 
 		CodeExportLossy:       {w, `node "{node}" ({type}) has no Arazzo equivalent and was left out`},
 		CodeServeSchedule:     {e, `schedule "{name}": {detail}`},
@@ -372,6 +386,9 @@ func codeTable() map[Code]codeInfo {
 		CodeRunWriteFailed:    {e, `node "{node}" could not write "{name}": {detail}`},
 		CodeRunStopped:        {e, `the run was stopped by "{node}" as failed{message}`},
 		CodeRunFuzzFailed:     {e, `{failed} of {cases} bad inputs sent by "{node}" broke the check: {first}` + hintMarker + "the step's outputs hold every failure with its case name; send that body by hand to see what the server did"},
+		CodeRunNotProblem:     {e, `"{node}" expects "{step}" to have received a problem details document (RFC 9457), but {problems}` + hintMarker + "an error response should be application/problem+json with the standard members used as the RFC says"},
+		CodeRunDeprecated:     {w, `{request} is announced as going away: {notice}` + hintMarker + "the server sent a Deprecation or Sunset header; move to the successor before the sunset date"},
+		CodeRunNoResponse:     {e, `"{node}" checks "{step}", but "{step}" has no response in this run` + hintMarker + "name an earlier request step of the same flow"},
 		CodeRunAssertNoSchema: {e, `"{node}" checks the schema of "{step}", but no response schema is kept for what "{step}" received` + hintMarker + "send the request once with schemas.infer on, or import an OpenAPI document, so a schema is kept"},
 		CodeRunSkipRead:       {e, `"{reader}" reads {reads}, which "{skipped}" would have made, and "{skipped}" is skipped` + hintMarker + "keep its last values (hold), skip \"{reader}\" too, or add a default with ??"},
 

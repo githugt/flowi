@@ -4,6 +4,7 @@ package flowi
 
 import (
 	"os"
+	"path/filepath"
 	"slices"
 	"testing"
 
@@ -38,6 +39,38 @@ func TestDuplicateRequest_Given_an_existing_path_or_bad_path_Then_FLW_WRITE_002(
 
 	if !slices.Equal(codesOfErr(exists), []diag.Code{diag.CodeWriteRequestPath}) || !slices.Equal(codesOfErr(bad), []diag.Code{diag.CodeWriteRequestPath}) {
 		t.Fatalf("exists %v bad %v", exists, bad)
+	}
+}
+
+func TestDuplicateRequestTo_should_copy_into_another_collection_and_leave_the_original(t *testing.T) {
+	w := demoWorkspace(t)
+	target := loginTarget(t, w)
+	source := requestOf(t, w, target)
+	other, err := w.InitCollection(filepath.Join(t.TempDir(), "other"), "Other", true)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	copied, err := w.DuplicateRequestTo(target, other.ID, "users/signin")
+
+	_, after, findErr := w.requestFor(copied)
+	_, original, originalErr := w.requestFor(target)
+	if err != nil || findErr != nil || copied.Collection != other.ID || after.ID == source.ID || after.Path != "users/signin" {
+		t.Fatalf("err %v find %v copy %+v", err, findErr, after)
+	}
+	if originalErr != nil || original.File != source.File {
+		t.Fatalf("the original must stay: %v %+v", originalErr, original)
+	}
+}
+
+func TestDuplicateRequestTo_Given_an_unknown_collection_Then_FLW_WS_005(t *testing.T) {
+	w := demoWorkspace(t)
+	target := loginTarget(t, w)
+
+	_, err := w.DuplicateRequestTo(target, "NOPE", "x")
+
+	if !slices.Equal(codesOfErr(err), []diag.Code{diag.CodeWSUnknownCollection}) {
+		t.Fatalf("err %v", err)
 	}
 }
 

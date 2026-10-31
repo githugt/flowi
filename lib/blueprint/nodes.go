@@ -25,6 +25,7 @@ func cloneNodes(nodes []model.Node, edit func(*model.Node)) []model.Node {
 
 func cloneNode(n model.Node, edit func(*model.Node)) model.Node {
 	n.Needs = slices.Clone(n.Needs)
+	n.AfterFailureOf = slices.Clone(n.AfterFailureOf)
 	n.Params = slices.Clone(n.Params)
 	if n.Request != nil {
 		c := *n.Request

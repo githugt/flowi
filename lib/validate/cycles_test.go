@@ -20,6 +20,7 @@ func TestDependencyCycles(t *testing.T) {
 	}{
 		{name: "explicit_two_node_cycle", nodes: []model.Node{log("a", "b"), log("b", "a")}, wantCycle: "a → b → a"},
 		{name: "through_implicit_previous", nodes: []model.Node{log("a", "c"), log("b"), log("c")}, wantCycle: "a → c → b → a"},
+		{name: "through_a_failure_arrow", nodes: []model.Node{{ID: "a", Type: "note", AfterFailureOf: []string{"b"}, Params: params("text", "x")}, log("b")}, wantCycle: "a → b → a"},
 		{name: "self_dependency", nodes: []model.Node{log("a", "a")}, wantCycle: "a → a"},
 	}
 	for _, tt := range tests {

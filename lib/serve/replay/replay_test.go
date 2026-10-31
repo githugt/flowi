@@ -6,11 +6,13 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/githugt/flowi-lib/model"
+	"github.com/githugt/flowi-lib/problem"
 )
 
 func TestHandler_should_answer_a_matching_request_with_its_default_example(t *testing.T) {
@@ -342,6 +344,11 @@ func TestHandler_should_add_CORS_headers_when_asked(t *testing.T) {
 		!strings.Contains(strings.ToLower(preflight.header.Get("Access-Control-Allow-Headers")), "x-flowi-status") {
 		t.Errorf("preflight: %d %v", preflight.status, preflight.header)
 	}
+	for _, method := range []string{"QUERY", "PROPFIND", "MKCALENDAR", "VERSION-CONTROL"} {
+		if !slices.Contains(strings.Split(preflight.header.Get("Access-Control-Allow-Methods"), ", "), method) {
+			t.Errorf("preflight does not allow %s: %q", method, preflight.header.Get("Access-Control-Allow-Methods"))
+		}
+	}
 	if plain.header.Get("Access-Control-Allow-Origin") != "*" || !strings.Contains(plain.header.Get("Access-Control-Expose-Headers"), "X-Flowi-Example") {
 		t.Errorf("plain: %v", plain.header)
 	}
@@ -411,5 +418,31 @@ func TestHandler_should_refuse_hosts_that_are_not_allowed(t *testing.T) {
 	f.h.ServeHTTP(rec, control)
 	if rec.Code != 403 {
 		t.Errorf("the control endpoints must check the Host too: %d", rec.Code)
+	}
+}
+
+// Before: the replayer's own errors (no route, no response, an injected fault) were a private JSON shape with the
+// content type application/json, which a client built on RFC 9457 could not tell from any other error.
+func TestHandler_Given_its_own_errors_Then_they_are_problem_details_documents(t *testing.T) {
+	f := newFixture(t, spec{path: "a", versions: get("{{env.base_url}}/a")}).materialise().start()
+	noRoute := f.do("GET", "/nowhere")
+	noResponse := f.do("GET", "/a")
+	wrongMethod := f.do("DELETE", "/a")
+
+	for name, got := range map[string]struct {
+		status int
+		header http.Header
+		doc    map[string]any
+	}{
+		"no route":     {noRoute.status, noRoute.header, noRoute.json(t)},
+		"no response":  {noResponse.status, noResponse.header, noResponse.json(t)},
+		"wrong method": {wrongMethod.status, wrongMethod.header, wrongMethod.json(t)},
+	} {
+		if violations := problem.Check(got.status, got.header.Get("Content-Type"), got.doc); len(violations) != 0 {
+			t.Errorf("%s (%d, %q): %v in %v", name, got.status, got.header.Get("Content-Type"), violations, got.doc)
+		}
+	}
+	if noRoute.json(t)["flowi"] != true {
+		t.Errorf("the replayer's own marker must stay: %s", noRoute.body)
 	}
 }

@@ -17,14 +17,25 @@ import (
 // fresh id and without the original's unsaved edit. Path rules are as for
 // NewRequest (FLW-WRITE-002); an unknown request is FLW-REQ-001.
 func (w *Workspace) DuplicateRequest(t RequestTarget, path string) (RequestTarget, error) {
-	c, r, err := w.requestFor(t)
+	return w.DuplicateRequestTo(t, t.Collection, path)
+}
+
+// DuplicateRequestTo is DuplicateRequest into collection to, which may be
+// t's own: the original stays where it is. An unknown collection is
+// FLW-WS-005.
+func (w *Workspace) DuplicateRequestTo(t RequestTarget, to model.ID, path string) (RequestTarget, error) {
+	_, r, err := w.requestFor(t)
 	if err != nil {
 		return RequestTarget{}, err
+	}
+	dest, ok := w.loadedCollection(to)
+	if !ok {
+		return RequestTarget{}, diagErr(diag.CodeWSUnknownCollection, map[string]string{"name": string(to)})
 	}
 	if detail := requestPathProblem(path); detail != "" {
 		return RequestTarget{}, diagErr(diag.CodeWriteRequestPath, map[string]string{"path": path, "detail": detail})
 	}
-	file := filepath.Join(c.Root, "requests", filepath.FromSlash(path)+".req.yaml")
+	file := filepath.Join(dest.Root, "requests", filepath.FromSlash(path)+".req.yaml")
 	if err := requireFree(file, path); err != nil {
 		return RequestTarget{}, err
 	}
@@ -34,10 +45,10 @@ func (w *Workspace) DuplicateRequest(t RequestTarget, path string) (RequestTarge
 	if err != nil {
 		return RequestTarget{}, fmt.Errorf("encoding %s: %w", file, err)
 	}
-	if err := w.writeAndReload(t.Collection, file, data, SaveOptions{}); err != nil {
+	if err := w.writeAndReload(to, file, data, SaveOptions{}); err != nil {
 		return RequestTarget{}, err
 	}
-	return RequestTarget{Collection: t.Collection, Request: copied.ID}, nil
+	return RequestTarget{Collection: to, Request: copied.ID}, nil
 }
 
 // DeleteRequest removes request t's file. Flows that use it are not

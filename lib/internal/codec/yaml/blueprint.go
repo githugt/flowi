@@ -29,6 +29,7 @@ func (c *Codec) DecodeBlueprint(file, path string, data []byte) (model.Blueprint
 	bp.Meta = m.meta()
 	bp.Phase = m.phase()
 	bp.Params = m.params()
+	bp.Outcomes = m.outcomes()
 	m.flowBody(&bp.Body)
 	m.closeStrict()
 	return bp, d.diags
@@ -105,6 +106,7 @@ func (c *Codec) EncodeBlueprint(bp model.Blueprint) ([]byte, error) {
 	putMeta(&o, bp.Meta)
 	o.put("phase", bp.Phase)
 	o.put("params", encodeParams(bp.Params))
+	o.put("outcomes", encodeOutcomes(bp.Outcomes))
 	putFlowBody(&o, bp.Body)
 	return marshal(o.items)
 }

@@ -21,7 +21,7 @@ func (h *Handler) deliver(w http.ResponseWriter, r *http.Request, a answer) {
 		hd.Set("Allow", strings.Join(a.allow, ", "))
 	}
 	if a.resp == nil {
-		writeJSON(w, r, a.status, a.problem)
+		writeJSONAs(w, r, a.status, "application/problem+json", a.problem)
 		return
 	}
 	hd.Set("X-Flowi-Example", a.resp.name)
@@ -60,11 +60,15 @@ func contentTypeOf(resp response) string {
 }
 
 func writeJSON(w http.ResponseWriter, r *http.Request, status int, v any) {
+	writeJSONAs(w, r, status, "application/json", v)
+}
+
+func writeJSONAs(w http.ResponseWriter, r *http.Request, status int, contentType string, v any) {
 	body, err := json.Marshal(v)
 	if err != nil {
 		body = []byte(`{"flowi":true,"error":"could not encode the answer"}`)
 	}
-	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Content-Type", contentType)
 	w.Header().Set("Content-Length", strconv.Itoa(len(body)))
 	w.WriteHeader(status)
 	if r.Method != http.MethodHead {

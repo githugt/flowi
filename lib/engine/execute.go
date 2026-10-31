@@ -7,12 +7,14 @@ import (
 	"errors"
 	"fmt"
 	"maps"
+	"net/http"
 	"sync"
 
 	"github.com/githugt/flowi-lib/diag"
 	"github.com/githugt/flowi-lib/internal/httpx"
 	"github.com/githugt/flowi-lib/internal/names"
 	"github.com/githugt/flowi-lib/internal/nodes"
+	"github.com/githugt/flowi-lib/lifecycle"
 	"github.com/githugt/flowi-lib/model"
 	"github.com/githugt/flowi-lib/template"
 )
@@ -55,19 +57,19 @@ func (r *runner) execute(ctx context.Context, c call) outcome {
 	if ok && x.runPhase(ctx, chain.Pre, nodes.PhasePre) {
 		x.sendAndCheck(ctx, chain.Post)
 	}
-	return x.outcome()
+	out := x.outcome()
+	// After outcome() has let go of the lock: the scope takes it too.
+	out.outcomes = matchOutcomes(x.outcomeList(), out.status, x.scope(true))
+	return out
 }
 
-// sendAndCheck is everything after the pre-hooks.
+// sendAndCheck is everything after the pre-hooks: what the version's family does.
 func (x *execution) sendAndCheck(ctx context.Context, post []HookRef) {
-	if x.version.GRPC != nil {
-		x.sendGRPC(ctx, post)
-		return
-	}
-	if x.version.Async != nil {
-		x.sendAsync(ctx, post)
-		return
-	}
+	x.exchange().send(ctx, post)
+}
+
+// sendHTTP is sendAndCheck for an HTTP request.
+func (x *execution) sendHTTP(ctx context.Context, post []HookRef) {
 	b, ok := x.build()
 	if !ok {
 		return
@@ -77,6 +79,7 @@ func (x *execution) sendAndCheck(ctx context.Context, post []HookRef) {
 		return
 	}
 	x.observe(b, resp)
+	x.warnIfDeprecated()
 	x.extractOutputs()
 	x.checkAssertions()
 	x.runPhase(ctx, post, nodes.PhasePost)
@@ -84,6 +87,32 @@ func (x *execution) sendAndCheck(ctx context.Context, post []HookRef) {
 		x.save()
 		x.checkSchemas()
 	}
+}
+
+// headerOf is the response headers of a record.
+func headerOf(rec *Record) http.Header {
+	header := http.Header{}
+	for _, h := range rec.Header {
+		header.Add(h.Name, h.Value)
+	}
+	return header
+}
+
+// warnIfDeprecated adds a warning when the response announces its own end (Deprecation, Sunset): the send is not
+// failed, since the endpoint works today.
+func (x *execution) warnIfDeprecated() {
+	if x.record == nil {
+		return
+	}
+	notice, found := lifecycle.Read(headerOf(x.record))
+	if !found {
+		return
+	}
+	x.mu.Lock()
+	defer x.mu.Unlock()
+	x.diags = append(x.diags, diag.New(diag.CodeRunDeprecated, diag.Location{}, map[string]string{
+		"request": x.c.request.Path, "notice": notice.Describe(x.r.deps.Clock()),
+	}))
 }
 
 // checkSchemas checks the response (and the request body) against the stored
@@ -263,14 +292,7 @@ func (x *execution) jar() *httpx.Jar {
 // requestView is the request as pre-hooks read it: a lenient render, so
 // fields that use values not set yet are empty instead of errors.
 func (x *execution) requestView() map[string]any {
-	if x.version.GRPC != nil {
-		return x.grpcView()
-	}
-	if x.version.Async != nil {
-		return x.asyncView()
-	}
-	b, _ := x.render(true)
-	return viewOf(b)
+	return x.exchange().view()
 }
 
 func viewOf(b built) map[string]any {

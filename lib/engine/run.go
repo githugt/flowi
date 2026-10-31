@@ -262,6 +262,7 @@ func onlyNodes(list []model.Node, only []string) []model.Node {
 			continue
 		}
 		n.Needs = slices.DeleteFunc(slices.Clone(n.Needs), func(id string) bool { return !keep[id] })
+		n.AfterFailureOf = slices.DeleteFunc(slices.Clone(n.AfterFailureOf), func(id string) bool { return !keep[id] })
 		out = append(out, n)
 	}
 	return out

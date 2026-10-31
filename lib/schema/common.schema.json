@@ -323,6 +323,10 @@
         "schema": {
           "type": "string",
           "description": "assert: the id of a request step whose response must match the response schema kept for its request"
+        },
+        "problem": {
+          "type": "string",
+          "description": "assert: the id of a request step whose response must be a problem details document (RFC 9457)"
         }
       },
       "allOf": [
@@ -382,6 +386,11 @@
               {
                 "required": [
                   "schema"
+                ]
+              },
+              {
+                "required": [
+                  "problem"
                 ]
               }
             ]

@@ -440,3 +440,134 @@ func TestDecodeRequest_Given_a_multipart_list_item_with_two_keys_Then_it_is_refu
 		t.Fatal("a part holds one name; two keys in one item should be reported")
 	}
 }
+
+const datasetRequest = requestHeader + `versions:
+  "1":
+    dataset:
+      driver: postgres
+      server: postgres://flowi:{{secret.db_password}}@{{env.db_host}}:5432/shop
+      query: SELECT id, name FROM customers WHERE id = $1 AND region = $2
+      params:
+        - "{{var.id}}"
+        - eu
+      limit: 50
+    extract:
+      first_name:
+        from: body
+        path: $.rows[0].name
+`
+
+func TestDecodeRequest_should_read_and_round_trip_a_dataset_version(t *testing.T) {
+	c := newCodec()
+
+	r, diags := c.DecodeRequest("r.req.yaml", "r", []byte(datasetRequest))
+	requireNoDiagnostics(t, diags)
+	out, err := c.EncodeRequest(r)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+	d := r.Versions[0].Dataset
+	if d == nil || d.Driver != "postgres" || d.Limit != 50 || d.Query != "SELECT id, name FROM customers WHERE id = $1 AND region = $2" {
+		t.Fatalf("dataset %+v", d)
+	}
+	if len(d.Params) != 2 || d.Params[0] != "{{var.id}}" || d.Params[1] != "eu" {
+		t.Fatalf("params %v", d.Params)
+	}
+	if string(out) != datasetRequest {
+		t.Fatalf("round trip differs:\n--- got\n%s\n--- want\n%s", out, datasetRequest)
+	}
+}
+
+func TestDecodeRequest_Given_a_number_param_should_keep_it_as_text(t *testing.T) {
+	text := requestHeader + "versions:\n  \"1\":\n    dataset:\n      driver: sqlite\n      server: shop.db\n      query: SELECT * FROM t WHERE id = ?\n      params:\n        - 42\n"
+
+	r, diags := newCodec().DecodeRequest("r.req.yaml", "r", []byte(text))
+
+	requireNoDiagnostics(t, diags)
+	if got := r.Versions[0].Dataset.Params; len(got) != 1 || got[0] != "42" {
+		t.Fatalf("params %v", got)
+	}
+}
+
+func TestRequest_Given_named_outcomes_When_saved_and_loaded_Then_they_round_trip_in_order(t *testing.T) {
+	src := requestHeader + `versions:
+  "1":
+    method: GET
+    url: https://example.test/x
+    outcomes:
+      - name: success
+      - name: failure
+        disabled: true
+      - name: ok
+        when: response.status in [200, 201]
+      - name: not-found
+        when: response.status == 404
+`
+	c := newCodec()
+
+	r, diags := c.DecodeRequest("x.req.yaml", "x", []byte(src))
+	requireNoDiagnostics(t, diags)
+	out, err := c.EncodeRequest(r)
+
+	got := r.Versions[0].Outcomes
+	if err != nil || len(got) != 4 || got[1].Name != "failure" || !got[1].Disabled || got[2].When != "response.status in [200, 201]" || got[3].Name != "not-found" {
+		t.Fatalf("err %v outcomes %+v", err, got)
+	}
+	if !bytes.Equal(out, []byte(src)) {
+		t.Fatalf("round trip differs:\n--- got\n%s\n--- want\n%s", out, src)
+	}
+}
+
+func TestNode_Given_after_outcome_When_saved_and_loaded_Then_it_round_trips(t *testing.T) {
+	const src = "id: 01J9ZB3M4N5P6Q7R8S9T0VWXYZ\nnodes:\n  - id: login\n    type: delay\n    duration: 1s\n  - id: missing\n    type: delay\n    after_outcome:\n      - login:not-found\n      - login:auth\n    duration: 1s\n"
+	c := newCodec()
+
+	f, diags := c.DecodeFlow("f.flow.yaml", "f", []byte(src))
+	requireNoDiagnostics(t, diags)
+	out, err := c.EncodeFlow(f)
+
+	if err != nil || len(f.Nodes[1].AfterOutcome) != 2 || !bytes.Equal(out, []byte(src)) {
+		t.Fatalf("err %v after_outcome %v, output:\n%s", err, f.Nodes[1].AfterOutcome, out)
+	}
+}
+
+func TestRequest_Given_outcome_colour_and_description_When_saved_and_loaded_Then_they_round_trip(t *testing.T) {
+	src := requestHeader + `versions:
+  "1":
+    method: GET
+    url: https://example.test/x
+    outcomes:
+      - name: success
+        color: green
+        description: What we want
+      - name: not-found
+        when: response.status == 404
+        color: amber
+        description: The thing is gone
+`
+	c := newCodec()
+
+	r, diags := c.DecodeRequest("x.req.yaml", "x", []byte(src))
+	requireNoDiagnostics(t, diags)
+	out, err := c.EncodeRequest(r)
+
+	got := r.Versions[0].Outcomes
+	if err != nil || got[0].Color != "green" || got[1].Description != "The thing is gone" || !bytes.Equal(out, []byte(src)) {
+		t.Fatalf("err %v outcomes %+v, output:\n%s", err, got, out)
+	}
+}
+
+func TestNode_Given_a_step_with_its_own_outcomes_When_saved_and_loaded_Then_they_round_trip(t *testing.T) {
+	const src = "id: 01J9ZB3M4N5P6Q7R8S9T0VWXYZ\nnodes:\n  - id: call\n    type: request\n    request:\n      id: 01J9ZA3M4N5P6Q7R8S9T0VWXYZ\n      path: auth/login\n    outcomes:\n      - name: success\n      - name: gone\n        when: response.status == 410\n        color: pink\n"
+	c := newCodec()
+
+	f, diags := c.DecodeFlow("f.flow.yaml", "f", []byte(src))
+	requireNoDiagnostics(t, diags)
+	out, err := c.EncodeFlow(f)
+
+	got := f.Nodes[0].Request.Outcomes
+	if err != nil || len(got) != 2 || got[1].Name != "gone" || got[1].Color != "pink" || !bytes.Equal(out, []byte(src)) {
+		t.Fatalf("err %v outcomes %+v, output:\n%s", err, got, out)
+	}
+}

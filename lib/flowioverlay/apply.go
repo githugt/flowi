@@ -79,7 +79,7 @@ func applyOne(v *model.RequestVersion, op model.OverlayOp) []Problem {
 func notUsed(v model.RequestVersion, field string) string {
 	switch field {
 	case "method", "url", "query", "body":
-		if v.Async != nil || v.GRPC != nil {
+		if v.Family() != model.FamilyHTTP {
 			return "this kind of request does not use " + field
 		}
 	}

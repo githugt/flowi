@@ -21,7 +21,7 @@ func NodeTypes() []NodeType {
 // NodeColors are the colours a person may give a step on the canvas. A step
 // with no colour is drawn in its category's colour.
 func NodeColors() []string {
-	return []string{"blue", "green", "amber", "pink", "purple", "teal"}
+	return []string{"blue", "green", "amber", "pink", "purple", "teal", "black", "red", "sky"}
 }
 
 // HookControl decides which API hooks a request node runs. Mode is "all"
@@ -51,6 +51,9 @@ type RequestCall struct {
 	Hooks   HookControl
 	With    []KeyValue
 	Headers []KeyValue
+	// Outcomes, when set, are this step's outcomes in place of the request version's own: the same request
+	// can end in different ways in different flows. See Outcome.
+	Outcomes []Outcome
 }
 
 // SubflowCall is the configuration of a subflow node.
@@ -114,10 +117,21 @@ type Node struct {
 	Name        string
 	Description string
 	Needs       []string
-	When        string
-	Concurrent  bool
-	OnError     string
-	Timeout     time.Duration
+	// AfterFailureOf lists the steps of the same list whose failure starts this one. Needs and
+	// AfterFailureOf are the arrows into a step: a name in Needs is an arrow taken when that step
+	// succeeds, one in AfterFailureOf when it fails, one in both whichever way it ends. With neither,
+	// the step follows the step before it, on success.
+	AfterFailureOf []string
+	// AfterOutcome lists "step:outcome" entries: the step starts this one when its request ends with that
+	// outcome (one of the outcomes the request names, or success or failure).
+	AfterOutcome []string
+	// Unlinked says the step has no arrow into it: it does not follow the step before it. The arrow from that step
+	// was taken away on purpose. It is ignored when the step has arrows of its own.
+	Unlinked   bool
+	When       string
+	Concurrent bool
+	OnError    string
+	Timeout    time.Duration
 	// Attach names a request or subflow node of the same list that this node is shown
 	// with: the canvas draws them as one block. It is a view only; the run order is
 	// the list order, as always.

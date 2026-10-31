@@ -86,3 +86,70 @@ func TestApplyTo_should_warn_when_extends_names_another_document(t *testing.T) {
 		})
 	}
 }
+
+// Overlay 1.1 adds the copy action: target is the destination, which must already exist (the spec's "ensure the target
+// exists" example makes it with an update first), and copy is the source; the content is merged in like update's.
+func TestApply_Given_an_overlay_1_1_copy_action_Then_the_element_is_copied_into_the_destination_and_the_original_stays(t *testing.T) {
+	// Arrange
+	ov := `overlay: 1.1.0
+info: {title: copy, version: 1.0.0}
+actions:
+  - target: $.paths
+    update: {"/copied": {}}
+  - target: $.paths['/copied']
+    copy: $.paths['/examples']
+`
+
+	// Act
+	out, diags := Apply([]byte(spec), [][]byte{[]byte(ov)})
+
+	// Assert
+	text := string(out)
+	if len(diags) != 0 || !strings.Contains(text, "/copied") || !strings.Contains(text, "/examples") {
+		t.Fatalf("diags %v, out:\n%s", diags, text)
+	}
+	if strings.Count(text, "description: ok") != 3 {
+		t.Fatalf("want the copied path to hold the same response as its source (three in all), out:\n%s", text)
+	}
+}
+
+func TestApply_Given_the_spec_move_example_Then_the_element_is_moved(t *testing.T) {
+	// Arrange
+	ov := `overlay: 1.1.0
+info: {title: move, version: 1.0.0}
+actions:
+  - target: $.paths
+    update: {"/moved": {}}
+  - target: $.paths['/moved']
+    copy: $.paths['/internal']
+  - target: $.paths['/internal']
+    remove: true
+`
+
+	// Act
+	out, diags := Apply([]byte(spec), [][]byte{[]byte(ov)})
+
+	// Assert
+	text := string(out)
+	if len(diags) != 0 || !strings.Contains(text, "/moved") || strings.Contains(text, "/internal") {
+		t.Fatalf("diags %v, out:\n%s", diags, text)
+	}
+}
+
+func TestApply_Given_a_copy_into_a_destination_that_does_not_exist_Then_nothing_changes_and_a_warning_says_so(t *testing.T) {
+	// Arrange: the spec's "simple copy" without ensuring the destination exists.
+	ov := `overlay: 1.1.0
+info: {title: simple, version: 1.0.0}
+actions:
+  - target: $.paths['/copied']
+    copy: $.paths['/examples']
+`
+
+	// Act
+	out, diags := Apply([]byte(spec), [][]byte{[]byte(ov)})
+
+	// Assert
+	if strings.Contains(string(out), "/copied") || len(diags) != 1 || diags[0].Code != diag.CodeImportUnmapped {
+		t.Fatalf("diags %v, out:\n%s", diags, out)
+	}
+}

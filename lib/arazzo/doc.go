@@ -30,9 +30,9 @@ type Operation struct {
 	Timeout time.Duration
 	Reply   bool
 	Match   bool
-	// GRPC marks a call to a gRPC request: no standard description of it
-	// exists, so its step is a custom one that keeps the call in x-flowi-flow.
-	GRPC bool
+	// Custom names a kind of request that has no standard description ("gRPC call", "dataset query"): its step is
+	// a custom one that keeps the call in x-flowi-flow. Empty for a request that has one.
+	Custom string
 }
 
 // AsyncSource is the name of the generated AsyncAPI description in a

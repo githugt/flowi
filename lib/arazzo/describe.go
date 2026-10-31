@@ -5,6 +5,7 @@ package arazzo
 import (
 	"cmp"
 	"fmt"
+	"maps"
 	"regexp"
 	"slices"
 	"strconv"
@@ -86,8 +87,8 @@ func operationsOf(c model.Collection) []operation {
 			if v.Async != nil {
 				continue // described by DescribeAsync
 			}
-			if v.GRPC != nil {
-				continue // no standard description of a gRPC call is generated
+			if customKind(v) != "" {
+				continue // no standard description of a gRPC call or a dataset query is generated
 			}
 			base := slug(r.Path)
 			switch {
@@ -123,7 +124,7 @@ func slug(s string) string {
 }
 
 func newOperation(r model.Request, v model.RequestVersion, id string) operation {
-	op := operation{req: r, version: v, id: id, method: strings.ToLower(cmp.Or(v.Method, "GET"))}
+	op := operation{req: r, version: v, id: id, method: cmp.Or(v.Method, "GET")}
 	rest := v.URL
 	if m := envPrefix.FindStringSubmatch(rest); m != nil {
 		op.server = m[1]
@@ -197,12 +198,25 @@ func serversOf(ops []operation) []any {
 	return out
 }
 
-var methodOrder = []string{"get", "put", "post", "delete", "options", "head", "patch"} //nolint:gochecknoglobals // a fixed ordering table
+// methodOrder are the methods an OpenAPI path item has a field for, in the order they are written; QUERY is 3.2's.
+var methodOrder = []string{"get", "put", "post", "delete", "options", "head", "patch", "trace", "query"} //nolint:gochecknoglobals // a fixed ordering table
+
+// fieldOf is the key a method has in a path item: its lower-case field, or "" for a method that has none (WebDAV's
+// PROPFIND, a CDN's Purge), which OpenAPI 3.2 keeps in additionalOperations under its own, case-sensitive, name.
+func fieldOf(method string) string {
+	if lower := strings.ToLower(method); slices.Contains(methodOrder, lower) {
+		return lower
+	}
+	return ""
+}
 
 func pathsOf(ops []operation, schemas SchemaLookup) yaml.MapSlice {
 	byPath := map[string]map[string]any{}
 	var order []string
 	add := func(path, method string, body yaml.MapSlice) {
+		if field := fieldOf(method); field != "" {
+			method = field
+		}
 		if _, taken := byPath[path][method]; taken {
 			path += "?flowi=" + method + strconv.Itoa(len(order)) // two requests on one URL and method: keep both
 		}
@@ -230,7 +244,21 @@ func pathsOf(ops []operation, schemas SchemaLookup) yaml.MapSlice {
 				item = append(item, yaml.MapItem{Key: m, Value: body})
 			}
 		}
+		if extra := additionalOperationsOf(byPath[p]); extra != nil {
+			item = append(item, yaml.MapItem{Key: "additionalOperations", Value: extra})
+		}
 		out = append(out, yaml.MapItem{Key: p, Value: item})
+	}
+	return out
+}
+
+// additionalOperationsOf are the operations of a path item whose method has no field of its own, by name; nil for none.
+func additionalOperationsOf(ops map[string]any) yaml.MapSlice {
+	var out yaml.MapSlice
+	for _, name := range slices.Sorted(maps.Keys(ops)) {
+		if !slices.Contains(methodOrder, name) {
+			out = append(out, yaml.MapItem{Key: name, Value: ops[name]})
+		}
 	}
 	return out
 }
@@ -329,40 +357,51 @@ func responsesOf(op operation, schemas SchemaLookup) yaml.MapSlice {
 // NewResolver resolves the operations Describe declares: the operation a
 // request call runs, and the request behind an operationId.
 func NewResolver(c model.Collection) Resolver {
-	return describedResolver{ops: operationsOf(c), async: asyncOperationsOf(c), grpc: grpcRequestsOf(c)}
+	return describedResolver{ops: operationsOf(c), async: asyncOperationsOf(c), custom: customRequestsOf(c)}
 }
 
 type describedResolver struct {
-	ops   []operation
-	async []asyncOperation
-	grpc  []model.Request // requests with a gRPC version (they have no described operation)
+	ops    []operation
+	async  []asyncOperation
+	custom []model.Request // requests with a gRPC or dataset version (they have no described operation)
 }
 
-// grpcRequestsOf lists the requests that have a gRPC version.
-func grpcRequestsOf(c model.Collection) []model.Request {
+// customKind is what a version is called in a limit when it has no standard description: "" for one that has.
+func customKind(v model.RequestVersion) string {
+	switch v.Family() {
+	case model.FamilyRPC:
+		return "gRPC call"
+	case model.FamilyDataset:
+		return "dataset query"
+	}
+	return ""
+}
+
+// customRequestsOf lists the requests that have a gRPC or a dataset version.
+func customRequestsOf(c model.Collection) []model.Request {
 	var out []model.Request
 	for _, r := range c.Requests {
-		if slices.ContainsFunc(r.Versions, func(v model.RequestVersion) bool { return v.GRPC != nil }) {
+		if slices.ContainsFunc(r.Versions, func(v model.RequestVersion) bool { return customKind(v) != "" }) {
 			out = append(out, r)
 		}
 	}
 	return out
 }
 
-// isGRPCCall reports whether call runs a gRPC version of a request.
-func (r describedResolver) isGRPCCall(call model.RequestCall) bool {
-	for _, req := range r.grpc {
+// customKindOf is what the version call runs is called when it has no standard description, "" when it has one.
+func (r describedResolver) customKindOf(call model.RequestCall) string {
+	for _, req := range r.custom {
 		if !sameRequest(req, call.Request) {
 			continue
 		}
 		want := cmp.Or(call.Version, defaultLabel(req))
 		for _, v := range req.Versions {
 			if v.Label == want {
-				return v.GRPC != nil
+				return customKind(v)
 			}
 		}
 	}
-	return false
+	return ""
 }
 
 func (r describedResolver) RequestFor(operationID string) (model.Ref, string, bool) {
@@ -388,8 +427,8 @@ func (r describedResolver) RequestFor(operationID string) (model.Ref, string, bo
 }
 
 func (r describedResolver) OperationOf(call model.RequestCall) (Operation, bool) {
-	if r.isGRPCCall(call) {
-		return Operation{GRPC: true}, true
+	if kind := r.customKindOf(call); kind != "" {
+		return Operation{Custom: kind}, true
 	}
 	for _, op := range r.async {
 		if sameRequest(op.req, call.Request) && op.version.Label == cmp.Or(call.Version, defaultLabel(op.req)) {
