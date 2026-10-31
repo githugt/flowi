@@ -383,6 +383,79 @@ export class Case {
 }
 
 /**
+ * Dataset is what a dataset request version does: it runs one read-only query against a data store and keeps the
+ * rows it returns.
+ */
+export class Dataset {
+    /**
+     * Creates a new Dataset instance.
+     * @param {Partial<Dataset>} [$$source = {}] - The source object to create the Dataset.
+     */
+    constructor($$source = {}) {
+        if (!("Driver" in $$source)) {
+            /**
+             * Driver is the store: postgres, mysql, mariadb or sqlite.
+             * @member
+             * @type {string}
+             */
+            this["Driver"] = "";
+        }
+        if (!("Server" in $$source)) {
+            /**
+             * Server is the connection string, templated: a postgres:// or mysql:// URL, or for sqlite a file path
+             * relative to the collection.
+             * @member
+             * @type {string}
+             */
+            this["Server"] = "";
+        }
+        if (!("Query" in $$source)) {
+            /**
+             * Query is one SELECT (or WITH, VALUES, SHOW, EXPLAIN, DESCRIBE) statement. It is not templated: values go in
+             * Params, which are sent to the store separately from the statement, so a value can never change what the
+             * statement means.
+             * @member
+             * @type {string}
+             */
+            this["Query"] = "";
+        }
+        if (!("Params" in $$source)) {
+            /**
+             * Params are the values of the query's placeholders, in order, templated. Placeholders are $1, $2 … for postgres
+             * and sqlite, and ? for mysql, mariadb and sqlite.
+             * @member
+             * @type {string[]}
+             */
+            this["Params"] = [];
+        }
+        if (!("Limit" in $$source)) {
+            /**
+             * Limit is the most rows kept; 0 means DefaultDatasetLimit. More rows than that are cut and the result says so.
+             * @member
+             * @type {number}
+             */
+            this["Limit"] = 0;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new Dataset instance from a string or object.
+     * @param {any} [$$source = {}]
+     * @returns {Dataset}
+     */
+    static createFrom($$source = {}) {
+        const $$createField3_0 = $$createType11;
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        if ("Params" in $$parsedSource) {
+            $$parsedSource["Params"] = $$createField3_0($$parsedSource["Params"]);
+        }
+        return new Dataset(/** @type {Partial<Dataset>} */($$parsedSource));
+    }
+}
+
+/**
  * Extraction names a value taken from a response. From is one of body,
  * header, cookie or status; the matching selector field is set.
  */
@@ -840,6 +913,35 @@ export class Node {
              */
             this["Needs"] = [];
         }
+        if (!("AfterFailureOf" in $$source)) {
+            /**
+             * AfterFailureOf lists the steps of the same list whose failure starts this one. Needs and
+             * AfterFailureOf are the arrows into a step: a name in Needs is an arrow taken when that step
+             * succeeds, one in AfterFailureOf when it fails, one in both whichever way it ends. With neither,
+             * the step follows the step before it, on success.
+             * @member
+             * @type {string[]}
+             */
+            this["AfterFailureOf"] = [];
+        }
+        if (!("AfterOutcome" in $$source)) {
+            /**
+             * AfterOutcome lists "step:outcome" entries: the step starts this one when its request ends with that
+             * outcome (one of the outcomes the request names, or success or failure).
+             * @member
+             * @type {string[]}
+             */
+            this["AfterOutcome"] = [];
+        }
+        if (!("Unlinked" in $$source)) {
+            /**
+             * Unlinked says the step has no arrow into it: it does not follow the step before it. The arrow from that step
+             * was taken away on purpose. It is ignored when the step has arrows of its own.
+             * @member
+             * @type {boolean}
+             */
+            this["Unlinked"] = false;
+        }
         if (!("When" in $$source)) {
             /**
              * @member
@@ -974,45 +1076,53 @@ export class Node {
      */
     static createFrom($$source = {}) {
         const $$createField4_0 = $$createType11;
-        const $$createField12_0 = $$createType17;
-        const $$createField13_0 = $$createType19;
-        const $$createField14_0 = $$createType10;
-        const $$createField15_0 = $$createType21;
-        const $$createField16_0 = $$createType10;
+        const $$createField5_0 = $$createType11;
+        const $$createField6_0 = $$createType11;
+        const $$createField15_0 = $$createType17;
+        const $$createField16_0 = $$createType19;
         const $$createField17_0 = $$createType10;
-        const $$createField18_0 = $$createType23;
-        const $$createField19_0 = $$createType25;
-        const $$createField20_0 = $$createType8;
+        const $$createField18_0 = $$createType21;
+        const $$createField19_0 = $$createType10;
+        const $$createField20_0 = $$createType10;
+        const $$createField21_0 = $$createType23;
+        const $$createField22_0 = $$createType25;
+        const $$createField23_0 = $$createType8;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("Needs" in $$parsedSource) {
             $$parsedSource["Needs"] = $$createField4_0($$parsedSource["Needs"]);
         }
+        if ("AfterFailureOf" in $$parsedSource) {
+            $$parsedSource["AfterFailureOf"] = $$createField5_0($$parsedSource["AfterFailureOf"]);
+        }
+        if ("AfterOutcome" in $$parsedSource) {
+            $$parsedSource["AfterOutcome"] = $$createField6_0($$parsedSource["AfterOutcome"]);
+        }
         if ("Request" in $$parsedSource) {
-            $$parsedSource["Request"] = $$createField12_0($$parsedSource["Request"]);
+            $$parsedSource["Request"] = $$createField15_0($$parsedSource["Request"]);
         }
         if ("Subflow" in $$parsedSource) {
-            $$parsedSource["Subflow"] = $$createField13_0($$parsedSource["Subflow"]);
+            $$parsedSource["Subflow"] = $$createField16_0($$parsedSource["Subflow"]);
         }
         if ("Body" in $$parsedSource) {
-            $$parsedSource["Body"] = $$createField14_0($$parsedSource["Body"]);
+            $$parsedSource["Body"] = $$createField17_0($$parsedSource["Body"]);
         }
         if ("Branches" in $$parsedSource) {
-            $$parsedSource["Branches"] = $$createField15_0($$parsedSource["Branches"]);
+            $$parsedSource["Branches"] = $$createField18_0($$parsedSource["Branches"]);
         }
         if ("Then" in $$parsedSource) {
-            $$parsedSource["Then"] = $$createField16_0($$parsedSource["Then"]);
+            $$parsedSource["Then"] = $$createField19_0($$parsedSource["Then"]);
         }
         if ("Else" in $$parsedSource) {
-            $$parsedSource["Else"] = $$createField17_0($$parsedSource["Else"]);
+            $$parsedSource["Else"] = $$createField20_0($$parsedSource["Else"]);
         }
         if ("Cases" in $$parsedSource) {
-            $$parsedSource["Cases"] = $$createField18_0($$parsedSource["Cases"]);
+            $$parsedSource["Cases"] = $$createField21_0($$parsedSource["Cases"]);
         }
         if ("Values" in $$parsedSource) {
-            $$parsedSource["Values"] = $$createField19_0($$parsedSource["Values"]);
+            $$parsedSource["Values"] = $$createField22_0($$parsedSource["Values"]);
         }
         if ("Params" in $$parsedSource) {
-            $$parsedSource["Params"] = $$createField20_0($$parsedSource["Params"]);
+            $$parsedSource["Params"] = $$createField23_0($$parsedSource["Params"]);
         }
         return new Node(/** @type {Partial<Node>} */($$parsedSource));
     }
@@ -1022,6 +1132,71 @@ export class Node {
  * NodeType names a kind of flow node.
  * @typedef {string} NodeType
  */
+
+/**
+ * Outcome is a named way a request can end, which an arrow can follow. A step has every outcome whose rule
+ * holds once the request and its hooks have run, so a response can be `success` and `ok` at once.
+ * success and failure are built in: their rule is "the request passed" and "it failed", and they have no
+ * When. Any other name has a When, an expression over the response (`status in [200, 201]`).
+ */
+export class Outcome {
+    /**
+     * Creates a new Outcome instance.
+     * @param {Partial<Outcome>} [$$source = {}] - The source object to create the Outcome.
+     */
+    constructor($$source = {}) {
+        if (!("Name" in $$source)) {
+            /**
+             * @member
+             * @type {string}
+             */
+            this["Name"] = "";
+        }
+        if (!("When" in $$source)) {
+            /**
+             * @member
+             * @type {string}
+             */
+            this["When"] = "";
+        }
+        if (!("Disabled" in $$source)) {
+            /**
+             * kept in the list, but never matched
+             * @member
+             * @type {boolean}
+             */
+            this["Disabled"] = false;
+        }
+        if (!("Color" in $$source)) {
+            /**
+             * Color is one of NodeColors, for the port and arrows of the outcome; "" is the outcome's own (green for
+             * success, red for failure, blue for a named one). Description says what it is for, shown beside it.
+             * @member
+             * @type {string}
+             */
+            this["Color"] = "";
+        }
+        if (!("Description" in $$source)) {
+            /**
+             * @member
+             * @type {string}
+             */
+            this["Description"] = "";
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new Outcome instance from a string or object.
+     * @param {any} [$$source = {}]
+     * @returns {Outcome}
+     */
+    static createFrom($$source = {}) {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new Outcome(/** @type {Partial<Outcome>} */($$parsedSource));
+    }
+}
 
 /**
  * Ref points at a request or flow. Collection is empty for the referencing
@@ -1161,6 +1336,15 @@ export class RequestCall {
              */
             this["Headers"] = [];
         }
+        if (!("Outcomes" in $$source)) {
+            /**
+             * Outcomes, when set, are this step's outcomes in place of the request version's own: the same request
+             * can end in different ways in different flows. See Outcome.
+             * @member
+             * @type {Outcome[]}
+             */
+            this["Outcomes"] = [];
+        }
 
         Object.assign(this, $$source);
     }
@@ -1175,6 +1359,7 @@ export class RequestCall {
         const $$createField6_0 = $$createType26;
         const $$createField7_0 = $$createType5;
         const $$createField8_0 = $$createType5;
+        const $$createField9_0 = $$createType28;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("Request" in $$parsedSource) {
             $$parsedSource["Request"] = $$createField0_0($$parsedSource["Request"]);
@@ -1187,6 +1372,9 @@ export class RequestCall {
         }
         if ("Headers" in $$parsedSource) {
             $$parsedSource["Headers"] = $$createField8_0($$parsedSource["Headers"]);
+        }
+        if ("Outcomes" in $$parsedSource) {
+            $$parsedSource["Outcomes"] = $$createField9_0($$parsedSource["Outcomes"]);
         }
         return new RequestCall(/** @type {Partial<RequestCall>} */($$parsedSource));
     }
@@ -1266,6 +1454,14 @@ export class RequestVersion {
              */
             this["Assert"] = [];
         }
+        if (!("Outcomes" in $$source)) {
+            /**
+             * Outcomes are the named ways the request can end (see Outcome). None (or an empty list): success and failure.
+             * @member
+             * @type {Outcome[]}
+             */
+            this["Outcomes"] = [];
+        }
         if (!("Settings" in $$source)) {
             /**
              * @member
@@ -1327,6 +1523,15 @@ export class RequestVersion {
              */
             this["GRPC"] = null;
         }
+        if (!("Dataset" in $$source)) {
+            /**
+             * Dataset, when set, makes this a query of a data store instead of an HTTP
+             * request. The version's Headers, Method, URL, Query and Body are unused.
+             * @member
+             * @type {Dataset | null}
+             */
+            this["Dataset"] = null;
+        }
 
         Object.assign(this, $$source);
     }
@@ -1340,14 +1545,16 @@ export class RequestVersion {
         const $$createField4_0 = $$createType5;
         const $$createField5_0 = $$createType5;
         const $$createField6_0 = $$createType6;
-        const $$createField7_0 = $$createType28;
+        const $$createField7_0 = $$createType30;
         const $$createField8_0 = $$createType11;
-        const $$createField9_0 = $$createType29;
+        const $$createField9_0 = $$createType28;
         const $$createField10_0 = $$createType31;
-        const $$createField11_0 = $$createType5;
-        const $$createField13_0 = $$createType33;
+        const $$createField11_0 = $$createType33;
+        const $$createField12_0 = $$createType5;
         const $$createField14_0 = $$createType35;
         const $$createField15_0 = $$createType37;
+        const $$createField16_0 = $$createType39;
+        const $$createField17_0 = $$createType41;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("Query" in $$parsedSource) {
             $$parsedSource["Query"] = $$createField4_0($$parsedSource["Query"]);
@@ -1364,23 +1571,29 @@ export class RequestVersion {
         if ("Assert" in $$parsedSource) {
             $$parsedSource["Assert"] = $$createField8_0($$parsedSource["Assert"]);
         }
+        if ("Outcomes" in $$parsedSource) {
+            $$parsedSource["Outcomes"] = $$createField9_0($$parsedSource["Outcomes"]);
+        }
         if ("Settings" in $$parsedSource) {
-            $$parsedSource["Settings"] = $$createField9_0($$parsedSource["Settings"]);
+            $$parsedSource["Settings"] = $$createField10_0($$parsedSource["Settings"]);
         }
         if ("Hooks" in $$parsedSource) {
-            $$parsedSource["Hooks"] = $$createField10_0($$parsedSource["Hooks"]);
+            $$parsedSource["Hooks"] = $$createField11_0($$parsedSource["Hooks"]);
         }
         if ("Variables" in $$parsedSource) {
-            $$parsedSource["Variables"] = $$createField11_0($$parsedSource["Variables"]);
+            $$parsedSource["Variables"] = $$createField12_0($$parsedSource["Variables"]);
         }
         if ("Auth" in $$parsedSource) {
-            $$parsedSource["Auth"] = $$createField13_0($$parsedSource["Auth"]);
+            $$parsedSource["Auth"] = $$createField14_0($$parsedSource["Auth"]);
         }
         if ("Async" in $$parsedSource) {
-            $$parsedSource["Async"] = $$createField14_0($$parsedSource["Async"]);
+            $$parsedSource["Async"] = $$createField15_0($$parsedSource["Async"]);
         }
         if ("GRPC" in $$parsedSource) {
-            $$parsedSource["GRPC"] = $$createField15_0($$parsedSource["GRPC"]);
+            $$parsedSource["GRPC"] = $$createField16_0($$parsedSource["GRPC"]);
+        }
+        if ("Dataset" in $$parsedSource) {
+            $$parsedSource["Dataset"] = $$createField17_0($$parsedSource["Dataset"]);
         }
         return new RequestVersion(/** @type {Partial<RequestVersion>} */($$parsedSource));
     }
@@ -1562,19 +1775,23 @@ const $$createType23 = $Create.Array($$createType22);
 const $$createType24 = SetValue.createFrom;
 const $$createType25 = $Create.Array($$createType24);
 const $$createType26 = HookControl.createFrom;
-const $$createType27 = Extraction.createFrom;
+const $$createType27 = Outcome.createFrom;
 const $$createType28 = $Create.Array($$createType27);
-var $$createType29 = /** @type {(...args: any[]) => any} */(function $$initCreateType29(...args) {
-    if ($$createType29 === $$initCreateType29) {
-        $$createType29 = $$createType30;
+const $$createType29 = Extraction.createFrom;
+const $$createType30 = $Create.Array($$createType29);
+var $$createType31 = /** @type {(...args: any[]) => any} */(function $$initCreateType31(...args) {
+    if ($$createType31 === $$initCreateType31) {
+        $$createType31 = $$createType32;
     }
-    return $$createType29(...args);
+    return $$createType31(...args);
 });
-const $$createType30 = $Create.Map($Create.Any, $Create.Any);
-const $$createType31 = Hooks.createFrom;
-const $$createType32 = Auth.createFrom;
-const $$createType33 = $Create.Nullable($$createType32);
-const $$createType34 = Async.createFrom;
+const $$createType32 = $Create.Map($Create.Any, $Create.Any);
+const $$createType33 = Hooks.createFrom;
+const $$createType34 = Auth.createFrom;
 const $$createType35 = $Create.Nullable($$createType34);
-const $$createType36 = GRPC.createFrom;
+const $$createType36 = Async.createFrom;
 const $$createType37 = $Create.Nullable($$createType36);
+const $$createType38 = GRPC.createFrom;
+const $$createType39 = $Create.Nullable($$createType38);
+const $$createType40 = Dataset.createFrom;
+const $$createType41 = $Create.Nullable($$createType40);

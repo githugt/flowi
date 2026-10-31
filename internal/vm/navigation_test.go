@@ -38,8 +38,8 @@ func TestMenuFor_should_offer_what_a_single_row_can_do(t *testing.T) {
 		"request":     {"r:C1:R1", []vm.Action{vm.ActOpen, vm.ActDuplicate, vm.ActRename, vm.ActDelete}},
 		"flow":        {"f:C1:F1", []vm.Action{vm.ActOpen, vm.ActDuplicate, vm.ActCopyMermaid, vm.ActDelete}},
 		"environment": {"e:/c/environments/local.yaml", []vm.Action{vm.ActOpen, vm.ActDelete}},
-		"collection":  {"c:C1", []vm.Action{vm.ActNewRequest, vm.ActNewAsyncRequest, vm.ActNewGRPCRequest, vm.ActNewFlow, vm.ActNewFolder, vm.ActFlowFromRequests}},
-		"folder":      {"c:C1/requests/auth", []vm.Action{vm.ActNewRequest, vm.ActNewAsyncRequest, vm.ActNewGRPCRequest, vm.ActNewFolder, vm.ActFlowFromRequests, vm.ActRename, vm.ActDelete}},
+		"collection":  {"c:C1", []vm.Action{vm.ActNewRequest, vm.ActNewAsyncRequest, vm.ActNewGRPCRequest, vm.ActNewDatasetRequest, vm.ActNewFlow, vm.ActNewFolder, vm.ActFlowFromRequests}},
+		"folder":      {"c:C1/requests/auth", []vm.Action{vm.ActNewRequest, vm.ActNewAsyncRequest, vm.ActNewGRPCRequest, vm.ActNewDatasetRequest, vm.ActNewFolder, vm.ActFlowFromRequests, vm.ActRename, vm.ActDelete}},
 		"flows group": {"c:C1/flows", []vm.Action{vm.ActNewFlow, vm.ActNewFolder}},
 		"envs group":  {"environments", []vm.Action{vm.ActNewEnvironment}},
 	}
@@ -157,6 +157,18 @@ func TestWorkspaceVM_DuplicateRequest_should_copy_then_open_the_copy(t *testing.
 	w.Wait()
 
 	if opened != "r:C1:R3-copy" || !b.Called("DuplicateRequest health-copy") || ws.Node("r:C1:R3-copy").Kind != vm.NodeRequest {
+		t.Fatalf("opened %q calls %v", opened, b.Calls)
+	}
+}
+
+func TestWorkspaceVM_DuplicateRequestTo_should_copy_into_the_chosen_collection_and_open_it(t *testing.T) {
+	ws, b, w := shopWorkspace(t)
+	var opened string
+
+	ws.DuplicateRequestTo(flowi.RequestTarget{Collection: "C1", Request: "R3"}, "C1", "health-two", func(id string) { opened = id }, nil)
+	w.Wait()
+
+	if opened != "r:C1:R3-copy" || !b.Called("DuplicateRequestTo C1 health-two") {
 		t.Fatalf("opened %q calls %v", opened, b.Calls)
 	}
 }

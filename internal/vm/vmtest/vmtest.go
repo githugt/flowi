@@ -376,6 +376,35 @@ func (f *Backend) DuplicateRequest(t flowi.RequestTarget, path string) (flowi.Re
 	return flowi.RequestTarget{Collection: t.Collection, Request: copyID}, nil
 }
 
+// DuplicateRequestTo records the call and adds the copy to the destination collection.
+func (f *Backend) DuplicateRequestTo(t flowi.RequestTarget, to model.ID, path string) (flowi.RequestTarget, error) {
+	f.record("DuplicateRequestTo " + string(to) + " " + path)
+	f.Mu.Lock()
+	defer f.Mu.Unlock()
+	if f.NewErr != nil {
+		return flowi.RequestTarget{}, f.NewErr
+	}
+	copyID := t.Request + "-copy"
+	var source model.Request
+	for _, c := range f.Cols {
+		if c.Manifest.ID != t.Collection {
+			continue
+		}
+		for _, r := range c.Requests {
+			if r.ID == t.Request {
+				source = r
+			}
+		}
+	}
+	for ci := range f.Cols {
+		if f.Cols[ci].Manifest.ID == to {
+			source.ID, source.Path, source.Name = copyID, path, path
+			f.Cols[ci].Requests = append(slices.Clone(f.Cols[ci].Requests), source)
+		}
+	}
+	return flowi.RequestTarget{Collection: to, Request: copyID}, nil
+}
+
 // deleteFailure counts a Delete* call and fails it when NewErr is set or it is
 // the FailDeleteAt-th. Callers hold Mu.
 func (f *Backend) deleteFailure() error {
@@ -734,6 +763,15 @@ func (f *Backend) NewAsyncRequest(collection model.ID, path, protocol string) (f
 // NewGRPCRequest records the call and fails like NewRequest.
 func (f *Backend) NewGRPCRequest(collection model.ID, path string) (flowi.RequestTarget, error) {
 	f.record("NewGRPCRequest " + path)
+	if f.NewErr != nil {
+		return flowi.RequestTarget{}, f.NewErr
+	}
+	return flowi.RequestTarget{Collection: collection, Request: "new"}, nil
+}
+
+// NewDatasetRequest records the call and fails like NewRequest.
+func (f *Backend) NewDatasetRequest(collection model.ID, path, driver string) (flowi.RequestTarget, error) {
+	f.record("NewDatasetRequest " + path + " " + driver)
 	if f.NewErr != nil {
 		return flowi.RequestTarget{}, f.NewErr
 	}
@@ -1267,7 +1305,14 @@ const ScratchID model.ID = "SCRATCH"
 
 func (f *Backend) NewDraft(name string) (model.Manifest, error) {
 	f.record("NewDraft " + name)
-	return model.Manifest{}, nil
+	f.Mu.Lock()
+	defer f.Mu.Unlock()
+	if f.NewErr != nil {
+		return model.Manifest{}, f.NewErr
+	}
+	m := model.Manifest{Meta: model.Meta{ID: model.ID("D-" + name), Name: name}, File: "/drafts/" + name + "/flowi.yaml"}
+	f.Cols = append(slices.Clone(f.Cols), model.Collection{Root: "/drafts/" + name, Manifest: m})
+	return m, nil
 }
 
 func (f *Backend) Scratch() (model.Manifest, error) {

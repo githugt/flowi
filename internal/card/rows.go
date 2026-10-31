@@ -24,6 +24,7 @@ func rowSpecs() map[string]rowSpec {
 		"receive":    {key: "receive", icon: "receive", editor: "receive", summary: receiveSummary},
 		"connection": {key: "connection", icon: "connection", editor: "connection", summary: connectionSummary},
 		"hooks":      {key: "hooks", icon: "hooks", editor: "hooks", summary: hooksSummary},
+		"outcomes":   {key: "outcomes", icon: "outcomes", editor: "outcomes", summary: outcomesSummary},
 		"settings":   {key: "settings", icon: "settings", editor: "settings", summary: settingsSummary},
 	}
 }
@@ -119,4 +120,19 @@ func settingsSummary(_ model.Node, f Facts, _ kindRule) string {
 		parts = append(parts, "region "+f.Region)
 	}
 	return join(parts...)
+}
+
+// outcomesSummary names the outcomes the request step can end with, the enabled ones in order: success and
+// failure for a request that writes none. It is always shown, since the arrows leaving the card follow them.
+func outcomesSummary(_ model.Node, f Facts, _ kindRule) string {
+	if len(f.Outcomes) == 0 {
+		return join(model.OutcomeSuccess, model.OutcomeFailure)
+	}
+	var names []string
+	for _, o := range f.Outcomes {
+		if !o.Disabled {
+			names = append(names, o.Name)
+		}
+	}
+	return join(names...)
 }

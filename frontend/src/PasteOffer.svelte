@@ -9,6 +9,8 @@
   import { live } from './lib/live'
   import type { ImportView } from './lib/types'
   import { ui } from './lib/ui.svelte'
+  import Code from './Code.svelte'
+  import type { CodeLang } from './lib/highlight'
 
   const offer = $derived(app.pasteOffer)
   let preview = $state<ImportView | null>(null)
@@ -21,7 +23,16 @@
     const lines = (offer?.text ?? '').trim().split('\n')
     return lines.slice(0, SHOWN_LINES).join('\n') + (lines.length > SHOWN_LINES ? `\n… ${lines.length - SHOWN_LINES} more lines` : '')
   })
-  const canFill = $derived(!!offer?.kind.fills && offer.http)
+  // What colours the excerpt: curl and .http have readers of their own; a document is JSON or YAML by how it starts.
+  const excerptLang = $derived.by((): CodeLang => {
+    const id = offer?.kind.id
+    if (id === 'curl' || id === 'http') return id
+    if (id === 'flowi') return 'yaml'
+    return (offer?.text.trimStart()[0] ?? '') === '{' ? 'json' : 'yaml'
+  })
+  // A request file fills a request of any kind; a curl command or a .http request only an HTTP one.
+  const isRequestFile = $derived(offer?.kind.id === 'flowi')
+  const canFill = $derived(!!offer?.kind.fills && (offer.http || isRequestFile))
 
   function close() {
     stop?.()
@@ -71,9 +82,30 @@
     document.execCommand('insertText', false, o.text)
   }
 
-  function moreOptions() {
+  // The import screen opens on what was recognised, with the text as its source: nothing to choose again.
+  async function moreOptions() {
+    const o = offer
+    if (!o) return
+    try {
+      await ImportService.PreparePasted(o.kind.id, o.text, o.node)
+    } catch (e) {
+      error = errorText(e)
+      return
+    }
     close()
     app.openScreen('screen:import', 'Import')
+  }
+
+  // The chooser the new-request and Save dialogs use; an import fills a whole collection, so no folder.
+  function chooseCollection(current: string) {
+    ui.place = {
+      title: 'Import into',
+      action: 'Choose',
+      tree: 'requests',
+      collectionsOnly: true,
+      row: `c:${current}`,
+      done: (row) => setCollection(row.replace(/^c:/, '')),
+    }
   }
 
   function setCollection(id: string) {
@@ -90,16 +122,16 @@
       <h3 id="paste-title">This looks like {offer.kind.label}</h3>
       {#if !preview}
         <p class="muted">
-          {canFill ? 'Fill this request from it, or import it as new requests.' : 'Import it as new requests into this collection.'}
-          {#if offer.kind.fills && !offer.http}A message request cannot take an HTTP request: import it instead.{/if}
+          {isRequestFile ? 'Fill this request from it: it takes the request file’s first version.' : canFill ? 'Fill this request from it, or import it as new requests.' : 'Import it as new requests into this collection.'}
+          {#if offer.kind.fills && !offer.http && !isRequestFile}A message request cannot take an HTTP request: import it instead.{/if}
         </p>
-        <pre class="text">{excerpt}</pre>
+        <div class="text"><Code text={excerpt} lang={excerptLang} /></div>
       {:else}
-        <label class="f"><span>Into collection</span>
-          <select value={preview.collection} onchange={(e) => setCollection(e.currentTarget.value)}>
-            {#each preview.collections as c}<option value={c.id}>{c.label}</option>{/each}
-          </select>
-        </label>
+        <div class="f"><span>Into collection</span>
+          <button type="button" class="choose" onclick={() => chooseCollection(preview!.collection)} title="Choose a collection, or make a new one">
+            {preview.collections.find((c) => c.id === preview!.collection)?.label ?? 'Choose a collection…'}<span class="chev">▾</span>
+          </button>
+        </div>
         {#if preview.previewed}
           <p class="sum">{preview.summary}</p>
           {#if preview.lossy.length}<ul class="muted">{#each preview.lossy as l}<li>{l}</li>{/each}</ul>{/if}
@@ -129,7 +161,7 @@
         <span class="grow"></span>
         <button type="button" onclick={pasteAsText}>Paste as text</button>
         {#if !preview}
-          <button type="button" class:primary={!canFill} onclick={importNew}>Import as new…</button>
+          {#if !isRequestFile}<button type="button" class:primary={!canFill} onclick={importNew}>Import as new…</button>{/if}
           {#if canFill}<button type="button" class="primary" onclick={fill}>Fill this request</button>{/if}
         {:else}
           <button type="button" class="primary" disabled={!preview.canImport} onclick={() => ImportService.Import(existing, preview!.skipped > 0)}>
@@ -148,9 +180,12 @@
   p { margin: 0; line-height: 1.45; }
   .muted { color: var(--muted); font-size: var(--fs-sm); }
   ul.muted { margin: 0; padding-left: 18px; }
-  .text, .files { margin: 0; padding: 8px 10px; max-height: 180px; overflow: auto; background: var(--bg); border: 1px solid var(--line); border-radius: var(--r-md); font: var(--fs-sm) var(--mono); white-space: pre-wrap; word-break: break-all; -webkit-user-select: text; user-select: text; }
+  .text { max-height: 180px; overflow: auto; border-radius: var(--r-md); }
+  .files { margin: 0; padding: 8px 10px; max-height: 180px; overflow: auto; background: var(--bg); border: 1px solid var(--line); border-radius: var(--r-md); font: var(--fs-sm) var(--mono); white-space: pre-wrap; word-break: break-all; -webkit-user-select: text; user-select: text; }
   .sum { font-weight: 600; }
   .f { display: flex; flex-direction: column; gap: 3px; color: var(--muted); font-size: var(--fs-xs); }
+  .choose { display: flex; justify-content: space-between; align-items: center; gap: 8px; text-align: left; width: 100%; box-sizing: border-box; }
+  .chev { color: var(--muted); }
   select { background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); padding: 5px 8px; font: inherit; }
   .item { border-left: 2px solid var(--line); padding: 2px 10px; font-size: var(--fs-sm); }
   .item.skipped { border-color: var(--fail); }

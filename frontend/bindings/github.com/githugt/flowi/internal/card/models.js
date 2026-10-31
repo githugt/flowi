@@ -109,6 +109,21 @@ export class Port {
              */
             this["tone"] = "";
         }
+        if (/** @type {any} */(false)) {
+            /**
+             * Color and Description come from the outcome the port stands for; Color is one of the step colours.
+             * @member
+             * @type {string | undefined}
+             */
+            this["color"] = undefined;
+        }
+        if (/** @type {any} */(false)) {
+            /**
+             * @member
+             * @type {string | undefined}
+             */
+            this["description"] = undefined;
+        }
 
         Object.assign(this, $$source);
     }

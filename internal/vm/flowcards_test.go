@@ -3,6 +3,7 @@
 package vm_test
 
 import (
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -113,5 +114,32 @@ func TestCardFacts_Given_the_hook_control_of_the_step_Then_only_the_hooks_that_r
 				t.Fatalf("hooks %d before, %d after; want %d and %d", got.PreHooks, got.PostHooks, tt.pre, tt.post)
 			}
 		})
+	}
+}
+
+func TestCardFacts_Given_a_version_with_written_outcomes_Then_the_facts_carry_them_in_order(t *testing.T) {
+	c := cardCollection()
+	c.Requests[0].Versions[0].Outcomes = []model.Outcome{{Name: "success"}, {Name: "failure", Disabled: true}, {Name: "ok", When: "status == 200"}}
+	n := model.Node{ID: "n", Type: "request", Request: &model.RequestCall{Request: model.Ref{ID: "R1"}}}
+
+	got := vm.CardFacts(c, n).Outcomes
+	none := vm.CardFacts(cardCollection(), n).Outcomes
+
+	want := []card.OutcomeFact{{Name: "success"}, {Name: "failure", Disabled: true}, {Name: "ok"}}
+	if !reflect.DeepEqual(got, want) || none != nil {
+		t.Fatalf("got %+v (want %+v), without written outcomes %+v", got, want, none)
+	}
+}
+
+func TestCardFacts_Given_a_step_with_its_own_outcomes_Then_they_win_over_the_requests(t *testing.T) {
+	c := cardCollection()
+	c.Requests[0].Versions[0].Outcomes = []model.Outcome{{Name: "success"}, {Name: "ok", When: "status == 200"}}
+	n := model.Node{ID: "n", Type: "request", Request: &model.RequestCall{Request: model.Ref{ID: "R1"}, Outcomes: []model.Outcome{{Name: "failure"}, {Name: "gone", When: "status == 410"}}}}
+
+	got := vm.CardFacts(c, n).Outcomes
+
+	want := []card.OutcomeFact{{Name: "failure"}, {Name: "gone"}}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("got %+v, want %+v", got, want)
 	}
 }

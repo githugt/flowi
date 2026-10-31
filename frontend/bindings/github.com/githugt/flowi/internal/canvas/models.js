@@ -164,11 +164,36 @@ export class Edge {
         }
         if (/** @type {any} */(false)) {
             /**
-             * the on_error goto route of a step, taken when it fails
+             * taken when the step it leaves fails: an after_failure_of arrow, or the on_error goto route
              * @member
              * @type {boolean | undefined}
              */
             this["fail"] = undefined;
+        }
+        if (/** @type {any} */(false)) {
+            /**
+             * …the on_error goto route (a Fail edge that is not an after_failure_of arrow)
+             * @member
+             * @type {boolean | undefined}
+             */
+            this["goto"] = undefined;
+        }
+        if (/** @type {any} */(false)) {
+            /**
+             * FromStep is the step an after_failure_of arrow names: the unit it leaves may hold several steps.
+             * @member
+             * @type {string | undefined}
+             */
+            this["fromStep"] = undefined;
+        }
+        if (/** @type {any} */(false)) {
+            /**
+             * Outcome is the named outcome of the step's request that takes the arrow (after_outcome); "" for the
+             * success and failure arrows.
+             * @member
+             * @type {string | undefined}
+             */
+            this["outcome"] = undefined;
         }
         if (/** @type {any} */(false)) {
             /**

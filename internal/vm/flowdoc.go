@@ -403,7 +403,7 @@ func (d *FlowDoc) moveRun(id string, count int, listPath string, index int, chan
 			return fmt.Errorf("no %d nodes from %s", count, id)
 		}
 		run := slices.Clone((*src)[i : i+count])
-		if i > 0 && len(run[0].Needs) == 1 && run[0].Needs[0] == (*src)[i-1].ID {
+		if i > 0 && len(run[0].Needs) == 1 && run[0].Needs[0] == (*src)[i-1].ID && len(run[0].AfterFailureOf) == 0 && len(run[0].AfterOutcome) == 0 {
 			run[0].Needs = nil // "after the node before" said by hand: it now follows its new neighbour by itself
 		}
 		for k := range run {
@@ -442,6 +442,16 @@ func ForwardNeeds(list []model.Node) []string {
 				out = append(out, list[i].ID+" needs "+id)
 			}
 		}
+		for _, id := range list[i].AfterFailureOf {
+			if later[id] {
+				out = append(out, list[i].ID+" runs after the failure of "+id)
+			}
+		}
+		for _, entry := range list[i].AfterOutcome {
+			if step, _, _ := strings.Cut(entry, ":"); later[step] {
+				out = append(out, list[i].ID+" runs after "+entry)
+			}
+		}
 		for _, child := range list[i].Children() {
 			out = append(out, ForwardNeeds(child)...)
 		}
@@ -478,6 +488,14 @@ func dropForwardNeeds(list []model.Node) {
 			}
 		}
 		list[i].Needs = kept
+		list[i].AfterFailureOf = slices.DeleteFunc(list[i].AfterFailureOf, func(id string) bool { return later[id] })
+		if len(list[i].AfterFailureOf) == 0 {
+			list[i].AfterFailureOf = nil
+		}
+		list[i].AfterOutcome = slices.DeleteFunc(list[i].AfterOutcome, func(entry string) bool { step, _, _ := strings.Cut(entry, ":"); return later[step] })
+		if len(list[i].AfterOutcome) == 0 {
+			list[i].AfterOutcome = nil
+		}
 		for _, child := range list[i].Children() {
 			dropForwardNeeds(child)
 		}
@@ -505,10 +523,110 @@ func shiftAfterRemoval(path, from string, i, count int) string {
 // before id is dropped: a node follows its predecessor without being told to.
 func (d *FlowDoc) SetNeeds(id string, needs []string) {
 	needs = slices.Clone(needs)
-	if len(needs) == 1 && needs[0] == d.Previous(id) {
-		needs = nil
+	if n, ok := d.Node(id); ok && len(needs) == 1 && needs[0] == d.Previous(id) && len(n.AfterFailureOf)+len(n.AfterOutcome) == 0 {
+		needs = nil // with no other arrow, success from the step before is what a step does without being told
 	}
 	d.EditNode(id, func(n *model.Node) { n.Needs = needs })
+}
+
+// SetArrow sets which outcomes of step `from` take the arrow into step `to`: success, failure, any named
+// outcome of its request, or none (the arrow is removed). It rewrites to's needs, after_failure_of and
+// after_outcome from the arrows to has now, so an arrow that was only implied (to follows the step before
+// it) becomes written down when it changes. The arrow from the step before `to` cannot be removed, since to
+// would follow that step again by itself, so it is marked unlinked: it has no arrow into it, and any arrow
+// put in later links it again.
+func (d *FlowDoc) SetArrow(from, to string, outcomes []string) error {
+	n, ok := d.Node(to)
+	if !ok {
+		return fmt.Errorf("no step %s", to)
+	}
+	if !slices.Contains(d.EarlierIDs(to), from) {
+		return fmt.Errorf("%s does not come before %s", from, to)
+	}
+	previous := d.Previous(to)
+	arrows := slices.DeleteFunc(n.Arrows(previous), func(a model.Arrow) bool { return a.From == from })
+	if arrow := arrowOf(from, outcomes); len(outcomes) > 0 {
+		arrows = append(arrows, arrow)
+	}
+	d.setArrows(to, arrows, previous)
+	return nil
+}
+
+// arrowOf is the arrow from step `from` taken on the given outcomes.
+func arrowOf(from string, outcomes []string) model.Arrow {
+	a := model.Arrow{From: from}
+	for _, o := range outcomes {
+		switch o {
+		case model.OutcomeSuccess:
+			a.OnSuccess = true
+		case model.OutcomeFailure:
+			a.OnFailure = true
+		default:
+			if !a.Takes(o) {
+				a.On = append(a.On, o)
+			}
+		}
+	}
+	return a
+}
+
+// ConnectOutcome makes step `to` run when step `from` ends with the outcome (dragging from that outcome's
+// port to a step). A step with no arrows written down only follows the step before it; that implied arrow
+// is dropped, since every arrow into a step has to be taken and `to` could never run when `from` ends this
+// way and the step before it is skipped. Arrows already written stay, and `from` keeps the outcomes it had.
+func (d *FlowDoc) ConnectOutcome(from, to, outcome string) error {
+	n, ok := d.Node(to)
+	if !ok {
+		return fmt.Errorf("no step %s", to)
+	}
+	if !slices.Contains(d.EarlierIDs(to), from) {
+		return fmt.Errorf("%s does not come before %s", from, to)
+	}
+	previous := d.Previous(to)
+	var arrows []model.Arrow
+	// The arrow from the step before is dropped only for an arrow that replaces it (a failure or a named outcome):
+	// one more success arrow is added to it.
+	if len(n.Needs)+len(n.AfterFailureOf)+len(n.AfterOutcome) > 0 || outcome == model.OutcomeSuccess {
+		arrows = n.Arrows(previous)
+	}
+	i := slices.IndexFunc(arrows, func(a model.Arrow) bool { return a.From == from })
+	if i < 0 {
+		arrows = append(arrows, arrowOf(from, []string{outcome}))
+	} else {
+		merged := arrowOf(from, []string{outcome})
+		arrows[i].OnSuccess = arrows[i].OnSuccess || merged.OnSuccess
+		arrows[i].OnFailure = arrows[i].OnFailure || merged.OnFailure
+		for _, name := range merged.On {
+			if !arrows[i].Takes(name) {
+				arrows[i].On = append(arrows[i].On, name)
+			}
+		}
+	}
+	d.setArrows(to, arrows, previous)
+	return nil
+}
+
+// setArrows writes arrows as to's needs, after_failure_of and after_outcome.
+func (d *FlowDoc) setArrows(to string, arrows []model.Arrow, previous string) {
+	var needs, failures, named []string
+	for _, a := range arrows {
+		if a.OnSuccess {
+			needs = append(needs, a.From)
+		}
+		if a.OnFailure {
+			failures = append(failures, a.From)
+		}
+		for _, name := range a.On {
+			named = append(named, a.From+":"+name)
+		}
+	}
+	if len(failures) == 0 && len(named) == 0 && len(needs) == 1 && needs[0] == previous {
+		needs = nil // success from the step before is what a step does without being told
+	}
+	unlinked := len(arrows) == 0 && previous != ""
+	d.EditNode(to, func(n *model.Node) {
+		n.Needs, n.AfterFailureOf, n.AfterOutcome, n.Unlinked = needs, failures, named, unlinked
+	})
 }
 
 // NodesAt is the nodes of the list at listPath ("$.nodes", or inside a lane); nil
@@ -559,10 +677,18 @@ func (d *FlowDoc) siblings(id string) ([]model.Node, int) {
 // before id, or a node id already waits for, changes nothing and reports false.
 func (d *FlowDoc) AddNeed(id, need string) bool {
 	n, ok := d.Node(id)
-	if !ok || need == id || slices.Contains(n.Needs, need) || (len(n.Needs) == 0 && need == d.Previous(id)) {
+	if ok && n.Unlinked && need != id && slices.Contains(d.EarlierIDs(id), need) {
+		// No arrow into it: the step before it is not a redundant wait, it is the arrow that was taken away.
+		return d.ConnectOutcome(need, id, model.OutcomeSuccess) == nil
+	}
+	if !ok || need == id || slices.Contains(n.Needs, need) || (len(n.Needs)+len(n.AfterFailureOf)+len(n.AfterOutcome) == 0 && need == d.Previous(id)) {
 		return false
 	}
-	d.SetNeeds(id, append(slices.Clone(n.Needs), need))
+	base := slices.Clone(n.Needs)
+	if len(n.Needs)+len(n.AfterFailureOf)+len(n.AfterOutcome) == 0 && !n.Unlinked && d.Previous(id) != "" {
+		base = []string{d.Previous(id)} // the arrow from the step before it was implied: written down, so it is kept
+	}
+	d.SetNeeds(id, append(base, need))
 	return true
 }
 
@@ -659,9 +785,16 @@ func (d *FlowDoc) moveLayoutKey(from, to string) {
 
 func renameNeeds(list []model.Node, from, to string) {
 	for i := range list {
-		for j, n := range list[i].Needs {
-			if n == from {
-				list[i].Needs[j] = to
+		for _, ids := range [][]string{list[i].Needs, list[i].AfterFailureOf} {
+			for j, n := range ids {
+				if n == from {
+					ids[j] = to
+				}
+			}
+		}
+		for j, entry := range list[i].AfterOutcome {
+			if step, name, ok := strings.Cut(entry, ":"); ok && step == from {
+				list[i].AfterOutcome[j] = to + ":" + name
 			}
 		}
 		for _, child := range listsOf(&list[i]) {
@@ -779,6 +912,25 @@ func (d *FlowDoc) Node(id string) (model.Node, bool) {
 // SetPosition places a unit by hand (free drag; not on the undo stack).
 func (d *FlowDoc) SetPosition(unit string, p model.Point) {
 	d.positions[unit] = p
+	d.layoutDue = true
+	d.layoutRev++
+	d.relayout()
+	d.changed()
+}
+
+// MakeRoom moves the units placed by hand at x or further right by dx, to make room for a step put in
+// front of them. Units the layout places itself already move.
+func (d *FlowDoc) MakeRoom(x, dx int64) {
+	moved := false
+	for id, p := range d.positions {
+		if p.X >= x {
+			d.positions[id] = model.Point{X: p.X + dx, Y: p.Y}
+			moved = true
+		}
+	}
+	if !moved {
+		return
+	}
 	d.layoutDue = true
 	d.layoutRev++
 	d.relayout()

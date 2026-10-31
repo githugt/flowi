@@ -408,6 +408,88 @@ func valueRowsOf(n model.Node) []ValueRow {
 	return rows
 }
 
+// RouteFailure makes step go on at target when it fails (dragging from its Fail port to a step); an
+// empty target puts the default back: the failure stops the flow. It names the step because the arrow
+// being dragged or deleted is not necessarily the selected one.
+func (s *FlowService) RouteFailure(node, step, target string) {
+	_ = s.edit(node, func(o *openFlow) error {
+		mode := vm.FailStop
+		if target != "" {
+			mode = vm.FailGoto
+		}
+		o.doc.EditNodeMerged(step+"/on_error", step, func(n *model.Node) { n.OnError = vm.FailRoute(mode, target) })
+		return nil
+	})
+}
+
+// SetArrow sets which outcomes of step `from` take the arrow into step `to`: "success", "failure", any named
+// outcome of its request, or none (removed). Like Connect it names the steps, not the selection.
+func (s *FlowService) SetArrow(node, from, to string, outcomes []string) error {
+	return s.edit(node, func(o *openFlow) error { return o.doc.SetArrow(from, to, outcomes) })
+}
+
+// ConnectOutcome makes step `to` run when step `from` ends with the outcome (dragging from that outcome's
+// port: "success", "failure" or a name).
+func (s *FlowService) ConnectOutcome(node, from, outcome, to string) error {
+	return s.edit(node, func(o *openFlow) error { return o.doc.ConnectOutcome(from, to, outcome) })
+}
+
+// AddStepOnOutcome adds a step of type typ that runs when step `from` ends with the outcome ("success",
+// "failure" or a name), selects it and returns its id. It goes right after `from`; the step that followed
+// `from` by itself keeps waiting for `from`, not for the new step, so the main line is not changed.
+func (s *FlowService) AddStepOnOutcome(node, typ, from, outcome string) (string, error) {
+	var id string
+	err := s.edit(node, func(o *openFlow) error {
+		d := o.doc
+		list, index, ok := d.Locate(from)
+		if !ok {
+			return fmt.Errorf("no step %s", from)
+		}
+		// It goes after the steps that already hang from `from`, so each new one is stacked under the last.
+		at, stacked := index+1, false
+		for after := d.NodesAt(list); at < len(after) && outcome != model.OutcomeSuccess && hangsFrom(after[at], from); at++ {
+			stacked = true
+		}
+		var next string
+		if after := d.NodesAt(list); at < len(after) && outcome != model.OutcomeSuccess {
+			if n := after[at]; len(n.Needs)+len(n.AfterFailureOf)+len(n.AfterOutcome) == 0 {
+				next = n.ID // it follows `from` only by being next: it would follow the new step instead
+			}
+		}
+		id = d.Insert(model.NodeType(typ), list, at, initialStep(model.NodeType(typ), d.NodesAt(list), at))
+		o.selected = id
+		if outcome != model.OutcomeSuccess {
+			if next != "" {
+				d.SetNeeds(next, []string{from})
+			}
+			if err := d.ConnectOutcome(from, id, outcome); err != nil {
+				return err
+			}
+			if u, found := d.Diagram().UnitOf(id); found && !stacked {
+				d.MakeRoom(u.X, u.W+canvasGap) // the steps placed by hand further right move over for it
+			}
+		}
+		s.app.emit("flow", s.view(node, o))
+		return nil
+	})
+	return id, err
+}
+
+// canvasGap is the room between two cards, which a step made room for takes as well.
+const canvasGap = 60
+
+// hangsFrom says whether n only runs on an outcome of step `from`: arrows after a failure or a named outcome of
+// it, and none on success.
+func hangsFrom(n model.Node, from string) bool {
+	if len(n.Needs) > 0 {
+		return false
+	}
+	if slices.Contains(n.AfterFailureOf, from) {
+		return true
+	}
+	return slices.ContainsFunc(n.AfterOutcome, func(e string) bool { id, _, _ := strings.Cut(e, ":"); return id == from })
+}
+
 // SetFailRoute sets what the selected step does when it fails.
 func (s *FlowService) SetFailRoute(node, mode, target string) {
 	_ = s.edit(node, func(o *openFlow) error {
@@ -577,9 +659,24 @@ func dropSlot(d *vm.FlowDoc, unit, step string, lift bool, p model.Point, snap f
 		return slot
 	}
 	if unit != "" && !lift {
+		if hangsFromAnOutcome(d, g, unit) {
+			return canvas.Slot{} // its place is below its source, not in the list: a drop leaves it where it is put
+		}
 		return canvas.UnitTarget(g, p, unit, firstNodeOf(g, unit, step), snap, d.Locate)
 	}
 	return canvas.CardTarget(g, p, step, snap, d.Locate)
+}
+
+// hangsFromAnOutcome says whether the unit's first step only runs on an outcome of another step (arrows after a
+// failure or a named outcome, none on success). The layout draws it below its source, so where it is dropped says
+// nothing about where it goes in the list.
+func hangsFromAnOutcome(d *vm.FlowDoc, g canvas.Diagram, unit string) bool {
+	u, ok := g.Unit(unit)
+	if !ok || len(u.Nodes) == 0 {
+		return false
+	}
+	n, found := d.Node(u.Nodes[0])
+	return found && len(n.Needs) == 0 && len(n.AfterFailureOf)+len(n.AfterOutcome) > 0
 }
 
 // firstNodeOf is the node a whole dragged unit is placed by: its first one (a

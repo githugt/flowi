@@ -198,6 +198,10 @@ func EndNear(d Diagram, p Point, exclude string) (list string, index int, ok boo
 // drop still counts as "between them".
 const gapMargin = 8
 
+// sideReach is how far to the side of an arrow (across the flow, canvas points) a drop still counts as being in its
+// gap: about the height of a card.
+const sideReach = 140
+
 // InsertNear is where something dropped at p goes in the node lists, judged
 // by position and not only by closeness to a connector line: on a node,
 // before it in its first half and after it in its second half (along the
@@ -235,6 +239,19 @@ func InsertNear(d Diagram, p Point, exclude string) (list string, index int, ok 
 		}
 		if along(p) < lo-gapMargin || along(p) > hi+gapMargin {
 			continue
+		}
+		side := func(pt Point) int64 {
+			if horizontal {
+				return pt.Y
+			}
+			return pt.X
+		}
+		sideLo, sideHi := side(path[0]), side(path[0])
+		for _, pt := range path {
+			sideLo, sideHi = min(sideLo, side(pt)), max(sideHi, side(pt))
+		}
+		if side(p) < sideLo-sideReach || side(p) > sideHi+sideReach {
+			continue // too far to the side: a card carried past the arrow is not dropped into it
 		}
 		// The middle of the gap decides: how far to the side the pointer is
 		// says nothing about which two nodes it is between.

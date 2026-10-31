@@ -106,7 +106,10 @@ func portEdges(d *Diagram) {
 			continue
 		}
 		d.Edges[i].FromPort = portDone
-		if e.Fail {
+		switch {
+		case e.Outcome != "":
+			d.Edges[i].FromPort = "outcome-" + e.Outcome
+		case e.Fail:
 			d.Edges[i].FromPort = portFail
 		}
 	}

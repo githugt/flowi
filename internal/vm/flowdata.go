@@ -282,6 +282,11 @@ func statusLine(rec engine.Record) string {
 		return fmt.Sprintf("%s · %s", rec.GRPCCode, total)
 	case rec.HasMessages():
 		return fmt.Sprintf("%s · %d messages", rec.Outcome, len(rec.Messages))
+	case rec.Kind == engine.KindDataset && rec.Outcome != engine.OutcomeOK:
+		return fmt.Sprintf("%s · %s", rec.Outcome, total) // no rows came back, so none are counted
+	case rec.Kind == engine.KindDataset:
+		rows, _ := rec.Rows()
+		return fmt.Sprintf("%s · %d rows · %s", rec.Outcome, rows, total)
 	}
 	return fmt.Sprintf("%d · %s", rec.Status, total)
 }

@@ -22,6 +22,8 @@ const yamlKey = (key: string) => new RegExp(`^${key}\\s*:`, 'm')
 const rules: Rule[] = [
   { id: 'curl', label: 'a curl command', fills: true, matches: (t) => /^(\$\s*)?curl\s/i.test(t) },
   { id: 'http', label: 'a .http request', fills: true, matches: (t) => /\n/.test(t) && METHOD_LINE.test(t.split('\n').find((l) => l.trim() && !l.startsWith('#')) ?? '') },
+  // A Flowi request file (the YAML of a *.req.yaml): a versions: list whose version has a method, a message or a gRPC block.
+  { id: 'flowi', label: 'a Flowi request file', fills: true, matches: (t, j) => !j && yamlKey('versions').test(t) && /^\s+(method|async|grpc):/m.test(t) },
   { id: 'openapi', label: 'an OpenAPI document', fills: false, matches: (t, j) => (j ? 'openapi' in j || 'swagger' in j : yamlKey('(openapi|swagger)').test(t)) },
   { id: 'asyncapi', label: 'an AsyncAPI document', fills: false, matches: (t, j) => (j ? 'asyncapi' in j : yamlKey('asyncapi').test(t)) },
   { id: 'har', label: 'a HAR file', fills: false, matches: (_, j) => Array.isArray(j?.log?.entries) },

@@ -63,13 +63,14 @@ func dependencyIndexes(list []model.Node) [][]int {
 	}
 	out := make([][]int, len(list))
 	for i, n := range list {
-		for _, need := range n.Needs {
-			if j, ok := index[need]; ok {
+		previous := ""
+		if i > 0 {
+			previous = list[i-1].ID
+		}
+		for _, a := range n.Arrows(previous) {
+			if j, ok := index[a.From]; ok {
 				out[i] = append(out[i], j)
 			}
-		}
-		if len(n.Needs) == 0 && i > 0 {
-			out[i] = []int{i - 1}
 		}
 	}
 	return out

@@ -60,6 +60,11 @@ type Call struct {
 	With    []Pair `json:"with"`
 	Headers []Pair `json:"headers,omitempty"`
 	Hooks   string `json:"hooks,omitempty"`
+	// Outcomes are the step's outcomes: its own when OutcomesOwn, else its request's (success and failure when
+	// the request writes none). RuleKind says which help the rules get: http, message or dataset.
+	Outcomes    []model.Outcome `json:"outcomes"`
+	OutcomesOwn bool            `json:"outcomesOwn"`
+	RuleKind    string          `json:"ruleKind,omitempty"`
 }
 
 // Lane is a case of a condition or a branch of a parallel.
@@ -250,9 +255,11 @@ func variableRows(n model.Node, spec flowi.NodeSpec) []Pair {
 func (s *FlowService) callOf(d *vm.FlowDoc, n model.Node) *Call {
 	switch {
 	case n.Request != nil:
+		outcomes, own, kind := s.outcomesOf(d.Collection(), n)
 		return &Call{
 			Kind: "request", Ref: string(n.Request.Request.ID), Choices: s.requestChoices(d.Collection()),
 			Version: n.Request.Version, Overlay: n.Request.Overlay, Overlays: overlayNames(d.Collection()), Open: n.Request.Open, Over: n.Request.Over, Close: n.Request.Close, With: pairsOf(n.Request.With), Headers: pairsOf(n.Request.Headers), Hooks: hookMode(n.Request.Hooks),
+			Outcomes: outcomes, OutcomesOwn: own, RuleKind: kind,
 		}
 	case n.Subflow != nil:
 		return &Call{Kind: "subflow", Ref: string(n.Subflow.Flow.ID), Choices: flowChoices(d.Collection()), With: pairsOf(n.Subflow.With)}

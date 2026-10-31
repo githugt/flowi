@@ -43,6 +43,20 @@ export function edgeCards(
   return { start, end, first, last }
 }
 
+/**
+ * The Start card where the person left it: Start sits beside the first step until it is shown, and after that it
+ * stays put while that step is dragged about. It was derived from the first step alone, so moving the first step
+ * carried Start along. It gives way (the placing beside the step is used) when the step comes within MIN_GAP of
+ * it or to its left, since the arrow to the first step would then run backwards.
+ */
+export function keepStart(kept: { x: number; y: number } | null, beside: Placed, first: Box | undefined): Placed {
+  if (!kept || !first || kept.x + beside.w + MIN_GAP > first.x) return beside
+  return { ...beside, x: kept.x, y: kept.y }
+}
+
+/** The least room left between Start and the first step for the arrow joining them. */
+export const MIN_GAP = 40
+
 /** The row a dragged row lands on after moving `dy` screen pixels at zoom `k`, kept inside the list. */
 export function dropIndex(from: number, dy: number, k: number, count: number): number {
   const rows = Math.round(dy / (CARD.row * k))

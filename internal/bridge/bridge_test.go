@@ -395,6 +395,33 @@ func TestRequestService_Send_should_publish_the_response(t *testing.T) {
 	}
 }
 
+func TestRequestService_Send_Given_an_XML_response_Then_the_body_goes_to_the_window_for_its_tree(t *testing.T) {
+	tests := []struct {
+		name, contentType, text string
+		want                    bool
+	}{
+		{name: "application/xml", contentType: "application/xml; charset=utf-8", text: `<D:multistatus xmlns:D="DAV:"/>`, want: true},
+		{name: "text/xml", contentType: "text/xml", text: `<a/>`, want: true},
+		{name: "a +xml media type", contentType: "application/atom+xml", text: `<feed/>`, want: true},
+		{name: "html is not shown as a tree", contentType: "text/html", text: `<html/>`},
+		{name: "plain text", contentType: "text/plain", text: `<a/>`},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			reqs, v, pub, b := openLogin(t)
+			b.NextSend = &vmtest.Sending{Result: engine.SendResult{Status: engine.StatusPassed,
+				Record: &engine.Record{Status: 207, Body: engine.Body{Text: tt.text, ContentType: tt.contentType, Size: int64(len(tt.text))}}}}
+
+			reqs.Send(v.Node, "")
+			got := pub.last["request"].(bridge.RequestView)
+
+			if has := got.Response.BodyXML != ""; has != tt.want {
+				t.Fatalf("bodyXml %q, want present %v", got.Response.BodyXML, tt.want)
+			}
+		})
+	}
+}
+
 func TestRequestService_setters_should_edit_the_selected_version(t *testing.T) {
 	reqs, v, pub, _ := openLogin(t)
 
@@ -959,6 +986,23 @@ func TestWorkspaceService_NewIn_and_NewScratchRequest_should_create_and_ask_to_o
 	}
 }
 
+func TestWorkspaceService_NewIn_Given_no_collection_Then_a_message_or_gRPC_draft_opens_in_Scratch(t *testing.T) {
+	for _, tc := range []struct{ kind, protocol string }{
+		{"async", "mqtt"},
+		{"grpc", ""},
+	} {
+		app, pub := fixture(t)
+		app.Start(t.Context())
+
+		app.Workspace().NewIn(tc.kind, "", "", tc.protocol)
+		opened, _ := pub.last["open"].(string)
+
+		if opened == "" {
+			t.Fatalf("%s: nothing opened", tc.kind)
+		}
+	}
+}
+
 func TestRequestService_SaveTo_should_move_the_request_and_ask_to_open_it(t *testing.T) {
 	reqs, v, pub, _ := openLogin(t)
 	_ = v
@@ -967,6 +1011,67 @@ func TestRequestService_SaveTo_should_move_the_request_and_ask_to_open_it(t *tes
 
 	if opened, _ := pub.last["open"].(string); opened == "" || pub.last["close"] != v.Node {
 		t.Fatalf("open %v, close %v", pub.last["open"], pub.last["close"])
+	}
+}
+
+func TestRequestService_SetMethod_Given_a_WebDAV_method_Then_its_headers_and_example_body_are_filled_in(t *testing.T) {
+	reqs, v, pub, _ := openLogin(t)
+
+	if err := reqs.SetMethod(v.Node, "propfind"); err != nil {
+		t.Fatal(err)
+	}
+
+	got := pub.last["request"].(bridge.RequestView)
+	depth := ""
+	for _, h := range got.Current.Headers {
+		if h.Key == "Depth" {
+			depth = h.Value
+		}
+	}
+	if got.Current.Method != "PROPFIND" || depth != "1" || !strings.Contains(got.Current.Body.Text, "<D:propfind") || got.BodyFormat != "xml" {
+		t.Fatalf("method %q headers %+v format %q", got.Current.Method, got.Current.Headers, got.BodyFormat)
+	}
+}
+
+func TestRequestService_SaveAsNew_should_copy_to_the_chosen_place_and_open_it_leaving_the_original(t *testing.T) {
+	reqs, v, pub, b := openLogin(t)
+
+	reqs.SaveAsNew(v.Node, "c:C1/requests/auth", "login-two")
+
+	opened, _ := pub.last["open"].(string)
+	if opened == "" || opened == v.Node || !b.Called("DuplicateRequestTo C1 auth/login-two") || pub.last["close"] != nil {
+		t.Fatalf("open %q close %v calls %v", opened, pub.last["close"], b.Calls)
+	}
+}
+
+func TestRequestService_SaveAsNew_Given_a_row_that_is_not_a_place_Then_a_notice_and_no_copy(t *testing.T) {
+	reqs, v, pub, b := openLogin(t)
+
+	reqs.SaveAsNew(v.Node, v.Node, "x")
+
+	notice, _ := pub.last["notice"].(bridge.Notice)
+	if notice.Level != "error" || b.Called("DuplicateRequestTo C1 x") {
+		t.Fatalf("notice %+v calls %v", notice, b.Calls)
+	}
+}
+
+func TestRequestService_PlaceOf_should_name_the_folder_the_request_is_in(t *testing.T) {
+	reqs, v, _, _ := openLogin(t)
+
+	got := reqs.PlaceOf(v.Node)
+
+	if got != "c:C1/requests/auth" {
+		t.Fatalf("got %q", got)
+	}
+}
+
+func TestRequestService_SuggestCopyName_should_add_copy_to_the_name(t *testing.T) {
+	reqs, v, _, _ := openLogin(t)
+
+	got := reqs.SuggestCopyName(v.Node)
+
+	if got != "login-copy" {
+		t.Fatalf("got %q", got)
 	}
 }
 
@@ -1066,11 +1171,63 @@ func TestFlowService_AddNeed_and_RemoveNeed_should_edit_what_the_selected_step_w
 	flows.RemoveNeed(v.Node, "a")
 	without := lastView(pub).Form.Step
 
-	if len(with.Needs) != 1 || with.Needs[0] != "a" || len(without.Needs) != 0 {
+	// c follows b by default: adding a wait for a keeps that (it used to replace it, and the arrow from b vanished).
+	if len(with.Needs) != 2 || with.Needs[0] != "b" || with.Needs[1] != "a" || len(without.Needs) != 0 {
 		t.Fatalf("needs with %v, without %v", with.Needs, without.Needs)
 	}
 	if len(with.NeedChoices) < 2 {
 		t.Fatalf("choices %v", with.NeedChoices)
+	}
+}
+
+// Dragging from a step's Fail port to another step, and deleting that arrow, change the step they leave
+// from, whichever step is selected: the arrow is picked by its ends, not by the selection.
+func TestFlowService_RouteFailure_Given_a_target_When_set_and_cleared_Then_the_named_step_changes(t *testing.T) {
+	flows, v, pub := openSignup(t) // a, b
+	flows.Select(v.Node, "b")      // not the step the route leaves from
+
+	flows.RouteFailure(v.Node, "a", "b")
+	flows.Select(v.Node, "a")
+	routed := lastView(pub).Form.Step
+	flows.RouteFailure(v.Node, "a", "")
+	cleared := lastView(pub).Form.Step
+
+	if routed.FailMode != "goto" || routed.FailTarget != "b" {
+		t.Fatalf("routed: mode %q target %q", routed.FailMode, routed.FailTarget)
+	}
+	if cleared.FailMode != "fail" || cleared.FailTarget != "" {
+		t.Fatalf("cleared: mode %q target %q", cleared.FailMode, cleared.FailTarget)
+	}
+}
+
+func TestFlowService_SetArrow_and_ConnectOutcome_should_change_when_a_step_runs(t *testing.T) {
+	flows, v, pub := openSignup(t) // a, b: b follows a
+	flows.Select(v.Node, "a")      // not the step the arrow goes into
+
+	failureOnly := flows.SetArrow(v.Node, "a", "b", []string{"failure"})
+	edges := lastView(pub).Diagram.Edges
+	refused := flows.SetArrow(v.Node, "a", "b", []string{})
+	both := flows.SetArrow(v.Node, "a", "b", []string{"success", "failure"})
+	bothEdges := lastView(pub).Diagram.Edges
+	_ = flows.SetArrow(v.Node, "a", "b", []string{"success"})
+	reconnected := flows.ConnectOutcome(v.Node, "a", "failure", "b")
+	flows.Select(v.Node, "b")
+	got := lastView(pub).Form.Step
+
+	if failureOnly != nil || both != nil || reconnected != nil {
+		t.Fatalf("errors %v %v %v", failureOnly, both, reconnected)
+	}
+	if refused != nil {
+		t.Errorf("taking the arrow away is allowed now: the step is unlinked, got %v", refused)
+	}
+	if len(edges) != 1 || !edges[0].Fail || edges[0].Goto {
+		t.Errorf("failure only: edges %+v", edges)
+	}
+	if len(bothEdges) != 2 {
+		t.Errorf("both: edges %+v", bothEdges)
+	}
+	if len(got.Needs) != 0 { // ConnectFailure replaced the implied arrow
+		t.Errorf("needs %v", got.Needs)
 	}
 }
 
@@ -1719,6 +1876,21 @@ func TestWireChoices_Given_a_set_target_Then_each_of_its_values_is_a_place_to_pu
 	}
 }
 
+// A set step with no value rows offered its `target` (a variable name) as a place to put a value. The
+// template went there, made no link, and the canvas drew no arrow, with nothing said.
+func TestWireChoices_Given_a_set_without_values_Then_its_variable_name_is_not_offered_as_a_place(t *testing.T) {
+	flows, v, _ := openSignup(t)
+	id := flows.AddStep(v.Node, "set", 0, 0, 0, false)
+
+	got := flows.WireChoices(v.Node, "a", id)
+
+	for _, f := range got.Fields {
+		if f.ID == "param.target" {
+			t.Fatalf("offered %+v", f)
+		}
+	}
+}
+
 func TestFlowService_NodeData_Given_a_message_request_Then_messages_are_listed_with_direction_and_the_size_is_known(t *testing.T) {
 	rec := engine.Record{Kind: engine.KindAsync, Outcome: "received", Messages: []engine.RecordMessage{
 		{Direction: "sent", Body: engine.Body{Text: "ping", ContentType: "text/plain", Size: 4}},
@@ -1752,5 +1924,267 @@ func TestFlowService_NodeData_Given_an_http_request_Then_the_kind_is_request_and
 
 	if got.Kind != "request" || got.Size != "2.0 KB" || len(got.Messages) != 0 {
 		t.Fatalf("data %+v", got)
+	}
+}
+
+func TestRequestService_SetOutcomes_should_keep_the_list_as_written_and_an_empty_one_means_the_defaults(t *testing.T) {
+	reqs, v, pub, _ := openLogin(t)
+	rows := []model.Outcome{{Name: "success"}, {Name: "failure", Disabled: true}, {Name: "not-found", When: "response.status == 404"}}
+
+	reqs.SetOutcomes(v.Node, rows)
+	written := pub.last["request"].(bridge.RequestView).Current.Outcomes
+	reqs.SetOutcomes(v.Node, []model.Outcome{})
+	reset := pub.last["request"].(bridge.RequestView).Current.Outcomes
+
+	if len(written) != 3 || !written[1].Disabled || written[2].Name != "not-found" {
+		t.Errorf("written %+v", written)
+	}
+	if len(reset) != 0 {
+		t.Errorf("an empty list is the defaults, got %#v", reset)
+	}
+}
+
+func TestFlowService_AddStepOnOutcome_should_add_a_step_that_runs_on_that_outcome_and_leave_the_main_line_alone(t *testing.T) {
+	flows, v, pub := openSignup(t) // a, b: b follows a
+
+	id, err := flows.AddStepOnOutcome(v.Node, "log", "a", "failure")
+	flows.Select(v.Node, id)
+	added := lastView(pub).Form.Step
+	flows.Select(v.Node, "b")
+	next := lastView(pub).Form.Step
+
+	if err != nil || id == "" {
+		t.Fatalf("id %q err %v", id, err)
+	}
+	if len(added.Needs) != 0 || added.Previous != "a" {
+		t.Errorf("the new step: needs %v, previous %q", added.Needs, added.Previous)
+	}
+	var failing bool
+	for _, e := range lastView(pub).Diagram.Edges {
+		failing = failing || (e.Fail && e.To == id && e.FromStep == "a")
+	}
+	if !failing {
+		t.Errorf("no failure edge a → %s in %+v", id, lastView(pub).Diagram.Edges)
+	}
+	if len(next.Needs) != 1 || next.Needs[0] != "a" { // b still waits for a, not for the new step
+		t.Errorf("b needs %v, want [a]", next.Needs)
+	}
+}
+
+func TestFlowService_AddStepOnOutcome_Given_success_Then_it_is_a_step_after_this_one(t *testing.T) {
+	flows, v, pub := openSignup(t)
+
+	id, err := flows.AddStepOnOutcome(v.Node, "log", "a", "success")
+	flows.Select(v.Node, id)
+	got := lastView(pub).Form.Step
+
+	if err != nil || got.Previous != "a" || len(got.Needs) != 0 {
+		t.Fatalf("id %q err %v step %+v", id, err, got)
+	}
+}
+
+func TestFlowService_Call_Given_a_request_step_Then_it_shows_the_outcomes_it_would_have_and_whether_they_are_its_own(t *testing.T) {
+	flows, v, pub := openTwoUnits(t)
+
+	flows.Select(v.Node, "login")
+	call := lastView(pub).Form.Step.Call
+
+	if call.OutcomesOwn || call.RuleKind != "http" || len(call.Outcomes) != 2 || call.Outcomes[0].Name != "success" || call.Outcomes[1].Name != "failure" {
+		t.Fatalf("call %+v", call)
+	}
+}
+
+func TestFlowService_SetStepOutcomes_should_give_one_step_its_own_list_and_an_empty_one_goes_back_to_the_requests(t *testing.T) {
+	flows, v, pub := openTwoUnits(t)
+	rows := []model.Outcome{{Name: "success"}, {Name: "gone", When: "response.status == 410", Color: "amber"}, {Name: "failure"}}
+
+	if err := flows.SetStepOutcomes(v.Node, "login", rows); err != nil {
+		t.Fatal(err)
+	}
+	flows.Select(v.Node, "login")
+	own := lastView(pub).Form.Step.Call
+	card := lastView(pub).Cards["login"].Face.Ports
+	if err := flows.SetStepOutcomes(v.Node, "login", []model.Outcome{}); err != nil {
+		t.Fatal(err)
+	}
+	back := lastView(pub).Form.Step.Call
+
+	if !own.OutcomesOwn || len(own.Outcomes) != 3 || own.Outcomes[1].Color != "amber" {
+		t.Errorf("own %+v", own)
+	}
+	var ports []string
+	for _, p := range card {
+		ports = append(ports, p.ID)
+	}
+	if strings.Join(ports, ",") != "done,outcome-gone,fail" {
+		t.Errorf("the card has ports %v", ports)
+	}
+	if back.OutcomesOwn || len(back.Outcomes) != 2 {
+		t.Errorf("back %+v", back)
+	}
+}
+
+func TestFlowService_SaveStepOutcomesToRequest_should_write_the_steps_list_into_the_request_and_drop_the_steps_own(t *testing.T) {
+	c := vmtest.SampleCollection()
+	c.Flows = []model.Flow{{Meta: model.Meta{ID: "F1", Name: "Pair"}, Path: "pair", File: "/c/flows/pair.arazzo.yaml", Nodes: []model.Node{
+		{ID: "login", Type: "request", Request: &model.RequestCall{Request: model.Ref{ID: "R1", Path: "auth/login"}}},
+	}}}
+	b := &vmtest.Backend{Cols: []model.Collection{c}}
+	pub := &published{}
+	app := bridge.NewApp(b, bridge.NewInlineActor(), pub.emit)
+	app.Start(t.Context())
+	flow, _ := findNode(app.Workspace().Tree().Roots, "flow")
+	v, err := app.Flows().Open(flow.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	flows := app.Flows()
+	_ = flows.SetStepOutcomes(v.Node, "login", []model.Outcome{{Name: "success"}, {Name: "gone", When: "response.status == 410"}})
+
+	err = flows.SaveStepOutcomesToRequest(v.Node, "login")
+
+	flows.Select(v.Node, "login")
+	call := lastView(pub).Form.Step.Call
+	var saved []model.Outcome
+	for _, r := range b.Cols[0].Requests {
+		if r.ID == "R1" {
+			saved = r.Versions[0].Outcomes
+		}
+	}
+	if err != nil || len(saved) != 2 || saved[1].Name != "gone" {
+		t.Fatalf("err %v, request outcomes %+v", err, saved)
+	}
+	if call.OutcomesOwn || len(call.Outcomes) != 2 || call.Outcomes[1].Name != "gone" {
+		t.Errorf("the step now uses the request's: %+v", call)
+	}
+}
+
+func TestFlowService_AddStepOnOutcome_Given_a_second_one_for_the_same_step_Then_it_goes_after_the_first_and_hangs_under_it(t *testing.T) {
+	flows, v, pub := openSignup(t) // a, b
+
+	first, err1 := flows.AddStepOnOutcome(v.Node, "log", "a", "failure")
+	second, err2 := flows.AddStepOnOutcome(v.Node, "log", "a", "failure")
+	g := lastView(pub).Diagram
+	order := []string{}
+	for _, u := range g.Units {
+		order = append(order, u.ID)
+	}
+	uf, _ := g.Unit(first)
+	us, _ := g.Unit(second)
+
+	if err1 != nil || err2 != nil {
+		t.Fatalf("errors %v %v", err1, err2)
+	}
+	if strings.Index(strings.Join(order, ","), first) > strings.Index(strings.Join(order, ","), second) && len(order) > 3 {
+		t.Errorf("the first is before the second in the list: %v", order)
+	}
+	if us.X != uf.X || us.Y < uf.Y+uf.H {
+		t.Errorf("the second hangs under the first: first %+v, second %+v", uf, us)
+	}
+}
+
+func TestFlowService_AddStepOnOutcome_should_make_room_by_moving_the_steps_placed_by_hand_to_its_right(t *testing.T) {
+	flows, v, pub := openTwoUnits(t) // login, wait, verify
+	verify, _ := v.Diagram.Unit("verify")
+	flows.Drop(v.Node, "verify", "verify", false, 0, 0, 0, verify.X+100, verify.Y) // verify placed by hand, 100 to the right
+	placed, _ := lastView(pub).Diagram.Unit("verify")
+
+	id, err := flows.AddStepOnOutcome(v.Node, "log", "login", "failure")
+	after := lastView(pub).Diagram
+	added, _ := after.Unit(id)
+	moved, _ := after.Unit("verify")
+
+	if err != nil {
+		t.Fatal(err)
+	}
+	if moved.X <= placed.X || moved.X < added.X+added.W {
+		t.Errorf("verify was at %d and is at %d; the new step is at %d..%d", placed.X, moved.X, added.X, added.X+added.W)
+	}
+}
+
+func TestFlowService_Connect_Given_a_step_whose_arrow_was_removed_Then_the_arrow_is_back_and_nothing_is_refused(t *testing.T) {
+	flows, v, pub := openTwoUnits(t) // login, wait, verify
+	_ = flows.SetArrow(v.Node, "wait", "verify", []string{})
+
+	flows.Connect(v.Node, "wait", "verify")
+
+	var edge bool
+	for _, e := range lastView(pub).Diagram.Edges {
+		edge = edge || (e.To == "verify" && !e.Fail && e.Outcome == "")
+	}
+	if n, refused := pub.last["notice"].(bridge.Notice); refused && strings.Contains(n.Text, "needs no link") {
+		t.Errorf("refused: %q", n.Text)
+	}
+	if !edge {
+		t.Errorf("no arrow into verify in %+v", lastView(pub).Diagram.Edges)
+	}
+}
+
+// A step that only runs on an outcome sits where the layout puts it, below its source, not where its place in the
+// list would put it. Dropping one far to the right counted as "move to the end of the list", and the layout then put
+// it back under its source: the card jumped into the gap between two arrows instead of staying where it was dropped.
+func TestFlowService_Drop_Given_a_step_that_only_runs_on_an_outcome_Then_it_stays_where_it_is_dropped_and_the_order_is_kept(t *testing.T) {
+	flows, v, pub := openTwoUnits(t) // login, wait, verify
+	if err := flows.ConnectOutcome(v.Node, "login", "failure", "wait"); err != nil {
+		t.Fatal(err)
+	}
+	before, _ := lastView(pub).Diagram.Unit("verify")
+
+	flows.Drop(v.Node, "wait", "wait", false, before.X+before.W+400, before.Y+20, 24, before.X+before.W+300, before.Y+10)
+
+	g := lastView(pub).Diagram
+	var order []string
+	for _, u := range g.Units {
+		order = append(order, u.ID)
+	}
+	wait, _ := g.Unit("wait")
+	if strings.Join(order, ",") != "login,wait,verify" {
+		t.Errorf("the list order changed: %v", order)
+	}
+	if wait.X != before.X+before.W+300 || wait.Y != before.Y+10 {
+		t.Errorf("wait is at (%d, %d), dropped at (%d, %d)", wait.X, wait.Y, before.X+before.W+300, before.Y+10)
+	}
+}
+
+func TestFlowService_Drop_Given_a_step_that_only_runs_on_an_outcome_dropped_over_a_gap_Then_it_is_not_inserted_there(t *testing.T) {
+	flows, v, pub := openTwoUnits(t) // login, wait, verify
+	if err := flows.ConnectOutcome(v.Node, "login", "failure", "verify"); err != nil {
+		t.Fatal(err)
+	}
+	g := lastView(pub).Diagram
+	login, _ := g.Unit("login")
+	wait, _ := g.Unit("wait")
+	gapX := (login.X + login.W + wait.X) / 2
+
+	flows.Drop(v.Node, "verify", "verify", false, gapX, login.Y+20, 24, gapX-100, login.Y-60)
+
+	after := lastView(pub).Diagram
+	var order []string
+	for _, u := range after.Units {
+		order = append(order, u.ID)
+	}
+	moved, _ := after.Unit("verify")
+	if strings.Join(order, ",") != "login,wait,verify" {
+		t.Errorf("a step that hangs from an outcome was put into the list at the gap: %v", order)
+	}
+	if moved.X != gapX-100 || moved.Y != login.Y-60 {
+		t.Errorf("verify is at (%d, %d), dropped at (%d, %d)", moved.X, moved.Y, gapX-100, login.Y-60)
+	}
+}
+
+func TestFlowService_Connect_should_add_an_arrow_and_keep_the_one_the_step_already_had(t *testing.T) {
+	flows, v, pub := openTwoUnits(t) // login, wait, verify: verify follows wait
+
+	flows.Connect(v.Node, "login", "verify")
+
+	var from []string
+	for _, e := range lastView(pub).Diagram.Edges {
+		if e.To == "verify" && !e.Fail && e.Outcome == "" {
+			from = append(from, e.From)
+		}
+	}
+	slices.Sort(from)
+	if !slices.Equal(from, []string{"login", "wait"}) {
+		t.Fatalf("arrows into verify come from %v, want login and wait", from)
 	}
 }

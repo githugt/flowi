@@ -22,6 +22,7 @@ const (
 	SectionSettings Section = "settings"
 	SectionExtract  Section = "extract"
 	SectionAssert   Section = "assert"
+	SectionOutcomes Section = "outcomes"
 	SectionHooks    Section = "hooks"
 	SectionDocs     Section = "docs"
 	SectionSchema   Section = "schema"
@@ -39,6 +40,9 @@ func (r *Request) Configured(s Section) bool {
 		return true
 	}
 	if v.GRPC != nil && grpcConfigured(*v.GRPC, s) {
+		return true
+	}
+	if v.Dataset != nil && datasetConfigured(*v.Dataset, s) {
 		return true
 	}
 	switch s {
@@ -64,6 +68,8 @@ func (r *Request) Configured(s Section) bool {
 		return len(v.Extract) > 0
 	case SectionAssert:
 		return len(v.Assert) > 0
+	case SectionOutcomes:
+		return len(v.Outcomes) > 0
 	case SectionHooks:
 		return len(r.HookChain()) > 0
 	}

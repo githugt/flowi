@@ -37,6 +37,7 @@ async function run(e: MenuEntry, ids: string[]) {
       label: e.prompt.label,
       initial: e.prompt.initial,
       protocols: e.prompt.protocols?.map((p) => ({ id: p.id, label: p.label })),
+      protocolsLabel: e.action === 'newDataset' ? 'Database' : undefined,
       done: (text, protocol) => go(text, protocol),
     })
   } else if (e.confirm) {
@@ -56,34 +57,36 @@ export async function touchesUnsaved(ids: string[]): Promise<boolean> {
   return (await tabsAffected(ids)).some((id) => app.isDirty(id))
 }
 
-// The "New" menu: quick starts and creation in a chosen collection.
+// The "New" menu: quick starts and creation in a chosen collection or folder.
 export function newMenu(): MenuItem[] {
-  const collections = (app.tree?.roots ?? []).filter((n) => n.kind === 'collection').map((n) => ({ id: n.id, label: n.label }))
-  const where = collections.length ? { label: 'Collection', options: collections } : undefined
-  const make = (kind: string, title: string, placeholder = '') => () =>
-    ui.prompt({
+  const ask = (kind: string, title: string, tree: 'requests' | 'flows', label: string, withProtocol = false, choices = protocols, choiceLabel?: string) => () => {
+    ui.place = {
       title,
-      label: `Path (for example ${placeholder})`,
-      initial: '',
-      select: where,
-      protocols: kind === 'async' ? protocols : undefined,
-      done: (path, protocol, collection) => WorkspaceService.NewIn(kind, collection, path, protocol),
-    })
+      action: 'Create',
+      tree,
+      name: { label, initial: '' },
+      protocols: withProtocol ? choices : undefined,
+      protocolsLabel: choiceLabel,
+      note: 'Leave the name empty for the next "untitled".',
+      done: (row, name, protocol) => WorkspaceService.NewAt(kind, row, name, protocol),
+    }
+  }
   return [
     { label: 'New request', run: () => WorkspaceService.NewScratchRequest() },
     { label: 'New flow', run: () => WorkspaceService.NewScratchFlow() },
+    { label: 'New message request', run: newScratchMessage },
+    { label: 'New gRPC request', run: () => WorkspaceService.NewAt('grpc', '', '', '') },
+    { label: 'New dataset query', run: newScratchDataset },
     { separator: true, label: '', run: () => {} },
-    { label: 'New request in a collection…', run: make('request', 'New request', 'users/create'), disabled: !where },
-    { label: 'New message request…', run: make('async', 'New message request', 'orders/placed'), disabled: !where },
-    { label: 'New gRPC request…', run: make('grpc', 'New gRPC request', 'shop/get-order'), disabled: !where },
-    { label: 'New flow in a collection…', run: make('flow', 'New flow', 'journeys/signup'), disabled: !where },
+    { label: 'New request in a collection…', run: ask('request', 'New request', 'requests', 'Name or path (for example users/create)') },
+    { label: 'New message request in a collection…', run: ask('async', 'New message request', 'requests', 'Name or path (for example orders/placed)', true) },
+    { label: 'New gRPC request in a collection…', run: ask('grpc', 'New gRPC request', 'requests', 'Name or path (for example shop/get-order)') },
+    { label: 'New dataset query in a collection…', run: ask('dataset', 'New dataset query', 'requests', 'Name or path (for example customers/by-id)', true, databases, 'Database') },
+    { label: 'New flow in a collection…', run: ask('flow', 'New flow', 'flows', 'Name or path (for example journeys/signup)') },
     { label: 'New flow from blueprint…', run: () => (ui.blueprint = { collection: '', folder: '' }) },
     { separator: true, label: '', run: () => {} },
     { label: 'New environment…', run: promptNewEnvironment },
-    {
-      label: 'New collection…',
-      run: () => app.openScreen('screen:manager', 'Collections'),
-    },
+    { label: 'New collection…', run: () => app.openScreen('screen:manager', 'Collections') },
   ]
 }
 
@@ -91,6 +94,33 @@ const protocols = [
   ['ws', 'WebSocket'], ['sse', 'Server-Sent Event'], ['mqtt', 'MQTT'], ['kafka', 'Kafka'], ['amqp', 'AMQP (RabbitMQ)'], ['amqp10', 'AMQP 1.0 (Artemis, Qpid…)'], ['nats', 'NATS'],
   ['redis', 'Redis'], ['sqs', 'AWS SQS'], ['sns', 'AWS SNS'], ['servicebus', 'Azure Service Bus'], ['pubsub', 'Google Pub/Sub'],
 ].map(([id, label]) => ({ id, label }))
+
+const databases = [
+  ['postgres', 'PostgreSQL'], ['mysql', 'MySQL'], ['mariadb', 'MariaDB'], ['sqlite', 'SQLite'],
+].map(([id, label]) => ({ id, label }))
+
+// A dataset query needs its database before it can be made; the draft goes to Scratch like New request.
+function newScratchDataset() {
+  ui.prompt({
+    title: 'New dataset query',
+    label: 'Name (blank for untitled)',
+    initial: '',
+    protocols: databases,
+    protocolsLabel: 'Database',
+    done: (path, driver) => WorkspaceService.NewAt('dataset', '', path, driver),
+  })
+}
+
+// A message request needs its protocol before it can be made; the draft goes to Scratch like New request.
+function newScratchMessage() {
+  ui.prompt({
+    title: 'New message request',
+    label: 'Name (blank for untitled)',
+    initial: '',
+    protocols,
+    done: (path, protocol) => WorkspaceService.NewAt('async', '', path, protocol),
+  })
+}
 
 /** Asks for a name and creates an environment in the workspace; its tab opens. */
 export function promptNewEnvironment() {

@@ -34,6 +34,7 @@ func authSchemeChoices() []Choice {
 	labels := map[string]string{
 		model.AuthAPIKey: "API key", model.AuthDigest: "Digest", model.AuthOAuth2: "OAuth 2.0", model.AuthOAuth1: "OAuth 1.0a",
 		model.AuthAWSSigV4: "AWS Signature v4", model.AuthJWT: "JWT bearer", model.AuthHawk: "Hawk", model.AuthMutualTLS: "Client certificate (mTLS)", model.AuthNTLM: "Windows (NTLM)",
+		model.AuthHTTPSig: "HTTP message signature (RFC 9421)", model.AuthDPoP: "DPoP proof (RFC 9449)",
 	}
 	out := make([]Choice, 0, len(labels))
 	for _, t := range model.AuthTypes() {
@@ -83,6 +84,8 @@ func authFields(scheme string, params []model.KeyValue) []AuthFieldView {
 // SetMethod sets the HTTP verb: any method name is accepted, so QUERY and the ones nobody has registered work. A known
 // method is stored in its registered spelling ("query" becomes QUERY); any other name is a case-sensitive token and is
 // kept as typed, so one that could not go on the wire is refused here rather than at the first send.
+// A WebDAV or CalDAV method also fills in the headers and example body it usually needs (vm.ApplyMethodPreset); what
+// the request already has stays as it is.
 func (s *RequestService) SetMethod(node, method string) error {
 	method = strings.TrimSpace(method)
 	if !model.ValidMethod(method) {
@@ -92,7 +95,10 @@ func (s *RequestService) SetMethod(node, method string) error {
 		method = spelling
 	}
 	s.with(node, func(o *openRequest) {
-		o.req.Edit(func(v *model.RequestVersion) { v.Method = method })
+		o.req.Edit(func(v *model.RequestVersion) {
+			v.Method = method
+			vm.ApplyMethodPreset(v)
+		})
 	})
 	return nil
 }
@@ -198,7 +204,7 @@ func (s *RequestService) SetAuth(node, kind, value string) {
 }
 
 // SetAuthScheme chooses the scheme of the version's auth block ("" removes the
-// block): apikey, digest, oauth2, oauth1, aws_sigv4, jwt, hawk or mtls.
+// block): apikey, digest, oauth2, oauth1, aws_sigv4, jwt, hawk, mtls, ntlm, httpsig or dpop.
 func (s *RequestService) SetAuthScheme(node, scheme string) {
 	s.with(node, func(o *openRequest) { o.req.SetAuthScheme(scheme) })
 }
@@ -211,6 +217,12 @@ func (s *RequestService) SetAuthParam(node, name, value string) {
 // SetExtract replaces the values taken from the response.
 func (s *RequestService) SetExtract(node string, rows []model.Extraction) {
 	s.with(node, func(o *openRequest) { o.req.Edit(func(v *model.RequestVersion) { v.Extract = rows }) })
+}
+
+// SetOutcomes replaces the named ways the version can end, in order. An empty list (or nil) is the defaults,
+// success and failure.
+func (s *RequestService) SetOutcomes(node string, outcomes []model.Outcome) {
+	s.with(node, func(o *openRequest) { o.req.Edit(func(v *model.RequestVersion) { v.Outcomes = outcomes }) })
 }
 
 // SetAssert replaces the assertions on the response.

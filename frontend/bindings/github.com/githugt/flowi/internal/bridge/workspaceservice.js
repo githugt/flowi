@@ -115,9 +115,23 @@ export function MoveTargets() {
 }
 
 /**
- * NewIn creates a request, async request, gRPC request or flow at path in a
+ * NewAt creates a request (kind request, async, grpc or dataset) or a flow at the place row stands for
+ * (a collection or a folder; "" is Scratch) and asks the window to open it. text is a name or a
+ * path below the place; blank makes the next "untitled". protocol is for async, and the database for a dataset query.
+ * @param {string} kind
+ * @param {string} row
+ * @param {string} text
+ * @param {string} protocol
+ * @returns {$CancellablePromise<void>}
+ */
+export function NewAt(kind, row, text, protocol) {
+    return $Call.ByID(161322173, kind, row, text, protocol);
+}
+
+/**
+ * NewIn creates a request, async request, gRPC request, dataset query or flow at path in a
  * collection (by its tree row), then asks the window to open it. kind is
- * request, async, grpc or flow; protocol is for async.
+ * request, async, grpc, dataset or flow; protocol is for async, and the database for a dataset query.
  * @param {string} kind
  * @param {string} collectionRow
  * @param {string} path
@@ -126,6 +140,29 @@ export function MoveTargets() {
  */
 export function NewIn(kind, collectionRow, path, protocol) {
     return $Call.ByID(4018791447, kind, collectionRow, path, protocol);
+}
+
+/**
+ * NewPlaceCollection makes a draft collection named name and returns its row, "" with a
+ * notice when it could not be made. A draft is kept in Flowi's folder until saved to one of the
+ * person's own.
+ * @param {string} name
+ * @returns {$CancellablePromise<string>}
+ */
+export function NewPlaceCollection(name) {
+    return $Call.ByID(937643875, name);
+}
+
+/**
+ * NewPlaceFolder makes the folder text below the place row stands for, in tree, and returns the
+ * folder's row, "" with a notice when it could not be made.
+ * @param {string} row
+ * @param {string} tree
+ * @param {string} text
+ * @returns {$CancellablePromise<string>}
+ */
+export function NewPlaceFolder(row, tree, text) {
+    return $Call.ByID(2909198927, row, tree, text);
 }
 
 /**
@@ -144,6 +181,18 @@ export function NewScratchFlow() {
  */
 export function NewScratchRequest() {
     return $Call.ByID(4142297119);
+}
+
+/**
+ * PlaceTargets lists where something of tree ("requests" or "flows") can go: every collection
+ * and the folders of that tree below it, in tree order.
+ * @param {string} tree
+ * @returns {$CancellablePromise<$models.MoveTargetView[]>}
+ */
+export function PlaceTargets(tree) {
+    return $Call.ByID(389561269, tree).then(/** @type {($result: any) => any} */(($result) => {
+        return $$createType7($result);
+    }));
 }
 
 /**

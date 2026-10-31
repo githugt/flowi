@@ -3,6 +3,7 @@
 package card_test
 
 import (
+	"reflect"
 	"strings"
 	"testing"
 
@@ -74,6 +75,15 @@ func TestSummarize_Given_each_request_kind_Then_badge_subline_and_rows_follow_th
 			badge:   "UNARY",
 			subline: "Service.Method",
 			rows:    []string{"send: Bearer · JSON · 2 metadata", "settings: timeout 5s"},
+			more:    []string{"hooks"},
+		},
+		{
+			name:    "dataset_query",
+			node:    request("", "", false),
+			facts:   card.Facts{Kind: "dataset", Method: "SQL", Target: "postgres://app@db/shop", Sends: true, Body: "postgres", Props: 2, Timeout: "5s"},
+			badge:   "SQL",
+			subline: "postgres://app@db/shop",
+			rows:    []string{"send: postgres · 2 params", "settings: timeout 5s"},
 			more:    []string{"hooks"},
 		},
 		{
@@ -219,10 +229,10 @@ func TestSummarize_Given_each_request_kind_Then_badge_subline_and_rows_follow_th
 			if got.Badge != tt.badge || got.Subline != tt.subline {
 				t.Fatalf("badge %q subline %q, want %q %q", got.Badge, got.Subline, tt.badge, tt.subline)
 			}
-			if r := rowsOf(got.Rows); strings.Join(r, "|") != strings.Join(tt.rows, "|") {
+			if r := rowsOf(withoutOutcomes(got.Rows)); strings.Join(r, "|") != strings.Join(tt.rows, "|") {
 				t.Fatalf("rows %q, want %q", r, tt.rows)
 			}
-			if m := moreOf(got.More); strings.Join(m, "|") != strings.Join(tt.more, "|") {
+			if m := moreOf(withoutOutcomes(got.More)); strings.Join(m, "|") != strings.Join(tt.more, "|") {
 				t.Fatalf("more %v, want %v", m, tt.more)
 			}
 			wantPorts := []string{"done", "fail"}
@@ -246,7 +256,7 @@ func TestSummarize_Given_a_default_part_Then_no_row_is_made_for_it(t *testing.T)
 
 	got := card.Summarize(request("", "", false), facts)
 
-	for _, r := range got.Rows {
+	for _, r := range withoutOutcomes(got.Rows) {
 		t.Fatalf("unexpected row %+v", r)
 	}
 }
@@ -268,7 +278,69 @@ func TestSummarize_Given_more_than_four_filled_parts_Then_four_rows_show_and_the
 
 	got := card.Summarize(request("c", "", false), facts)
 
-	if len(got.Rows) != 4 || len(got.More) != 1 || got.More[0].Key != "hooks" {
+	if len(got.Rows) != 4 || len(got.More) != 2 || got.More[0].Key != "hooks" || got.More[1].Key != "outcomes" {
 		t.Fatalf("rows %q more %v", rowsOf(got.Rows), moreOf(got.More))
+	}
+}
+
+func TestSummarize_Given_a_request_with_named_outcomes_Then_it_has_a_port_for_each_enabled_one(t *testing.T) {
+	n := model.Node{ID: "r", Type: "request"}
+	f := card.Facts{Kind: "http", Outcomes: []card.OutcomeFact{{Name: "success"}, {Name: "failure", Disabled: true}, {Name: "not-found"}, {Name: "auth"}}}
+
+	got := card.Summarize(n, f).Ports
+
+	want := []card.Port{
+		{ID: "done", Label: "Done", Tone: "done"},
+		{ID: "outcome-not-found", Label: "not-found", Tone: "outcome"},
+		{ID: "outcome-auth", Label: "auth", Tone: "outcome"},
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("ports %+v, want %+v", got, want)
+	}
+}
+
+func TestSummarize_Given_a_request_without_written_outcomes_Then_it_has_done_and_fail(t *testing.T) {
+	got := card.Summarize(model.Node{ID: "r", Type: "request"}, card.Facts{Kind: "http"}).Ports
+
+	if len(got) != 2 || got[0].ID != "done" || got[1].ID != "fail" {
+		t.Fatalf("ports %+v", got)
+	}
+}
+
+func rowNamed(c card.Card, key string) (card.Row, bool) {
+	for _, r := range append(append([]card.Row{}, c.Rows...), c.More...) {
+		if r.Key == key {
+			return r, true
+		}
+	}
+	return card.Row{}, false
+}
+
+// withoutOutcomes leaves out the Outcomes row, which every request card has and the tables below do not list.
+func withoutOutcomes(rows []card.Row) []card.Row {
+	var out []card.Row
+	for _, r := range rows {
+		if r.Key != "outcomes" {
+			out = append(out, r)
+		}
+	}
+	return out
+}
+
+func TestSummarize_Given_a_request_Then_its_outcomes_row_is_always_shown_and_names_the_enabled_ones(t *testing.T) {
+	n := model.Node{ID: "r", Type: "request"}
+
+	defaults, ok := rowNamed(card.Summarize(n, card.Facts{Kind: "http"}), "outcomes")
+	named, ok2 := rowNamed(card.Summarize(n, card.Facts{Kind: "http", Outcomes: []card.OutcomeFact{{Name: "success"}, {Name: "failure", Disabled: true}, {Name: "not-found"}}}), "outcomes")
+	shown := false
+	for _, r := range card.Summarize(n, card.Facts{Kind: "http"}).Rows {
+		shown = shown || r.Key == "outcomes"
+	}
+
+	if !ok || !shown || defaults.Summary != "success · failure" || defaults.Editor != "outcomes" {
+		t.Errorf("default: %+v (found %v, shown %v)", defaults, ok, shown)
+	}
+	if !ok2 || named.Summary != "success · not-found" {
+		t.Errorf("named: %+v", named)
 	}
 }

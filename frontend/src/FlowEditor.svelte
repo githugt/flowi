@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { tick } from 'svelte'
   import { confirmDeleteSteps } from './lib/flowDelete'
   import { FlowService } from '../bindings/github.com/githugt/flowi/internal/bridge'
   import type { FlowView, Slot, StepChoice, WireChoices } from './lib/types'
@@ -182,9 +183,13 @@
 
   // The popup that adds a step: opened by the + on either side of a card (near that card), the Add step button
   // and the / key (at the end, or after the selected step). It shows only in Edit.
-  let popup = $state<{ x: number; y: number; near: { step: string; before: boolean } | null } | null>(null)
+  let popup = $state<{ x: number; y: number; near: { step: string; before: boolean } | null; on: { step: string; outcome: string } | null } | null>(null)
   function openPopup(x: number, y: number, near: { step: string; before: boolean } | null) {
-    popup = { x, y, near }
+    popup = { x, y, near, on: null }
+  }
+  // The + beside an outcome port: the step picked is added to run on that outcome of the step.
+  function openPopupOn(step: string, outcome: string, x: number, y: number) {
+    popup = { x, y, near: null, on: { step, outcome } }
   }
   function openPopupAtButton(e: MouseEvent) {
     const r = (e.currentTarget as HTMLElement).getBoundingClientRect()
@@ -200,17 +205,34 @@
 
   // A Start or End row opened for editing: the input or output behind it, and where it was clicked.
   let io = $state<{ role: 'start' | 'end'; index: number; x: number; y: number } | null>(null)
+  // Moving a step or opening a row with Edit off did nothing and said nothing; say so, at most once in a while.
+  let lockedAt = 0
+  function tellLocked() {
+    if (Date.now() - lockedAt < 4000) return
+    lockedAt = Date.now()
+    ui.toast('Turn on Edit to change the flow.')
+  }
   function openIO(role: 'start' | 'end', key: string, e: MouseEvent) {
-    if (!editing) return
+    if (!editing) return tellLocked()
     const list = role === 'start' ? view.inputs : view.outputs
     const index = list.findIndex((i) => key === (role === 'start' ? 'input:' : 'output:') + i.name)
     if (index >= 0) io = { role, index, x: e.clientX, y: e.clientY }
   }
+  // Where the editor of a new Start or End row opens: at the row itself, as when it is clicked, not in the middle
+  // of the window. The row is drawn once the view has come back from Go, so wait for it a moment.
+  async function whereIsRow(role: 'start' | 'end', name: string): Promise<{ index: number; x: number; y: number }> {
+    const list = () => (role === 'start' ? view.inputs : view.outputs)
+    for (let tries = 0; tries < 20 && !list().some((i) => i.name === name); tries++) await new Promise((r) => setTimeout(r, 25))
+    await tick()
+    const index = list().findIndex((i) => i.name === name)
+    const row = document.querySelectorAll(`.edgecard.${role} .row:not(.add)`)[Math.max(index, 0)]
+    const r = row?.getBoundingClientRect()
+    return { index: index >= 0 ? index : list().length, x: r ? r.left + r.width / 2 : window.innerWidth / 3, y: r ? r.bottom : 140 }
+  }
   async function addInput() {
     try {
       const name = await FlowService.AddInput(node, '')
-      const index = view.inputs.findIndex((i) => i.name === name)
-      io = { role: 'start', index: index >= 0 ? index : view.inputs.length, x: window.innerWidth / 3, y: 140 }
+      io = { role: 'start', ...(await whereIsRow('start', name)) }
     } catch (e) {
       ui.toast(errorText(e))
     }
@@ -218,8 +240,7 @@
   async function addOutput() {
     try {
       const name = await FlowService.AddOutput(node, '')
-      const index = view.outputs.findIndex((i) => i.name === name)
-      io = { role: 'end', index: index >= 0 ? index : view.outputs.length, x: window.innerWidth / 2, y: 140 }
+      io = { role: 'end', ...(await whereIsRow('end', name)) }
     } catch (e) {
       ui.toast(errorText(e))
     }
@@ -246,9 +267,11 @@
   const popupSteps = $derived(withRouteByStatus(view.steps, routeAfter))
   function addPicked(s: StepChoice) {
     const near = popup?.near
+    const on = popup?.on
     const after = routeAfter
     popup = null
-    if (s.mode === 'status' && after) FlowService.AddRouteByStatus(node, after).catch((e) => ui.toast(errorText(e)))
+    if (on) FlowService.AddStepOnOutcome(node, s.type, on.step, on.outcome).catch((e) => ui.toast(errorText(e)))
+    else if (s.mode === 'status' && after) FlowService.AddRouteByStatus(node, after).catch((e) => ui.toast(errorText(e)))
     else if (near) FlowService.AddStepNear(node, s.type, near.step, near.before)
     else FlowService.AddStep(node, s.type, 0, 0, 0, false)
   }
@@ -323,6 +346,11 @@
         editable={editing}
         onselect={(step, additive) => (additive ? FlowService.ToggleSelect(node, step) : FlowService.Select(node, step))}
         onconnect={(from, to) => FlowService.Connect(node, from, to)}
+        onfail={(step) => FlowService.RouteFailure(node, step, '').catch((e) => ui.toast(errorText(e)))}
+        onoutcome={(from, outcome, to) => FlowService.ConnectOutcome(node, from, outcome, to).catch((e) => ui.toast(errorText(e)))}
+        onaddon={openPopupOn}
+        onarrow={(from, to, outcomes) => FlowService.SetArrow(node, from, to, outcomes).catch((e) => ui.toast(errorText(e)))}
+        onlocked={tellLocked}
         oncollapse={(unit, on) => FlowService.Collapse(node, unit, on)}
         onaddcase={(id) => FlowService.AddCaseTo(node, id)}
         onadd={editing ? openPopup : undefined}

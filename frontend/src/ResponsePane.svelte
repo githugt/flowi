@@ -6,15 +6,25 @@
   import Problem from './Problem.svelte'
   import EmptyState from './EmptyState.svelte'
   import JsonNode from './JsonNode.svelte'
+  import XmlNode from './XmlNode.svelte'
+  import { multiStatus, parseXml, pathsOf } from './lib/xml'
   import Code from './Code.svelte'
+  import { cellOf } from './lib/cells'
   import { Clipboard } from '@wailsio/runtime'
   import { ui } from './lib/ui.svelte'
   import { app } from './lib/app.svelte'
 
   let { view }: { view: RequestView } = $props()
   let tab = $state<'received' | 'sent' | 'timing' | 'messages' | 'pipeline'>('received')
-  let format = $state('tree')
   const r = $derived(view.response)
+  // How the body is shown. Until one is picked, a dataset's rows are read as a table and any other response as a tree.
+  let chosenFormat = $state('')
+  // Rows need a result: a query that failed has none, so it falls back to the tree.
+  const shape = $derived(chosenFormat === 'rows' && !r?.table ? 'tree' : chosenFormat || (view.kind === 'dataset' && r?.table ? 'rows' : 'tree'))
+  function pickFormat(f: string) {
+    chosenFormat = f
+    if (f !== 'tree' && f !== 'status' && f !== 'rows') RequestService.SetFormat(view.node, f)
+  }
   // Go ends the pipeline with the engine's own steps under a "Built in" heading (schema learning):
   // they run with every send, hooks or not, so they are drawn apart from the hooks.
   const builtInAt = $derived(view.pipeline.findIndex((p, i) => p.kind === 'section' && view.pipeline[i + 1]?.kind === 'builtin'))
@@ -34,11 +44,20 @@
   const hookWaiting = $derived(hookSteps.filter((p) => !['passed', 'failed', 'running'].includes(p.state)).length)
   let query = $state('')
   let picked = $state('')
-  const tree = $derived(format === 'tree' && r?.bodyJson !== undefined && r?.bodyJson !== null)
+  const tree = $derived(shape === 'tree' && r?.bodyJson !== undefined && r?.bodyJson !== null)
+  // An XML answer (WebDAV's 207 Multi-Status among them) is read in the window; a body that is not well-formed stays text.
+  const xml = $derived(r?.bodyXml ? parseXml(r.bodyXml) : null)
+  const xmlRoot = $derived(xml && 'root' in xml ? xml.root : null)
+  const xmlPaths = $derived(xmlRoot ? pathsOf(xmlRoot) : new Map())
+  const entries = $derived(xmlRoot ? multiStatus(xmlRoot) : null)
+  const xmlTree = $derived(shape === 'tree' && !!xmlRoot)
+  const statusList = $derived(shape === 'status' && !!entries)
+  const rowsShown = $derived(shape === 'rows' && !!r?.table)
+  const bodyShown = $derived(tree || xmlTree || statusList || rowsShown)
   // What the Response tab lists. The tree shows the body itself, and the Timing tab the timings, so neither
   // is listed again here.
   const received = $derived(
-    (r?.received ?? []).filter((p) => !(tree && p.kind === 'code') && !(r?.phases.length && p.heading === 'Timings')),
+    (r?.received ?? []).filter((p) => !(bodyShown && p.kind === 'code') && !(r?.phases.length && p.heading === 'Timings')),
   )
   const emptyHint: Record<string, string> = {
     received: 'Send the request to see its response.',
@@ -185,8 +204,10 @@
         <span class="grow"></span>
         <button class="mini" onclick={pin}>Pin as example…</button>
         <button class="mini" onclick={saveBody}>Save body…</button>
-        <select bind:value={format} onchange={() => format !== 'tree' && RequestService.SetFormat(view.node, format)} aria-label="Body format">
+        <select value={shape} onchange={(e) => pickFormat(e.currentTarget.value)} aria-label="Body format">
+          {#if r.table}<option value="rows">Rows</option>{/if}
           <option value="tree">Tree</option>
+          {#if entries}<option value="status">Multi-status</option>{/if}
           <option value="json">JSON</option>
           <option value="text">Text</option>
           <option value="raw">Raw</option>
@@ -215,6 +236,24 @@
           <div class="msg {m.direction}"><div class="mh">{m.direction === 'sent' ? '→ sent' : '← received'} · {m.at}{m.key ? ' · key ' + m.key : ''}</div><Code text={m.body} /></div>
         {/each}
       </div>
+    {:else if tab === 'received' && rowsShown && r.table}
+      <div class="body">
+        <p class="muted rowsum">
+          {r.table.rowCount} {r.table.rowCount === 1 ? 'row' : 'rows'}{#if r.table.truncated}. The store had more: raise “Keep at most … rows” in the Query tab to see them.{/if}
+        </p>
+        {#if r.table.columns.length}
+          <div class="grid">
+            <table>
+              <thead><tr><th class="idx">#</th>{#each r.table.columns as c}<th>{c}</th>{/each}</tr></thead>
+              <tbody>
+                {#each r.table.rows as row, i}
+                  <tr><td class="idx">{i + 1}</td>{#each row as v}{@const cell = cellOf(v)}<td class={cell.kind}>{cell.text}</td>{/each}</tr>
+                {/each}
+              </tbody>
+            </table>
+          </div>
+        {/if}
+      </div>
     {:else if tab === 'received' && tree}
       <div class="treebar">
         <input type="search" placeholder="Search the body" bind:value={query} spellcheck="false" />
@@ -226,6 +265,30 @@
       </div>
       <div class="body mono">
         <JsonNode value={r.bodyJson} name="$" path="$" selected={picked} {query} onpick={(p) => (picked = p)} />
+      </div>
+    {:else if tab === 'received' && xmlTree && xmlRoot}
+      <div class="treebar">
+        <input type="search" placeholder="Search the body" bind:value={query} spellcheck="false" />
+        {#if picked}
+          <code class="path">{picked}</code>
+          <button class="mini" onclick={copyPath}>Copy path</button>
+          <button class="mini" onclick={extract}>Extract as variable…</button>
+        {/if}
+      </div>
+      <div class="body mono">
+        <XmlNode el={xmlRoot} paths={xmlPaths} selected={picked} {query} onpick={(p) => (picked = p)} />
+      </div>
+    {:else if tab === 'received' && statusList && entries}
+      <div class="body">
+        <p class="muted">{entries.length} {entries.length === 1 ? 'resource' : 'resources'} in the answer</p>
+        {#each entries as e}
+          <div class="ms">
+            <div class="mshead"><code class="mshref">{e.href}</code>{#if e.status}<span class="mstat bad">{e.status}</span>{/if}</div>
+            {#each e.props as p}
+              <div class="msprop"><span class="mskey">{p.name}</span><span class="msval">{p.value || '—'}</span><span class="mstat" class:bad={!p.status.includes(' 2')}>{p.status}</span></div>
+            {/each}
+          </div>
+        {/each}
       </div>
     {:else}
       <div class="body">
@@ -271,6 +334,23 @@
   .col { display: flex; flex-direction: column; }
   .col .edit { align-self: flex-start; }
   .mono { font: 12.5px/1.6 ui-monospace, Menlo, monospace; -webkit-user-select: text; user-select: text; }
+  .ms { border-left: 2px solid var(--line); padding: 2px 10px; margin: 6px 0; }
+  .mshead { display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; }
+  .mshref { font: 600 var(--fs-sm) var(--mono); }
+  .msprop { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 10px; font-size: var(--fs-sm); padding: 2px 0; }
+  .mskey { color: var(--accent); font-family: var(--mono); flex: none; }
+  .msval { flex: 1 0 100%; order: 3; font-family: var(--mono); overflow-wrap: anywhere; color: var(--text); }
+  .mstat { color: var(--muted); font-size: var(--fs-xs); margin-left: auto; text-align: right; }
+  .mstat.bad { color: var(--fail); }
+  .rowsum { margin: 0 0 6px; }
+  .grid { overflow: auto; border: 1px solid var(--line); border-radius: var(--r-md); }
+  .grid table { border-collapse: collapse; width: 100%; font: 12.5px/1.5 ui-monospace, Menlo, monospace; -webkit-user-select: text; user-select: text; }
+  .grid th, .grid td { padding: 3px 10px; border-bottom: 1px solid var(--line); text-align: left; white-space: nowrap; max-width: 28em; overflow: hidden; text-overflow: ellipsis; }
+  .grid th { position: sticky; top: 0; background: var(--bg); color: var(--muted); font-weight: 600; font-size: var(--fs-xs); z-index: 1; }
+  .grid td.number { text-align: right; color: var(--syn-number); }
+  .grid td.bool { color: var(--syn-atom); }
+  .grid td.null { color: var(--muted); font-style: italic; }
+  .grid .idx { color: var(--muted); text-align: right; width: 1%; }
   .treebar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
   .treebar input { flex: 1; min-width: 120px; background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); padding: 3px 8px; font: inherit; }
   .path { color: var(--muted); font: var(--fs-xs) var(--mono); }

@@ -11,6 +11,7 @@
   import KVRows from './KVRows.svelte'
   import EmptyState from './EmptyState.svelte'
   import { parseDuration, showDuration } from './lib/duration'
+  import { mergeBinding, optionNames } from './lib/binding'
 
   let { view, section }: { view: RequestView; section: string } = $props()
   const node = $derived(view.node)
@@ -74,12 +75,17 @@
   function setReadMode(mode: string) {
     putBinding([...options.filter((kv) => kv.Key !== 'read'), { Key: 'read', Value: mode, Description: '' }], authMode, credentials)
   }
+  // Each key is written once, and an option named like a sign-in value goes to Credentials (and says so),
+  // so the two tabs never drop or double each other's rows.
   function putBinding(opts: KV[], mode: string, creds: KV[]) {
-    const list: KV[] = [...opts]
-    if (mode && mode !== 'default') list.push({ Key: AUTH, Value: mode, Description: '' })
-    list.push(...creds)
+    const { list, moved } = mergeBinding(opts, a?.cloud ? mode : 'default', creds, credentialNames)
+    // Said once, when the row first moves: typing its value goes on updating the credential, without a toast for each key.
+    const fresh = moved.filter((k) => !creds.some((c) => c.Key === k))
+    if (fresh.length) ui.toast(`${fresh.join(', ')} ${fresh.length > 1 ? 'are sign-in values' : 'is a sign-in value'}, so ${fresh.length > 1 ? 'they are' : 'it is'} in the Credentials tab.`)
     putAsync((b) => (b.Binding = list))
   }
+  // The names the Binding table suggests: the protocol's, without its sign-in values.
+  const suggestedNames = $derived(optionNames(a?.bindings ?? [], credentialNames))
   const setCredential = (name: string, value: string) => {
     const others = credentials.filter((c) => c.Key !== name)
     putBinding(options, authMode, value ? [...others, { Key: name, Value: value, Description: '' }] : others)
@@ -125,13 +131,15 @@
     <p class="muted">Stops after this many messages, or fails when the timeout passes. Only messages the filter accepts count.</p>
   {/if}
 {:else if section === 'Credentials' && a}
-  <label class="f"><span>Sign in</span>
-    <select value={authMode} onchange={(e) => putBinding(options, e.currentTarget.value, credentials)}>
-      <option value="default">The provider's own credential lookup</option>
-      <option value="explicit">Credentials written here</option>
-    </select>
-  </label>
-  {#if authMode !== 'explicit'}
+  {#if a.cloud}
+    <label class="f"><span>Sign in</span>
+      <select value={authMode} onchange={(e) => putBinding(options, e.currentTarget.value, credentials)}>
+        <option value="default">The provider's own credential lookup</option>
+        <option value="explicit">Credentials written here</option>
+      </select>
+    </label>
+  {/if}
+  {#if a.cloud && authMode !== 'explicit'}
     <EmptyState icon="auth" title="The provider's own credentials" hint="Found the provider's usual way (its environment variables, profile or signed-in session). Pick “Credentials written here” above to set them for this request." compact />
   {:else}
     {#each credentialNames as name}
@@ -153,9 +161,9 @@
       <p class="muted">Nothing is locked, removed or counted as delivered. A later run sees the same messages again.</p>
     {/if}
   {/if}
-  {#if options.length}<p class="muted">The protocol's own options. Known names: {a.bindings.join(', ') || 'none'}.</p>{/if}
-  <KVRows rows={options} keyLabel="option" onchange={(rows) => putBinding(rows, authMode, credentials)}
-    empty={{ icon: 'binding', title: 'No protocol options', hint: a.bindings.length ? `The protocol's own options, such as ${a.bindings.join(', ')}.` : 'This protocol takes no options of its own.', add: 'Add option' }} />
+  {#if options.length}<p class="muted">The protocol's own options. Known names: {suggestedNames.join(', ') || 'none'}.{credentialNames.length ? ' Sign-in values are in the Credentials tab.' : ''}</p>{/if}
+  <KVRows rows={options} keyLabel="option" suggestKeys={suggestedNames} onchange={(rows) => putBinding(rows, authMode, credentials)}
+    empty={{ icon: 'binding', title: 'No protocol options', hint: suggestedNames.length ? `The protocol's own options, such as ${suggestedNames.join(', ')}.` : 'This protocol takes no options of its own.', add: 'Add option' }} />
 {:else if section === 'Proto' && g}
   <p class="muted">Schema: {g.source === 'files' ? 'the .proto files below' : 'the server’s reflection (no files listed)'}.</p>
   <AreaField label=".proto files, relative to the collection (one per line)" rows={4} value={lines(g.block.Proto)} oninput={(t) => putGRPC((b) => (b.Proto = splitLines(t)))}

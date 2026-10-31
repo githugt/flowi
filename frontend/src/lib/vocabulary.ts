@@ -19,10 +19,16 @@ function parse(text: string): unknown {
 export function responsePaths(response: ResponseView | null | undefined, kind: string, asMessages: boolean): Item[] {
   if (!response) return []
   if (kind === 'http') return bodyPaths(response.bodyJson, 'body', source)
+  if (kind === 'dataset') return datasetPaths(response)
   const first = response.messages?.find((m) => m.direction !== 'sent') ?? response.messages?.[0]
   const body = first && parse(first.body)
   if (body === undefined || body === null) return []
   return asMessages ? [...bodyPaths(body, 'body', source), ...bodyPaths(body, 'messages[0].body', source)] : bodyPaths(body, 'body', source)
+}
+
+/** A dataset's columns, read from the first row the way a check reads them: rows[0].name. */
+function datasetPaths(response: ResponseView): Item[] {
+  return (response.table?.columns ?? []).map((name) => ({ insert: `rows[0]${/^[A-Za-z_]\w*$/.test(name) ? '.' + name : `[${JSON.stringify(name)}]`}`, detail: source }))
 }
 
 /** The first entry of each name: the live response says more than the saved one, so it goes first. */

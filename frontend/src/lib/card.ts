@@ -17,10 +17,18 @@ export function clipText(text: string, max: number): string {
 
 /** The colour token of a port: done is green, fail red, a case the accent, else muted. */
 export function toneToken(tone: string): string {
-  return { done: '--ok', fail: '--fail', case: '--accent', else: '--muted' }[tone] ?? '--muted'
+  return { done: '--ok', fail: '--fail', case: '--accent', else: '--muted', outcome: '--info' }[tone] ?? '--muted'
 }
 
-export const COLOUR_NAMES = ['blue', 'green', 'amber', 'pink', 'purple', 'teal'] as const
+/** The colour token of a port: the colour its outcome was given, else the one of its tone. */
+export function portToken(p: { tone: string; color?: string }): string {
+  return p.color && (COLOUR_NAMES as readonly string[]).includes(p.color) ? `--c-${p.color}` : toneToken(p.tone)
+}
+
+export const COLOUR_NAMES = ['blue', 'green', 'amber', 'pink', 'purple', 'teal', 'black', 'red', 'sky'] as const
+
+/** The colour an outcome has when it was given none: success green, failure red, any named one aqua blue. */
+export const outcomeColour = (name: string, given?: string) => given || (name === 'success' ? 'green' : name === 'failure' ? 'red' : 'sky')
 
 /** The token a step is drawn in: its own colour when set, else its category's. */
 export function colourToken(type: string, colour?: string): string {
@@ -49,7 +57,7 @@ export function typeIcon(type: string): string {
 /** The icon of a summary row (Face rows name theirs by key). */
 export function rowIcon(key: string): string {
   const icons: Record<string, string> = {
-    inputs: 'params', send: 'send', receive: 'stream', connection: 'binding', hooks: 'hooks',
+    inputs: 'params', send: 'send', receive: 'stream', connection: 'binding', hooks: 'hooks', outcomes: 'checks',
     settings: 'settings', values: 'variables', checks: 'assert', steps: 'list', message: 'docs',
   }
   return icons[key] ?? 'list'

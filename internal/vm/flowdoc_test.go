@@ -621,3 +621,220 @@ func TestFlowDoc_ApplySource_should_apply_the_text_and_note_what_is_wrong_with_t
 		t.Fatalf("problems %v notes %v: the text is applied, and the flow's own problems are told", problems, notes)
 	}
 }
+
+func TestFlowDoc_SetArrow_should_switch_the_arrow_between_two_steps_to_success_failure_or_both(t *testing.T) {
+	d, _, _ := newFlowDoc(t) // a, b, p: b follows a, p follows b
+	arrows := func() ([]string, []string) { n, _ := d.Node("p"); return n.Needs, n.AfterFailureOf }
+
+	// the arrow from the step before is the implicit success one
+	if err := d.SetArrow("b", "p", []string{"success", "failure"}); err != nil {
+		t.Fatal(err)
+	}
+	needsBoth, failBoth := arrows()
+	if err := d.SetArrow("b", "p", []string{"failure"}); err != nil {
+		t.Fatal(err)
+	}
+	needsFail, failFail := arrows()
+	if err := d.SetArrow("b", "p", []string{"success"}); err != nil {
+		t.Fatal(err)
+	}
+	needsBack, failBack := arrows()
+
+	if !slices.Equal(needsBoth, []string{"b"}) || !slices.Equal(failBoth, []string{"b"}) {
+		t.Errorf("both: needs %v, after_failure_of %v", needsBoth, failBoth)
+	}
+	if len(needsFail) != 0 || !slices.Equal(failFail, []string{"b"}) {
+		t.Errorf("failure only: needs %v, after_failure_of %v", needsFail, failFail)
+	}
+	if len(needsBack) != 0 || len(failBack) != 0 { // success only from the step before is the default again
+		t.Errorf("success only: needs %v, after_failure_of %v", needsBack, failBack)
+	}
+}
+
+// Taking away the arrow from the step before used to be refused, because the step would follow that step again
+// by itself; there was no way to say "this step has no arrow into it".
+func TestFlowDoc_SetArrow_Given_the_arrow_from_the_step_before_When_none_Then_the_step_is_unlinked_and_a_new_arrow_links_it_again(t *testing.T) {
+	d, _, _ := newFlowDoc(t)
+
+	err := d.SetArrow("b", "p", []string{})
+	p, _ := d.Node("p")
+	unlinked := p.Unlinked
+	relinked := d.SetArrow("b", "p", []string{"success"})
+	p, _ = d.Node("p")
+
+	if err != nil || !unlinked {
+		t.Fatalf("err %v, unlinked %v", err, unlinked)
+	}
+	if relinked != nil || p.Unlinked || len(p.Needs) != 0 {
+		t.Fatalf("after switching it back: err %v, unlinked %v, needs %v", relinked, p.Unlinked, p.Needs)
+	}
+}
+
+func TestFlowDoc_SetArrow_Given_an_arrow_from_an_earlier_step_When_neither_Then_it_is_removed(t *testing.T) {
+	d, _, _ := newFlowDoc(t)
+	d.SetNeeds("p", []string{"a", "b"})
+
+	err := d.SetArrow("a", "p", []string{})
+
+	n, _ := d.Node("p")
+	if err != nil || len(n.Needs) != 0 { // b is left: it is the step before p, the default
+		t.Fatalf("err %v, needs %v", err, n.Needs)
+	}
+}
+
+// A step that only runs after a failure stayed in the file naming a step that was deleted or renamed.
+func TestFlowDoc_Delete_and_Rename_should_keep_failure_arrows_pointing_at_real_steps(t *testing.T) {
+	d, _, _ := newFlowDoc(t)
+	_ = d.SetArrow("a", "p", []string{"failure"})
+	_ = d.SetArrow("b", "p", []string{"failure"})
+
+	if err := d.Rename("a", "first"); err != nil {
+		t.Fatal(err)
+	}
+	renamed, _ := d.Node("p")
+	renamed.AfterFailureOf = slices.Clone(renamed.AfterFailureOf) // Node shares its slices with the draft
+	d.Delete("b")
+	deleted, _ := d.Node("p")
+
+	if !slices.Equal(renamed.AfterFailureOf, []string{"first", "b"}) {
+		t.Errorf("after the rename %v", renamed.AfterFailureOf)
+	}
+	if !slices.Equal(deleted.AfterFailureOf, []string{"first"}) {
+		t.Errorf("after the delete %v", deleted.AfterFailureOf)
+	}
+}
+
+// A step with only the arrow from the step before it, given a failure arrow from an earlier step, must not
+// keep the first one: every arrow into a step has to be taken, so it could never run (b is skipped when a fails).
+func TestFlowDoc_ConnectOutcome_should_replace_the_implied_arrow_and_keep_written_ones(t *testing.T) {
+	d, _, _ := newFlowDoc(t) // a, b, p
+
+	if err := d.ConnectOutcome("a", "p", "failure"); err != nil {
+		t.Fatal(err)
+	}
+	implied, _ := d.Node("p")
+	impliedNeeds, impliedFail := slices.Clone(implied.Needs), slices.Clone(implied.AfterFailureOf)
+	_ = d.SetArrow("b", "p", []string{"success"})
+	if err := d.ConnectOutcome("b", "p", "failure"); err != nil {
+		t.Fatal(err)
+	}
+	written, _ := d.Node("p")
+
+	if len(impliedNeeds) != 0 || !slices.Equal(impliedFail, []string{"a"}) {
+		t.Errorf("from the implied arrow: needs %v, after_failure_of %v", impliedNeeds, impliedFail)
+	}
+	if !slices.Equal(written.Needs, []string{"b"}) || !slices.Equal(slices.Sorted(slices.Values(written.AfterFailureOf)), []string{"a", "b"}) {
+		t.Errorf("with written arrows: needs %v, after_failure_of %v", written.Needs, written.AfterFailureOf)
+	}
+}
+
+func TestFlowDoc_SetArrow_should_take_named_outcomes_and_keep_them_with_the_others(t *testing.T) {
+	d, _, _ := newFlowDoc(t) // a, b, p
+
+	if err := d.SetArrow("a", "p", []string{"failure", "not-found", "auth"}); err != nil {
+		t.Fatal(err)
+	}
+	p, _ := d.Node("p")
+	named := slices.Clone(p.AfterOutcome)
+	failure := slices.Clone(p.AfterFailureOf)
+	if err := d.SetArrow("a", "p", []string{"not-found"}); err != nil {
+		t.Fatal(err)
+	}
+	p, _ = d.Node("p")
+
+	if !slices.Equal(named, []string{"a:not-found", "a:auth"}) || !slices.Equal(failure, []string{"a"}) {
+		t.Errorf("after_outcome %v, after_failure_of %v", named, failure)
+	}
+	// b's success arrow, which p had by following it, stays: only the arrow from a was edited
+	if !slices.Equal(p.AfterOutcome, []string{"a:not-found"}) || len(p.AfterFailureOf) != 0 || !slices.Equal(p.Needs, []string{"b"}) {
+		t.Errorf("after narrowing: needs %v, after_failure_of %v, after_outcome %v", p.Needs, p.AfterFailureOf, p.AfterOutcome)
+	}
+}
+
+func TestFlowDoc_ConnectOutcome_should_add_a_named_outcome_to_the_arrow_it_joins(t *testing.T) {
+	d, _, _ := newFlowDoc(t)
+
+	if err := d.ConnectOutcome("a", "p", "not-found"); err != nil {
+		t.Fatal(err)
+	}
+	if err := d.ConnectOutcome("a", "p", "auth"); err != nil {
+		t.Fatal(err)
+	}
+	p, _ := d.Node("p")
+
+	if !slices.Equal(p.AfterOutcome, []string{"a:not-found", "a:auth"}) || len(p.Needs) != 0 {
+		t.Errorf("needs %v, after_outcome %v", p.Needs, p.AfterOutcome)
+	}
+}
+
+func TestFlowDoc_Delete_and_Rename_should_keep_named_outcome_arrows_pointing_at_real_steps(t *testing.T) {
+	d, _, _ := newFlowDoc(t)
+	_ = d.ConnectOutcome("a", "p", "ok")
+	_ = d.ConnectOutcome("b", "p", "ok")
+
+	if err := d.Rename("a", "first"); err != nil {
+		t.Fatal(err)
+	}
+	renamed, _ := d.Node("p")
+	renamed.AfterOutcome = slices.Clone(renamed.AfterOutcome)
+	d.Delete("b")
+	deleted, _ := d.Node("p")
+
+	if !slices.Equal(renamed.AfterOutcome, []string{"first:ok", "b:ok"}) || !slices.Equal(deleted.AfterOutcome, []string{"first:ok"}) {
+		t.Errorf("after the rename %v, after the delete %v", renamed.AfterOutcome, deleted.AfterOutcome)
+	}
+}
+
+// Dragging from the done port of the step before onto a step whose arrow had been removed said "it follows it in
+// the list already, so it needs no link", and drew nothing: the check ignored that the step was unlinked.
+func TestFlowDoc_AddNeed_Given_an_unlinked_step_Then_the_step_before_links_it_again(t *testing.T) {
+	d, _, _ := newFlowDoc(t) // a, b, p
+	_ = d.SetArrow("b", "p", []string{})
+
+	added := d.AddNeed("p", "b")
+	p, _ := d.Node("p")
+	again := d.AddNeed("p", "b")
+
+	if !added || p.Unlinked || len(p.Arrows("b")) != 1 || p.Arrows("b")[0].From != "b" || !p.Arrows("b")[0].OnSuccess {
+		t.Fatalf("added %v, unlinked %v, arrows %+v", added, p.Unlinked, p.Arrows("b"))
+	}
+	if again {
+		t.Error("the second time it is linked already: nothing to add")
+	}
+}
+
+func TestFlowDoc_AddNeed_Given_a_step_with_only_a_failure_arrow_Then_success_from_the_step_before_is_added_not_called_redundant(t *testing.T) {
+	d, _, _ := newFlowDoc(t) // a, b, p
+	_ = d.ConnectOutcome("a", "p", "failure")
+
+	added := d.AddNeed("p", "b")
+	p, _ := d.Node("p")
+
+	if !added || len(p.Needs) != 1 || p.Needs[0] != "b" || len(p.AfterFailureOf) != 1 {
+		t.Fatalf("added %v, needs %v, after_failure_of %v", added, p.Needs, p.AfterFailureOf)
+	}
+}
+
+// A step that follows the one before it only by being next had that arrow replaced when another step was
+// connected to it: the new `needs` listed only the new step, and the implied arrow went with it.
+func TestFlowDoc_AddNeed_Given_a_step_that_follows_the_one_before_it_by_default_Then_both_arrows_are_kept(t *testing.T) {
+	d, _, _ := newFlowDoc(t) // a, b, p: p follows b
+
+	added := d.AddNeed("p", "a")
+	p, _ := d.Node("p")
+
+	if !added || !slices.Equal(p.Needs, []string{"b", "a"}) {
+		t.Fatalf("added %v, needs %v: p must wait for b as before, and for a", added, p.Needs)
+	}
+}
+
+func TestFlowDoc_ConnectOutcome_Given_success_to_a_step_that_follows_the_one_before_it_Then_both_arrows_are_kept(t *testing.T) {
+	d, _, _ := newFlowDoc(t)
+
+	err := d.ConnectOutcome("a", "p", "success")
+	p, _ := d.Node("p")
+
+	if err != nil || !slices.Equal(p.Needs, []string{"b", "a"}) {
+		t.Fatalf("err %v, needs %v", err, p.Needs)
+	}
+}

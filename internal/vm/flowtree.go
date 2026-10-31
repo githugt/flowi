@@ -6,6 +6,7 @@ import (
 	"regexp"
 	"slices"
 	"strconv"
+	"strings"
 
 	"github.com/githugt/flowi-lib/model"
 )
@@ -149,6 +150,8 @@ func cloneNodes(list []model.Node) []model.Node {
 	out := make([]model.Node, len(list))
 	for i, n := range list {
 		n.Needs = slices.Clone(n.Needs)
+		n.AfterFailureOf = slices.Clone(n.AfterFailureOf)
+		n.AfterOutcome = slices.Clone(n.AfterOutcome)
 		if n.Request != nil {
 			r := *n.Request
 			r.With, r.Headers, r.Hooks.Skip = slices.Clone(r.With), slices.Clone(r.Headers), slices.Clone(r.Hooks.Skip)
@@ -205,6 +208,14 @@ func dropNeeds(list []model.Node, gone map[string]bool) {
 		list[i].Needs = slices.DeleteFunc(list[i].Needs, func(id string) bool { return gone[id] })
 		if len(list[i].Needs) == 0 {
 			list[i].Needs = nil
+		}
+		list[i].AfterFailureOf = slices.DeleteFunc(list[i].AfterFailureOf, func(id string) bool { return gone[id] })
+		if len(list[i].AfterFailureOf) == 0 {
+			list[i].AfterFailureOf = nil
+		}
+		list[i].AfterOutcome = slices.DeleteFunc(list[i].AfterOutcome, func(entry string) bool { step, _, _ := strings.Cut(entry, ":"); return gone[step] })
+		if len(list[i].AfterOutcome) == 0 {
+			list[i].AfterOutcome = nil
 		}
 		for _, child := range listsOf(&list[i]) {
 			dropNeeds(*child, gone)

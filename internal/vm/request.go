@@ -163,10 +163,12 @@ func cloneRequest(r model.Request) model.Request {
 	for i, v := range r.Versions {
 		v.Query, v.Headers, v.Extract, v.Assert = slices.Clone(v.Query), slices.Clone(v.Headers), slices.Clone(v.Extract), slices.Clone(v.Assert)
 		v.Body.Form, v.Body.Multipart = slices.Clone(v.Body.Form), slices.Clone(v.Body.Multipart)
+		v.Outcomes = slices.Clone(v.Outcomes)
 		v.Settings = cloneSettings(v.Settings)
 		v.Hooks = cloneHooks(v.Hooks)
 		v.Async = cloneAsync(v.Async)
 		v.GRPC = cloneGRPC(v.GRPC)
+		v.Dataset = cloneDataset(v.Dataset)
 		r.Versions[i] = v
 	}
 	r.Hooks = cloneHooks(r.Hooks)
@@ -335,7 +337,7 @@ func (r *Request) CanDiscardEdit() bool {
 // isBlankVersion is a version with nothing but a method and a label.
 func isBlankVersion(v model.RequestVersion) bool {
 	return v.URL == "" && len(v.Query) == 0 && len(v.Headers) == 0 && !bodyHasContent(v.Body) && len(v.Extract) == 0 &&
-		len(v.Assert) == 0 && len(v.Variables) == 0 && v.Docs == "" && len(v.Settings) == 0 &&
+		len(v.Assert) == 0 && len(v.Outcomes) == 0 && len(v.Variables) == 0 && v.Docs == "" && len(v.Settings) == 0 &&
 		len(v.Hooks.Pre) == 0 && len(v.Hooks.Post) == 0 && len(v.Hooks.Message) == 0
 }
 

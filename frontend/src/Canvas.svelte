@@ -19,8 +19,9 @@
   import type { Card, DataEdge, Diagram, Edge, Face, Slot, Unit } from './lib/types'
   import StepCard from './StepCard.svelte'
   import EdgeCard from './EdgeCard.svelte'
-  import { edgeCards } from './lib/edgecards'
-  import { CARD, openAfterClick, portLine, type OpenRow } from './lib/card'
+  import { edgeCards, keepStart } from './lib/edgecards'
+  import { arrowEdges, arrowKey, arrowMarker, arrowOutcomes, outcomeOfPort, outcomesOfCard, toggled } from './lib/arrows'
+  import { CARD, COLOUR_NAMES, openAfterClick, portLine, type OpenRow } from './lib/card'
 
   export interface CanvasView {
     x: number
@@ -39,6 +40,11 @@
     editable = true,
     onselect,
     onconnect,
+    onfail,
+    onoutcome,
+    onaddon,
+    onarrow,
+    onlocked,
     oncollapse,
     onaddcase,
     onadd,
@@ -70,6 +76,16 @@
     editable?: boolean // structure changes (move, lift, connect) need Edit; pan and select do not
     onselect: (step: string, additive: boolean) => void
     onconnect: (from: string, to: string) => void
+    /** A Fail port was dragged onto a step (or an arrow from it deleted, target ""): `step` goes on at `target` when it fails. */
+    onfail?: (step: string, target: string) => void
+    /** An outcome port (success, failure or a named outcome) was dragged onto a step: `to` runs when `from` ends with it. */
+    onoutcome?: (from: string, outcome: string, to: string) => void
+    /** The + beside an outcome port was clicked: a step is to be added that runs on that outcome of `step`. */
+    onaddon?: (step: string, outcome: string, clientX: number, clientY: number) => void
+    /** The person switched the outcomes that take the arrow from step `from` to step `to`: its success, its failure, both or neither. */
+    onarrow?: (from: string, to: string, outcomes: string[]) => void
+    /** The person tried to change the flow (move a step, open a row) while Edit is off. */
+    onlocked?: () => void
     oncollapse: (unit: string, collapsed: boolean) => void
     onaddcase?: (condition: string) => void // the "+ else if" under a condition (editing only)
     /** A + was clicked: a new step goes right before or after `near.step`; near is null for the + of an empty flow. */
@@ -123,7 +139,9 @@
   // A lifted card follows the pointer as a ghost.
   let ghost = $state<{ step: string; x: number; y: number } | null>(null)
   // A needs link being drawn from a unit's port to the pointer; a value wire (kind data) is drawn the same way.
-  let link = $state<{ from: string; x: number; y: number; data?: boolean } | null>(null)
+  let link = $state<{ from: string; x: number; y: number; data?: boolean; port?: string; ports?: string[] } | null>(null)
+  // Outcome ports picked together (shift-click) on one card: dragging any of them takes them all to the step it is dropped on.
+  let pickedPorts = $state<{ unit: string; ports: string[] }>({ unit: '', ports: [] })
   // Where a unit was dropped, until Go's new layout arrives. The layout may put the unit somewhere else (a drop
   // that reorders, or into a lane, is placed by the layout, not by the pointer), so any newer layout replaces it.
   let pending = $state<Record<string, { x: number; y: number }>>({})
@@ -145,7 +163,15 @@
 
   const units = $derived(diagram.units)
   // Start and End are views of the flow, placed beside its first and last card.
-  const edge = $derived(edgeCards(units, start?.rows.length ?? 0, end?.rows.length ?? 0, editable && !!onaddinput))
+  const placed = $derived(edgeCards(units, start?.rows.length ?? 0, end?.rows.length ?? 0, editable && !!onaddinput))
+  // Start stays where it was shown while the first step is dragged about (see keepStart); it is remembered here.
+  let startKept = $state<{ x: number; y: number } | null>(null)
+  const edge = $derived({ ...placed, start: keepStart(startKept, placed.start, placed.first) })
+  $effect(() => {
+    const s = edge.start
+    const kept = untrack(() => startKept)
+    if (!kept || kept.x !== s.x || kept.y !== s.y) startKept = { x: s.x, y: s.y }
+  })
   const curve = (x1: number, y1: number, x2: number, y2: number) => {
     const mid = (x1 + x2) / 2
     return `M${x1},${y1} C${mid},${y1} ${mid},${y2} ${x2},${y2}`
@@ -294,6 +320,8 @@
     step?: string
     lift?: boolean
     dragging: boolean
+    locked?: boolean // Edit is off: dragging pans, and says so once
+    told?: boolean
   }
   let press: Press | null = null
 
@@ -301,6 +329,7 @@
   let open = $state<OpenRow | null>(null)
   function rowClicked(u: Unit, key: string) {
     onselect(u.nodes[0], false)
+    if (!editable) onlocked?.()
     open = openAfterClick(open, u.id, key, !!panel)
   }
   // Steps whose dock stays open although another step is selected.
@@ -334,6 +363,8 @@
 
   function onbackground(e: PointerEvent) {
     open = null
+    pickedEdge = ''
+    pickedPorts = { unit: '', ports: [] }
     if (!e.shiftKey) onselect('', false)
     press = { kind: 'pan', sx: e.clientX, sy: e.clientY, vx: view.x, vy: view.y, dragging: true }
     svg.setPointerCapture(e.pointerId)
@@ -369,9 +400,101 @@
     return u.nodes[Math.min(Math.max(i, 0), u.nodes.length - 1)]
   }
 
+  /** The step a unit's card is for (the request of a block, else its first step). */
+  const coreOf = (u: Unit) => u.nodes[u.core ?? 0]
+
+  // The arrow picked by a click says when its step runs: when the one before succeeds, when it fails, or either
+  // way. Two switches on it change that; switching both off (or Delete) takes the arrow away, which Go refuses
+  // for the arrow from the step before (the step would follow it again by itself). An on_error goto route is
+  // not an arrow written on a step: it only has its ×.
+  let pickedEdge = $state('')
+  const pickedEdges = $derived(arrowEdges(diagram.edges, pickedEdge))
+  const pickedE = $derived(pickedEdges[0])
+  const pickedOutcomes = $derived(pickedE ? arrowOutcomes(diagram.edges, pickedE.from, pickedE.to) : [])
+  // The switches: every outcome the card the arrow leaves can end with, and any the arrow still follows that the card no longer has.
+  const pickedOffered = $derived.by(() => {
+    if (!pickedE) return []
+    const offered = outcomesOfCard(cards[pickedE.from]?.face)
+    return [...offered, ...pickedOutcomes.filter((o) => !offered.includes(o))]
+  })
+  // The colour an outcome was given shows on its arrows and switches; without one they keep their tone's.
+  const portIdOf = (o: string) => (o === 'success' ? 'done' : o === 'failure' ? 'fail' : `outcome-${o}`)
+  function portColourName(unit: string, port: string | undefined): string | undefined {
+    const p = cards[unit]?.face?.ports?.find((x) => x.id === port)
+    return p?.color && (COLOUR_NAMES as readonly string[]).includes(p.color) ? p.color : undefined
+  }
+  const portColour = (unit: string, port: string | undefined) => {
+    const name = portColourName(unit, port)
+    return name ? `var(--c-${name})` : undefined
+  }
+  const edgeTone = (e: Edge) => portColour(e.from, e.fromPort)
+  const markerOf = (e: Edge) => `url(#${arrowMarker(e, portColourName(e.from, e.fromPort))})`
+  const outcomeLabel = (o: string) => (o === 'success' ? 'On success' : o === 'failure' ? 'On failure' : o)
+  const chipWidth = (o: string) => 36 + outcomeLabel(o).length * 6.8
+  // The row of switches is centred on the arrow.
+  const chipRow = $derived.by(() => {
+    let x = 0
+    const items = pickedOffered.map((o) => {
+      const item = { o, x, w: chipWidth(o) }
+      x += item.w + 6
+      return item
+    })
+    return { items, shift: -(x + 30 - 6) / 2 }
+  })
+  function pickEdge(ev: PointerEvent, e: Edge) {
+    ev.stopPropagation()
+    open = null
+    onselect('', false)
+    pickedEdge = arrowKey(e)
+  }
+  /** The steps an arrow joins: the one it leaves (the one an after_failure_of names, else the last of the card) and the first of the one it enters. */
+  function arrowSteps(): { from: string; to: string } | null {
+    const e = pickedE
+    const a = e && byId.get(e.from)
+    const b = e && byId.get(e.to)
+    if (!e || !a || !b) return null
+    const named = pickedEdges.find((x) => x.fromStep)?.fromStep
+    return { from: named ?? a.nodes[a.nodes.length - 1], to: b.nodes[0] }
+  }
+  function switchOutcome(outcome: string) {
+    if (!editable) return onlocked?.()
+    const steps = arrowSteps()
+    if (!steps) return
+    const next = toggled(pickedOutcomes, outcome)
+    onarrow?.(steps.from, steps.to, next)
+    if (!next.length) pickedEdge = ''
+  }
+  function removeEdge() {
+    const steps = arrowSteps()
+    if (!steps || !editable) return
+    if (pickedE?.goto) onfail?.(steps.from, '')
+    else onarrow?.(steps.from, steps.to, [])
+    pickedEdge = ''
+  }
+  function onkeydown(ev: KeyboardEvent) {
+    if (!pickedE) return
+    if (ev.key === 'Escape') pickedEdge = ''
+    if ((ev.key === 'Delete' || ev.key === 'Backspace') && !(ev.target as Element | null)?.closest?.('input, textarea, [contenteditable]')) {
+      ev.preventDefault()
+      editable ? removeEdge() : onlocked?.()
+    }
+  }
+  // The middle of an arrow, where its switches go: a curve with level ends passes through the average of them.
+  function edgeCentre(e: Edge): { x: number; y: number } | null {
+    const a = byId.get(e.from)
+    const b = byId.get(e.to)
+    if (!a || !b) return null
+    const failFromStrip = e.fail && !a.card
+    const x1 = failFromStrip ? at(a).x + a.w / 2 : at(a).x + a.w
+    const y1 = failFromStrip ? at(a).y + a.h : portYOf(a, e.fromPort)
+    return { x: (x1 + at(b).x) / 2, y: (y1 + portY(b)) / 2 }
+  }
+
   function onunit(e: PointerEvent, u: Unit) {
     e.stopPropagation()
     if (open && open.unit !== u.id) open = null
+    pickedEdge = ''
+    pickedPorts = { unit: '', ports: [] }
     const c = toCanvas(e.clientX, e.clientY)!
     const step = stepAt(u, c.x, c.y)
     if (e.shiftKey) {
@@ -380,7 +503,7 @@
     }
     if (!selection.includes(step)) onselect(step, false)
     if (!editable) {
-      press = { kind: 'pan', sx: e.clientX, sy: e.clientY, vx: view.x, vy: view.y, dragging: false }
+      press = { kind: 'pan', sx: e.clientX, sy: e.clientY, vx: view.x, vy: view.y, dragging: false, locked: true }
       svg.setPointerCapture(e.pointerId)
       return
     }
@@ -402,11 +525,18 @@
     }
   }
 
-  function onport(e: PointerEvent, u: Unit) {
+  function onport(e: PointerEvent, u: Unit, port = 'done') {
     e.stopPropagation()
     if (!editable) return
+    if (e.shiftKey) {
+      const same = pickedPorts.unit === u.id ? pickedPorts.ports : []
+      pickedPorts = { unit: u.id, ports: same.includes(port) ? same.filter((p) => p !== port) : [...same, port] }
+      return
+    }
+    const together = pickedPorts.unit === u.id && pickedPorts.ports.includes(port) ? pickedPorts.ports : [port]
+    pickedPorts = { unit: '', ports: [] }
     const c = toCanvas(e.clientX, e.clientY)!
-    link = { from: u.id, x: c.x, y: c.y }
+    link = { from: u.id, x: c.x, y: c.y, port, ports: together }
     svg.setPointerCapture(e.pointerId)
   }
 
@@ -433,6 +563,10 @@
     const dx = e.clientX - p.sx
     const dy = e.clientY - p.sy
     if (p.kind === 'pan') {
+      if (p.locked && !p.told && Math.hypot(dx, dy) >= DRAG_THRESHOLD) {
+        p.told = true
+        onlocked?.()
+      }
       view = { ...view, x: p.vx + dx, y: p.vy + dy }
       return
     }
@@ -449,9 +583,12 @@
       const target = unitAt(link.x, link.y)
       const wire = link.data
       const from = link.from
+      const port = link.port
+      const ports = link.ports ?? (port ? [port] : [])
       link = null
       if (target && target.id !== from) {
         if (wire) ondata?.(byId.get(from)!.nodes[0], target.nodes[0], e.clientX, e.clientY)
+        else if ((port && port !== 'done') || ports.length > 1) for (const p of ports) onoutcome?.(coreOf(byId.get(from)!), outcomeOfPort(p), target.nodes[0])
         else onconnect(from, target.id)
       }
       return
@@ -616,6 +753,8 @@
   </g>
 {/snippet}
 
+<svelte:window {onkeydown} />
+
 <svg
   bind:this={svg}
   class:readonly={!editable}
@@ -636,11 +775,15 @@
     <pattern id="skiphatch" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
       <rect width="4" height="8" fill="var(--muted)" opacity="0.28" />
     </pattern>
-    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
-      <path d="M0,0 L10,5 L0,10 z" fill="var(--muted)" />
-    </marker>
-    <marker id="dataarrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
-      <path d="M0,0 L10,5 L0,10 z" fill="var(--data)" />
+    <!-- Where an arrow lands is a ring on the card's edge, in the arrow's own colour: a triangle was hard to read as a
+         direction. One marker per colour, since a marker cannot take the colour of its line everywhere (context-stroke). -->
+    {#each [{ id: 'arrow', colour: 'var(--muted)' }, { id: 'arrow-fail', colour: 'var(--fail)' }, ...COLOUR_NAMES.map((c) => ({ id: `arrow-c-${c}`, colour: `var(--c-${c})` }))] as m (m.id)}
+      <marker id={m.id} viewBox="0 0 10 10" refX="5" refY="5" markerWidth="9" markerHeight="9" markerUnits="userSpaceOnUse" orient="auto">
+        <circle cx="5" cy="5" r="3.6" fill="var(--bg)" stroke={m.colour} stroke-width="1.8" />
+      </marker>
+    {/each}
+    <marker id="dataarrow" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="9" markerHeight="9" markerUnits="userSpaceOnUse" orient="auto">
+      <circle cx="5" cy="5" r="3.6" fill="var(--bg)" stroke="var(--data)" stroke-width="1.8" />
     </marker>
   </defs>
   <rect width="100%" height="100%" fill="url(#grid)" />
@@ -689,10 +832,14 @@
 
     {#each diagram.edges as e}
       {#if !e.into}
-        <path class="edge" class:fail={e.fail} class:needs={e.needs} d={edgePath(e)} marker-end="url(#arrow)" />
-        <path class="flow" class:fail={e.fail} class:live={live(e)} d={edgePath(e)} />
+        {@const either = !e.fail && !e.outcome && diagram.edges.some((x) => (x.fail || !!x.outcome) && !x.goto && x.from === e.from && x.to === e.to)}
+        <path class="edge" class:fail={e.fail} class:named={!!e.outcome} style:stroke={edgeTone(e)} d={edgePath(e)} marker-end={markerOf(e)} />
+        <path class="flow" class:fail={e.fail} class:named={!!e.outcome} class:live={live(e)} style:stroke={edgeTone(e)} d={edgePath(e)} />
+        <path class="edgepick" class:on={pickedEdges.includes(e)} d={edgePath(e)} />
+        <path class="edgehit" d={edgePath(e)} role="button" tabindex="-1" aria-label="Select this arrow" onpointerdown={(ev) => pickEdge(ev, e)}><title>{e.fail ? 'Runs when the step fails' : 'Runs when the step succeeds'}</title></path>
         {#if e.fail && edgeMid(e)}{@const m = edgeMid(e)!}<text class="edgelabel fail" x={m.x} y={m.y + 16} text-anchor="middle">if it fails</text>{/if}
-        {#if e.needs && edgeMid(e)}{@const m = edgeMid(e)!}<text class="edgelabel" x={m.x} y={m.y} text-anchor="middle">waits for</text>{/if}
+        {#if e.outcome && edgeMid(e)}{@const m = edgeMid(e)!}<text class="edgelabel named" style:fill={edgeTone(e)} x={m.x} y={m.y + 16} text-anchor="middle">{e.outcome}</text>{/if}
+        {#if either && edgeMid(e)}{@const m = edgeMid(e)!}<text class="edgelabel" x={m.x} y={m.y} text-anchor="middle">if it succeeds</text>{/if}
       {/if}
     {/each}
 
@@ -707,7 +854,7 @@
             toolbar={!!ontoolbar && editable && selection.length === 1 && selectedUnits.has(u.id) && !moving && !link}
             ontool={(tool, e) => ontoolbar?.(tool, u.nodes[u.core ?? 0], e)} oncolour={(c) => oncolour?.(u.nodes[u.core ?? 0], c)}
             oncase={oncase ? (i, e) => oncase(u.nodes[u.core ?? 0], i, e) : undefined}
-            onrow={(key) => rowClicked(u, key)} onport={(e) => onport(e, u)} ondataport={ondata ? (e) => ondataport(e, u) : undefined} />
+            onrow={(key) => rowClicked(u, key)} onport={(e, port) => onport(e, u, port)} pickedPorts={pickedPorts.unit === u.id ? pickedPorts.ports : []} onaddon={onaddon && editable ? (port, e) => onaddon(coreOf(u), outcomeOfPort(port), e.clientX, e.clientY) : undefined} ondataport={ondata ? (e) => ondataport(e, u) : undefined} />
         {:else if u.headW}
           <rect width={u.headW} height="40" y="12" rx="10" />
         {:else if u.above || u.nodes.some((_, i) => stacked(u, i))}
@@ -788,6 +935,41 @@
       {/if}
     {/each}
 
+    <!-- The switches of the picked arrow, over the cards so the narrow gap between two of them is no limit. -->
+    {#if pickedE && edgeCentre(pickedE)}
+      {@const m = edgeCentre(pickedE)!}
+      {#if pickedE.goto}
+        {#if editable}
+          <g class="edgex" role="button" tabindex="-1" aria-label="Delete this route" onpointerdown={(ev) => ev.stopPropagation()} onclick={removeEdge} onkeydown={() => {}}>
+            <title>Delete this failure route</title>
+            <circle cx={m.x} cy={m.y} r="12" />
+            <path d={`M${m.x - 4},${m.y - 4} l8,8 M${m.x + 4},${m.y - 4} l-8,8`} />
+          </g>
+        {/if}
+      {:else}
+        <g class="arrowswitch" transform={`translate(${m.x + chipRow.shift} ${m.y})`}>
+          {#each chipRow.items as sw (sw.o)}
+            {@const on = pickedOutcomes.includes(sw.o)}
+            {@const tone = sw.o === 'success' ? 'success' : sw.o === 'failure' ? 'failure' : 'named'}
+            <g class="switch {tone}" class:on style:--chip={portColour(pickedE.from, portIdOf(sw.o))} role="switch" aria-checked={on} aria-label={`Run when the step ends with ${sw.o}`} tabindex="-1"
+              onpointerdown={(ev) => ev.stopPropagation()} onclick={() => switchOutcome(sw.o)} onkeydown={() => {}}>
+              <title>{on ? `Runs on ${sw.o}: click to stop` : `Click to also run on ${sw.o}`}</title>
+              <rect x={sw.x} y="-13" width={sw.w} height="26" rx="13" />
+              <path class="tick" d={`M${sw.x + 11},0 l4,4 l8,-8`} />
+              <text x={sw.x + 29} y="4">{outcomeLabel(sw.o)}</text>
+            </g>
+          {/each}
+          {#if editable}
+            <g class="edgex" role="button" tabindex="-1" aria-label="Remove this arrow" onpointerdown={(ev) => ev.stopPropagation()} onclick={removeEdge} onkeydown={() => {}}>
+              <title>Remove this arrow: the step is then not started by it</title>
+              <circle cx={(chipRow.items.at(-1)?.x ?? 0) + (chipRow.items.at(-1)?.w ?? 0) + 18} cy="0" r="12" />
+              <path d={`M${(chipRow.items.at(-1)?.x ?? 0) + (chipRow.items.at(-1)?.w ?? 0) + 14},-4 l8,8 M${(chipRow.items.at(-1)?.x ?? 0) + (chipRow.items.at(-1)?.w ?? 0) + 22},-4 l-8,8`} />
+            </g>
+          {/if}
+        </g>
+      {/if}
+    {/if}
+
     {#if onadd && !moving && !link}
       {#if addAfter}
         {@const joined = plusOnEdge(addAfter, true)}
@@ -807,8 +989,8 @@
     {#if link}
       {@const from = byId.get(link.from)}
       {#if from}
-        <path class="linking" class:wire={link.data} d={link.data ? `M${at(from).x + from.w / 2},${at(from).y + (from.headH || from.h)} L${link.x},${link.y}` : `M${at(from).x + from.w},${portY(from)} L${link.x},${link.y}`} />
-        <text class="slotlabel" x={link.x + 10} y={link.y - 8}>{link.data ? `Release on a step to pass it a value from ${from.nodes[0]}` : `Release on a step to make it wait for ${from.nodes[from.core ?? 0]}`}</text>
+        <path class="linking" class:wire={link.data} class:failing={link.port === 'fail'} class:named={!!link.port && link.port.startsWith('outcome-')} d={link.data ? `M${at(from).x + from.w / 2},${at(from).y + (from.headH || from.h)} L${link.x},${link.y}` : `M${at(from).x + from.w},${link.port && link.port !== 'done' ? portYOf(from, link.port) : portY(from)} L${link.x},${link.y}`} />
+        <text class="slotlabel" x={link.x + 10} y={link.y - 8}>{link.data ? `Release on a step to pass it a value from ${from.nodes[0]}` : link.port === 'fail' ? `Release on a step to run it when ${coreOf(from)} fails` : link.port?.startsWith('outcome-') ? `Release on a step to run it on ${outcomeOfPort(link.port)} of ${coreOf(from)}` : `Release on a step to make it wait for ${coreOf(from)}`}</text>
       {/if}
     {/if}
     {#if slot?.ok}
@@ -884,18 +1066,41 @@
   .addcase rect { fill: var(--panel); stroke: var(--accent); stroke-dasharray: 3 3; }
   .addcase text { fill: var(--accent); font-size: 11px; pointer-events: none; }
   .addcase:hover rect { fill: color-mix(in srgb, var(--accent) 18%, var(--panel)); }
-  .data { fill: none; stroke: var(--data); stroke-width: 1.3; stroke-dasharray: 2 4; opacity: 0.55; pointer-events: none; }
-  .data.hot { opacity: 1; stroke-width: 1.8; }
-  .datalabel { fill: var(--data); font-size: 10px; opacity: 0.7; pointer-events: none; }
+  /* Faint, thin dots were not seen as an arrow at all after a value was connected. */
+  .data { fill: none; stroke: var(--data); stroke-width: 2; stroke-dasharray: 6 4; opacity: 0.9; pointer-events: none; }
+  .data.hot { opacity: 1; stroke-width: 2.6; }
+  .datalabel { fill: var(--data); font-size: 11px; opacity: 0.9; pointer-events: none; }
   .datalabel.hot { opacity: 1; font-weight: 600; }
   .edgelabel { fill: var(--muted); font-size: 10px; font-style: italic; pointer-events: none; }
   .branchlabel { fill: var(--accent); font-size: 11px; font-weight: 600; pointer-events: none; }
   .edge.branch { stroke-dasharray: none; }
   .lane { fill: none; stroke: var(--line); stroke-dasharray: 6 5; }
   .edge { fill: none; stroke: var(--muted); stroke-width: 1.6; }
-  .edge.needs { stroke-dasharray: 4 4; }
   .edge.fail, .flow.fail { stroke: var(--fail); }
-  .edge.fail { stroke-dasharray: 5 4; }
+  .edgehit { fill: none; stroke: transparent; stroke-width: 16; pointer-events: stroke; cursor: pointer; }
+  .edgepick { fill: none; stroke: var(--accent); stroke-width: 3; opacity: 0; pointer-events: none; }
+  .edgepick.on { opacity: 0.9; }
+  .readonly .edgehit { cursor: default; }
+  .edgex { cursor: pointer; }
+  .edgex circle { fill: var(--panel); stroke: var(--accent); stroke-width: 2; }
+  .edgex:hover circle { fill: var(--fail); stroke: var(--fail); }
+  .edgex path { fill: none; stroke: var(--text); stroke-width: 2; stroke-linecap: round; pointer-events: none; }
+  .switch { cursor: pointer; }
+  .switch rect { fill: var(--panel); stroke: var(--line); stroke-width: 1.4; filter: drop-shadow(0 2px 6px rgb(0 0 0 / 0.3)); }
+  .switch text { fill: var(--muted); font-size: 12px; font-weight: 600; pointer-events: none; }
+  .switch .tick { fill: none; stroke: transparent; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; pointer-events: none; }
+  .switch.on text { fill: var(--text); }
+  .switch.on rect { stroke: var(--chip, var(--accent)); }
+  .switch.success.on rect { stroke: var(--chip, var(--ok)); fill: color-mix(in srgb, var(--chip, var(--ok)) 18%, var(--panel)); }
+  .switch.named.on rect { stroke: var(--chip, var(--info)); fill: color-mix(in srgb, var(--chip, var(--info)) 18%, var(--panel)); }
+  .switch.named.on .tick { stroke: var(--chip, var(--info)); }
+  .switch.failure.on rect { stroke: var(--chip, var(--fail)); fill: color-mix(in srgb, var(--chip, var(--fail)) 18%, var(--panel)); }
+  .switch.success.on .tick { stroke: var(--chip, var(--ok)); }
+  .switch.failure.on .tick { stroke: var(--chip, var(--fail)); }
+  .switch:hover rect { stroke: var(--accent); }
+  .linking.failing { stroke: var(--fail); }
+  .linking.named, .edge.named, .flow.named { stroke: var(--info); }
+  .edgelabel.named { fill: var(--info); }
   .edgelabel.fail { fill: var(--fail); }
   .failport { fill: var(--bg); stroke: var(--fail); stroke-width: 2; pointer-events: none; }
   .flow {

@@ -69,3 +69,20 @@ func TestExpressionVocabulary_should_not_repeat_a_name(t *testing.T) {
 		seen[s.Insert] = true
 	}
 }
+
+func TestExpressionVocabulary_should_offer_the_names_a_dataset_check_can_read(t *testing.T) {
+	want := []string{"rows", "columns", "row_count", "truncated", "outcome", "body"}
+
+	got := insertsOf(ExpressionVocabulary(ExprDatasetCheck))
+
+	for _, name := range want {
+		if _, ok := got[name]; !ok {
+			t.Errorf("missing %q in %v", name, got)
+		}
+	}
+	for _, not := range []string{"status", "messages", "received"} {
+		if _, ok := got[not]; ok {
+			t.Errorf("%q is not defined for a dataset check", not)
+		}
+	}
+}

@@ -5,6 +5,8 @@ package bridge
 import (
 	"errors"
 	"fmt"
+	"mime"
+	"path"
 	"slices"
 	"strconv"
 	"strings"
@@ -30,8 +32,10 @@ type ResponseView struct {
 	Received []PartView    `json:"received"`
 	Diags    []string      `json:"diags"`
 	BodyJSON any           `json:"bodyJson,omitempty"` // the parsed JSON body, for the tree; absent for other bodies and large ones
+	BodyXML  string        `json:"bodyXml,omitempty"`  // the body text of an XML response (not HTML), for the tree and the multi-status list; absent otherwise and when large
 	Phases   []PhaseView   `json:"phases"`
 	Messages []MessageView `json:"messages"`
+	Table    *TableView    `json:"table,omitempty"` // the rows of a dataset response
 }
 
 // RequestView is an open request as its screen shows it.
@@ -39,7 +43,7 @@ type RequestView struct {
 	Node           string               `json:"node"`
 	Name           string               `json:"name"`
 	Path           string               `json:"path"`
-	Kind           string               `json:"kind"` // http, async or grpc
+	Kind           string               `json:"kind"` // http, async, grpc or dataset
 	Verb           string               `json:"verb"` // GET, POST …, or the protocol (MQTT, GRPC …): what the tab and pickers colour
 	Versions       []string             `json:"versions"`
 	VersionNames   []string             `json:"versionNames"` // each version's title, "" when it has none; in the order of Versions
@@ -67,6 +71,7 @@ type RequestView struct {
 	InScratch      bool                 `json:"inScratch"`      // a try-out request in the Scratch draft: saving it asks where to keep it
 	Async          *AsyncInfo           `json:"async,omitempty"`
 	GRPC           *GRPCInfo            `json:"grpc,omitempty"`
+	Dataset        *DatasetInfo         `json:"dataset,omitempty"`
 
 	// Parts are the parts of a multipart form body, for its editor.
 	Parts []MultipartPartView `json:"parts"`
@@ -246,12 +251,14 @@ func (s *RequestService) view(node string, o *openRequest) RequestView {
 		kind = "async"
 	case r.IsGRPC():
 		kind = "grpc"
+	case r.IsDataset():
+		kind = "dataset"
 	}
 	v := RequestView{
 		Node: node, Name: d.Name, Path: d.Path, Kind: kind, Verb: vm.Verb(r.Current()), Versions: r.Labels(), VersionNames: versionNamesOf(d), Selected: r.SelectedLabel(), Default: d.Default,
 		BodyKind: string(r.BodyKind()), BodyFormat: string(r.BodyFormat()), Multipart: r.Multipart(), Auth: authViewOf(r),
 		Dirty: r.Dirty(), OnDisk: r.ChangedOnDisk(), NeedsDrop: r.NeedsDropConfirm(), Error: r.Err(), Current: r.Current(), FullURL: vm.URLWithQuery(r.Current().URL, r.Current().Query), HookChain: nonNil(r.HookChain()),
-		InScratch: s.app.workspace.InScratch(node), Snippet: snippetViewOf(o.snip), Pipeline: pipelineOf(r, s.app.send.TraceFor(t)), Live: liveOf(s.app.send.TraceFor(t)), Async: asyncInfoOf(r), GRPC: grpcInfoOf(r), Sending: s.app.send.RunningFor(t), SendError: s.app.send.ErrFor(t),
+		InScratch: s.app.workspace.InScratch(node), Snippet: snippetViewOf(o.snip), Pipeline: pipelineOf(r, s.app.send.TraceFor(t)), Live: liveOf(s.app.send.TraceFor(t)), Async: asyncInfoOf(r), GRPC: grpcInfoOf(r), Dataset: datasetInfoOf(r), Sending: s.app.send.RunningFor(t), SendError: s.app.send.ErrFor(t),
 	}
 	v.FlowiOverlay, v.FlowiOverlays, v.FlowiOverlayNotes = r.OverlayName(), flowiOverlaysOf(r), nonNil(r.OverlayNotes())
 	v.FlowiOverlayMarks = flowiOverlayMarksOf(r)
@@ -282,6 +289,16 @@ func (s *RequestService) view(node string, o *openRequest) RequestView {
 // maxTreeBody is the largest JSON body sent to the window as a tree: bigger ones are shown as text.
 const maxTreeBody = 1 << 20
 
+// isXMLType says whether a Content-Type is XML: text/xml, application/xml or a +xml type (WebDAV answers are
+// application/xml). HTML is not: it is rarely well-formed and has no use for a tree.
+func isXMLType(contentType string) bool {
+	mediaType, _, err := mime.ParseMediaType(contentType)
+	if err != nil {
+		return false
+	}
+	return mediaType == "text/xml" || mediaType == "application/xml" || strings.HasSuffix(mediaType, "+xml")
+}
+
 func responseOf(ex vm.Exchange, f vm.ViewFormat) *ResponseView {
 	rv := &ResponseView{
 		Title: ex.Title, At: ex.At.Local().Format(time.TimeOnly), Passed: ex.Result.Status == engine.StatusPassed,
@@ -295,10 +312,14 @@ func responseOf(ex vm.Exchange, f vm.ViewFormat) *ResponseView {
 		if rec.Body.JSON != nil && rec.Body.Size <= maxTreeBody {
 			rv.BodyJSON = rec.Body.JSON
 		}
+		if isXMLType(rec.Body.ContentType) && rec.Body.Text != "" && rec.Body.Size <= maxTreeBody {
+			rv.BodyXML = rec.Body.Text
+		}
 		rv.Phases = phasesOf(rec.Timings)
 		rv.Took = vm.TookText(rec.Timings.Total)
 		rv.Size = sizeOf(rec)
 		rv.Messages = messagesOf(rec.Messages)
+		rv.Table = tableOf(rec)
 		rv.Sent = partsOf(vm.InputParts(model.Node{}, detail))
 		rv.Received = partsOf(vm.OutputParts(model.Node{}, detail, f))
 	}
@@ -375,21 +396,59 @@ func (s *RequestService) SuggestSavePath(node string) string {
 }
 
 // SaveTo saves the open request (its pending edits too), then moves it to
-// path in a collection (by its tree row) unless it is already there; the
+// the place a tree row stands for (a collection or a request folder), under
+// the name text, unless it is already there; the
 // moved request opens in place of this tab ("open" event, then close it).
-func (s *RequestService) SaveTo(node, collectionRow, path string) {
+func (s *RequestService) SaveTo(node, placeRow, text string) {
 	s.with(node, func(o *openRequest) {
-		to := s.app.workspace.Node(collectionRow).Collection
+		to, folder, ok := placeDestination(s.app.workspace, placeRow, "requests")
+		if !ok {
+			s.app.emit("notice", Notice{Level: "error", Text: "Choose a collection or a folder."})
+			return
+		}
+		dest := placePath(folder, text)
 		target := o.req.Target()
 		o.req.SaveThen(false, func() {
-			if _, r, found := s.app.workspace.Request(target); found && to == target.Collection && r.Path == path {
+			if _, r, found := s.app.workspace.Request(target); found && to == target.Collection && r.Path == dest {
 				return // saved where it was
 			}
-			s.app.workspace.MoveRequest(target, to, path, func(newRow string) {
+			s.app.workspace.MoveRequest(target, to, dest, func(newRow string) {
 				s.app.emit("open", newRow)
 				s.app.emit("close", node)
 			}, func(err error) { s.app.emit("notice", Notice{Level: "error", Text: vm.ErrorText(err)}) })
 		})
+	})
+}
+
+// SuggestCopyName is the name offered for a copy of the open request: its own with "-copy".
+func (s *RequestService) SuggestCopyName(node string) string {
+	return path.Base(s.app.workspace.Node(node).Path) + "-copy"
+}
+
+// PlaceOf is the tree row of the folder the request is in (its collection's row at the top): the
+// place a copy starts from.
+func (s *RequestService) PlaceOf(node string) string {
+	n := s.app.workspace.Node(node)
+	row := "c:" + string(n.Collection)
+	if dir := path.Dir(n.Path); dir != "." {
+		row += "/requests/" + dir
+	}
+	return row
+}
+
+// SaveAsNew copies the open request, as last saved, to the place a tree row stands for (a
+// collection or a request folder) under the name text, and opens the copy. The original and its
+// tab stay as they are, unsaved edits included: they are not in the copy.
+func (s *RequestService) SaveAsNew(node, placeRow, text string) {
+	s.with(node, func(o *openRequest) {
+		to, folder, ok := placeDestination(s.app.workspace, placeRow, "requests")
+		if !ok || strings.TrimSpace(text) == "" {
+			s.app.emit("notice", Notice{Level: "error", Text: "Choose a collection or a folder, and a name."})
+			return
+		}
+		s.app.workspace.DuplicateRequestTo(o.req.Target(), to, placePath(folder, text),
+			func(row string) { s.app.emit("open", row) },
+			func(err error) { s.app.emit("notice", Notice{Level: "error", Text: vm.ErrorText(err)}) })
 	})
 }
 
@@ -409,9 +468,10 @@ func untitledName(ws *vm.Workspace, node string, req *vm.Request) string {
 	return url
 }
 
-// sizeOf is the size of the body a send got back. Messages and gRPC calls have no single body, so they show none.
+// sizeOf is the size of the body a send got back. Messages, gRPC calls and queries have no single body, so they show
+// none: a query shows its rows.
 func sizeOf(rec *engine.Record) string {
-	if rec.HasMessages() || rec.Kind == engine.KindGRPC {
+	if rec.HasMessages() || rec.Kind == engine.KindGRPC || rec.Kind == engine.KindDataset {
 		return ""
 	}
 	return vm.SizeText(rec.Body.Size)
@@ -422,7 +482,7 @@ func codeOf(rec *engine.Record, fallback string) string {
 	switch {
 	case rec.Kind == engine.KindGRPC:
 		return rec.GRPCCode
-	case rec.HasMessages():
+	case rec.HasMessages(), rec.Kind == engine.KindDataset:
 		return rec.Outcome
 	case rec.Status != 0:
 		return strconv.Itoa(rec.Status)

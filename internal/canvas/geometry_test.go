@@ -97,7 +97,11 @@ func TestInsertNear_should_insert_before_or_after_the_node_under_the_pointer_or_
 	}{
 		{"first half of b goes before b", Point{X: b.X + 2, Y: b.Y + b.H/2}, 1, true},
 		{"second half of b goes after b", Point{X: b.X + b.W - 2, Y: b.Y + b.H/2}, 2, true},
-		{"in the gap, far above the connector", Point{X: (a.X + a.W + b.X) / 2, Y: b.Y - 300}, 1, true},
+		{"in the gap, a card's height above the connector", Point{X: (a.X + a.W + b.X) / 2, Y: b.Y - 100}, 1, true},
+		// Behaviour change: the gap took a drop however far to the side it was (300 above was fine), so a card
+		// carried past an arrow was still inserted into it. A drop further than sideReach from the arrow is free.
+		{"in the gap, far above the connector", Point{X: (a.X + a.W + b.X) / 2, Y: b.Y - 300}, 0, false},
+		{"in the gap, far below the connector", Point{X: (a.X + a.W + b.X) / 2, Y: b.Y + 400}, 0, false},
 		{"far beyond everything", Point{X: b.X + 5000, Y: b.Y}, 0, false},
 	}
 	for _, tt := range tests {

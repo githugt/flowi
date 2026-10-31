@@ -84,6 +84,23 @@ func (ws *Workspace) CreateGRPCRequest(collection model.ID, path string, open fu
 	}, ws.openThenReport(open, fail, &seedErr), fail)
 }
 
+// CreateDatasetRequest is CreateRequest for a dataset request of the given driver.
+func (ws *Workspace) CreateDatasetRequest(collection model.ID, path, driver string, open func(nodeID string), fail func(error)) {
+	var seedErr error
+	path = ws.untitledIfBlank(collection, path)
+	ws.create(func() (string, error) {
+		id, err := ws.orScratch(collection)
+		if err != nil {
+			return "", err
+		}
+		t, err := ws.b.NewDatasetRequest(id, path, driver)
+		if err == nil {
+			seedErr = ws.b.SeedRequestHooks(t) // the library seeds a dataset request with hooks that read the outcome
+		}
+		return requestNodeID(t), err
+	}, ws.openThenReport(open, fail, &seedErr), fail)
+}
+
 // GenerateGRPCRequests creates a gRPC request for each of methods in
 // collection (see flowi.Workspace.GenerateGRPCRequests), shows the tree with
 // them, then calls done with what was created and skipped.
@@ -111,6 +128,27 @@ func (ws *Workspace) CreateFolder(collection model.ID, tree, path string, fail f
 	ws.create(func() (string, error) {
 		return "", ws.b.NewFolder(collection, tree, path)
 	}, nil, fail)
+}
+
+// CreateDraftCollection creates a collection named name in Flowi's own folder and
+// calls open with its tree row: the place a request can be put without choosing a
+// folder on disk first.
+func (ws *Workspace) CreateDraftCollection(name string, open func(nodeID string), fail func(error)) {
+	ws.create(func() (string, error) {
+		m, err := ws.b.NewDraft(strings.TrimSpace(name))
+		return "c:" + string(m.ID), err
+	}, open, fail)
+}
+
+// CreateFolderAt is CreateFolder that calls open with the new folder's tree row.
+func (ws *Workspace) CreateFolderAt(collection model.ID, tree, path string, open func(nodeID string), fail func(error)) {
+	path = strings.Trim(strings.TrimSpace(path), "/")
+	ws.create(func() (string, error) {
+		if err := ws.b.NewFolder(collection, tree, path); err != nil {
+			return "", err
+		}
+		return "c:" + string(collection) + "/" + tree + "/" + path, nil
+	}, open, fail)
 }
 
 // SetFolderOrder sets the order the entries of folder dir ("" is the top of the

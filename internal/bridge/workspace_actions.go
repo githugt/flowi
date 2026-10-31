@@ -45,7 +45,7 @@ func actionNames() map[vm.Action]string {
 	return map[vm.Action]string{
 		vm.ActOpen: "open", vm.ActDuplicate: "duplicate", vm.ActRename: "rename", vm.ActDelete: "delete", vm.ActCopyMermaid: "mermaid",
 		vm.ActNewRequest: "newRequest", vm.ActNewEnvironment: "newEnvironment", vm.ActNewFlow: "newFlow", vm.ActFlowFromRequests: "flowFromRequests",
-		vm.ActNewFolder: "newFolder", vm.ActNewAsyncRequest: "newAsync", vm.ActNewGRPCRequest: "newGRPC",
+		vm.ActNewFolder: "newFolder", vm.ActNewAsyncRequest: "newAsync", vm.ActNewGRPCRequest: "newGRPC", vm.ActNewDatasetRequest: "newDataset",
 	}
 }
 
@@ -86,6 +86,8 @@ func (s *WorkspaceService) entry(item vm.MenuItem, ids []string) MenuEntry {
 		e.Prompt = &Prompt{Title: strings.TrimSuffix(e.Label, "…"), Label: nameLabel(where)}
 	case vm.ActNewAsyncRequest:
 		e.Prompt = &Prompt{Title: strings.TrimSuffix(e.Label, "…"), Label: nameLabel(where), Protocols: protocolChoices()}
+	case vm.ActNewDatasetRequest:
+		e.Prompt = &Prompt{Title: strings.TrimSuffix(e.Label, "…"), Label: nameLabel(where), Protocols: driverPromptChoices()}
 	case vm.ActNewFolder:
 		e.Prompt = &Prompt{Title: "New folder", Label: nameLabel(where)}
 	case vm.ActNewEnvironment:
@@ -115,6 +117,8 @@ func menuLabel(item vm.MenuItem) string {
 		return "New async request…"
 	case vm.ActNewGRPCRequest:
 		return "New gRPC request…"
+	case vm.ActNewDatasetRequest:
+		return "New dataset query…"
 	case vm.ActNewEnvironment:
 		return "New environment…"
 	case vm.ActNewFolder:
@@ -253,6 +257,8 @@ func (s *WorkspaceService) do(action string, ids []string, text, protocol string
 		ws.CreateAsyncRequest(n.Collection, prefix+text, protocol, open, fail)
 	case "newGRPC":
 		ws.CreateGRPCRequest(n.Collection, prefix+text, open, fail)
+	case "newDataset":
+		ws.CreateDatasetRequest(n.Collection, prefix+text, protocol, open, fail)
 	case "newFolder":
 		tree := n.Tree
 		if tree == "" {
@@ -297,9 +303,9 @@ func (s *WorkspaceService) NewScratchFlow() {
 	})
 }
 
-// NewIn creates a request, async request, gRPC request or flow at path in a
+// NewIn creates a request, async request, gRPC request, dataset query or flow at path in a
 // collection (by its tree row), then asks the window to open it. kind is
-// request, async, grpc or flow; protocol is for async.
+// request, async, grpc, dataset or flow; protocol is for async, and the database for a dataset query.
 func (s *WorkspaceService) NewIn(kind, collectionRow, path, protocol string) {
 	s.app.actor.Do(func() {
 		n := s.app.workspace.Node(collectionRow)
@@ -313,6 +319,8 @@ func (s *WorkspaceService) NewIn(kind, collectionRow, path, protocol string) {
 			ws.CreateAsyncRequest(n.Collection, path, protocol, open, fail)
 		case "grpc":
 			ws.CreateGRPCRequest(n.Collection, path, open, fail)
+		case "dataset":
+			ws.CreateDatasetRequest(n.Collection, path, protocol, open, fail)
 		case "flow":
 			ws.CreateFlow(n.Collection, path, open, fail)
 		default:

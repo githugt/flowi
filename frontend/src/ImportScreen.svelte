@@ -4,6 +4,7 @@
   import { ImportService } from '../bindings/github.com/githugt/flowi/internal/bridge'
   import type { ImportView } from './lib/types'
   import PathField from './PathField.svelte'
+  import { ui } from './lib/ui.svelte'
 
   let view = $state<ImportView | null>(null)
   let file = $state('')
@@ -18,8 +19,28 @@
     }),
   )
 
+  // The same chooser the new-request and Save dialogs use; an import fills a whole collection, so no folder.
+  function chooseCollection() {
+    ui.place = {
+      title: 'Import into',
+      action: 'Choose',
+      tree: 'requests',
+      collectionsOnly: true,
+      row: view ? `c:${view.collection}` : undefined,
+      done: (row) => ImportService.SetCollection(row.replace(/^c:/, '')),
+    }
+  }
+
+  // Back to choosing a file: the pasted text is let go.
+  function usePath() {
+    file = ''
+    ImportService.SetPaste('')
+    ImportService.SetFile('')
+  }
+
+  const collectionLabel = $derived(view?.collections.find((c) => c.id === view?.collection)?.label)
   const kind = $derived(view?.kinds.find((k) => k.id === view?.kind))
-  const hasSource = $derived(kind?.source === 'paste' ? !!(view?.paste || file) : !!file)
+  const hasSource = $derived(!!(view?.pasted || file))
 
   // A path chosen in the dialog or typed goes to Go once typing pauses.
   let timer: ReturnType<typeof setTimeout>
@@ -39,16 +60,21 @@
           {#each view.kinds as k}<option value={k.id}>{k.label}</option>{/each}
         </select>
       </label>
-      <label class="f"><span>Into collection</span>
-        {#key view.collections.length}
-          <select value={view.collection} onchange={(e) => ImportService.SetCollection(e.currentTarget.value)}>
-            {#each view.collections as c}<option value={c.id}>{c.label}</option>{/each}
-          </select>
-        {/key}
-      </label>
+      <div class="f"><span>Into collection</span>
+        <button type="button" class="choose" onclick={chooseCollection} title="Choose a collection, or make a new one">
+          {collectionLabel ?? 'Choose a collection…'}<span class="chev">▾</span>
+        </button>
+      </div>
     </div>
 
-    <PathField bind:value={file} kind={kind?.source === 'folder' ? 'folder' : 'file'} label={kind?.source === 'folder' ? 'Folder to import' : 'File to import, or an http(s) URL'} title="Choose what to import" />
+    {#if view.pasted}
+      <div class="pasted">
+        <span>Importing the text you pasted.</span>
+        <button type="button" class="link" onclick={usePath}>Choose a file instead</button>
+      </div>
+    {:else}
+      <PathField bind:value={file} kind={kind?.source === 'folder' ? 'folder' : 'file'} label={kind?.source === 'folder' ? 'Folder to import' : 'File to import, or an http(s) URL'} title="Choose what to import" />
+    {/if}
     {#if kind?.source === 'paste'}
       <label class="f"><span>…or paste it here (curl commands, a .http file, a Mermaid flowchart)</span>
         <textarea value={view.paste} oninput={(e) => ImportService.SetPaste(e.currentTarget.value)} spellcheck="false"></textarea>
@@ -113,6 +139,9 @@
   .note { color: var(--muted); margin: 0; }
   .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
   .f { display: flex; flex-direction: column; gap: 3px; color: var(--muted); font-size: var(--fs-xs); }
+  .choose { display: flex; justify-content: space-between; align-items: center; gap: 8px; text-align: left; background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); padding: 5px 8px; font: inherit; }
+  .choose:hover { border-color: var(--accent); }
+  .chev { color: var(--muted); }
   select, input, textarea { background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); padding: 5px 8px; font: inherit; -webkit-user-select: text; user-select: text; }
   textarea { min-height: 90px; font: var(--fs-sm) var(--mono); resize: vertical; }
   .actions { display: flex; gap: 8px; }

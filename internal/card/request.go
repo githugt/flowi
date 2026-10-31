@@ -27,21 +27,22 @@ type kindRule struct {
 // connection open between steps (WebSocket, MQTT, NATS) have a Connection row.
 func kindRules() map[string]kindRule {
 	return map[string]kindRule{
-		"http":       {rows: []string{"inputs", "hooks", "settings"}, inputs: []string{"auth", "query", "headers", "body"}, sendWord: "GET"},
-		"graphql":    {rows: []string{"inputs", "hooks", "settings"}, inputs: []string{"auth", "variables", "headers"}, sendWord: "QUERY"},
-		"grpc":       {rows: []string{"send", "hooks", "settings"}, authInSend: true, prop: "metadata", props: "metadata", sendWord: "UNARY"},
-		"ws":         {rows: []string{"inputs", "send", "receive", "connection", "hooks"}, inputs: []string{"auth", "headers"}, sendWord: "SEND", recvWord: "LISTEN"},
-		"sse":        {rows: []string{"inputs", "receive", "hooks", "settings"}, inputs: []string{"auth", "query", "headers"}, recvWord: "LISTEN", sendWord: "LISTEN"},
-		"mqtt":       {rows: []string{"send", "receive", "connection", "hooks", "settings"}, prop: "property", props: "properties", sendWord: "PUBLISH", recvWord: "SUBSCRIBE"},
-		"nats":       {rows: []string{"send", "receive", "connection", "hooks"}, prop: "header", props: "headers", sendWord: "PUBLISH", recvWord: "SUBSCRIBE"},
-		"kafka":      {rows: []string{"send", "receive", "hooks", "settings"}, prop: "header", props: "headers", sendWord: "PRODUCE", recvWord: "CONSUME"},
-		"amqp":       {rows: []string{"send", "receive", "hooks", "settings"}, prop: "property", props: "properties", sendWord: "PUBLISH", recvWord: "CONSUME"},
-		"amqp10":     {rows: []string{"send", "receive", "hooks", "settings"}, prop: "property", props: "properties", sendWord: "PUBLISH", recvWord: "CONSUME"},
-		"redis":      {rows: []string{"send", "receive", "hooks"}, prop: "field", props: "fields", sendWord: "PUBLISH", recvWord: "READ"},
-		"sns":        {rows: []string{"send", "hooks", "settings"}, prop: "attribute", props: "attributes", sendWord: "PUBLISH"},
-		"sqs":        {rows: []string{"send", "receive", "hooks", "settings"}, prop: "attribute", props: "attributes", sendWord: "SEND", recvWord: "RECEIVE"},
-		"pubsub":     {rows: []string{"send", "receive", "hooks"}, prop: "attribute", props: "attributes", sendWord: "PUBLISH", recvWord: "PULL"},
-		"servicebus": {rows: []string{"send", "receive", "hooks", "settings"}, prop: "property", props: "properties", sendWord: "SEND", recvWord: "RECEIVE"},
+		"http":       {rows: []string{"inputs", "hooks", "outcomes", "settings"}, inputs: []string{"auth", "query", "headers", "body"}, sendWord: "GET"},
+		"graphql":    {rows: []string{"inputs", "hooks", "outcomes", "settings"}, inputs: []string{"auth", "variables", "headers"}, sendWord: "QUERY"},
+		"grpc":       {rows: []string{"send", "hooks", "outcomes", "settings"}, authInSend: true, prop: "metadata", props: "metadata", sendWord: "UNARY"},
+		"dataset":    {rows: []string{"send", "hooks", "outcomes", "settings"}, prop: "param", props: "params", sendWord: "SQL"},
+		"ws":         {rows: []string{"inputs", "send", "receive", "connection", "hooks", "outcomes"}, inputs: []string{"auth", "headers"}, sendWord: "SEND", recvWord: "LISTEN"},
+		"sse":        {rows: []string{"inputs", "receive", "hooks", "outcomes", "settings"}, inputs: []string{"auth", "query", "headers"}, recvWord: "LISTEN", sendWord: "LISTEN"},
+		"mqtt":       {rows: []string{"send", "receive", "connection", "hooks", "outcomes", "settings"}, prop: "property", props: "properties", sendWord: "PUBLISH", recvWord: "SUBSCRIBE"},
+		"nats":       {rows: []string{"send", "receive", "connection", "hooks", "outcomes"}, prop: "header", props: "headers", sendWord: "PUBLISH", recvWord: "SUBSCRIBE"},
+		"kafka":      {rows: []string{"send", "receive", "hooks", "outcomes", "settings"}, prop: "header", props: "headers", sendWord: "PRODUCE", recvWord: "CONSUME"},
+		"amqp":       {rows: []string{"send", "receive", "hooks", "outcomes", "settings"}, prop: "property", props: "properties", sendWord: "PUBLISH", recvWord: "CONSUME"},
+		"amqp10":     {rows: []string{"send", "receive", "hooks", "outcomes", "settings"}, prop: "property", props: "properties", sendWord: "PUBLISH", recvWord: "CONSUME"},
+		"redis":      {rows: []string{"send", "receive", "hooks", "outcomes"}, prop: "field", props: "fields", sendWord: "PUBLISH", recvWord: "READ"},
+		"sns":        {rows: []string{"send", "hooks", "outcomes", "settings"}, prop: "attribute", props: "attributes", sendWord: "PUBLISH"},
+		"sqs":        {rows: []string{"send", "receive", "hooks", "outcomes", "settings"}, prop: "attribute", props: "attributes", sendWord: "SEND", recvWord: "RECEIVE"},
+		"pubsub":     {rows: []string{"send", "receive", "hooks", "outcomes"}, prop: "attribute", props: "attributes", sendWord: "PUBLISH", recvWord: "PULL"},
+		"servicebus": {rows: []string{"send", "receive", "hooks", "outcomes", "settings"}, prop: "property", props: "properties", sendWord: "SEND", recvWord: "RECEIVE"},
 	}
 }
 
@@ -51,6 +52,9 @@ func summarizeRequest(n model.Node, f Facts) Card {
 		rule = kindRules()["http"]
 	}
 	c := Card{Badge: badgeOf(f, rule), Subline: f.Target, Ports: donePorts()}
+	if len(f.Outcomes) > 0 {
+		c.Ports = outcomePorts(f.Outcomes)
+	}
 	specs := rowSpecs()
 	for _, key := range rule.rows {
 		spec := specs[key]

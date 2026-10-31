@@ -70,6 +70,14 @@ func flowFacts(c model.Collection, ref model.Ref) card.Facts {
 }
 
 func requestFacts(c model.Collection, n model.Node) card.Facts {
+	f := requestVersionFacts(c, n)
+	if len(n.Request.Outcomes) > 0 {
+		f.Outcomes = outcomeFactsOf(n.Request.Outcomes) // the step's own list wins over the request's
+	}
+	return f
+}
+
+func requestVersionFacts(c model.Collection, n model.Node) card.Facts {
 	ref := n.Request.Request
 	for _, r := range c.Requests {
 		if !sameRequest(r, ref) {
@@ -82,6 +90,7 @@ func requestFacts(c model.Collection, n model.Node) card.Facts {
 		f := versionFacts(v)
 		f.PreHooks, f.PostHooks = hooksThatRun(n.Request.Hooks, "pre", len(r.Hooks.Pre)+len(v.Hooks.Pre)), hooksThatRun(n.Request.Hooks, "post", len(r.Hooks.Post)+len(v.Hooks.Post))
 		f.Retry, f.Timeout = settingInt(v.Settings, "retry.max"), settingText(v.Settings, "timeout")
+		f.Outcomes = outcomeFactsOf(v.Outcomes)
 		return f
 	}
 	return card.Facts{Kind: "http", Target: ref.Path}
@@ -102,12 +111,26 @@ func versionFor(r model.Request, label string) (model.RequestVersion, bool) {
 	return model.RequestVersion{}, false
 }
 
+// outcomeFacts are the outcomes the version writes, nil when it writes none or an empty list (success and failure then).
+func outcomeFactsOf(list []model.Outcome) []card.OutcomeFact {
+	if len(list) == 0 {
+		return nil
+	}
+	out := make([]card.OutcomeFact, 0, len(list))
+	for _, o := range list {
+		out = append(out, card.OutcomeFact{Name: o.Name, Disabled: o.Disabled, Color: o.Color, Description: o.Description})
+	}
+	return out
+}
+
 func versionFacts(v model.RequestVersion) card.Facts {
 	switch {
 	case v.Async != nil:
 		return asyncFacts(v)
 	case v.GRPC != nil:
 		return grpcFacts(v)
+	case v.Dataset != nil:
+		return datasetFacts(v)
 	}
 	headers, auth := withoutAuthorization(v.Headers)
 	if v.Auth != nil {
@@ -130,6 +153,11 @@ func grpcFacts(v model.RequestVersion) card.Facts {
 		auth = v.Auth.Type
 	}
 	return card.Facts{Kind: "grpc", Method: method, Target: g.Method, Auth: auth, Body: bodyKind(g.Body), Props: len(v.Headers)}
+}
+
+func datasetFacts(v model.RequestVersion) card.Facts {
+	d := v.Dataset
+	return card.Facts{Kind: "dataset", Method: datasetVerb, Target: datasetTip(*d), Sends: true, Body: d.Driver, Props: len(d.Params)}
 }
 
 func asyncFacts(v model.RequestVersion) card.Facts {
