@@ -1,0 +1,48 @@
+# A flowi overlay is written as an OpenAPI Overlay for the specs the collection
+# keeps; what a spec has no place for is listed and stays in the flowi overlay.
+exec flowi import openapi api/openapi.yaml --init ./shop
+mkdir shop/overlays
+cp docs.flowi-overlay.yaml shop/overlays/docs.flowi-overlay.yaml
+
+exec flowi overlay export docs
+stdout '^overlay: 1.0.0'
+stdout 'Reviewed by the team'
+stderr 'not carried: .*the settings'
+
+# With a folder, one document is written for each kept spec.
+exec flowi overlay export docs --to out
+stdout 'Wrote out.docs.openapi.overlay.yaml'
+exists out/docs.openapi.overlay.yaml
+
+# An overlay a spec cannot hold writes nothing and says so.
+cp slow.flowi-overlay.yaml shop/overlays/slow.flowi-overlay.yaml
+exec flowi overlay export slow
+! stdout .
+stderr 'Nothing in this overlay can go into a spec'
+
+# The exported overlay applies to the same spec when imported again.
+exec flowi import openapi api/openapi.yaml --overlay out/docs.openapi.overlay.yaml --init ./again
+! stderr 'applied anyway'
+grep 'Reviewed by the team' again/requests/addPet.req.yaml
+
+-- api/openapi.yaml --
+openapi: 3.0.3
+info: {title: shop, version: 1.0.0}
+paths:
+  /pets:
+    post:
+      operationId: addPet
+      responses:
+        "200": {description: ok}
+-- docs.flowi-overlay.yaml --
+flowi_overlay: 1
+shared:
+  - set: docs
+    value: Reviewed by the team
+  - set: settings.timeouts.total
+    value: 1s
+-- slow.flowi-overlay.yaml --
+flowi_overlay: 1
+shared:
+  - set: settings.timeouts.total
+    value: 1s

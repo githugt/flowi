@@ -1,0 +1,71 @@
+# A flowi overlay is laid over the version at send time; it is not an OpenAPI Overlay.
+server-url tools/environments/local.yaml
+exec flowi workspace mount ./tools
+
+# Listing and showing.
+exec flowi overlay ls
+stdout 'Tools: vip'
+stdout '1 shared change'
+exec flowi overlay show vip
+stdout 'set: headers.X-Tier'
+
+# The plain request does not carry the overlay's header; the overlaid one does.
+exec flowi send echo --env local --headers
+! stdout 'X-Tier'
+exec flowi send echo --env local --flowi-overlay vip
+stdout '"X-Tier": "vip"'
+
+# A change that does not fit is a warning and the rest still applies.
+exec flowi send echo --env local --flowi-overlay stale
+stdout '"X-Tier": "vip"'
+stderr 'was left out'
+
+# Overlays stack: repeat the flag or join the names with +; the later one wins.
+exec flowi send echo --env local --flowi-overlay vip --flowi-overlay gold
+stdout '"X-Tier": "gold"'
+exec flowi send echo --env local --flowi-overlay vip+gold
+stdout '"X-Tier": "gold"'
+
+# An unknown overlay stops before anything is sent.
+! exec flowi send echo --env local --flowi-overlay ghost
+stderr 'no flowi overlay named "ghost"'
+
+# Deleting removes the file.
+exec flowi overlay rm vip
+! exists tools/overlays/vip.flowi-overlay.yaml
+
+-- tools/flowi.yaml --
+format: 1
+id: 01JA00000000000000000000T1
+name: Tools
+-- tools/environments/local.yaml --
+id: 01JA00000000000000000000T2
+vars:
+  base_url: SERVER_URL
+-- tools/requests/echo.req.yaml --
+id: 01JA00000000000000000000T4
+name: Echo
+versions:
+  "1":
+    method: POST
+    url: "{{env.base_url}}/echo"
+    body:
+      json: |
+        { "email": "a@example.com" }
+-- tools/overlays/vip.flowi-overlay.yaml --
+flowi_overlay: 1
+description: The VIP customer
+shared:
+  - set: headers.X-Tier
+    value: vip
+-- tools/overlays/gold.flowi-overlay.yaml --
+flowi_overlay: 1
+shared:
+  - set: headers.X-Tier
+    value: gold
+-- tools/overlays/stale.flowi-overlay.yaml --
+flowi_overlay: 1
+shared:
+  - set: headers.X-Tier
+    value: vip
+  - remove: headers.X-Gone

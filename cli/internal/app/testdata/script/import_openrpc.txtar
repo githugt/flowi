@@ -1,0 +1,18 @@
+# An OpenRPC document: one request per method, posting the JSON-RPC envelope to the document's server.
+exec flowi import openrpc pets.openrpc.json --init ./rpc
+stdout '^Created collection rpc'
+exists rpc/requests/pets.list.req.yaml
+grep '"jsonrpc": "2.0"' rpc/requests/pets.list.req.yaml
+grep '"method": "pets.list"' rpc/requests/pets.list.req.yaml
+grep 'base_url: https://rpc.example.com/v1' config/workspaces/default-workspace/environments/openrpc.yaml
+
+# A document that is not OpenRPC is refused.
+! exec flowi import openrpc not-rpc.json --collection rpc
+stderr 'FLW-IMPORT-002'
+
+-- pets.openrpc.json --
+{"openrpc": "1.2.6", "info": {"title": "Pets", "version": "1"},
+ "servers": [{"name": "prod", "url": "https://rpc.example.com/v1"}],
+ "methods": [{"name": "pets.list", "params": [{"name": "limit", "schema": {"type": "integer", "default": 10}}]}]}
+-- not-rpc.json --
+{"hello": "world"}
