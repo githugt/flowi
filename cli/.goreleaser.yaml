@@ -1,8 +1,8 @@
 # GoReleaser configuration for the flowi command line. Releases are cut by
 # .github/workflows/release-cli.yml when a cli/v* tag is pushed; nothing here is run
 # by the normal CI. The binary has no cgo (design 13.0), so every target is a
-# plain cross-compile. The version printed by `flowi version` comes from the
-# module version Go stamps into tagged builds, so no ldflags are needed.
+# plain cross-compile. The version printed by `flowi version` is the tag, given to the
+# linker below.
 version: 2
 
 project_name: flowi
@@ -15,6 +15,9 @@ builds:
       - CGO_ENABLED=0
     flags:
       - -trimpath
+    # Go does not stamp a version into a module in a subfolder, so the tag (cli/v1.2.3) is given to the linker.
+    ldflags:
+      - -s -w -X github.com/githugt/flowi/cli/internal/buildinfo.stamped=v{{ trimprefix .Tag "cli/v" }}
     goos: [linux, darwin, windows]
     goarch: [amd64, arm64]
 
