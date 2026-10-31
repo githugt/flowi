@@ -9,10 +9,11 @@ import (
 
 func TestVersionFrom(t *testing.T) {
 	tests := []struct {
-		name string
-		info *debug.BuildInfo
-		ok   bool
-		want string
+		name    string
+		stamped string
+		info    *debug.BuildInfo
+		ok      bool
+		want    string
 	}{
 		{name: "should_return_dev_when_build_info_missing", info: nil, ok: false, want: "dev"},
 		{
@@ -28,6 +29,15 @@ func TestVersionFrom(t *testing.T) {
 			want: "v0.1.0",
 		},
 		{
+			// A release build is made with -buildvcs=false and from a module in a subfolder, so Go stamps no
+			// version of its own: the one the release workflow gives the linker is the only one there is.
+			name:    "should_return_stamped_version_over_what_go_stamped",
+			stamped: "v0.4.0-alpha.1",
+			info:    &debug.BuildInfo{Main: debug.Module{Version: "(devel)"}},
+			ok:      true,
+			want:    "v0.4.0-alpha.1",
+		},
+		{
 			name: "should_append_short_revision_for_devel_build",
 			info: &debug.BuildInfo{
 				Main:     debug.Module{Version: "(devel)"},
@@ -39,7 +49,7 @@ func TestVersionFrom(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := versionFrom(tt.info, tt.ok)
+			got := versionFrom(tt.stamped, tt.info, tt.ok)
 
 			if got != tt.want {
 				t.Fatalf("got %q, want %q", got, tt.want)
