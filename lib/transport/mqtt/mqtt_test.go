@@ -17,8 +17,8 @@ import (
 	"github.com/mochi-mqtt/server/v2/listeners"
 	"github.com/mochi-mqtt/server/v2/packets"
 
-	"github.com/githugt/flowi-lib/transport"
-	"github.com/githugt/flowi-lib/transport/mqtt"
+	"github.com/githugt/flowi/lib/transport"
+	"github.com/githugt/flowi/lib/transport/mqtt"
 )
 
 // broker starts an in-process MQTT broker and returns its server URL.

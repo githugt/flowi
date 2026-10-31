@@ -8,7 +8,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/githugt/flowi-lib/settings"
+	"github.com/githugt/flowi/lib/settings"
 )
 
 // SettingField is one user setting on the settings page.

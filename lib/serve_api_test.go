@@ -18,9 +18,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/githugt/flowi-lib/model"
-	"github.com/githugt/flowi-lib/serve/replay"
-	"github.com/githugt/flowi-lib/serve/shared/sharedtest"
+	"github.com/githugt/flowi/lib/model"
+	"github.com/githugt/flowi/lib/serve/replay"
+	"github.com/githugt/flowi/lib/serve/shared/sharedtest"
 )
 
 // serveOnFreePorts starts a server on ephemeral loopback ports and stops

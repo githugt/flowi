@@ -16,9 +16,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/githugt/flowi-lib/diag"
-	"github.com/githugt/flowi-lib/importers"
-	"github.com/githugt/flowi-lib/model"
+	"github.com/githugt/flowi/lib/diag"
+	"github.com/githugt/flowi/lib/importers"
+	"github.com/githugt/flowi/lib/model"
 )
 
 // Resolver finds requests and flows by path.

@@ -3,7 +3,7 @@
   // command, an OpenAPI document …): fill the request from it, import it as new requests, or paste it
   // as typed. Importing shows the import screen's preview here, in short.
   import { onDestroy } from 'svelte'
-  import { ImportService, RequestService } from '../bindings/github.com/githugt/flowi/internal/bridge'
+  import { ImportService, RequestService } from '../bindings/github.com/githugt/flowi/app/internal/bridge'
   import { app } from './lib/app.svelte'
   import { errorText } from './lib/errors'
   import { live } from './lib/live'

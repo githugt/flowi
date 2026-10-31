@@ -8,7 +8,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/githugt/flowi-lib/model"
+	"github.com/githugt/flowi/lib/model"
 )
 
 // Diff works out the operations that turn base into edited, and the parts

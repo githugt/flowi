@@ -2,7 +2,7 @@
   // Update from spec: import a kept spec again with its overlays, from the kept copy or a newer
   // document. Requests it replaces keep your edits, checks, extractions and hooks; the preview says
   // what changes before anything is written.
-  import { ManagerService } from '../bindings/github.com/githugt/flowi/internal/bridge'
+  import { ManagerService } from '../bindings/github.com/githugt/flowi/app/internal/bridge'
   import { errorText } from './lib/errors'
   import { ui } from './lib/ui.svelte'
   import type { KeptSpec, SpecUpdate } from './lib/types'

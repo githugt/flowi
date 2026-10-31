@@ -15,13 +15,13 @@ import (
 	"github.com/samber/do/v2"
 	"github.com/spf13/cobra"
 
-	flowi "github.com/githugt/flowi-lib"
-	"github.com/githugt/flowi-lib/diag"
-	"github.com/githugt/flowi-lib/engine"
-	"github.com/githugt/flowi-lib/report"
+	flowi "github.com/githugt/flowi/lib"
+	"github.com/githugt/flowi/lib/diag"
+	"github.com/githugt/flowi/lib/engine"
+	"github.com/githugt/flowi/lib/report"
 
-	"github.com/githugt/flowi-cli/internal/buildinfo"
-	"github.com/githugt/flowi-cli/internal/tui"
+	"github.com/githugt/flowi/cli/internal/buildinfo"
+	"github.com/githugt/flowi/cli/internal/tui"
 )
 
 type runFlags struct {

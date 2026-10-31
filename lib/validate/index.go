@@ -3,8 +3,8 @@
 package validate
 
 import (
-	"github.com/githugt/flowi-lib/diag"
-	"github.com/githugt/flowi-lib/model"
+	"github.com/githugt/flowi/lib/diag"
+	"github.com/githugt/flowi/lib/model"
 )
 
 type entityKey struct{ collection, id model.ID }

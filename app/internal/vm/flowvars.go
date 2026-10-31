@@ -7,7 +7,7 @@ import (
 	"regexp"
 	"slices"
 
-	"github.com/githugt/flowi-lib/model"
+	"github.com/githugt/flowi/lib/model"
 )
 
 // FlowVars is what a flow does with variables and secrets, read from the flow

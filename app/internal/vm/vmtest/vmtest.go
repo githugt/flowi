@@ -14,20 +14,20 @@ import (
 	"sync"
 	"time"
 
-	flowi "github.com/githugt/flowi-lib"
-	"github.com/githugt/flowi-lib/analysis"
-	"github.com/githugt/flowi-lib/announce"
-	"github.com/githugt/flowi-lib/diag"
-	"github.com/githugt/flowi-lib/engine"
-	"github.com/githugt/flowi-lib/flowioverlay"
-	"github.com/githugt/flowi-lib/grpcx"
-	"github.com/githugt/flowi-lib/model"
-	"github.com/githugt/flowi-lib/schemainfer"
-	"github.com/githugt/flowi-lib/serve/replay"
-	"github.com/githugt/flowi-lib/serve/scheduler"
-	"github.com/githugt/flowi-lib/settings"
+	flowi "github.com/githugt/flowi/lib"
+	"github.com/githugt/flowi/lib/analysis"
+	"github.com/githugt/flowi/lib/announce"
+	"github.com/githugt/flowi/lib/diag"
+	"github.com/githugt/flowi/lib/engine"
+	"github.com/githugt/flowi/lib/flowioverlay"
+	"github.com/githugt/flowi/lib/grpcx"
+	"github.com/githugt/flowi/lib/model"
+	"github.com/githugt/flowi/lib/schemainfer"
+	"github.com/githugt/flowi/lib/serve/replay"
+	"github.com/githugt/flowi/lib/serve/scheduler"
+	"github.com/githugt/flowi/lib/settings"
 
-	"github.com/githugt/flowi/internal/vm"
+	"github.com/githugt/flowi/app/internal/vm"
 )
 
 // StoredEdit is one StoreEdit call.

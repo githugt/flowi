@@ -2,7 +2,7 @@
 
 package engine
 
-import "github.com/githugt/flowi-lib/internal/nodes"
+import "github.com/githugt/flowi/lib/internal/nodes"
 
 // keepVars remembers the flow's top-level variables for the report and gives
 // them the values an earlier run ended with (see RunInput.PriorVars).

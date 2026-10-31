@@ -15,7 +15,7 @@ import (
 
 	paho311 "github.com/eclipse/paho.mqtt.golang"
 
-	"github.com/githugt/flowi-lib/transport"
+	"github.com/githugt/flowi/lib/transport"
 )
 
 // Protocol levels of the `version` binding. MQTT 5 is the default.

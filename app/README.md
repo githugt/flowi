@@ -8,8 +8,8 @@ git repository; secrets stay in an encrypted local vault.
 
 ![A flow with its run results and the inspector](docs/images/flow-editor.png)
 
-Flowi is three repositories: this app, the [command-line tool](https://github.com/githugt/flowi-cli) that
-runs the same collections in CI, and the [core library](https://github.com/githugt/flowi-lib) both are built on.
+Flowi is one repository with three parts: this app (`app/`), the [command-line tool](../cli) that
+runs the same collections in CI, and the [core library](../lib) both are built on.
 
 ## Why
 
@@ -110,7 +110,7 @@ You need [Go](https://go.dev/dl/) 1.27 or later, [Node.js](https://nodejs.org/) 
 Xcode command line tools; on Windows the WebView2 runtime.
 
 ```bash
-git clone https://github.com/githugt/flowi && cd flowi
+git clone https://github.com/githugt/flowi && cd flowi/app
 just run          # build the front end, then start the app
 just build        # or build a binary into ./bin/flowi-app
 ```
@@ -127,7 +127,7 @@ just build        # or build a binary into ./bin/flowi-app
 
 `FLOWI_CONFIG_DIR` points the app at another config folder, so you can try it without touching your own
 workspace. To see it with data, mount the example collection in
-[flowi-lib](https://github.com/githugt/flowi-lib/tree/master/examples) (the folder icon in the sidebar) and start
+[the library's examples](../lib/examples) (the folder icon in the sidebar) and start
 its demo server.
 
 ## Develop

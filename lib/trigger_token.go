@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"slices"
 
-	"github.com/githugt/flowi-lib/vault"
+	"github.com/githugt/flowi/lib/vault"
 )
 
 // The trigger token is a workspace-level secret kept in the vault like any

@@ -10,13 +10,13 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/githugt/flowi-lib/diag"
-	"github.com/githugt/flowi-lib/internal/httpx"
-	"github.com/githugt/flowi-lib/internal/nodes"
-	"github.com/githugt/flowi-lib/model"
-	"github.com/githugt/flowi-lib/template"
-	"github.com/githugt/flowi-lib/transport"
-	transportall "github.com/githugt/flowi-lib/transport/all"
+	"github.com/githugt/flowi/lib/diag"
+	"github.com/githugt/flowi/lib/internal/httpx"
+	"github.com/githugt/flowi/lib/internal/nodes"
+	"github.com/githugt/flowi/lib/model"
+	"github.com/githugt/flowi/lib/template"
+	"github.com/githugt/flowi/lib/transport"
+	transportall "github.com/githugt/flowi/lib/transport/all"
 )
 
 // asyncMaxBytes stops a receive whose messages add up to more than this: a

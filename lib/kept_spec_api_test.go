@@ -10,7 +10,7 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/githugt/flowi-lib/model"
+	"github.com/githugt/flowi/lib/model"
 )
 
 func collectionRoot(t *testing.T, w *Workspace, c model.ID) string {

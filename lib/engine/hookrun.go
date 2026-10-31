@@ -7,9 +7,9 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/githugt/flowi-lib/diag"
-	"github.com/githugt/flowi-lib/internal/nodes"
-	"github.com/githugt/flowi-lib/ratelimit"
+	"github.com/githugt/flowi/lib/diag"
+	"github.com/githugt/flowi/lib/internal/nodes"
+	"github.com/githugt/flowi/lib/ratelimit"
 )
 
 // runPhase runs hook steps in order and stops at the first that fails.

@@ -5,7 +5,7 @@ package bridge
 import (
 	"log/slog"
 
-	"github.com/githugt/flowi/internal/vm"
+	"github.com/githugt/flowi/app/internal/vm"
 )
 
 // SessionService keeps what carries over between sessions: the open tabs,

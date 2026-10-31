@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/githugt/flowi/internal/vm"
+	"github.com/githugt/flowi/app/internal/vm"
 )
 
 // RunView is how the last run of a flow went, as the canvas and the header show it.

@@ -7,7 +7,7 @@ package main
 import (
 	"os"
 
-	"github.com/githugt/flowi/internal/preflight"
+	"github.com/githugt/flowi/app/internal/preflight"
 )
 
 // systemReady checks, before the window is made, that the system has what the web view needs; the message says what to

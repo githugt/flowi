@@ -7,10 +7,10 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/githugt/flowi-lib/diag"
-	"github.com/githugt/flowi-lib/engine"
+	"github.com/githugt/flowi/lib/diag"
+	"github.com/githugt/flowi/lib/engine"
 
-	"github.com/githugt/flowi/internal/vm"
+	"github.com/githugt/flowi/app/internal/vm"
 )
 
 // Emit publishes an event to the front end.

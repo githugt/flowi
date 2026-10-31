@@ -11,9 +11,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/githugt/flowi-lib/importers"
-	"github.com/githugt/flowi-lib/importers/importerstest"
-	"github.com/githugt/flowi-lib/model"
+	"github.com/githugt/flowi/lib/importers"
+	"github.com/githugt/flowi/lib/importers/importerstest"
+	"github.com/githugt/flowi/lib/model"
 )
 
 func TestTokenize_should_follow_shell_quoting(t *testing.T) {

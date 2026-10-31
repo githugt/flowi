@@ -20,7 +20,7 @@ import (
 	"github.com/twmb/franz-go/pkg/sasl/plain"
 	"github.com/twmb/franz-go/pkg/sasl/scram"
 
-	"github.com/githugt/flowi-lib/transport"
+	"github.com/githugt/flowi/lib/transport"
 )
 
 const (

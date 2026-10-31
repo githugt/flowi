@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"math"
 
-	"github.com/githugt/flowi-lib/diag"
-	"github.com/githugt/flowi-lib/model"
-	"github.com/githugt/flowi-lib/template"
+	"github.com/githugt/flowi/lib/diag"
+	"github.com/githugt/flowi/lib/model"
+	"github.com/githugt/flowi/lib/template"
 )
 
 // runValues writes a set node's values in order, so a later value may read

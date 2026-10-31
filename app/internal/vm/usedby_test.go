@@ -5,11 +5,11 @@ package vm_test
 import (
 	"testing"
 
-	flowi "github.com/githugt/flowi-lib"
-	"github.com/githugt/flowi-lib/analysis"
+	flowi "github.com/githugt/flowi/lib"
+	"github.com/githugt/flowi/lib/analysis"
 
-	"github.com/githugt/flowi/internal/vm"
-	"github.com/githugt/flowi/internal/vm/vmtest"
+	"github.com/githugt/flowi/app/internal/vm"
+	"github.com/githugt/flowi/app/internal/vm/vmtest"
 )
 
 func TestUsedBy_rows_per_version_and_consumer_targets(t *testing.T) {

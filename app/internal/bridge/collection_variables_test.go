@@ -5,11 +5,11 @@ package bridge_test
 import (
 	"testing"
 
-	flowi "github.com/githugt/flowi-lib"
-	"github.com/githugt/flowi-lib/diag"
-	"github.com/githugt/flowi-lib/model"
+	flowi "github.com/githugt/flowi/lib"
+	"github.com/githugt/flowi/lib/diag"
+	"github.com/githugt/flowi/lib/model"
 
-	"github.com/githugt/flowi/internal/bridge"
+	"github.com/githugt/flowi/app/internal/bridge"
 )
 
 type fakeVariables struct {

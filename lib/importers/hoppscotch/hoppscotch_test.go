@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/githugt/flowi-lib/diag"
-	"github.com/githugt/flowi-lib/importers/importerstest"
+	"github.com/githugt/flowi/lib/diag"
+	"github.com/githugt/flowi/lib/importers/importerstest"
 )
 
 func TestImport_corpus(t *testing.T) {

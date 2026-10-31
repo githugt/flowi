@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/githugt/flowi-lib/model"
+	"github.com/githugt/flowi/lib/model"
 )
 
 const recordedSession = `{"log": {"entries": [

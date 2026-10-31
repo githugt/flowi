@@ -19,7 +19,7 @@ import (
 	"github.com/eclipse/paho.golang/packets"
 	"github.com/eclipse/paho.golang/paho"
 
-	"github.com/githugt/flowi-lib/transport"
+	"github.com/githugt/flowi/lib/transport"
 )
 
 const keepAlive = 30 // seconds

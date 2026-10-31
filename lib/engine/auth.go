@@ -11,10 +11,10 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/githugt/flowi-lib/diag"
-	"github.com/githugt/flowi-lib/internal/authx"
-	"github.com/githugt/flowi-lib/internal/httpx"
-	"github.com/githugt/flowi-lib/model"
+	"github.com/githugt/flowi/lib/diag"
+	"github.com/githugt/flowi/lib/internal/authx"
+	"github.com/githugt/flowi/lib/internal/httpx"
+	"github.com/githugt/flowi/lib/model"
 )
 
 // authenticate applies the version's auth block to the request just before

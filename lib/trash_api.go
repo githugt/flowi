@@ -13,10 +13,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/githugt/flowi-lib/internal/names"
-	"github.com/githugt/flowi-lib/model"
-	"github.com/githugt/flowi-lib/store"
-	"github.com/githugt/flowi-lib/workspace"
+	"github.com/githugt/flowi/lib/internal/names"
+	"github.com/githugt/flowi/lib/model"
+	"github.com/githugt/flowi/lib/store"
+	"github.com/githugt/flowi/lib/workspace"
 )
 
 // Kinds of what the trash holds.

@@ -17,7 +17,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/githugt/flowi-lib/internal/httpx"
+	"github.com/githugt/flowi/lib/internal/httpx"
 )
 
 const (

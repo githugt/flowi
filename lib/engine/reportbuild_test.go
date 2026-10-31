@@ -13,9 +13,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/githugt/flowi-lib/diag"
-	"github.com/githugt/flowi-lib/model"
-	"github.com/githugt/flowi-lib/report"
+	"github.com/githugt/flowi/lib/diag"
+	"github.com/githugt/flowi/lib/model"
+	"github.com/githugt/flowi/lib/report"
 )
 
 var updateGolden = flag.Bool("update", false, "rewrite golden files") //nolint:gochecknoglobals // the standard golden-file flag; flags must be package-level to register before the test runs

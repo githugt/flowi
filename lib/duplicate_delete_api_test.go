@@ -8,7 +8,7 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/githugt/flowi-lib/diag"
+	"github.com/githugt/flowi/lib/diag"
 )
 
 func TestDuplicateRequest_should_copy_the_request_with_a_new_id_and_no_edit(t *testing.T) {

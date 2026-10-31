@@ -5,8 +5,8 @@ package curl
 import (
 	"strings"
 
-	"github.com/githugt/flowi-lib/importers"
-	"github.com/githugt/flowi-lib/model"
+	"github.com/githugt/flowi/lib/importers"
+	"github.com/githugt/flowi/lib/model"
 )
 
 // flagSpec says whether a flag takes a value and what it does; a nil set

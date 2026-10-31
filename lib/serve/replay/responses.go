@@ -13,7 +13,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/githugt/flowi-lib/model"
+	"github.com/githugt/flowi/lib/model"
 )
 
 // Where a response came from (X-Flowi-Source).

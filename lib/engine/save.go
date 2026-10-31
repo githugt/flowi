@@ -11,8 +11,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/githugt/flowi-lib/internal/names"
-	"github.com/githugt/flowi-lib/vault"
+	"github.com/githugt/flowi/lib/internal/names"
+	"github.com/githugt/flowi/lib/vault"
 )
 
 // saveDir is where this request version's responses are kept.

@@ -6,7 +6,7 @@ import (
 	"github.com/samber/do/v2"
 	"github.com/spf13/cobra"
 
-	"github.com/githugt/flowi-lib/diag"
+	"github.com/githugt/flowi/lib/diag"
 )
 
 func newValidateCommand(i do.Injector) *cobra.Command {

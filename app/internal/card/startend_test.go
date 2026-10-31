@@ -7,10 +7,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/githugt/flowi-lib/model"
-	"github.com/githugt/flowi-lib/report"
+	"github.com/githugt/flowi/lib/model"
+	"github.com/githugt/flowi/lib/report"
 
-	"github.com/githugt/flowi/internal/card"
+	"github.com/githugt/flowi/app/internal/card"
 )
 
 func TestStartCard_Given_inputs_Then_rows_are_in_declared_order_with_types(t *testing.T) {

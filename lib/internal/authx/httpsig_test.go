@@ -18,8 +18,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/githugt/flowi-lib/internal/httpx"
-	"github.com/githugt/flowi-lib/model"
+	"github.com/githugt/flowi/lib/internal/httpx"
+	"github.com/githugt/flowi/lib/model"
 )
 
 // The request of RFC 9421 appendix B.2.

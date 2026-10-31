@@ -9,9 +9,9 @@ import (
 	"github.com/goccy/go-yaml"
 	"github.com/goccy/go-yaml/ast"
 
-	"github.com/githugt/flowi-lib/diag"
-	"github.com/githugt/flowi-lib/model"
-	"github.com/githugt/flowi-lib/settings"
+	"github.com/githugt/flowi/lib/diag"
+	"github.com/githugt/flowi/lib/model"
+	"github.com/githugt/flowi/lib/settings"
 )
 
 // flatSettings is a settings block flattened to dotted keys, with the key

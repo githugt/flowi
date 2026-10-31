@@ -7,9 +7,9 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/githugt/flowi-lib/model"
+	"github.com/githugt/flowi/lib/model"
 
-	"github.com/githugt/flowi/internal/vm"
+	"github.com/githugt/flowi/app/internal/vm"
 )
 
 // AuthView is the Authorization header as the Auth section shows it.

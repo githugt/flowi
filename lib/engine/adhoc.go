@@ -11,9 +11,9 @@ import (
 	"path"
 	"slices"
 
-	"github.com/githugt/flowi-lib/diag"
-	"github.com/githugt/flowi-lib/internal/httpx"
-	"github.com/githugt/flowi-lib/internal/nodes"
+	"github.com/githugt/flowi/lib/diag"
+	"github.com/githugt/flowi/lib/internal/httpx"
+	"github.com/githugt/flowi/lib/internal/nodes"
 )
 
 // HTTP makes an ad-hoc call (fetch, webhook, digest webhook) with the

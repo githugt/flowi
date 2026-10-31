@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/githugt/flowi-lib/model"
-	"github.com/githugt/flowi-lib/vault"
+	"github.com/githugt/flowi/lib/model"
+	"github.com/githugt/flowi/lib/vault"
 )
 
 func TestPreviewSend_should_resolve_variables_without_sending(t *testing.T) {

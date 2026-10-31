@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/githugt/flowi-lib/model"
+	"github.com/githugt/flowi/lib/model"
 )
 
 // Node lists are addressed by YAML path, the way flowi-lib reports them:

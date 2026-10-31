@@ -12,8 +12,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/githugt/flowi-lib/engine"
-	"github.com/githugt/flowi-lib/internal/names"
+	"github.com/githugt/flowi/lib/engine"
+	"github.com/githugt/flowi/lib/internal/names"
 )
 
 // What a stored response is.

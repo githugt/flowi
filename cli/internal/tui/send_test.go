@@ -10,7 +10,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/githugt/flowi-lib/engine"
+	"github.com/githugt/flowi/lib/engine"
 )
 
 func feed(m sendModel, events ...engine.Event) sendModel {

@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/githugt/flowi-lib/transport"
-	"github.com/githugt/flowi-lib/transport/nats"
+	"github.com/githugt/flowi/lib/transport"
+	"github.com/githugt/flowi/lib/transport/nats"
 )
 
 func TestOpen_should_hold_messages_published_before_the_step_that_reads_them(t *testing.T) {

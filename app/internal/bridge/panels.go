@@ -6,10 +6,10 @@ import (
 	"fmt"
 	"time"
 
-	flowi "github.com/githugt/flowi-lib"
-	"github.com/githugt/flowi-lib/diag"
+	flowi "github.com/githugt/flowi/lib"
+	"github.com/githugt/flowi/lib/diag"
 
-	"github.com/githugt/flowi/internal/vm"
+	"github.com/githugt/flowi/app/internal/vm"
 )
 
 // LogLine is a line of the run log.

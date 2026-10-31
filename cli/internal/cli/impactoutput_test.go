@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/githugt/flowi-lib/analysis"
+	"github.com/githugt/flowi/lib/analysis"
 )
 
 func TestWriteImpactText_should_show_consumers_and_failing_reads(t *testing.T) {

@@ -5,7 +5,7 @@ package vm
 import (
 	"strconv"
 
-	"github.com/githugt/flowi-lib/model"
+	"github.com/githugt/flowi/lib/model"
 )
 
 // hop is one step on the way down to a node: the list it is in and its place there.

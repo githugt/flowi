@@ -9,13 +9,13 @@ import (
 	"strings"
 	"testing"
 
-	flowi "github.com/githugt/flowi-lib"
-	"github.com/githugt/flowi-lib/diag"
-	"github.com/githugt/flowi-lib/importers"
-	"github.com/githugt/flowi-lib/model"
+	flowi "github.com/githugt/flowi/lib"
+	"github.com/githugt/flowi/lib/diag"
+	"github.com/githugt/flowi/lib/importers"
+	"github.com/githugt/flowi/lib/model"
 
-	"github.com/githugt/flowi/internal/vm"
-	"github.com/githugt/flowi/internal/vm/vmtest"
+	"github.com/githugt/flowi/app/internal/vm"
+	"github.com/githugt/flowi/app/internal/vm/vmtest"
 )
 
 func newImportWizard(t *testing.T) (*vm.ImportWizard, *vmtest.Backend, *vm.Worker, string) {

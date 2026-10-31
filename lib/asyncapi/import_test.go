@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/githugt/flowi-lib/diag"
-	"github.com/githugt/flowi-lib/model"
+	"github.com/githugt/flowi/lib/diag"
+	"github.com/githugt/flowi/lib/model"
 )
 
 func newID() func() model.ID {

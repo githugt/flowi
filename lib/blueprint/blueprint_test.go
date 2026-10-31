@@ -9,8 +9,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/githugt/flowi-lib/diag"
-	"github.com/githugt/flowi-lib/model"
+	"github.com/githugt/flowi/lib/diag"
+	"github.com/githugt/flowi/lib/model"
 )
 
 // resolver is a fake that knows a few requests and flows by path.

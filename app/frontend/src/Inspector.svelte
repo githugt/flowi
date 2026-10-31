@@ -1,7 +1,7 @@
 <script lang="ts">
   import { confirmDeleteSteps } from './lib/flowDelete'
   import { errorText } from './lib/errors'
-  import { FlowService } from '../bindings/github.com/githugt/flowi/internal/bridge'
+  import { FlowService } from '../bindings/github.com/githugt/flowi/app/internal/bridge'
   import type { FlowView, Pair, ValueRow } from './lib/types'
   import ValuesEditor from './ValuesEditor.svelte'
   import TextField from './TextField.svelte'

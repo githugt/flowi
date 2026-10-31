@@ -8,14 +8,14 @@ import (
 	"os"
 	"slices"
 
-	flowi "github.com/githugt/flowi-lib"
-	"github.com/githugt/flowi-lib/diag"
-	"github.com/githugt/flowi-lib/importers"
-	"github.com/githugt/flowi-lib/importers/curl"
-	"github.com/githugt/flowi-lib/importers/httpfile"
-	"github.com/githugt/flowi-lib/model"
+	flowi "github.com/githugt/flowi/lib"
+	"github.com/githugt/flowi/lib/diag"
+	"github.com/githugt/flowi/lib/importers"
+	"github.com/githugt/flowi/lib/importers/curl"
+	"github.com/githugt/flowi/lib/importers/httpfile"
+	"github.com/githugt/flowi/lib/model"
 
-	"github.com/githugt/flowi/internal/vm"
+	"github.com/githugt/flowi/app/internal/vm"
 )
 
 // Text pasted into a request's address (a curl command, a .http request, an

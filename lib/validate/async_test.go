@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/githugt/flowi-lib/diag"
-	"github.com/githugt/flowi-lib/model"
+	"github.com/githugt/flowi/lib/diag"
+	"github.com/githugt/flowi/lib/model"
 )
 
 func TestAsync_should_report_what_is_wrong_with_a_version(t *testing.T) {

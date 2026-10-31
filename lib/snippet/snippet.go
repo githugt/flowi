@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/githugt/flowi-lib/engine"
+	"github.com/githugt/flowi/lib/engine"
 )
 
 // Format is a snippet language.

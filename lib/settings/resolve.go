@@ -5,8 +5,8 @@ package settings
 import (
 	"slices"
 
-	"github.com/githugt/flowi-lib/diag"
-	"github.com/githugt/flowi-lib/model"
+	"github.com/githugt/flowi/lib/diag"
+	"github.com/githugt/flowi/lib/model"
 )
 
 // LayerValues are the validated values one layer sets. Source names the

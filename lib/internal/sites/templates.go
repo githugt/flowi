@@ -3,9 +3,9 @@
 package sites
 
 import (
-	"github.com/githugt/flowi-lib/internal/nodes"
-	"github.com/githugt/flowi-lib/internal/yamlpath"
-	"github.com/githugt/flowi-lib/model"
+	"github.com/githugt/flowi/lib/internal/nodes"
+	"github.com/githugt/flowi/lib/internal/yamlpath"
+	"github.com/githugt/flowi/lib/model"
 )
 
 // Site is one template or expression and where it is written.

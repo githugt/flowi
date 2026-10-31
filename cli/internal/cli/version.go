@@ -7,7 +7,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/githugt/flowi-cli/internal/buildinfo"
+	"github.com/githugt/flowi/cli/internal/buildinfo"
 )
 
 func newVersionCommand() *cobra.Command {

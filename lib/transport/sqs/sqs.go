@@ -23,9 +23,9 @@ import (
 	awssqs "github.com/aws/aws-sdk-go-v2/service/sqs"
 	"github.com/aws/aws-sdk-go-v2/service/sqs/types"
 
-	"github.com/githugt/flowi-lib/transport"
-	"github.com/githugt/flowi-lib/transport/internal/awscfg"
-	shared "github.com/githugt/flowi-lib/transport/internal/pull"
+	"github.com/githugt/flowi/lib/transport"
+	"github.com/githugt/flowi/lib/transport/internal/awscfg"
+	shared "github.com/githugt/flowi/lib/transport/internal/pull"
 )
 
 const (

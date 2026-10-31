@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/githugt/flowi-lib/dataset"
-	"github.com/githugt/flowi-lib/model"
+	"github.com/githugt/flowi/lib/dataset"
+	"github.com/githugt/flowi/lib/model"
 )
 
 func TestRegistry_Run_Given_a_bad_server_should_explain_without_connecting(t *testing.T) {

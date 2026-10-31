@@ -6,7 +6,7 @@ import (
 	"slices"
 	"sync"
 
-	"github.com/githugt/flowi-lib/model"
+	"github.com/githugt/flowi/lib/model"
 )
 
 // inflight tracks the top-level leaf nodes running, in start order, so an

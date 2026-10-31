@@ -20,9 +20,9 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"github.com/githugt/flowi-lib/engine"
-	"github.com/githugt/flowi-lib/importers"
-	"github.com/githugt/flowi-lib/model"
+	"github.com/githugt/flowi/lib/engine"
+	"github.com/githugt/flowi/lib/importers"
+	"github.com/githugt/flowi/lib/model"
 )
 
 // MatchUpstreamError is the Match value when the upstream could not be

@@ -13,11 +13,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/githugt/flowi-lib/serve/replay"
-	"github.com/githugt/flowi-lib/serve/runs"
-	"github.com/githugt/flowi-lib/serve/scheduler"
-	"github.com/githugt/flowi-lib/serve/shared"
-	"github.com/githugt/flowi-lib/serve/trigger"
+	"github.com/githugt/flowi/lib/serve/replay"
+	"github.com/githugt/flowi/lib/serve/runs"
+	"github.com/githugt/flowi/lib/serve/scheduler"
+	"github.com/githugt/flowi/lib/serve/shared"
+	"github.com/githugt/flowi/lib/serve/trigger"
 )
 
 const (

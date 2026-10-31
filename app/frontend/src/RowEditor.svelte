@@ -1,7 +1,7 @@
 <script lang="ts">
   // What opens under a card when one of its rows is clicked: the same controls the side inspector has for that part
   // of the step, with nothing else. One row is open at a time; the card's step is the selected one.
-  import { FlowService } from '../bindings/github.com/githugt/flowi/internal/bridge'
+  import { FlowService } from '../bindings/github.com/githugt/flowi/app/internal/bridge'
   import type { FlowView, Pair, ValueRow } from './lib/types'
   import PairsEditor from './PairsEditor.svelte'
   import ValuesEditor from './ValuesEditor.svelte'

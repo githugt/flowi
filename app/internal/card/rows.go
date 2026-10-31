@@ -5,7 +5,7 @@ package card
 import (
 	"strconv"
 
-	"github.com/githugt/flowi-lib/model"
+	"github.com/githugt/flowi/lib/model"
 )
 
 // rowSpec says how one row is named, drawn and edited; its summary comes from

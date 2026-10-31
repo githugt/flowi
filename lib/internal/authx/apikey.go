@@ -8,7 +8,7 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/githugt/flowi-lib/internal/httpx"
+	"github.com/githugt/flowi/lib/internal/httpx"
 )
 
 // apiKey sends a key in a header, the query string or a cookie.

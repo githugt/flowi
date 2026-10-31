@@ -14,10 +14,10 @@ import (
 
 	"github.com/pb33f/libopenapi"
 
-	"github.com/githugt/flowi-lib/analysis"
-	"github.com/githugt/flowi-lib/diag"
-	"github.com/githugt/flowi-lib/importers"
-	"github.com/githugt/flowi-lib/model"
+	"github.com/githugt/flowi/lib/analysis"
+	"github.com/githugt/flowi/lib/diag"
+	"github.com/githugt/flowi/lib/importers"
+	"github.com/githugt/flowi/lib/model"
 )
 
 const fetchNameWorkflow = `arazzo: 1.0.1

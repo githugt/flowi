@@ -7,9 +7,9 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/githugt/flowi-lib/diag"
-	"github.com/githugt/flowi-lib/model"
-	"github.com/githugt/flowi-lib/transport"
+	"github.com/githugt/flowi/lib/diag"
+	"github.com/githugt/flowi/lib/model"
+	"github.com/githugt/flowi/lib/transport"
 )
 
 // keepable is a transport that can be kept open: every Open makes a session

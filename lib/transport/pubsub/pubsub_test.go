@@ -12,8 +12,8 @@ import (
 	"cloud.google.com/go/pubsub/v2/apiv1/pubsubpb"
 	"cloud.google.com/go/pubsub/v2/pstest"
 
-	"github.com/githugt/flowi-lib/transport"
-	"github.com/githugt/flowi-lib/transport/pubsub"
+	"github.com/githugt/flowi/lib/transport"
+	"github.com/githugt/flowi/lib/transport/pubsub"
 )
 
 const project = "demo"

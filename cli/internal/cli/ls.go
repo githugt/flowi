@@ -12,8 +12,8 @@ import (
 	"github.com/samber/do/v2"
 	"github.com/spf13/cobra"
 
-	"github.com/githugt/flowi-lib/model"
-	"github.com/githugt/flowi-lib/version"
+	"github.com/githugt/flowi/lib/model"
+	"github.com/githugt/flowi/lib/version"
 )
 
 // listSections are the parts of a collection "flowi ls" can show, in order.

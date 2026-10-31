@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/githugt/flowi-lib/engine"
+	"github.com/githugt/flowi/lib/engine"
 )
 
 func feedRun(m runModel, events ...engine.Event) runModel {

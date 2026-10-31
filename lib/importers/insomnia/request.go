@@ -7,8 +7,8 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/githugt/flowi-lib/importers"
-	"github.com/githugt/flowi-lib/model"
+	"github.com/githugt/flowi/lib/importers"
+	"github.com/githugt/flowi/lib/model"
 )
 
 // request imports one request into folders.

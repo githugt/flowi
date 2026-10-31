@@ -10,8 +10,8 @@ import (
 
 	"github.com/goccy/go-yaml"
 
-	"github.com/githugt/flowi-lib/diag"
-	"github.com/githugt/flowi-lib/model"
+	"github.com/githugt/flowi/lib/diag"
+	"github.com/githugt/flowi/lib/model"
 )
 
 // Version is the Arazzo version Export writes. Step fields 1.0.1 lacks

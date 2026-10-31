@@ -7,10 +7,10 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/githugt/flowi-lib/diag"
-	"github.com/githugt/flowi-lib/internal/nodes"
-	"github.com/githugt/flowi-lib/model"
-	"github.com/githugt/flowi-lib/template"
+	"github.com/githugt/flowi/lib/diag"
+	"github.com/githugt/flowi/lib/internal/nodes"
+	"github.com/githugt/flowi/lib/model"
+	"github.com/githugt/flowi/lib/template"
 )
 
 // defaultRunIterations bounds a flow-level run: without max_iterations it

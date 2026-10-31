@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/githugt/flowi-lib/model"
-	"github.com/githugt/flowi-lib/serve/scheduler"
+	"github.com/githugt/flowi/lib/model"
+	"github.com/githugt/flowi/lib/serve/scheduler"
 )
 
 func valid() model.Schedule {

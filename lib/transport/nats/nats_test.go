@@ -15,8 +15,8 @@ import (
 	natsgo "github.com/nats-io/nats.go"
 	"github.com/nats-io/nats.go/jetstream"
 
-	"github.com/githugt/flowi-lib/transport"
-	"github.com/githugt/flowi-lib/transport/nats"
+	"github.com/githugt/flowi/lib/transport"
+	"github.com/githugt/flowi/lib/transport/nats"
 )
 
 // startServer runs an embedded NATS server with JetStream and returns its URL.

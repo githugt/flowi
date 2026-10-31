@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/githugt/flowi-lib/serve/runs"
+	"github.com/githugt/flowi/lib/serve/runs"
 )
 
 // recordTTL is how long a published run stays readable by other instances.

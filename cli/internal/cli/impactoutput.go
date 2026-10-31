@@ -11,8 +11,8 @@ import (
 
 	"github.com/spf13/cobra"
 
-	flowi "github.com/githugt/flowi-lib"
-	"github.com/githugt/flowi-lib/analysis"
+	flowi "github.com/githugt/flowi/lib"
+	"github.com/githugt/flowi/lib/analysis"
 )
 
 func impactSymbol(s analysis.Status) string {

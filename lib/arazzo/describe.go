@@ -13,8 +13,8 @@ import (
 
 	"github.com/goccy/go-yaml"
 
-	"github.com/githugt/flowi-lib/model"
-	"github.com/githugt/flowi-lib/openapi"
+	"github.com/githugt/flowi/lib/model"
+	"github.com/githugt/flowi/lib/openapi"
 )
 
 // SchemaLookup gives Describe the schemas learned (or imported) for a request

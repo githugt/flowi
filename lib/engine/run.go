@@ -12,11 +12,11 @@ import (
 	"slices"
 	"time"
 
-	"github.com/githugt/flowi-lib/diag"
-	"github.com/githugt/flowi-lib/internal/httpx"
-	"github.com/githugt/flowi-lib/model"
-	"github.com/githugt/flowi-lib/report"
-	"github.com/githugt/flowi-lib/template"
+	"github.com/githugt/flowi/lib/diag"
+	"github.com/githugt/flowi/lib/internal/httpx"
+	"github.com/githugt/flowi/lib/model"
+	"github.com/githugt/flowi/lib/report"
+	"github.com/githugt/flowi/lib/template"
 )
 
 // RunInput is one flow run.

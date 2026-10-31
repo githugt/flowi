@@ -12,10 +12,10 @@ import (
 	"slices"
 	"strconv"
 
-	"github.com/githugt/flowi-lib/diag"
-	"github.com/githugt/flowi-lib/model"
-	"github.com/githugt/flowi-lib/openapi"
-	"github.com/githugt/flowi-lib/specoverlay"
+	"github.com/githugt/flowi/lib/diag"
+	"github.com/githugt/flowi/lib/model"
+	"github.com/githugt/flowi/lib/openapi"
+	"github.com/githugt/flowi/lib/specoverlay"
 )
 
 // KeptSpec is an OpenAPI description an import kept in descriptions/, with

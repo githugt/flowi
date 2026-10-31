@@ -14,7 +14,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/githugt/flowi-lib/internal/httpx"
+	"github.com/githugt/flowi/lib/internal/httpx"
 )
 
 // oauth1 signs a request with OAuth 1.0a (RFC 5849) and sends the result in

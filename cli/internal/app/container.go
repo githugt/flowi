@@ -10,11 +10,11 @@ import (
 
 	"github.com/samber/do/v2"
 
-	flowi "github.com/githugt/flowi-lib"
-	"github.com/githugt/flowi-lib/settings"
-	"github.com/githugt/flowi-lib/vault"
+	flowi "github.com/githugt/flowi/lib"
+	"github.com/githugt/flowi/lib/settings"
+	"github.com/githugt/flowi/lib/vault"
 
-	"github.com/githugt/flowi-cli/internal/cli"
+	"github.com/githugt/flowi/cli/internal/cli"
 )
 
 // Logging owns the process logger and its log file.

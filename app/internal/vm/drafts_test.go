@@ -6,11 +6,11 @@ import (
 	"errors"
 	"testing"
 
-	flowi "github.com/githugt/flowi-lib"
-	"github.com/githugt/flowi-lib/model"
+	flowi "github.com/githugt/flowi/lib"
+	"github.com/githugt/flowi/lib/model"
 
-	"github.com/githugt/flowi/internal/vm"
-	"github.com/githugt/flowi/internal/vm/vmtest"
+	"github.com/githugt/flowi/app/internal/vm"
+	"github.com/githugt/flowi/app/internal/vm/vmtest"
 )
 
 // Behaviour change: a collection stored in Flowi's own folder is an

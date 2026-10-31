@@ -7,8 +7,8 @@ import (
 
 	"github.com/goccy/go-yaml/ast"
 
-	"github.com/githugt/flowi-lib/diag"
-	"github.com/githugt/flowi-lib/internal/yamlpath"
+	"github.com/githugt/flowi/lib/diag"
+	"github.com/githugt/flowi/lib/internal/yamlpath"
 )
 
 // decoder walks a parsed YAML tree, collecting every problem it finds rather

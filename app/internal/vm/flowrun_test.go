@@ -7,11 +7,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/githugt/flowi-lib/engine"
-	"github.com/githugt/flowi-lib/model"
+	"github.com/githugt/flowi/lib/engine"
+	"github.com/githugt/flowi/lib/model"
 
-	"github.com/githugt/flowi/internal/vm"
-	"github.com/githugt/flowi/internal/vm/vmtest"
+	"github.com/githugt/flowi/app/internal/vm"
+	"github.com/githugt/flowi/app/internal/vm/vmtest"
 )
 
 func runFixture(t *testing.T, events []engine.Event) (*vm.FlowRun, *vmtest.Backend, *vm.Worker, map[string]string) {

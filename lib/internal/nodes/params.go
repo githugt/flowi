@@ -5,8 +5,8 @@ package nodes
 import (
 	"time"
 
-	"github.com/githugt/flowi-lib/diag"
-	"github.com/githugt/flowi-lib/model"
+	"github.com/githugt/flowi/lib/diag"
+	"github.com/githugt/flowi/lib/model"
 )
 
 // intParam reads an integer parameter (YAML ints are int64), or def.

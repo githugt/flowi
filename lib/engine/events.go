@@ -5,7 +5,7 @@ package engine
 import (
 	"time"
 
-	"github.com/githugt/flowi-lib/diag"
+	"github.com/githugt/flowi/lib/diag"
 )
 
 // Status is the outcome of a run, hook or node.

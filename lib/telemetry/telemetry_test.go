@@ -15,8 +15,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/githugt/flowi-lib/engine"
-	"github.com/githugt/flowi-lib/settings"
+	"github.com/githugt/flowi/lib/engine"
+	"github.com/githugt/flowi/lib/settings"
 )
 
 var updateReference = flag.Bool("update", false, "rewrite docs/reference/telemetry.md") //nolint:gochecknoglobals // the standard golden-file flag; flags must be package-level to register before the test runs

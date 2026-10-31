@@ -16,7 +16,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/githugt/flowi-lib/engine"
+	"github.com/githugt/flowi/lib/engine"
 )
 
 const (

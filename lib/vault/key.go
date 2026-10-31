@@ -12,7 +12,7 @@ import (
 	"github.com/zalando/go-keyring"
 	"golang.org/x/crypto/argon2"
 
-	"github.com/githugt/flowi-lib/model"
+	"github.com/githugt/flowi/lib/model"
 )
 
 // KeyStore is the OS keychain.

@@ -8,7 +8,7 @@ import (
 
 	"golang.org/x/net/http/httpguts"
 
-	"github.com/githugt/flowi-lib/settings"
+	"github.com/githugt/flowi/lib/settings"
 )
 
 // ConfigFrom reads the otel.* settings. on is false when no endpoint is

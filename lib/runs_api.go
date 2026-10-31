@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/githugt/flowi-lib/report"
+	"github.com/githugt/flowi/lib/report"
 )
 
 // RunSummary is one saved run of a flow, as much as a history list and a

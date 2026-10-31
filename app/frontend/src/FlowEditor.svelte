@@ -1,7 +1,7 @@
 <script lang="ts">
   import { tick } from 'svelte'
   import { confirmDeleteSteps } from './lib/flowDelete'
-  import { FlowService } from '../bindings/github.com/githugt/flowi/internal/bridge'
+  import { FlowService } from '../bindings/github.com/githugt/flowi/app/internal/bridge'
   import type { FlowView, Slot, StepChoice, WireChoices } from './lib/types'
   import Canvas, { type DragInfo } from './Canvas.svelte'
   import SidePanel from './SidePanel.svelte'

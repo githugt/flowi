@@ -8,8 +8,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/githugt/flowi-lib/model"
-	"github.com/githugt/flowi-lib/settings"
+	"github.com/githugt/flowi/lib/model"
+	"github.com/githugt/flowi/lib/settings"
 )
 
 // limits are the run-wide HTTP limits (plan Decision 2): at most cap

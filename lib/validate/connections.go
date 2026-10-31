@@ -3,10 +3,10 @@
 package validate
 
 import (
-	"github.com/githugt/flowi-lib/diag"
-	"github.com/githugt/flowi-lib/internal/sites"
-	"github.com/githugt/flowi-lib/internal/yamlpath"
-	"github.com/githugt/flowi-lib/model"
+	"github.com/githugt/flowi/lib/diag"
+	"github.com/githugt/flowi/lib/internal/sites"
+	"github.com/githugt/flowi/lib/internal/yamlpath"
+	"github.com/githugt/flowi/lib/model"
 )
 
 // checkConnections reports request steps that misuse a connection kept open:

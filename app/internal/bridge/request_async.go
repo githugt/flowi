@@ -5,10 +5,10 @@ package bridge
 import (
 	"slices"
 
-	"github.com/githugt/flowi-lib/grpcx"
-	"github.com/githugt/flowi-lib/model"
+	"github.com/githugt/flowi/lib/grpcx"
+	"github.com/githugt/flowi/lib/model"
 
-	"github.com/githugt/flowi/internal/vm"
+	"github.com/githugt/flowi/app/internal/vm"
 )
 
 // AsyncInfo is what the screen of a message request needs besides its block.

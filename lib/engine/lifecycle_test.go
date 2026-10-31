@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/githugt/flowi-lib/diag"
+	"github.com/githugt/flowi/lib/diag"
 )
 
 // An endpoint that announces its end (Deprecation, Sunset) is worth a warning on the send that heard it, and the

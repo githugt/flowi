@@ -24,8 +24,8 @@ import (
 	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/types/dynamicpb"
 
-	"github.com/githugt/flowi-lib/model"
-	"github.com/githugt/flowi-lib/transport"
+	"github.com/githugt/flowi/lib/model"
+	"github.com/githugt/flowi/lib/transport"
 )
 
 // gRPC-Web is gRPC for browsers and proxies that cannot do HTTP/2 trailers: the

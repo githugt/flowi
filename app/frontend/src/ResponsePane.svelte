@@ -1,6 +1,6 @@
 <script lang="ts">
   import { errorText } from './lib/errors'
-  import { RequestService } from '../bindings/github.com/githugt/flowi/internal/bridge'
+  import { RequestService } from '../bindings/github.com/githugt/flowi/app/internal/bridge'
   import type { RequestView } from './lib/types'
   import Parts from './Parts.svelte'
   import Problem from './Problem.svelte'

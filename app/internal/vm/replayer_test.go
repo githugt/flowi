@@ -6,11 +6,11 @@ import (
 	"errors"
 	"testing"
 
-	flowi "github.com/githugt/flowi-lib"
-	"github.com/githugt/flowi-lib/serve/replay"
+	flowi "github.com/githugt/flowi/lib"
+	"github.com/githugt/flowi/lib/serve/replay"
 
-	"github.com/githugt/flowi/internal/vm"
-	"github.com/githugt/flowi/internal/vm/vmtest"
+	"github.com/githugt/flowi/app/internal/vm"
+	"github.com/githugt/flowi/app/internal/vm/vmtest"
 )
 
 // uiQueue stands in for the UI goroutine: posted functions wait until the

@@ -12,10 +12,10 @@ import (
 	"sync/atomic"
 	"testing"
 
-	flowi "github.com/githugt/flowi-lib"
-	"github.com/githugt/flowi-lib/engine"
+	flowi "github.com/githugt/flowi/lib"
+	"github.com/githugt/flowi/lib/engine"
 
-	"github.com/githugt/flowi/internal/vm"
+	"github.com/githugt/flowi/app/internal/vm"
 )
 
 func TestSession_should_keep_the_open_tabs_between_runs(t *testing.T) {

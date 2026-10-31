@@ -5,7 +5,7 @@ package blueprint
 import (
 	"slices"
 
-	"github.com/githugt/flowi-lib/model"
+	"github.com/githugt/flowi/lib/model"
 )
 
 // cloneNodes copies a node tree and calls edit on every copy, children

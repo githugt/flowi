@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/githugt/flowi-lib/engine"
+	"github.com/githugt/flowi/lib/engine"
 )
 
 func TestLogRunAborted_should_write_the_exact_line(t *testing.T) {

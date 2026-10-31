@@ -17,9 +17,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/githugt/flowi-lib/engine"
-	"github.com/githugt/flowi-lib/model"
-	"github.com/githugt/flowi-lib/report"
+	"github.com/githugt/flowi/lib/engine"
+	"github.com/githugt/flowi/lib/model"
+	"github.com/githugt/flowi/lib/report"
 )
 
 // Format is the version of the layout. A bundle with a higher one was made by a newer Flowi.

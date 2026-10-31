@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/githugt/flowi-lib/model"
+	"github.com/githugt/flowi/lib/model"
 )
 
 func TestFormat_should_return_no_changes_for_canonical_tree(t *testing.T) {

@@ -6,10 +6,10 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/githugt/flowi-lib/dataset/readonly"
-	"github.com/githugt/flowi-lib/diag"
-	"github.com/githugt/flowi-lib/internal/yamlpath"
-	"github.com/githugt/flowi-lib/model"
+	"github.com/githugt/flowi/lib/dataset/readonly"
+	"github.com/githugt/flowi/lib/diag"
+	"github.com/githugt/flowi/lib/internal/yamlpath"
+	"github.com/githugt/flowi/lib/model"
 )
 
 // checkDataset reports what is wrong with the dataset versions of every request.

@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/githugt/flowi-lib/model"
+	"github.com/githugt/flowi/lib/model"
 )
 
 func TestStepCatalog_Then_it_lists_ten_entries_in_five_groups(t *testing.T) {

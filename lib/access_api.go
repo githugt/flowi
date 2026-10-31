@@ -9,12 +9,12 @@ import (
 	"regexp"
 	"slices"
 
-	"github.com/githugt/flowi-lib/analysis"
-	"github.com/githugt/flowi-lib/diag"
-	"github.com/githugt/flowi-lib/engine"
-	"github.com/githugt/flowi-lib/flowioverlay"
-	"github.com/githugt/flowi-lib/model"
-	"github.com/githugt/flowi-lib/report"
+	"github.com/githugt/flowi/lib/analysis"
+	"github.com/githugt/flowi/lib/diag"
+	"github.com/githugt/flowi/lib/engine"
+	"github.com/githugt/flowi/lib/flowioverlay"
+	"github.com/githugt/flowi/lib/model"
+	"github.com/githugt/flowi/lib/report"
 )
 
 // AccessOptions configure CheckAccess. An identity is a flowi overlay that makes the requests that user's: it

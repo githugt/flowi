@@ -10,12 +10,12 @@ import (
 	"sync"
 	"time"
 
-	"github.com/githugt/flowi-lib/diag"
-	"github.com/githugt/flowi-lib/internal/httpx"
-	"github.com/githugt/flowi-lib/model"
-	"github.com/githugt/flowi-lib/ratelimit"
-	"github.com/githugt/flowi-lib/report"
-	"github.com/githugt/flowi-lib/template"
+	"github.com/githugt/flowi/lib/diag"
+	"github.com/githugt/flowi/lib/internal/httpx"
+	"github.com/githugt/flowi/lib/model"
+	"github.com/githugt/flowi/lib/ratelimit"
+	"github.com/githugt/flowi/lib/report"
+	"github.com/githugt/flowi/lib/template"
 )
 
 // Phase is when a node runs relative to its request.

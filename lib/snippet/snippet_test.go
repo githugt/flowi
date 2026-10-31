@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/githugt/flowi-lib/engine"
+	"github.com/githugt/flowi/lib/engine"
 )
 
 func jsonPost() engine.PreviewRequest {

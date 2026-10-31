@@ -8,7 +8,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/githugt/flowi-lib/serve/runs"
+	"github.com/githugt/flowi/lib/serve/runs"
 )
 
 // runView is a run as the API shows it.

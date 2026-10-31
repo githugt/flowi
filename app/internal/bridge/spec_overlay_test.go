@@ -7,10 +7,10 @@ import (
 	"slices"
 	"testing"
 
-	flowi "github.com/githugt/flowi-lib"
-	"github.com/githugt/flowi-lib/model"
+	flowi "github.com/githugt/flowi/lib"
+	"github.com/githugt/flowi/lib/model"
 
-	"github.com/githugt/flowi/internal/bridge"
+	"github.com/githugt/flowi/app/internal/bridge"
 )
 
 // fakeSpecs is SpecOverlays with canned answers; it records what was applied.

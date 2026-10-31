@@ -6,7 +6,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/githugt/flowi/internal/vm"
+	"github.com/githugt/flowi/app/internal/vm"
 )
 
 // Pickers open the operating system's file dialogs. They are set by the

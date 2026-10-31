@@ -12,11 +12,11 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/githugt/flowi-lib/arazzo"
-	"github.com/githugt/flowi-lib/diag"
-	"github.com/githugt/flowi-lib/flowioverlay"
-	"github.com/githugt/flowi-lib/internal/migrate"
-	"github.com/githugt/flowi-lib/model"
+	"github.com/githugt/flowi/lib/arazzo"
+	"github.com/githugt/flowi/lib/diag"
+	"github.com/githugt/flowi/lib/flowioverlay"
+	"github.com/githugt/flowi/lib/internal/migrate"
+	"github.com/githugt/flowi/lib/model"
 )
 
 // Load reads the collection at root. User problems are returned as

@@ -14,9 +14,9 @@ import (
 	"github.com/samber/do/v2"
 	"github.com/spf13/cobra"
 
-	flowi "github.com/githugt/flowi-lib"
-	"github.com/githugt/flowi-lib/serve/replay"
-	"github.com/githugt/flowi-lib/vault"
+	flowi "github.com/githugt/flowi/lib"
+	"github.com/githugt/flowi/lib/serve/replay"
+	"github.com/githugt/flowi/lib/vault"
 )
 
 type serveFlags struct {

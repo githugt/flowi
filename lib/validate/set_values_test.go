@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/githugt/flowi-lib/diag"
-	"github.com/githugt/flowi-lib/model"
+	"github.com/githugt/flowi/lib/diag"
+	"github.com/githugt/flowi/lib/model"
 )
 
 func TestNodes_Given_a_removed_node_type_Then_the_diagnostic_names_the_replacement(t *testing.T) {

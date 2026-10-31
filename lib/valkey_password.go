@@ -3,7 +3,7 @@
 package flowi
 
 import (
-	"github.com/githugt/flowi-lib/vault"
+	"github.com/githugt/flowi/lib/vault"
 )
 
 // The Valkey password lives in the vault like the trigger token: an entry

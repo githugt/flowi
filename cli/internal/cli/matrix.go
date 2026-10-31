@@ -9,7 +9,7 @@ import (
 	"strings"
 	"text/tabwriter"
 
-	flowi "github.com/githugt/flowi-lib"
+	flowi "github.com/githugt/flowi/lib"
 )
 
 // maxMatrixCells keeps a typo from starting a thousand runs.

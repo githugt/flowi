@@ -7,7 +7,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/githugt/flowi-lib/model"
+	"github.com/githugt/flowi/lib/model"
 )
 
 // DepRow is a dependency of a collection and whether it is mounted.

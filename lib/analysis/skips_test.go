@@ -6,7 +6,7 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/githugt/flowi-lib/model"
+	"github.com/githugt/flowi/lib/model"
 )
 
 func skipFlow(reader string) model.Flow {

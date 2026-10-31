@@ -7,7 +7,7 @@ bin := justfile_directory() / "bin" / "flowi"
 # Scratch area for trying commands: its own config dir, so your real Flowi
 # settings and workspaces are never touched.
 sandbox := justfile_directory() / ".sandbox"
-lib := justfile_directory() / ".." / "flowi-lib"
+lib := justfile_directory() / ".." / "lib"
 example := lib / "examples" / "user-creation"
 
 # The sandbox vault uses a passphrase key, so trying commands never writes

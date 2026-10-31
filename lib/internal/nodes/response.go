@@ -11,9 +11,9 @@ import (
 
 	"github.com/theory/jsonpath"
 
-	"github.com/githugt/flowi-lib/internal/httpx"
-	"github.com/githugt/flowi-lib/internal/xmlpath"
-	"github.com/githugt/flowi-lib/model"
+	"github.com/githugt/flowi/lib/internal/httpx"
+	"github.com/githugt/flowi/lib/internal/xmlpath"
+	"github.com/githugt/flowi/lib/model"
 )
 
 // errNothing means an extraction matched nothing.

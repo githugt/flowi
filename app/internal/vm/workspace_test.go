@@ -9,11 +9,11 @@ import (
 	"testing"
 	"time"
 
-	flowi "github.com/githugt/flowi-lib"
-	"github.com/githugt/flowi-lib/model"
+	flowi "github.com/githugt/flowi/lib"
+	"github.com/githugt/flowi/lib/model"
 
-	"github.com/githugt/flowi/internal/vm"
-	"github.com/githugt/flowi/internal/vm/vmtest"
+	"github.com/githugt/flowi/app/internal/vm"
+	"github.com/githugt/flowi/app/internal/vm/vmtest"
 )
 
 func loadedWorkspace(t *testing.T, b *vmtest.Backend) (*vm.Workspace, *vm.Worker) {

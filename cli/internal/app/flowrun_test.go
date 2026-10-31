@@ -12,7 +12,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/githugt/flowi-cli/internal/cli"
+	"github.com/githugt/flowi/cli/internal/cli"
 )
 
 func TestRun_exit_codes(t *testing.T) {

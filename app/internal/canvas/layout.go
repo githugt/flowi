@@ -11,9 +11,9 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/githugt/flowi-lib/model"
+	"github.com/githugt/flowi/lib/model"
 
-	"github.com/githugt/flowi/internal/card"
+	"github.com/githugt/flowi/app/internal/card"
 )
 
 // key and index build YAML paths the way flowi-lib writes them

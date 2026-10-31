@@ -10,13 +10,13 @@ import (
 	"net/http"
 	"sync"
 
-	"github.com/githugt/flowi-lib/diag"
-	"github.com/githugt/flowi-lib/internal/httpx"
-	"github.com/githugt/flowi-lib/internal/names"
-	"github.com/githugt/flowi-lib/internal/nodes"
-	"github.com/githugt/flowi-lib/lifecycle"
-	"github.com/githugt/flowi-lib/model"
-	"github.com/githugt/flowi-lib/template"
+	"github.com/githugt/flowi/lib/diag"
+	"github.com/githugt/flowi/lib/internal/httpx"
+	"github.com/githugt/flowi/lib/internal/names"
+	"github.com/githugt/flowi/lib/internal/nodes"
+	"github.com/githugt/flowi/lib/lifecycle"
+	"github.com/githugt/flowi/lib/model"
+	"github.com/githugt/flowi/lib/template"
 )
 
 // execution is one request being executed, with its hooks.

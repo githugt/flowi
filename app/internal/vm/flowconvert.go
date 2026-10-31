@@ -7,8 +7,8 @@ import (
 	"slices"
 	"strings"
 
-	flowi "github.com/githugt/flowi-lib"
-	"github.com/githugt/flowi-lib/model"
+	flowi "github.com/githugt/flowi/lib"
+	"github.com/githugt/flowi/lib/model"
 )
 
 // StepEntry is one thing the step popup offers. Type is the node type it

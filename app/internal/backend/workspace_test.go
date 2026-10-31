@@ -5,8 +5,8 @@ package backend_test
 import (
 	"testing"
 
-	"github.com/githugt/flowi/internal/backend"
-	"github.com/githugt/flowi/internal/uithread"
+	"github.com/githugt/flowi/app/internal/backend"
+	"github.com/githugt/flowi/app/internal/uithread"
 )
 
 func TestWorkspace_Given_call_on_ui_goroutine_in_debug_Then_panics_before_the_library(t *testing.T) {

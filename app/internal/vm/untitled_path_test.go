@@ -5,9 +5,9 @@ package vm_test
 import (
 	"testing"
 
-	"github.com/githugt/flowi-lib/model"
+	"github.com/githugt/flowi/lib/model"
 
-	"github.com/githugt/flowi/internal/vm/vmtest"
+	"github.com/githugt/flowi/app/internal/vm/vmtest"
 )
 
 // Before: an empty path made nothing (the backend refused it silently).

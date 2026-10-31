@@ -7,7 +7,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/githugt/flowi-lib/internal/jsonschema"
+	"github.com/githugt/flowi/lib/internal/jsonschema"
 )
 
 // maxBodyDepth bounds generated bodies (deeply nested schemas).

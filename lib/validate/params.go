@@ -8,12 +8,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/githugt/flowi-lib/diag"
-	"github.com/githugt/flowi-lib/internal/names"
-	"github.com/githugt/flowi-lib/internal/nodes"
-	"github.com/githugt/flowi-lib/internal/sites"
-	"github.com/githugt/flowi-lib/internal/yamlpath"
-	"github.com/githugt/flowi-lib/model"
+	"github.com/githugt/flowi/lib/diag"
+	"github.com/githugt/flowi/lib/internal/names"
+	"github.com/githugt/flowi/lib/internal/nodes"
+	"github.com/githugt/flowi/lib/internal/sites"
+	"github.com/githugt/flowi/lib/internal/yamlpath"
+	"github.com/githugt/flowi/lib/model"
 )
 
 // checkParams checks every node's parameters against its spec: kinds,

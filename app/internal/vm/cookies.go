@@ -3,8 +3,8 @@
 package vm
 
 import (
-	flowi "github.com/githugt/flowi-lib"
-	"github.com/githugt/flowi-lib/model"
+	flowi "github.com/githugt/flowi/lib"
+	"github.com/githugt/flowi/lib/model"
 )
 
 // Cookies is the request screen's Cookies tab: the saved jar of the

@@ -11,8 +11,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/githugt/flowi-lib/diag"
-	"github.com/githugt/flowi-lib/model"
+	"github.com/githugt/flowi/lib/diag"
+	"github.com/githugt/flowi/lib/model"
 )
 
 func TestRequest_should_render_with_and_headers_and_return_runtime_outcome(t *testing.T) {

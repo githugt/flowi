@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/githugt/flowi-lib/serve/replay"
+	"github.com/githugt/flowi/lib/serve/replay"
 )
 
 func TestHandler_should_log_every_call_and_serve_the_log_and_routes(t *testing.T) {

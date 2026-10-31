@@ -12,10 +12,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/githugt/flowi-lib/diag"
-	"github.com/githugt/flowi-lib/model"
-	"github.com/githugt/flowi-lib/template"
-	"github.com/githugt/flowi-lib/vault"
+	"github.com/githugt/flowi/lib/diag"
+	"github.com/githugt/flowi/lib/model"
+	"github.com/githugt/flowi/lib/template"
+	"github.com/githugt/flowi/lib/vault"
 )
 
 func echoed(t *testing.T, rec *Record) map[string]any {

@@ -9,10 +9,10 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/githugt/flowi-lib/arazzo"
-	"github.com/githugt/flowi-lib/diag"
-	"github.com/githugt/flowi-lib/flowioverlay"
-	"github.com/githugt/flowi-lib/model"
+	"github.com/githugt/flowi/lib/arazzo"
+	"github.com/githugt/flowi/lib/diag"
+	"github.com/githugt/flowi/lib/flowioverlay"
+	"github.com/githugt/flowi/lib/model"
 )
 
 const newFileMode fs.FileMode = 0o644

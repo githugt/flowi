@@ -8,7 +8,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/githugt/flowi-lib/model"
+	"github.com/githugt/flowi/lib/model"
 )
 
 // Problem is an operation that did not fit the version it was applied to,

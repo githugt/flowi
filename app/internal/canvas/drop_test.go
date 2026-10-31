@@ -5,7 +5,7 @@ package canvas
 import (
 	"testing"
 
-	"github.com/githugt/flowi-lib/model"
+	"github.com/githugt/flowi/lib/model"
 )
 
 // A step dragged by its left edge has its centre outside a narrow lane while

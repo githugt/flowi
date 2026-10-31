@@ -1,5 +1,5 @@
 // The tree's context menu: the entries come from Go; this runs them, asking first where they say to.
-import { BlueprintsService, WorkspaceService } from '../../bindings/github.com/githugt/flowi/internal/bridge'
+import { BlueprintsService, WorkspaceService } from '../../bindings/github.com/githugt/flowi/app/internal/bridge'
 import { app } from './app.svelte'
 import { ui, type MenuItem } from './ui.svelte'
 import type { MenuEntry } from './types'

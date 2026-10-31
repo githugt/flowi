@@ -8,11 +8,11 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/githugt/flowi-lib/analysis"
-	"github.com/githugt/flowi-lib/diag"
-	"github.com/githugt/flowi-lib/internal/sites"
-	"github.com/githugt/flowi-lib/internal/yamlpath"
-	"github.com/githugt/flowi-lib/model"
+	"github.com/githugt/flowi/lib/analysis"
+	"github.com/githugt/flowi/lib/diag"
+	"github.com/githugt/flowi/lib/internal/sites"
+	"github.com/githugt/flowi/lib/internal/yamlpath"
+	"github.com/githugt/flowi/lib/model"
 )
 
 // Completion is something a template at a node can read, for editor

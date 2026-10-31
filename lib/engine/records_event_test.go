@@ -9,8 +9,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/githugt/flowi-lib/model"
-	"github.com/githugt/flowi-lib/vault"
+	"github.com/githugt/flowi/lib/model"
+	"github.com/githugt/flowi/lib/vault"
 )
 
 func recordEvents(events []Event) []RecordCaptured {

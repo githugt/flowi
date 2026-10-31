@@ -6,7 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	flowi "github.com/githugt/flowi-lib"
+	flowi "github.com/githugt/flowi/lib"
 )
 
 // SchemaItem is one stored schema of the selected version: its title, where

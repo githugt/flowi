@@ -1,7 +1,7 @@
 <script lang="ts">
   // "2 skipped" in the flow's header: the steps this open flow leaves out of its runs, what that would break, and the
   // choice to keep their last values instead. Nothing here is saved in the flow file.
-  import { FlowService } from '../bindings/github.com/githugt/flowi/internal/bridge'
+  import { FlowService } from '../bindings/github.com/githugt/flowi/app/internal/bridge'
   import type { FlowView } from './lib/types'
 
   let { view }: { view: FlowView } = $props()

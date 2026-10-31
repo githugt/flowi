@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/githugt/flowi/internal/bridge"
-	"github.com/githugt/flowi/internal/vm/vmtest"
+	"github.com/githugt/flowi/app/internal/bridge"
+	"github.com/githugt/flowi/app/internal/vm/vmtest"
 )
 
 func TestSecretsService_Reveal_should_return_one_value_and_log_that_it_happened_without_the_value(t *testing.T) {

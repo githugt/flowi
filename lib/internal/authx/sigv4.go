@@ -14,7 +14,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	v4 "github.com/aws/aws-sdk-go-v2/aws/signer/v4"
 
-	"github.com/githugt/flowi-lib/internal/httpx"
+	"github.com/githugt/flowi/lib/internal/httpx"
 )
 
 // sigV4 signs a request with AWS Signature Version 4, with the AWS SDK's own

@@ -12,8 +12,8 @@ import (
 	"github.com/samber/do/v2"
 	"github.com/spf13/cobra"
 
-	"github.com/githugt/flowi-lib/announce"
-	"github.com/githugt/flowi-lib/settings"
+	"github.com/githugt/flowi/lib/announce"
+	"github.com/githugt/flowi/lib/settings"
 )
 
 // announcementsCacheName is the cache file inside the config directory.

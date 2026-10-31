@@ -18,8 +18,8 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 
-	"github.com/githugt/flowi-lib/internal/httpx"
-	"github.com/githugt/flowi-lib/model"
+	"github.com/githugt/flowi/lib/internal/httpx"
+	"github.com/githugt/flowi/lib/model"
 )
 
 // verifiedProof parses a DPoP proof and checks its signature with the public key it carries in its own header, as a

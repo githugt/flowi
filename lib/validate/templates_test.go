@@ -5,8 +5,8 @@ package validate
 import (
 	"testing"
 
-	"github.com/githugt/flowi-lib/diag"
-	"github.com/githugt/flowi-lib/model"
+	"github.com/githugt/flowi/lib/diag"
+	"github.com/githugt/flowi/lib/model"
 )
 
 func TestValidate_Given_bad_template_Then_FLW_TPL_002_at_field_position(t *testing.T) {

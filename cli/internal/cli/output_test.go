@@ -9,8 +9,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/githugt/flowi-lib/diag"
-	"github.com/githugt/flowi-lib/importers"
+	"github.com/githugt/flowi/lib/diag"
+	"github.com/githugt/flowi/lib/importers"
 )
 
 func sampleDiagnostics(base string) diag.List {

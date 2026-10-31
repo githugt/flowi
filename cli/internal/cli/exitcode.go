@@ -6,9 +6,9 @@ import (
 	"context"
 	"errors"
 
-	"github.com/githugt/flowi-lib/diag"
-	"github.com/githugt/flowi-lib/store"
-	"github.com/githugt/flowi-lib/workspace"
+	"github.com/githugt/flowi/lib/diag"
+	"github.com/githugt/flowi/lib/store"
+	"github.com/githugt/flowi/lib/workspace"
 )
 
 // Process exit codes. Scripts and CI rely on these values; do not renumber.

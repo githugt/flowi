@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/githugt/flowi-lib/diag"
-	"github.com/githugt/flowi-lib/engine"
+	"github.com/githugt/flowi/lib/diag"
+	"github.com/githugt/flowi/lib/engine"
 )
 
 func TestTextReport_body_should_print_received_json_indented_keeping_order_and_numbers(t *testing.T) {

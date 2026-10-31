@@ -16,9 +16,9 @@ import (
 	"github.com/samber/do/v2"
 	"github.com/spf13/cobra"
 
-	flowi "github.com/githugt/flowi-lib"
-	"github.com/githugt/flowi-lib/diag"
-	"github.com/githugt/flowi-lib/settings"
+	flowi "github.com/githugt/flowi/lib"
+	"github.com/githugt/flowi/lib/diag"
+	"github.com/githugt/flowi/lib/settings"
 )
 
 func newConfigCommand(i do.Injector) *cobra.Command {

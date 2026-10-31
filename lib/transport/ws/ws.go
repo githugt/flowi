@@ -12,7 +12,7 @@ import (
 
 	"github.com/coder/websocket"
 
-	"github.com/githugt/flowi-lib/transport"
+	"github.com/githugt/flowi/lib/transport"
 )
 
 // readLimit is the largest message accepted when the receive sets no limit.

@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/githugt/flowi-lib/report"
+	"github.com/githugt/flowi/lib/report"
 )
 
 func saveReport(t *testing.T, dir, id string, status string, nodes ...report.Node) {

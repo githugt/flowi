@@ -7,12 +7,12 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/githugt/flowi-lib/analysis"
-	"github.com/githugt/flowi-lib/model"
+	"github.com/githugt/flowi/lib/analysis"
+	"github.com/githugt/flowi/lib/model"
 
-	"github.com/githugt/flowi/internal/canvas"
-	"github.com/githugt/flowi/internal/card"
-	"github.com/githugt/flowi/internal/vm"
+	"github.com/githugt/flowi/app/internal/canvas"
+	"github.com/githugt/flowi/app/internal/card"
+	"github.com/githugt/flowi/app/internal/vm"
 )
 
 // Card is what a canvas unit shows.

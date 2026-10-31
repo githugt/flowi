@@ -5,7 +5,7 @@ package engine
 import (
 	"testing"
 
-	"github.com/githugt/flowi-lib/model"
+	"github.com/githugt/flowi/lib/model"
 )
 
 func TestSelectEnvironment_Given_an_environment_that_extends_Then_its_own_values_win_and_the_base_fills_the_rest(t *testing.T) {

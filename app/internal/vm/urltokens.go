@@ -6,7 +6,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/githugt/flowi-lib/template"
+	"github.com/githugt/flowi/lib/template"
 )
 
 // URLPart is what a stretch of a URL is, for colouring.

@@ -4,7 +4,7 @@
   import { errorText } from './lib/errors'
   import { live } from './lib/live'
   import { ui } from './lib/ui.svelte'
-  import { PassphraseService, SecretsService } from '../bindings/github.com/githugt/flowi/internal/bridge'
+  import { PassphraseService, SecretsService } from '../bindings/github.com/githugt/flowi/app/internal/bridge'
   import type { SecretsView } from './lib/types'
 
   let view = $state<SecretsView>({ secrets: [] })

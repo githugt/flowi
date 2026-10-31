@@ -10,7 +10,7 @@ import (
 
 	"github.com/coder/websocket"
 
-	"github.com/githugt/flowi-lib/transport"
+	"github.com/githugt/flowi/lib/transport"
 )
 
 // Open connects and keeps the connection open for later steps.

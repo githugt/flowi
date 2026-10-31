@@ -11,9 +11,9 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/githugt/flowi-lib/arazzo"
-	"github.com/githugt/flowi-lib/model"
-	"github.com/githugt/flowi-lib/store"
+	"github.com/githugt/flowi/lib/arazzo"
+	"github.com/githugt/flowi/lib/model"
+	"github.com/githugt/flowi/lib/store"
 )
 
 // RegenerateDescription rewrites the collection's generated OpenAPI

@@ -9,12 +9,12 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/githugt/flowi-lib/dataset"
-	"github.com/githugt/flowi-lib/dataset/readonly"
-	"github.com/githugt/flowi-lib/diag"
-	"github.com/githugt/flowi-lib/internal/nodes"
-	"github.com/githugt/flowi-lib/model"
-	"github.com/githugt/flowi-lib/vault"
+	"github.com/githugt/flowi/lib/dataset"
+	"github.com/githugt/flowi/lib/dataset/readonly"
+	"github.com/githugt/flowi/lib/diag"
+	"github.com/githugt/flowi/lib/internal/nodes"
+	"github.com/githugt/flowi/lib/model"
+	"github.com/githugt/flowi/lib/vault"
 )
 
 // DatasetRunner runs one dataset query. The engine uses dataset.Default; tests pass fakes.

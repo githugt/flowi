@@ -6,7 +6,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/githugt/flowi-lib/model"
+	"github.com/githugt/flowi/lib/model"
 )
 
 func TestNode_Arrows(t *testing.T) {

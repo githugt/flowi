@@ -9,9 +9,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/githugt/flowi-lib/model"
+	"github.com/githugt/flowi/lib/model"
 
-	"github.com/githugt/flowi/internal/card"
+	"github.com/githugt/flowi/app/internal/card"
 )
 
 // CardsOf is the card of every step of f, nested ones included, by node id.

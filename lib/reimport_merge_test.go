@@ -6,8 +6,8 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/githugt/flowi-lib/diag"
-	"github.com/githugt/flowi-lib/model"
+	"github.com/githugt/flowi/lib/diag"
+	"github.com/githugt/flowi/lib/model"
 )
 
 // specReq is a request as a spec import makes it; change edits a copy.

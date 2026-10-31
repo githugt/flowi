@@ -17,7 +17,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/githugt/flowi-lib/examples/demoserver"
+	"github.com/githugt/flowi/lib/examples/demoserver"
 )
 
 const (

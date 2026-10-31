@@ -7,10 +7,10 @@ import (
 	"context"
 	"time"
 
-	"github.com/githugt/flowi-lib/diag"
-	"github.com/githugt/flowi-lib/internal/nodes"
-	"github.com/githugt/flowi-lib/model"
-	"github.com/githugt/flowi-lib/report"
+	"github.com/githugt/flowi/lib/diag"
+	"github.com/githugt/flowi/lib/internal/nodes"
+	"github.com/githugt/flowi/lib/model"
+	"github.com/githugt/flowi/lib/report"
 )
 
 // nodeRuntime is nodes.Runtime for one node instance: the run, the frame

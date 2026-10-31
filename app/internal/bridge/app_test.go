@@ -10,11 +10,11 @@ import (
 	"testing/synctest"
 	"time"
 
-	"github.com/githugt/flowi-lib/diag"
-	"github.com/githugt/flowi-lib/model"
+	"github.com/githugt/flowi/lib/diag"
+	"github.com/githugt/flowi/lib/model"
 
-	"github.com/githugt/flowi/internal/bridge"
-	"github.com/githugt/flowi/internal/vm/vmtest"
+	"github.com/githugt/flowi/app/internal/bridge"
+	"github.com/githugt/flowi/app/internal/vm/vmtest"
 )
 
 func TestApp_should_hand_out_one_instance_of_each_service(t *testing.T) {

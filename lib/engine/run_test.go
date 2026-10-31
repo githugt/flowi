@@ -7,10 +7,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/githugt/flowi-lib/diag"
-	"github.com/githugt/flowi-lib/internal/nodes"
-	"github.com/githugt/flowi-lib/model"
-	"github.com/githugt/flowi-lib/vault"
+	"github.com/githugt/flowi/lib/diag"
+	"github.com/githugt/flowi/lib/internal/nodes"
+	"github.com/githugt/flowi/lib/model"
+	"github.com/githugt/flowi/lib/vault"
 )
 
 // flowNode builds a node with params (key, value, …).

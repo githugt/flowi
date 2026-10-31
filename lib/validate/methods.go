@@ -3,9 +3,9 @@
 package validate
 
 import (
-	"github.com/githugt/flowi-lib/diag"
-	"github.com/githugt/flowi-lib/internal/yamlpath"
-	"github.com/githugt/flowi-lib/model"
+	"github.com/githugt/flowi/lib/diag"
+	"github.com/githugt/flowi/lib/internal/yamlpath"
+	"github.com/githugt/flowi/lib/model"
 )
 
 // checkMethods reports an HTTP method that cannot be sent (anything that is not a token), and a known method written

@@ -3,9 +3,9 @@
 package bridge
 
 import (
-	"github.com/githugt/flowi-lib/model"
+	"github.com/githugt/flowi/lib/model"
 
-	"github.com/githugt/flowi/internal/vm"
+	"github.com/githugt/flowi/app/internal/vm"
 )
 
 // ScheduleView is a cron schedule of workspace.yaml.

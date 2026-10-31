@@ -3,10 +3,10 @@
 package bridge
 
 import (
-	"github.com/githugt/flowi-lib/settings"
+	"github.com/githugt/flowi/lib/settings"
 
-	"github.com/githugt/flowi/internal/palette"
-	"github.com/githugt/flowi/internal/vm"
+	"github.com/githugt/flowi/app/internal/palette"
+	"github.com/githugt/flowi/app/internal/vm"
 )
 
 // SettingView is one setting on the settings page.

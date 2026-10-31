@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/githugt/flowi-lib/model"
+	"github.com/githugt/flowi/lib/model"
 )
 
 func TestSource_New_should_return_valid_increasing_ids_for_fixed_clock(t *testing.T) {

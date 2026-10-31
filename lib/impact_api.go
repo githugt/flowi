@@ -5,9 +5,9 @@ package flowi
 import (
 	"slices"
 
-	"github.com/githugt/flowi-lib/analysis"
-	"github.com/githugt/flowi-lib/diag"
-	"github.com/githugt/flowi-lib/model"
+	"github.com/githugt/flowi/lib/analysis"
+	"github.com/githugt/flowi/lib/diag"
+	"github.com/githugt/flowi/lib/model"
 )
 
 // Impact reports who uses request t across every mounted collection (flow

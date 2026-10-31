@@ -2,7 +2,7 @@
   // What a step did in the last run, under its card: tabs by kind of step (Input, Output and Checks for a request,
   // Messages for a message request, Output for the rest), and a footer with how it went. Pinning keeps it open
   // while another step is selected.
-  import { FlowService } from '../bindings/github.com/githugt/flowi/internal/bridge'
+  import { FlowService } from '../bindings/github.com/githugt/flowi/app/internal/bridge'
   import type { FlowView, NodeData } from './lib/types'
   import { dockTabs, type DockTab } from './lib/card'
   import Parts from './Parts.svelte'

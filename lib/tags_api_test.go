@@ -6,7 +6,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/githugt/flowi-lib/diag"
+	"github.com/githugt/flowi/lib/diag"
 )
 
 func TestFindFlowsTagged_Given_a_saved_tag_Then_the_flow_is_found_and_other_tags_find_nothing(t *testing.T) {

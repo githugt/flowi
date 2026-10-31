@@ -7,8 +7,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/githugt/flowi-lib/diag"
-	"github.com/githugt/flowi-lib/model"
+	"github.com/githugt/flowi/lib/diag"
+	"github.com/githugt/flowi/lib/model"
 )
 
 // Translator turns another tool's {{var}} text into Flowi templates for

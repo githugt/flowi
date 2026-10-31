@@ -3,9 +3,9 @@
 package bridge
 
 import (
-	flowi "github.com/githugt/flowi-lib"
+	flowi "github.com/githugt/flowi/lib"
 
-	"github.com/githugt/flowi/internal/vm"
+	"github.com/githugt/flowi/app/internal/vm"
 )
 
 // SettingRowView is a setting a version sets for itself, as typed.

@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/githugt/flowi-lib/model"
+	"github.com/githugt/flowi/lib/model"
 )
 
 // maxShown bounds a value in a one-line description.

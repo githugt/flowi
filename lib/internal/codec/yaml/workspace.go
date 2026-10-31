@@ -3,9 +3,9 @@
 package yamlcodec
 
 import (
-	"github.com/githugt/flowi-lib/diag"
-	"github.com/githugt/flowi-lib/model"
-	"github.com/githugt/flowi-lib/settings"
+	"github.com/githugt/flowi/lib/diag"
+	"github.com/githugt/flowi/lib/model"
+	"github.com/githugt/flowi/lib/settings"
 )
 
 // DecodeWorkspace reads workspace.yaml.

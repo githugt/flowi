@@ -5,7 +5,7 @@ package nodes
 import (
 	"context"
 
-	"github.com/githugt/flowi-lib/model"
+	"github.com/githugt/flowi/lib/model"
 )
 
 func webhookSpec() Spec {

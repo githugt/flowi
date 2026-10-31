@@ -2,7 +2,7 @@
   // Where it goes: one chooser for New request, New message request, New gRPC request, New flow, Save and
   // the importer. A searchable tree of collections and the folders in them (the Move dialog's list); a
   // collection or a folder can be made here, so nobody has to leave the dialog to have somewhere to put it.
-  import { WorkspaceService } from '../bindings/github.com/githugt/flowi/internal/bridge'
+  import { WorkspaceService } from '../bindings/github.com/githugt/flowi/app/internal/bridge'
   import Dropdown from './Dropdown.svelte'
   import { protocolVerb } from './lib/verbs'
   import { app } from './lib/app.svelte'

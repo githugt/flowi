@@ -9,8 +9,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/githugt/flowi-lib/diag"
-	"github.com/githugt/flowi-lib/report"
+	"github.com/githugt/flowi/lib/diag"
+	"github.com/githugt/flowi/lib/report"
 )
 
 // reportBuilder turns a run's events into its report tree (design §7.7),

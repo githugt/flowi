@@ -1,9 +1,9 @@
 # AGENTS.md: flowi-lib
 
 Instructions for AI coding agents (and a useful checklist for people) working in this repository.
-`flowi-lib` is the core library of Flowi: all logic, no user interface. The CLI (`flowi-cli`) and the app
-(`flowi`) are thin layers over it. Read `README.md` for what it does and `docs/development.md` for how the three
-repositories fit together.
+`lib` is the core library of Flowi: all logic, no user interface. The CLI (`cli`) and the app
+(`app`) are thin layers over it. Read `README.md` for what it does and `docs/development.md` for how the three
+parts of the repository fit together.
 
 ## Musts
 

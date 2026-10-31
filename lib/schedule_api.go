@@ -7,9 +7,9 @@ import (
 	"fmt"
 	"slices"
 
-	"github.com/githugt/flowi-lib/diag"
-	"github.com/githugt/flowi-lib/model"
-	"github.com/githugt/flowi-lib/serve/scheduler"
+	"github.com/githugt/flowi/lib/diag"
+	"github.com/githugt/flowi/lib/model"
+	"github.com/githugt/flowi/lib/serve/scheduler"
 )
 
 // Schedules lists the cron schedules in workspace.yaml.

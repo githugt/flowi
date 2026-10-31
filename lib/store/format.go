@@ -8,7 +8,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/githugt/flowi-lib/model"
+	"github.com/githugt/flowi/lib/model"
 )
 
 // FileChange is a file whose canonical content differs from disk. Old is

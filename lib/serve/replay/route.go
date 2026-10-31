@@ -9,8 +9,8 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/githugt/flowi-lib/internal/names"
-	"github.com/githugt/flowi-lib/model"
+	"github.com/githugt/flowi/lib/internal/names"
+	"github.com/githugt/flowi/lib/model"
 )
 
 // matchKind ranks how a request path matched a route: an exact match

@@ -15,9 +15,9 @@ import (
 	reflectionv1 "google.golang.org/grpc/reflection/grpc_reflection_v1"
 	"google.golang.org/protobuf/reflect/protoregistry"
 
-	"github.com/githugt/flowi-lib/diag"
-	"github.com/githugt/flowi-lib/grpcx"
-	"github.com/githugt/flowi-lib/model"
+	"github.com/githugt/flowi/lib/diag"
+	"github.com/githugt/flowi/lib/grpcx"
+	"github.com/githugt/flowi/lib/model"
 )
 
 type serviceNames []string

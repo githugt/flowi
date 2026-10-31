@@ -11,7 +11,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/githugt/flowi-lib/engine"
+	"github.com/githugt/flowi/lib/engine"
 )
 
 const standaloneWorkflow = `arazzo: 1.0.1

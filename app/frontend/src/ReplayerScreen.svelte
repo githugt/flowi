@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte'
   import { live } from './lib/live'
-  import { ReplayerService } from '../bindings/github.com/githugt/flowi/internal/bridge'
+  import { ReplayerService } from '../bindings/github.com/githugt/flowi/app/internal/bridge'
   import type { ReplayerView } from './lib/types'
 
   let view = $state<ReplayerView | null>(null)

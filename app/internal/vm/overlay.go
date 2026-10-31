@@ -7,9 +7,9 @@ import (
 	"slices"
 	"strings"
 
-	flowi "github.com/githugt/flowi-lib"
-	"github.com/githugt/flowi-lib/flowioverlay"
-	"github.com/githugt/flowi-lib/model"
+	flowi "github.com/githugt/flowi/lib"
+	"github.com/githugt/flowi/lib/flowioverlay"
+	"github.com/githugt/flowi/lib/model"
 )
 
 // A flowi overlay chosen on the request screen is laid over the selected

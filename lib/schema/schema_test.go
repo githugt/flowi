@@ -18,11 +18,11 @@ import (
 	"github.com/goccy/go-yaml"
 	"github.com/santhosh-tekuri/jsonschema/v6"
 
-	"github.com/githugt/flowi-lib/internal/nodes"
-	"github.com/githugt/flowi-lib/settings"
+	"github.com/githugt/flowi/lib/internal/nodes"
+	"github.com/githugt/flowi/lib/settings"
 )
 
-const base = "https://github.com/githugt/flowi-lib/schema/"
+const base = "https://github.com/githugt/flowi/lib/schema/"
 
 func compile(t *testing.T, name string) *jsonschema.Schema {
 	t.Helper()

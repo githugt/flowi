@@ -6,7 +6,7 @@ import (
 	"maps"
 	"strings"
 
-	"github.com/githugt/flowi-lib/model"
+	"github.com/githugt/flowi/lib/model"
 )
 
 // OwnWrites are the targets one node writes itself.

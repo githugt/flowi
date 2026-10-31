@@ -9,8 +9,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/githugt/flowi-lib/analysis"
-	"github.com/githugt/flowi-lib/diag"
+	"github.com/githugt/flowi/lib/analysis"
+	"github.com/githugt/flowi/lib/diag"
 )
 
 func loginTarget(t *testing.T, w *Workspace) RequestTarget {

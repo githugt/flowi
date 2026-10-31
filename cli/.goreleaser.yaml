@@ -1,5 +1,5 @@
 # GoReleaser configuration for the flowi command line. Releases are cut by
-# .github/workflows/release.yml when a v* tag is pushed; nothing here is run
+# .github/workflows/release-cli.yml when a cli/v* tag is pushed; nothing here is run
 # by the normal CI. The binary has no cgo (design 13.0), so every target is a
 # plain cross-compile. The version printed by `flowi version` comes from the
 # module version Go stamps into tagged builds, so no ldflags are needed.
@@ -20,6 +20,8 @@ builds:
 
 archives:
   - id: flowi
+    # {{ .Tag }} is cli/v1.2.3 in this monorepo, so the folder prefix and the v are cut off.
+    name_template: "flowi_{{ trimprefix .Tag \"cli/v\" }}_{{ .Os }}_{{ .Arch }}"
     formats: [tar.gz]
     format_overrides:
       - goos: windows
@@ -39,4 +41,5 @@ changelog:
 
 # A tag with a pre-release suffix (v0.1.0-alpha.1) is published as a GitHub pre-release.
 release:
+  name_template: "flowi {{ trimprefix .Tag \"cli/\" }}"
   prerelease: auto

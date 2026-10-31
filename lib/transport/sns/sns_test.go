@@ -11,8 +11,8 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/githugt/flowi-lib/transport"
-	"github.com/githugt/flowi-lib/transport/sns"
+	"github.com/githugt/flowi/lib/transport"
+	"github.com/githugt/flowi/lib/transport/sns"
 )
 
 const secretKey = "wJalrXUtnFEMI-s3cret-key"

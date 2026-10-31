@@ -2,7 +2,7 @@
   import { app } from './lib/app.svelte'
   import { ui } from './lib/ui.svelte'
   import { errorText } from './lib/errors'
-  import { WorkspaceService } from '../bindings/github.com/githugt/flowi/internal/bridge'
+  import { WorkspaceService } from '../bindings/github.com/githugt/flowi/app/internal/bridge'
   import TreeItem from './TreeItem.svelte'
   import Icon from './Icon.svelte'
   import { screens } from './lib/screens'

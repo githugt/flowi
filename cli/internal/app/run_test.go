@@ -11,8 +11,8 @@ import (
 
 	"github.com/samber/do/v2"
 
-	"github.com/githugt/flowi-cli/internal/buildinfo"
-	"github.com/githugt/flowi-cli/internal/cli"
+	"github.com/githugt/flowi/cli/internal/buildinfo"
+	"github.com/githugt/flowi/cli/internal/cli"
 )
 
 // shutdownProbe records whether the injector shut it down.

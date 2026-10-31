@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/githugt/flowi/internal/vm"
+	"github.com/githugt/flowi/app/internal/vm"
 )
 
 // tokens renders spans as "part:text" separated by "|"; key/value spans

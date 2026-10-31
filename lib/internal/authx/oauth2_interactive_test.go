@@ -15,7 +15,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/githugt/flowi-lib/model"
+	"github.com/githugt/flowi/lib/model"
 )
 
 // idp is a fake identity provider for the grants that need a person.

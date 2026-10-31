@@ -5,8 +5,8 @@ package all_test
 import (
 	"testing"
 
-	"github.com/githugt/flowi-lib/model"
-	"github.com/githugt/flowi-lib/transport/all"
+	"github.com/githugt/flowi/lib/model"
+	"github.com/githugt/flowi/lib/transport/all"
 )
 
 func TestNew_should_speak_every_protocol_the_model_knows(t *testing.T) {

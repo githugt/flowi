@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/githugt/flowi-lib/model"
-	"github.com/githugt/flowi-lib/store"
+	"github.com/githugt/flowi/lib/model"
+	"github.com/githugt/flowi/lib/store"
 )
 
 func descriptionFile(w *Workspace) string {

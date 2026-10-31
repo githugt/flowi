@@ -3,8 +3,8 @@
 package analysis
 
 import (
-	"github.com/githugt/flowi-lib/internal/sites"
-	"github.com/githugt/flowi-lib/model"
+	"github.com/githugt/flowi/lib/internal/sites"
+	"github.com/githugt/flowi/lib/model"
 )
 
 // Target names one request: the collection that holds it and its id.

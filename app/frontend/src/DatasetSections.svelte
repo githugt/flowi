@@ -1,6 +1,6 @@
 <script lang="ts">
   // The sections only a dataset request has: the query, and the values it is sent with.
-  import { RequestService } from '../bindings/github.com/githugt/flowi/internal/bridge'
+  import { RequestService } from '../bindings/github.com/githugt/flowi/app/internal/bridge'
   import type { DatasetBlock, RequestView } from './lib/types'
   import CodeArea from './CodeArea.svelte'
   import TextField from './TextField.svelte'

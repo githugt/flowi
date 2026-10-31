@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/githugt/flowi-lib/model"
+	"github.com/githugt/flowi/lib/model"
 )
 
 // ErrNoName is returned by FromFlow for an empty blueprint name.

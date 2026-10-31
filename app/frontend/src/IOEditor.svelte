@@ -1,7 +1,7 @@
 <script lang="ts">
   // The editor behind a Start or End row: the input's or output's name, type and default or value, and Remove. It
   // opens where the row was clicked and each field commits when it is left, so Undo takes back one field at a time.
-  import { FlowService } from '../bindings/github.com/githugt/flowi/internal/bridge'
+  import { FlowService } from '../bindings/github.com/githugt/flowi/app/internal/bridge'
   import { errorText } from './lib/errors'
   import { IO_TYPES } from './lib/edgecards'
   import type { IOItem } from './lib/types'

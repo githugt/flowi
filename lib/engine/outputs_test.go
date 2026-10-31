@@ -5,8 +5,8 @@ package engine
 import (
 	"testing"
 
-	"github.com/githugt/flowi-lib/model"
-	"github.com/githugt/flowi-lib/report"
+	"github.com/githugt/flowi/lib/model"
+	"github.com/githugt/flowi/lib/report"
 )
 
 func TestRun_Given_declared_outputs_Then_the_report_lists_them_in_declared_order_with_values(t *testing.T) {

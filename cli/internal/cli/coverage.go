@@ -11,7 +11,7 @@ import (
 	"github.com/samber/do/v2"
 	"github.com/spf13/cobra"
 
-	"github.com/githugt/flowi-lib/analysis"
+	"github.com/githugt/flowi/lib/analysis"
 )
 
 type coverageFlags struct {

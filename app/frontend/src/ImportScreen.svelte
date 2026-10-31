@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte'
   import { live } from './lib/live'
-  import { ImportService } from '../bindings/github.com/githugt/flowi/internal/bridge'
+  import { ImportService } from '../bindings/github.com/githugt/flowi/app/internal/bridge'
   import type { ImportView } from './lib/types'
   import PathField from './PathField.svelte'
   import { ui } from './lib/ui.svelte'

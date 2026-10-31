@@ -3,7 +3,7 @@
   // a changed description break (before you import it). Neither writes anything.
   import { onMount } from 'svelte'
   import { errorText } from './lib/errors'
-  import { ChecksService } from '../bindings/github.com/githugt/flowi/internal/bridge'
+  import { ChecksService } from '../bindings/github.com/githugt/flowi/app/internal/bridge'
   import PathField from './PathField.svelte'
   import type { CoverageView, SpecChangeView } from './lib/types'
 

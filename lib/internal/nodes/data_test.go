@@ -8,9 +8,9 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/githugt/flowi-lib/diag"
-	"github.com/githugt/flowi-lib/model"
-	"github.com/githugt/flowi-lib/template"
+	"github.com/githugt/flowi/lib/diag"
+	"github.com/githugt/flowi/lib/model"
+	"github.com/githugt/flowi/lib/template"
 )
 
 func TestVars_should_layer_and_snapshot(t *testing.T) {

@@ -5,8 +5,8 @@ package store
 import (
 	"strings"
 
-	"github.com/githugt/flowi-lib/arazzo"
-	"github.com/githugt/flowi-lib/model"
+	"github.com/githugt/flowi/lib/arazzo"
+	"github.com/githugt/flowi/lib/model"
 )
 
 // descriptionsDir holds the derived and imported API descriptions flows refer to.

@@ -5,7 +5,7 @@ package engine
 import (
 	"testing"
 
-	"github.com/githugt/flowi-lib/model"
+	"github.com/githugt/flowi/lib/model"
 )
 
 func countFinished(events []Event, id string, status Status) int {

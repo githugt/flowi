@@ -5,11 +5,11 @@ package bridge
 import (
 	"runtime"
 
-	"github.com/githugt/flowi-lib/changelog"
-	"github.com/githugt/flowi-lib/telemetry"
+	"github.com/githugt/flowi/lib/changelog"
+	"github.com/githugt/flowi/lib/telemetry"
 
-	"github.com/githugt/flowi/internal/buildinfo"
-	"github.com/githugt/flowi/internal/vm"
+	"github.com/githugt/flowi/app/internal/buildinfo"
+	"github.com/githugt/flowi/app/internal/vm"
 )
 
 // AnnouncementView is a notice from the project's feed.

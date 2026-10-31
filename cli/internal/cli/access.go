@@ -12,7 +12,7 @@ import (
 	"github.com/samber/do/v2"
 	"github.com/spf13/cobra"
 
-	flowi "github.com/githugt/flowi-lib"
+	flowi "github.com/githugt/flowi/lib"
 )
 
 type accessFlags struct {

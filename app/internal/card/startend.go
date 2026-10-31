@@ -8,8 +8,8 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/githugt/flowi-lib/model"
-	"github.com/githugt/flowi-lib/report"
+	"github.com/githugt/flowi/lib/model"
+	"github.com/githugt/flowi/lib/report"
 )
 
 // StartCard is the flow's first card: a view of its inputs, in the order the

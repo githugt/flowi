@@ -5,7 +5,7 @@ package engine
 import (
 	"context"
 
-	"github.com/githugt/flowi-lib/model"
+	"github.com/githugt/flowi/lib/model"
 )
 
 // exchange is how the engine runs the requests of one family (model.Family). Everything the engine does that depends

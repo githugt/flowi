@@ -11,12 +11,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/githugt/flowi-lib/analysis"
-	"github.com/githugt/flowi-lib/diag"
-	"github.com/githugt/flowi-lib/engine"
-	"github.com/githugt/flowi-lib/flowioverlay"
-	"github.com/githugt/flowi-lib/model"
-	"github.com/githugt/flowi-lib/vault"
+	"github.com/githugt/flowi/lib/analysis"
+	"github.com/githugt/flowi/lib/diag"
+	"github.com/githugt/flowi/lib/engine"
+	"github.com/githugt/flowi/lib/flowioverlay"
+	"github.com/githugt/flowi/lib/model"
+	"github.com/githugt/flowi/lib/vault"
 )
 
 // FlowTarget identifies a flow of a mounted collection.

@@ -6,7 +6,7 @@ import (
 	"slices"
 	"strings"
 
-	flowi "github.com/githugt/flowi-lib"
+	flowi "github.com/githugt/flowi/lib"
 )
 
 // maxCompletions bounds the suggestions shown at once.

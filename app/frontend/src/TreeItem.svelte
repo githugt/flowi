@@ -5,7 +5,7 @@
   import { rowMenu } from './lib/menus'
   import { ui } from './lib/ui.svelte'
   import Verb from './Verb.svelte'
-  import { WorkspaceService } from '../bindings/github.com/githugt/flowi/internal/bridge'
+  import { WorkspaceService } from '../bindings/github.com/githugt/flowi/app/internal/bridge'
   import { moved } from './lib/reorder'
   import { moveRequests, movingWith } from './lib/move'
 

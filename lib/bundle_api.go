@@ -13,12 +13,12 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/githugt/flowi-lib/engine"
-	"github.com/githugt/flowi-lib/internal/bundle"
-	"github.com/githugt/flowi-lib/internal/tapeplayer"
-	"github.com/githugt/flowi-lib/model"
-	"github.com/githugt/flowi-lib/report"
-	"github.com/githugt/flowi-lib/vault"
+	"github.com/githugt/flowi/lib/engine"
+	"github.com/githugt/flowi/lib/internal/bundle"
+	"github.com/githugt/flowi/lib/internal/tapeplayer"
+	"github.com/githugt/flowi/lib/model"
+	"github.com/githugt/flowi/lib/report"
+	"github.com/githugt/flowi/lib/vault"
 )
 
 // BundleExtension is what a run bundle file is named.

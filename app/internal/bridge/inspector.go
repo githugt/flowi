@@ -10,12 +10,12 @@ import (
 	"strings"
 	"time"
 
-	flowi "github.com/githugt/flowi-lib"
-	"github.com/githugt/flowi-lib/analysis"
-	"github.com/githugt/flowi-lib/model"
+	flowi "github.com/githugt/flowi/lib"
+	"github.com/githugt/flowi/lib/analysis"
+	"github.com/githugt/flowi/lib/model"
 
-	"github.com/githugt/flowi/internal/canvas"
-	"github.com/githugt/flowi/internal/vm"
+	"github.com/githugt/flowi/app/internal/canvas"
+	"github.com/githugt/flowi/app/internal/vm"
 )
 
 // Pair is one row of a key/value editor.

@@ -11,12 +11,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/githugt/flowi-lib/diag"
-	"github.com/githugt/flowi-lib/internal/httpx"
-	"github.com/githugt/flowi-lib/model"
-	"github.com/githugt/flowi-lib/settings"
-	"github.com/githugt/flowi-lib/template"
-	"github.com/githugt/flowi-lib/version"
+	"github.com/githugt/flowi/lib/diag"
+	"github.com/githugt/flowi/lib/internal/httpx"
+	"github.com/githugt/flowi/lib/model"
+	"github.com/githugt/flowi/lib/settings"
+	"github.com/githugt/flowi/lib/template"
+	"github.com/githugt/flowi/lib/version"
 )
 
 // config is the resolved settings one request runs with.

@@ -8,7 +8,7 @@ import (
 	"sync"
 	"time"
 
-	flowi "github.com/githugt/flowi-lib"
+	flowi "github.com/githugt/flowi/lib"
 )
 
 // ScheduleRunnerState is where the schedule runner is in its life.

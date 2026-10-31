@@ -5,7 +5,7 @@ package vm
 import (
 	"slices"
 
-	"github.com/githugt/flowi-lib/model"
+	"github.com/githugt/flowi/lib/model"
 )
 
 // An async request's credentials are entries of its binding list: the

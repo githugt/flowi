@@ -8,7 +8,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/githugt/flowi-lib/announce"
+	"github.com/githugt/flowi/lib/announce"
 )
 
 // Announcements is the list of project notices on the welcome screen. It

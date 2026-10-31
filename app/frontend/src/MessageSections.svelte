@@ -1,6 +1,6 @@
 <script lang="ts">
   // The sections only message (async) and gRPC requests have.
-  import { RequestService } from '../bindings/github.com/githugt/flowi/internal/bridge'
+  import { RequestService } from '../bindings/github.com/githugt/flowi/app/internal/bridge'
   import { ui } from './lib/ui.svelte'
   import type { AsyncBlock, GRPCBlock, KV, RequestView } from './lib/types'
   import AreaField from './AreaField.svelte'

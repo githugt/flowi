@@ -5,7 +5,7 @@ package vm
 import (
 	"errors"
 
-	flowi "github.com/githugt/flowi-lib"
+	flowi "github.com/githugt/flowi/lib"
 )
 
 // SecretState is where a secret's value comes from.

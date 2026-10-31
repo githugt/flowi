@@ -3,9 +3,9 @@
 package analysis
 
 import (
-	"github.com/githugt/flowi-lib/internal/sites"
-	"github.com/githugt/flowi-lib/model"
-	"github.com/githugt/flowi-lib/template"
+	"github.com/githugt/flowi/lib/internal/sites"
+	"github.com/githugt/flowi/lib/model"
+	"github.com/githugt/flowi/lib/template"
 )
 
 // DataLink says that node To reads a value node From made: either its output

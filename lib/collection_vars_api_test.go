@@ -5,7 +5,7 @@ package flowi
 import (
 	"testing"
 
-	"github.com/githugt/flowi-lib/model"
+	"github.com/githugt/flowi/lib/model"
 )
 
 func TestSetCollectionVariables_should_write_them_to_the_manifest_and_read_them_back(t *testing.T) {

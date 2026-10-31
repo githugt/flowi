@@ -2,7 +2,7 @@
   // The flowi overlays of this request's collection: list them, open one to read or edit its file, add
   // one (type it, or paste one brought from elsewhere), delete one. An overlay is a named set of changes
   // laid over a request version when it is sent; this is not the spec overlay of an imported API.
-  import { RequestService } from '../bindings/github.com/githugt/flowi/internal/bridge'
+  import { RequestService } from '../bindings/github.com/githugt/flowi/app/internal/bridge'
   import { errorText } from './lib/errors'
   import { ui } from './lib/ui.svelte'
   import type { FlowiOverlayInfo, SpecExport } from './lib/types'

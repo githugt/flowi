@@ -9,7 +9,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/githugt/flowi-lib/internal/yamldoc"
+	"github.com/githugt/flowi/lib/internal/yamldoc"
 )
 
 // Inlining limits. Acyclic references can still fan out exponentially

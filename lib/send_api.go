@@ -15,13 +15,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/githugt/flowi-lib/diag"
-	"github.com/githugt/flowi-lib/engine"
-	"github.com/githugt/flowi-lib/grpcx"
-	"github.com/githugt/flowi-lib/model"
-	"github.com/githugt/flowi-lib/settings"
-	"github.com/githugt/flowi-lib/vault"
-	"github.com/githugt/flowi-lib/workspace"
+	"github.com/githugt/flowi/lib/diag"
+	"github.com/githugt/flowi/lib/engine"
+	"github.com/githugt/flowi/lib/grpcx"
+	"github.com/githugt/flowi/lib/model"
+	"github.com/githugt/flowi/lib/settings"
+	"github.com/githugt/flowi/lib/vault"
+	"github.com/githugt/flowi/lib/workspace"
 )
 
 // RequestTarget identifies a request of a mounted collection.

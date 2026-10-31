@@ -5,7 +5,7 @@ package vm
 import (
 	"strings"
 
-	"github.com/githugt/flowi-lib/model"
+	"github.com/githugt/flowi/lib/model"
 )
 
 // URLWithQuery is what the URL bar shows: the request's URL followed by its

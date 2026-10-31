@@ -7,9 +7,9 @@ import (
 	"fmt"
 	"os"
 
-	flowi "github.com/githugt/flowi-lib"
-	"github.com/githugt/flowi-lib/analysis"
-	"github.com/githugt/flowi-lib/model"
+	flowi "github.com/githugt/flowi/lib"
+	"github.com/githugt/flowi/lib/analysis"
+	"github.com/githugt/flowi/lib/model"
 )
 
 // ChecksService backs the Checks screen: how much of the API descriptions the flows use, and what a changed

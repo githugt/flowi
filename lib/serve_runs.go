@@ -7,9 +7,9 @@ import (
 	"errors"
 	"strings"
 
-	"github.com/githugt/flowi-lib/diag"
-	"github.com/githugt/flowi-lib/engine"
-	"github.com/githugt/flowi-lib/serve/runs"
+	"github.com/githugt/flowi/lib/diag"
+	"github.com/githugt/flowi/lib/engine"
+	"github.com/githugt/flowi/lib/serve/runs"
 )
 
 // maxOutcomeMessages bounds the diagnostics kept on a finished run.

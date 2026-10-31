@@ -9,8 +9,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/githugt/flowi-lib/diag"
-	"github.com/githugt/flowi-lib/model"
+	"github.com/githugt/flowi/lib/diag"
+	"github.com/githugt/flowi/lib/model"
 )
 
 // bindingSources are the `bindings` objects of the places an AsyncAPI document

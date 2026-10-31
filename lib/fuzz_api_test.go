@@ -12,8 +12,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/githugt/flowi-lib/engine"
-	"github.com/githugt/flowi-lib/model"
+	"github.com/githugt/flowi/lib/engine"
+	"github.com/githugt/flowi/lib/model"
 )
 
 // fuzzServer validates names like a careless service: it answers 400 for anything it checks, and crashes (500)

@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/githugt/flowi/internal/preflight"
+	"github.com/githugt/flowi/app/internal/preflight"
 )
 
 func TestParseOSRelease_should_name_the_family_of_the_system(t *testing.T) {

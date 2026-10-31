@@ -8,9 +8,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/githugt/flowi-lib/changelog"
+	"github.com/githugt/flowi/lib/changelog"
 
-	flowicli "github.com/githugt/flowi-cli"
+	flowicli "github.com/githugt/flowi/cli"
 )
 
 func TestEmbeddedChangelog_should_parse_into_at_least_one_release_with_entries(t *testing.T) {

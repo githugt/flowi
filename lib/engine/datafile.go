@@ -9,8 +9,8 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/githugt/flowi-lib/internal/names"
-	"github.com/githugt/flowi-lib/internal/nodes"
+	"github.com/githugt/flowi/lib/internal/names"
+	"github.com/githugt/flowi/lib/internal/nodes"
 )
 
 // dataDirs are the directories nodes may write to.

@@ -7,8 +7,8 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/githugt/flowi-lib/model"
-	"github.com/githugt/flowi-lib/template"
+	"github.com/githugt/flowi/lib/model"
+	"github.com/githugt/flowi/lib/template"
 )
 
 // stepBuilder makes the card of one step type.

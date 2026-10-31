@@ -7,9 +7,9 @@ import (
 	"path"
 	"strings"
 
-	"github.com/githugt/flowi-lib/model"
+	"github.com/githugt/flowi/lib/model"
 
-	"github.com/githugt/flowi/internal/vm"
+	"github.com/githugt/flowi/app/internal/vm"
 )
 
 // The chooser every "new" and "save as" dialog shares: a tree of collections and the folders

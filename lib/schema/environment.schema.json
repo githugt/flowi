@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://github.com/githugt/flowi-lib/schema/environment.schema.json",
+  "$id": "https://github.com/githugt/flowi/lib/schema/environment.schema.json",
   "title": "Flowi environment",
   "type": "object",
   "additionalProperties": false,

@@ -8,8 +8,8 @@ import (
 	"slices"
 	"strings"
 
-	flowi "github.com/githugt/flowi-lib"
-	"github.com/githugt/flowi-lib/model"
+	flowi "github.com/githugt/flowi/lib"
+	"github.com/githugt/flowi/lib/model"
 )
 
 // Action is something the tree's context menu can do to the rows it was

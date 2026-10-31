@@ -14,7 +14,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/githugt/flowi-lib/announce"
+	"github.com/githugt/flowi/lib/announce"
 )
 
 type newsFeed struct {

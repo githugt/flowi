@@ -6,10 +6,10 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/githugt/flowi-lib/blueprint"
-	"github.com/githugt/flowi-lib/model"
+	"github.com/githugt/flowi/lib/blueprint"
+	"github.com/githugt/flowi/lib/model"
 
-	"github.com/githugt/flowi/internal/vm"
+	"github.com/githugt/flowi/app/internal/vm"
 )
 
 // BlueprintParam is a value a blueprint asks for.

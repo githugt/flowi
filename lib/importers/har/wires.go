@@ -11,8 +11,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/githugt/flowi-lib/importers"
-	"github.com/githugt/flowi-lib/model"
+	"github.com/githugt/flowi/lib/importers"
+	"github.com/githugt/flowi/lib/model"
 )
 
 // A recording shows which value came from where: the id a POST returned is the id the next GET asks for. wire

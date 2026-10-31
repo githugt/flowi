@@ -7,9 +7,9 @@ import (
 	"strings"
 	"time"
 
-	flowi "github.com/githugt/flowi-lib"
-	"github.com/githugt/flowi-lib/grpcx"
-	"github.com/githugt/flowi-lib/model"
+	flowi "github.com/githugt/flowi/lib"
+	"github.com/githugt/flowi/lib/grpcx"
+	"github.com/githugt/flowi/lib/model"
 )
 
 // Drafts are collections kept in Flowi's own directory until the user

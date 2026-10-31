@@ -9,9 +9,9 @@ import (
 	"errors"
 	"strings"
 
-	"github.com/githugt/flowi-lib/diag"
-	"github.com/githugt/flowi-lib/internal/nodes"
-	"github.com/githugt/flowi-lib/model"
+	"github.com/githugt/flowi/lib/diag"
+	"github.com/githugt/flowi/lib/internal/nodes"
+	"github.com/githugt/flowi/lib/model"
 )
 
 // RequestSchemer is an optional part of a SchemaChecker: it gives the schema kept for the body a request sends,

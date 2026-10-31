@@ -3,7 +3,7 @@
   import Code from './Code.svelte'
   // The request's side tabs: the code snippet, who uses it, and the cookie jar.
   import { Clipboard } from '@wailsio/runtime'
-  import { RequestService } from '../bindings/github.com/githugt/flowi/internal/bridge'
+  import { RequestService } from '../bindings/github.com/githugt/flowi/app/internal/bridge'
   import { app } from './lib/app.svelte'
   import { ui } from './lib/ui.svelte'
   import type { CookiesView, RequestView, UsedByView } from './lib/types'

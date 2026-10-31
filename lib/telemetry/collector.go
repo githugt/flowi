@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/githugt/flowi-lib/engine"
+	"github.com/githugt/flowi/lib/engine"
 )
 
 // maxEvents bounds one report; a long-running serve does not grow it

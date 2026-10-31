@@ -3,9 +3,9 @@
 package bridge
 
 import (
-	"github.com/githugt/flowi-lib/model"
+	"github.com/githugt/flowi/lib/model"
 
-	"github.com/githugt/flowi/internal/vm"
+	"github.com/githugt/flowi/app/internal/vm"
 )
 
 // DepView is a dependency of a collection.

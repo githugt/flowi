@@ -9,8 +9,8 @@ import (
 	mochi "github.com/mochi-mqtt/server/v2"
 	"github.com/mochi-mqtt/server/v2/packets"
 
-	"github.com/githugt/flowi-lib/transport"
-	"github.com/githugt/flowi-lib/transport/mqtt"
+	"github.com/githugt/flowi/lib/transport"
+	"github.com/githugt/flowi/lib/transport/mqtt"
 )
 
 func TestOpen_should_hold_messages_published_before_the_step_that_reads_them(t *testing.T) {

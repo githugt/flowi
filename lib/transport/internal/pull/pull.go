@@ -15,7 +15,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/githugt/flowi-lib/transport"
+	"github.com/githugt/flowi/lib/transport"
 )
 
 // settleTimeout bounds the final acknowledge and give-back calls, which run

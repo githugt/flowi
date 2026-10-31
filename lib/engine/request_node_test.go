@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/githugt/flowi-lib/diag"
-	"github.com/githugt/flowi-lib/model"
+	"github.com/githugt/flowi/lib/diag"
+	"github.com/githugt/flowi/lib/model"
 )
 
 func requestNode(id string, r model.Request, with ...model.KeyValue) model.Node {

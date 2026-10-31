@@ -9,8 +9,8 @@ import (
 	"strings"
 	"time"
 
-	flowi "github.com/githugt/flowi-lib"
-	"github.com/githugt/flowi-lib/model"
+	flowi "github.com/githugt/flowi/lib"
+	"github.com/githugt/flowi/lib/model"
 )
 
 // NodeKind is what a workspace tree node shows.

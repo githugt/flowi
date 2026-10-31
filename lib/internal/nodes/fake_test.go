@@ -7,8 +7,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/githugt/flowi-lib/model"
-	"github.com/githugt/flowi-lib/report"
+	"github.com/githugt/flowi/lib/model"
+	"github.com/githugt/flowi/lib/report"
 )
 
 // fakeRuntime records what nodes ask for and answers from scripts.

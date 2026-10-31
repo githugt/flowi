@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/githugt/flowi-lib/model"
-	"github.com/githugt/flowi-lib/specoverlay"
+	"github.com/githugt/flowi/lib/model"
+	"github.com/githugt/flowi/lib/specoverlay"
 )
 
 func writeTestOverlay(t *testing.T, w *Workspace, c model.ID, ov model.Overlay) {

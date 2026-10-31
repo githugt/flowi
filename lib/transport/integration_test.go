@@ -23,12 +23,12 @@ import (
 	"github.com/nats-io/nats.go/jetstream"
 	amqp091 "github.com/rabbitmq/amqp091-go"
 
-	"github.com/githugt/flowi-lib/transport"
-	"github.com/githugt/flowi-lib/transport/amqp"
-	"github.com/githugt/flowi-lib/transport/amqp10"
-	"github.com/githugt/flowi-lib/transport/kafka"
-	"github.com/githugt/flowi-lib/transport/mqtt"
-	"github.com/githugt/flowi-lib/transport/nats"
+	"github.com/githugt/flowi/lib/transport"
+	"github.com/githugt/flowi/lib/transport/amqp"
+	"github.com/githugt/flowi/lib/transport/amqp10"
+	"github.com/githugt/flowi/lib/transport/kafka"
+	"github.com/githugt/flowi/lib/transport/mqtt"
+	"github.com/githugt/flowi/lib/transport/nats"
 )
 
 const brokerWait = 90 * time.Second

@@ -6,11 +6,11 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/githugt/flowi-lib/engine"
-	"github.com/githugt/flowi-lib/report"
+	"github.com/githugt/flowi/lib/engine"
+	"github.com/githugt/flowi/lib/report"
 
-	"github.com/githugt/flowi/internal/vm"
-	"github.com/githugt/flowi/internal/vm/vmtest"
+	"github.com/githugt/flowi/app/internal/vm"
+	"github.com/githugt/flowi/app/internal/vm/vmtest"
 )
 
 // debugFixture is the skip fixture's flow (steps a, b, p) whose runs pass and leave x = 1.

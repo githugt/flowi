@@ -1,7 +1,7 @@
 <script lang="ts">
   // The open flow's breakpoints, and while a debug session is paused, a bar to continue, step or stop it and to change
   // a variable the next part starts with. Breakpoints belong to the open flow, not to the file.
-  import { FlowService } from '../bindings/github.com/githugt/flowi/internal/bridge'
+  import { FlowService } from '../bindings/github.com/githugt/flowi/app/internal/bridge'
   import type { FlowView } from './lib/types'
 
   let { view }: { view: FlowView } = $props()

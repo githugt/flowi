@@ -6,10 +6,10 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/githugt/flowi-lib/diag"
-	"github.com/githugt/flowi-lib/engine"
-	"github.com/githugt/flowi-lib/model"
-	"github.com/githugt/flowi-lib/schemainfer"
+	"github.com/githugt/flowi/lib/diag"
+	"github.com/githugt/flowi/lib/engine"
+	"github.com/githugt/flowi/lib/model"
+	"github.com/githugt/flowi/lib/schemainfer"
 )
 
 // flowWithSchemaCheck is the shared login flow with an assert after the login

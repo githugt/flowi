@@ -19,8 +19,8 @@ import (
 	"testing/synctest"
 	"time"
 
-	"github.com/githugt/flowi-lib/serve/runs"
-	"github.com/githugt/flowi-lib/serve/trigger"
+	"github.com/githugt/flowi/lib/serve/runs"
+	"github.com/githugt/flowi/lib/serve/trigger"
 )
 
 const token = "s3cret-token-value"

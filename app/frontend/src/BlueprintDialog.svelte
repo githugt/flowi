@@ -2,7 +2,7 @@
   // "New flow from blueprint": pick a blueprint, where the flow goes, and its
   // parameters. Opened from the New menu, from a folder's menu and from the
   // Blueprints screen.
-  import { BlueprintsService } from '../bindings/github.com/githugt/flowi/internal/bridge'
+  import { BlueprintsService } from '../bindings/github.com/githugt/flowi/app/internal/bridge'
   import { ui } from './lib/ui.svelte'
   import type { BlueprintsView } from './lib/types'
 

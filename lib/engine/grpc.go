@@ -12,12 +12,12 @@ import (
 
 	"google.golang.org/grpc/codes"
 
-	"github.com/githugt/flowi-lib/diag"
-	"github.com/githugt/flowi-lib/grpcx"
-	"github.com/githugt/flowi-lib/internal/httpx"
-	"github.com/githugt/flowi-lib/internal/nodes"
-	"github.com/githugt/flowi-lib/model"
-	"github.com/githugt/flowi-lib/transport"
+	"github.com/githugt/flowi/lib/diag"
+	"github.com/githugt/flowi/lib/grpcx"
+	"github.com/githugt/flowi/lib/internal/httpx"
+	"github.com/githugt/flowi/lib/internal/nodes"
+	"github.com/githugt/flowi/lib/model"
+	"github.com/githugt/flowi/lib/transport"
 )
 
 // GRPCRunner makes one gRPC call. The engine uses grpcx.Run; tests pass fakes.

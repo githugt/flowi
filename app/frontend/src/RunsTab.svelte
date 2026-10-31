@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { FlowService } from '../bindings/github.com/githugt/flowi/internal/bridge'
+  import { FlowService } from '../bindings/github.com/githugt/flowi/app/internal/bridge'
   import { app } from './lib/app.svelte'
   import { errorText } from './lib/errors'
   import type { DiffView, FlowView, RunComparison } from './lib/types'

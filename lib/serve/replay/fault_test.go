@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/githugt/flowi-lib/serve/replay"
+	"github.com/githugt/flowi/lib/serve/replay"
 )
 
 func loginFixture(t *testing.T, mutate func(*replay.Options)) *fixture {

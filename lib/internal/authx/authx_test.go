@@ -20,8 +20,8 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 
-	"github.com/githugt/flowi-lib/internal/httpx"
-	"github.com/githugt/flowi-lib/model"
+	"github.com/githugt/flowi/lib/internal/httpx"
+	"github.com/githugt/flowi/lib/model"
 )
 
 func auth(typ string, kv ...string) model.Auth {

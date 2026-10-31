@@ -17,12 +17,12 @@ import (
 	"github.com/coder/websocket"
 	"github.com/samber/do/v2"
 
-	"github.com/githugt/flowi-lib/examples"
-	"github.com/githugt/flowi-lib/examples/demoserver"
-	"github.com/githugt/flowi-lib/settings"
-	"github.com/githugt/flowi-lib/workspace"
+	"github.com/githugt/flowi/lib/examples"
+	"github.com/githugt/flowi/lib/examples/demoserver"
+	"github.com/githugt/flowi/lib/settings"
+	"github.com/githugt/flowi/lib/workspace"
 
-	"github.com/githugt/flowi-cli/internal/cli"
+	"github.com/githugt/flowi/cli/internal/cli"
 )
 
 const demoPassword = "pw-1234567"

@@ -6,11 +6,11 @@ import (
 	"fmt"
 	"os"
 
-	flowi "github.com/githugt/flowi-lib"
-	"github.com/githugt/flowi-lib/flowioverlay"
-	"github.com/githugt/flowi-lib/model"
+	flowi "github.com/githugt/flowi/lib"
+	"github.com/githugt/flowi/lib/flowioverlay"
+	"github.com/githugt/flowi/lib/model"
 
-	"github.com/githugt/flowi/internal/vm"
+	"github.com/githugt/flowi/app/internal/vm"
 )
 
 // A flowi overlay is a named set of changes laid over a request version (the

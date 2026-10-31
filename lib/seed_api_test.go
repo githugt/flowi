@@ -14,9 +14,9 @@ import (
 
 	"github.com/coder/websocket"
 
-	"github.com/githugt/flowi-lib/engine"
-	"github.com/githugt/flowi-lib/model"
-	"github.com/githugt/flowi-lib/settings"
+	"github.com/githugt/flowi/lib/engine"
+	"github.com/githugt/flowi/lib/model"
+	"github.com/githugt/flowi/lib/settings"
 )
 
 func newSeedRequest(t *testing.T, w *Workspace, path string) RequestTarget {

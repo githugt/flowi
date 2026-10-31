@@ -13,7 +13,7 @@ import (
 	"time"
 	"unicode/utf16"
 
-	"github.com/githugt/flowi-lib/internal/httpx"
+	"github.com/githugt/flowi/lib/internal/httpx"
 )
 
 func mustHex(t *testing.T, s string) []byte {

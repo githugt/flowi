@@ -7,9 +7,9 @@ import (
 	"fmt"
 	"slices"
 
-	"github.com/githugt/flowi-lib/diag"
-	"github.com/githugt/flowi-lib/model"
-	"github.com/githugt/flowi-lib/store"
+	"github.com/githugt/flowi/lib/diag"
+	"github.com/githugt/flowi/lib/model"
+	"github.com/githugt/flowi/lib/store"
 )
 
 // Format returns the canonical-formatting changes for the collection in dir,

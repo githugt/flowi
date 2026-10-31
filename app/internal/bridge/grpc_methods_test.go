@@ -5,12 +5,12 @@ package bridge_test
 import (
 	"testing"
 
-	flowi "github.com/githugt/flowi-lib"
-	"github.com/githugt/flowi-lib/grpcx"
-	"github.com/githugt/flowi-lib/model"
+	flowi "github.com/githugt/flowi/lib"
+	"github.com/githugt/flowi/lib/grpcx"
+	"github.com/githugt/flowi/lib/model"
 
-	"github.com/githugt/flowi/internal/bridge"
-	"github.com/githugt/flowi/internal/vm/vmtest"
+	"github.com/githugt/flowi/app/internal/bridge"
+	"github.com/githugt/flowi/app/internal/vm/vmtest"
 )
 
 // openRPC opens a gRPC request whose server lists methods, returning the

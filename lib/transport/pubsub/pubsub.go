@@ -22,9 +22,9 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 
-	"github.com/githugt/flowi-lib/model"
-	"github.com/githugt/flowi-lib/transport"
-	shared "github.com/githugt/flowi-lib/transport/internal/pull"
+	"github.com/githugt/flowi/lib/model"
+	"github.com/githugt/flowi/lib/transport"
+	shared "github.com/githugt/flowi/lib/transport/internal/pull"
 )
 
 const (

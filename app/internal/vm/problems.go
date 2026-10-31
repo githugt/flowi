@@ -7,8 +7,8 @@ import (
 	"path/filepath"
 	"slices"
 
-	flowi "github.com/githugt/flowi-lib"
-	"github.com/githugt/flowi-lib/diag"
+	flowi "github.com/githugt/flowi/lib"
+	"github.com/githugt/flowi/lib/diag"
 )
 
 // Problem is one row of the Problems panel.

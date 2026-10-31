@@ -7,8 +7,8 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/githugt/flowi-lib/jsonrpc"
-	"github.com/githugt/flowi-lib/model"
+	"github.com/githugt/flowi/lib/jsonrpc"
+	"github.com/githugt/flowi/lib/model"
 )
 
 // BodyKind is what the Body section's first picker chooses.

@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/githugt/flowi-lib/model"
+	"github.com/githugt/flowi/lib/model"
 )
 
 // petsWithFlow is a collection with the petstore imported and a flow that reads the pet's name.

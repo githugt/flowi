@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/githugt/flowi-lib/internal/names"
+	"github.com/githugt/flowi/lib/internal/names"
 )
 
 func TestValid_should_refuse_separators_dots_and_long_names(t *testing.T) {

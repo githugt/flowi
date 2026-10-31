@@ -2,7 +2,7 @@
   import { markerAt, slotAmong } from './lib/reorder'
   import { screenOf } from './lib/screens'
   import { onMount, tick } from 'svelte'
-  import { SessionService } from '../bindings/github.com/githugt/flowi/internal/bridge'
+  import { SessionService } from '../bindings/github.com/githugt/flowi/app/internal/bridge'
   import { app } from './lib/app.svelte'
   import Sidebar from './Sidebar.svelte'
   import Splitter from './Splitter.svelte'

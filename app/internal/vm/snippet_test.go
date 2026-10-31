@@ -6,13 +6,13 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/githugt/flowi-lib/engine"
-	"github.com/githugt/flowi-lib/model"
-	"github.com/githugt/flowi-lib/snippet"
-	"github.com/githugt/flowi-lib/vault"
+	"github.com/githugt/flowi/lib/engine"
+	"github.com/githugt/flowi/lib/model"
+	"github.com/githugt/flowi/lib/snippet"
+	"github.com/githugt/flowi/lib/vault"
 
-	"github.com/githugt/flowi/internal/vm"
-	"github.com/githugt/flowi/internal/vm/vmtest"
+	"github.com/githugt/flowi/app/internal/vm"
+	"github.com/githugt/flowi/app/internal/vm/vmtest"
 )
 
 func newSnippetVM(t *testing.T, b *vmtest.Backend, exclude bool) (*vm.Snippet, *vm.Request) {

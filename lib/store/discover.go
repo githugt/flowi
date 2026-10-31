@@ -11,8 +11,8 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/githugt/flowi-lib/diag"
-	"github.com/githugt/flowi-lib/flowioverlay"
+	"github.com/githugt/flowi/lib/diag"
+	"github.com/githugt/flowi/lib/flowioverlay"
 )
 
 // fileKind classifies a file found in a collection directory.

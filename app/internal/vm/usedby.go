@@ -5,9 +5,9 @@ package vm
 import (
 	"strings"
 
-	flowi "github.com/githugt/flowi-lib"
-	"github.com/githugt/flowi-lib/analysis"
-	"github.com/githugt/flowi-lib/model"
+	flowi "github.com/githugt/flowi/lib"
+	"github.com/githugt/flowi/lib/analysis"
+	"github.com/githugt/flowi/lib/model"
 )
 
 // UsedByRow is one line of the "Used by" tab: a version header, or a

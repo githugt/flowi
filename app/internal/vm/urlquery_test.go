@@ -5,7 +5,7 @@ package vm
 import (
 	"testing"
 
-	"github.com/githugt/flowi-lib/model"
+	"github.com/githugt/flowi/lib/model"
 )
 
 func TestURLWithQuery_should_append_the_params_that_have_a_name(t *testing.T) {

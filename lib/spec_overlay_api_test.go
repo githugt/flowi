@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/githugt/flowi-lib/model"
+	"github.com/githugt/flowi/lib/model"
 )
 
 // keptPets imports the petstore as pets.openapi.yaml, kept in descriptions/.

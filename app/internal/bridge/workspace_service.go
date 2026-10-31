@@ -5,7 +5,7 @@ package bridge
 import (
 	"path"
 
-	"github.com/githugt/flowi/internal/vm"
+	"github.com/githugt/flowi/app/internal/vm"
 )
 
 // TreeNode is one row of the workspace tree.

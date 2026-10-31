@@ -10,9 +10,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/githugt/flowi-lib/diag"
-	"github.com/githugt/flowi-lib/internal/ids"
-	"github.com/githugt/flowi-lib/model"
+	"github.com/githugt/flowi/lib/diag"
+	"github.com/githugt/flowi/lib/internal/ids"
+	"github.com/githugt/flowi/lib/model"
 )
 
 // Errors returned by the store.

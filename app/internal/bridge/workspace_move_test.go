@@ -6,9 +6,9 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/githugt/flowi-lib/model"
+	"github.com/githugt/flowi/lib/model"
 
-	"github.com/githugt/flowi/internal/vm/vmtest"
+	"github.com/githugt/flowi/app/internal/vm/vmtest"
 )
 
 // twoCollections is the sample Shop collection (auth/login, auth/verify,

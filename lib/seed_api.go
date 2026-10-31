@@ -7,9 +7,9 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/githugt/flowi-lib/blueprint"
-	"github.com/githugt/flowi-lib/diag"
-	"github.com/githugt/flowi-lib/model"
+	"github.com/githugt/flowi/lib/blueprint"
+	"github.com/githugt/flowi/lib/diag"
+	"github.com/githugt/flowi/lib/model"
 )
 
 // Values of requests.seed_blueprint that are not blueprint names.

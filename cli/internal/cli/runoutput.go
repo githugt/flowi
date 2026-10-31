@@ -8,10 +8,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/githugt/flowi-lib/diag"
-	"github.com/githugt/flowi-lib/engine"
+	"github.com/githugt/flowi/lib/diag"
+	"github.com/githugt/flowi/lib/engine"
 
-	"github.com/githugt/flowi-cli/internal/tui"
+	"github.com/githugt/flowi/cli/internal/tui"
 )
 
 // runText prints a run for people: a line per node as it finishes

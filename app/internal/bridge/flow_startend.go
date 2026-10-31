@@ -8,10 +8,10 @@ import (
 	"slices"
 	"strconv"
 
-	"github.com/githugt/flowi-lib/model"
-	"github.com/githugt/flowi-lib/report"
+	"github.com/githugt/flowi/lib/model"
+	"github.com/githugt/flowi/lib/report"
 
-	"github.com/githugt/flowi/internal/card"
+	"github.com/githugt/flowi/app/internal/card"
 )
 
 // IOView is one declared input or output as the editor behind its row needs

@@ -6,7 +6,7 @@ import (
 	"bytes"
 	"testing"
 
-	"github.com/githugt/flowi-lib/model"
+	"github.com/githugt/flowi/lib/model"
 )
 
 const setValuesFlow = `id: 01J9ZB3M4N5P6Q7R8S9T0VWXYZ

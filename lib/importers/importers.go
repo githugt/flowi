@@ -14,8 +14,8 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/githugt/flowi-lib/diag"
-	"github.com/githugt/flowi-lib/model"
+	"github.com/githugt/flowi/lib/diag"
+	"github.com/githugt/flowi/lib/model"
 )
 
 // Result is what a document imports as. Paths are relative to requests/

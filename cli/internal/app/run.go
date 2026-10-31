@@ -14,9 +14,9 @@ import (
 
 	"github.com/samber/do/v2"
 
-	"github.com/githugt/flowi-lib/diag"
+	"github.com/githugt/flowi/lib/diag"
 
-	"github.com/githugt/flowi-cli/internal/cli"
+	"github.com/githugt/flowi/cli/internal/cli"
 )
 
 // shutdownTimeout bounds application shutdown. It is unrelated to the

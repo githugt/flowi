@@ -7,10 +7,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/githugt/flowi-lib/telemetry"
+	"github.com/githugt/flowi/lib/telemetry"
 
-	"github.com/githugt/flowi/internal/vm"
-	"github.com/githugt/flowi/internal/vm/vmtest"
+	"github.com/githugt/flowi/app/internal/vm"
+	"github.com/githugt/flowi/app/internal/vm/vmtest"
 )
 
 func guiClient() telemetry.Client {

@@ -9,10 +9,10 @@ import (
 	"github.com/goccy/go-yaml"
 	"github.com/goccy/go-yaml/ast"
 
-	"github.com/githugt/flowi-lib/diag"
-	"github.com/githugt/flowi-lib/model"
-	"github.com/githugt/flowi-lib/settings"
-	"github.com/githugt/flowi-lib/version"
+	"github.com/githugt/flowi/lib/diag"
+	"github.com/githugt/flowi/lib/model"
+	"github.com/githugt/flowi/lib/settings"
+	"github.com/githugt/flowi/lib/version"
 )
 
 // DecodeRequest reads a *.req.yaml file. path is the request's path relative

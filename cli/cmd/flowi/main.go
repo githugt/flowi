@@ -9,7 +9,7 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/githugt/flowi-cli/internal/app"
+	"github.com/githugt/flowi/cli/internal/app"
 )
 
 func main() {

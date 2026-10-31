@@ -5,7 +5,7 @@ package card
 import (
 	"strings"
 
-	"github.com/githugt/flowi-lib/model"
+	"github.com/githugt/flowi/lib/model"
 )
 
 // kindRule is what one request kind's card has: which rows apply (in the order

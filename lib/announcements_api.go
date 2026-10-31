@@ -6,7 +6,7 @@ import (
 	"context"
 	"path/filepath"
 
-	"github.com/githugt/flowi-lib/announce"
+	"github.com/githugt/flowi/lib/announce"
 )
 
 // announcementsCacheName is the announcements cache inside the config

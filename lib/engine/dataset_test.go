@@ -10,10 +10,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/githugt/flowi-lib/dataset"
-	"github.com/githugt/flowi-lib/dataset/readonly"
-	"github.com/githugt/flowi-lib/diag"
-	"github.com/githugt/flowi-lib/model"
+	"github.com/githugt/flowi/lib/dataset"
+	"github.com/githugt/flowi/lib/dataset/readonly"
+	"github.com/githugt/flowi/lib/diag"
+	"github.com/githugt/flowi/lib/model"
 )
 
 // scriptedDataset records the query it was given and answers with a canned result.

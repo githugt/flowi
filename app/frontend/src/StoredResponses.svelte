@@ -4,7 +4,7 @@
   // the replayer and for showing again) and the examples pinned next to it (in
   // the collection, committed). One at a time can be shown, pinned and deleted.
   import { errorText } from './lib/errors'
-  import { RequestService } from '../bindings/github.com/githugt/flowi/internal/bridge'
+  import { RequestService } from '../bindings/github.com/githugt/flowi/app/internal/bridge'
   import { ui } from './lib/ui.svelte'
   import type { RequestView, StoredView } from './lib/types'
 

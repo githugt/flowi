@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	flowi "github.com/githugt/flowi-lib"
+	flowi "github.com/githugt/flowi/lib"
 )
 
 func TestParseMatrix_Given_dimensions_Then_names_and_values_are_read_in_order(t *testing.T) {

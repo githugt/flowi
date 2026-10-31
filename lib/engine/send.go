@@ -7,13 +7,13 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/githugt/flowi-lib/diag"
-	"github.com/githugt/flowi-lib/internal/authx"
-	"github.com/githugt/flowi-lib/internal/nodes"
-	"github.com/githugt/flowi-lib/model"
-	"github.com/githugt/flowi-lib/settings"
-	"github.com/githugt/flowi-lib/transport"
-	"github.com/githugt/flowi-lib/vault"
+	"github.com/githugt/flowi/lib/diag"
+	"github.com/githugt/flowi/lib/internal/authx"
+	"github.com/githugt/flowi/lib/internal/nodes"
+	"github.com/githugt/flowi/lib/model"
+	"github.com/githugt/flowi/lib/settings"
+	"github.com/githugt/flowi/lib/transport"
+	"github.com/githugt/flowi/lib/vault"
 )
 
 // Lookup gives the engine the loaded collections. The facade implements

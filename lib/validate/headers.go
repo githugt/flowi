@@ -7,8 +7,8 @@ import (
 
 	"golang.org/x/net/http/httpguts"
 
-	"github.com/githugt/flowi-lib/diag"
-	"github.com/githugt/flowi-lib/internal/yamlpath"
+	"github.com/githugt/flowi/lib/diag"
+	"github.com/githugt/flowi/lib/internal/yamlpath"
 )
 
 // checkHeaderNames reports request headers whose name can never be sent: an

@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/githugt/flowi-lib/engine"
+	"github.com/githugt/flowi/lib/engine"
 )
 
 func TestGenerate_Given_query_or_a_custom_method_Then_every_format_sends_that_exact_method(t *testing.T) {

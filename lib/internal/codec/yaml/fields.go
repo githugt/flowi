@@ -3,9 +3,9 @@
 package yamlcodec
 
 import (
-	"github.com/githugt/flowi-lib/diag"
-	"github.com/githugt/flowi-lib/internal/ids"
-	"github.com/githugt/flowi-lib/model"
+	"github.com/githugt/flowi/lib/diag"
+	"github.com/githugt/flowi/lib/internal/ids"
+	"github.com/githugt/flowi/lib/model"
 )
 
 func (d *decoder) rawFields(m *mapping) []model.Field {

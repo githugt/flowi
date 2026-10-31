@@ -9,11 +9,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/githugt/flowi-lib/diag"
-	yamlcodec "github.com/githugt/flowi-lib/internal/codec/yaml"
-	"github.com/githugt/flowi-lib/model"
-	"github.com/githugt/flowi-lib/settings"
-	"github.com/githugt/flowi-lib/store"
+	"github.com/githugt/flowi/lib/diag"
+	yamlcodec "github.com/githugt/flowi/lib/internal/codec/yaml"
+	"github.com/githugt/flowi/lib/model"
+	"github.com/githugt/flowi/lib/settings"
+	"github.com/githugt/flowi/lib/store"
 )
 
 // workspaceCopy copies the usage fixtures to a temp dir so a test can edit

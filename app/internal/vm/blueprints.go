@@ -6,8 +6,8 @@ import (
 	"errors"
 	"strings"
 
-	flowi "github.com/githugt/flowi-lib"
-	"github.com/githugt/flowi-lib/model"
+	flowi "github.com/githugt/flowi/lib"
+	"github.com/githugt/flowi/lib/model"
 )
 
 // BlueprintChoice is a blueprint offered in the "New flow from blueprint"

@@ -20,10 +20,10 @@ import (
 
 	"github.com/rogpeppe/go-internal/testscript"
 
-	"github.com/githugt/flowi-lib/examples"
-	"github.com/githugt/flowi-lib/examples/demoserver"
-	"github.com/githugt/flowi-lib/settings"
-	"github.com/githugt/flowi-lib/workspace"
+	"github.com/githugt/flowi/lib/examples"
+	"github.com/githugt/flowi/lib/examples/demoserver"
+	"github.com/githugt/flowi/lib/settings"
+	"github.com/githugt/flowi/lib/workspace"
 )
 
 // scriptPassword is the demo server's password in scripts. Scripts assert

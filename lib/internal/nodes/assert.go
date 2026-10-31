@@ -7,10 +7,10 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/githugt/flowi-lib/diag"
-	"github.com/githugt/flowi-lib/model"
-	"github.com/githugt/flowi-lib/problem"
-	"github.com/githugt/flowi-lib/template"
+	"github.com/githugt/flowi/lib/diag"
+	"github.com/githugt/flowi/lib/model"
+	"github.com/githugt/flowi/lib/problem"
+	"github.com/githugt/flowi/lib/template"
 )
 
 func assertSpec() Spec {

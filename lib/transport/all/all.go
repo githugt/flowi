@@ -4,20 +4,20 @@
 package all
 
 import (
-	"github.com/githugt/flowi-lib/model"
-	"github.com/githugt/flowi-lib/transport"
-	"github.com/githugt/flowi-lib/transport/amqp"
-	"github.com/githugt/flowi-lib/transport/amqp10"
-	"github.com/githugt/flowi-lib/transport/kafka"
-	"github.com/githugt/flowi-lib/transport/mqtt"
-	"github.com/githugt/flowi-lib/transport/nats"
-	"github.com/githugt/flowi-lib/transport/pubsub"
-	"github.com/githugt/flowi-lib/transport/redis"
-	"github.com/githugt/flowi-lib/transport/servicebus"
-	"github.com/githugt/flowi-lib/transport/sns"
-	"github.com/githugt/flowi-lib/transport/sqs"
-	"github.com/githugt/flowi-lib/transport/sse"
-	"github.com/githugt/flowi-lib/transport/ws"
+	"github.com/githugt/flowi/lib/model"
+	"github.com/githugt/flowi/lib/transport"
+	"github.com/githugt/flowi/lib/transport/amqp"
+	"github.com/githugt/flowi/lib/transport/amqp10"
+	"github.com/githugt/flowi/lib/transport/kafka"
+	"github.com/githugt/flowi/lib/transport/mqtt"
+	"github.com/githugt/flowi/lib/transport/nats"
+	"github.com/githugt/flowi/lib/transport/pubsub"
+	"github.com/githugt/flowi/lib/transport/redis"
+	"github.com/githugt/flowi/lib/transport/servicebus"
+	"github.com/githugt/flowi/lib/transport/sns"
+	"github.com/githugt/flowi/lib/transport/sqs"
+	"github.com/githugt/flowi/lib/transport/sse"
+	"github.com/githugt/flowi/lib/transport/ws"
 )
 
 // New returns a registry with every protocol this build speaks.

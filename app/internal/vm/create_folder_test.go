@@ -6,10 +6,10 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/githugt/flowi-lib/model"
+	"github.com/githugt/flowi/lib/model"
 
-	"github.com/githugt/flowi/internal/vm"
-	"github.com/githugt/flowi/internal/vm/vmtest"
+	"github.com/githugt/flowi/app/internal/vm"
+	"github.com/githugt/flowi/app/internal/vm/vmtest"
 )
 
 func TestWorkspaceVM_CreateFolder_should_show_an_empty_folder_in_the_tree(t *testing.T) {

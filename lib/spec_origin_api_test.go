@@ -9,7 +9,7 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/githugt/flowi-lib/model"
+	"github.com/githugt/flowi/lib/model"
 )
 
 func TestSpecOrigin_should_name_the_overlay_that_sets_each_field(t *testing.T) {

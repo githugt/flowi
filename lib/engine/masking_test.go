@@ -11,8 +11,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/githugt/flowi-lib/model"
-	"github.com/githugt/flowi-lib/report"
+	"github.com/githugt/flowi/lib/model"
+	"github.com/githugt/flowi/lib/report"
 )
 
 func TestRun_secret_should_be_masked_everywhere(t *testing.T) {

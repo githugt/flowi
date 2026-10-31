@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/githugt/flowi-lib/diag"
-	"github.com/githugt/flowi-lib/template"
+	"github.com/githugt/flowi/lib/diag"
+	"github.com/githugt/flowi/lib/template"
 )
 
 // schemaState is a state whose runtime answers CheckSchema for step "login" with out.

@@ -1,0 +1,40 @@
+name: release-cli
+
+# Push a cli/v* tag (for example cli/v0.3.0-alpha.1) to release the command line tool.
+on:
+  push:
+    tags: ["cli/v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: cli
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0 # git-cliff and goreleaser read the history and the tags
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: cli/go.mod
+      - name: release notes
+        uses: orhun/git-cliff-action@v4
+        with:
+          config: cli/cliff.toml
+          args: --latest --strip header --include-path "cli/**"
+        env:
+          OUTPUT: cli/RELEASE_NOTES.md
+          GITHUB_REPO: ${{ github.repository }}
+      - uses: goreleaser/goreleaser-action@v6
+        with:
+          version: "~> v2"
+          workdir: cli
+          args: release --clean --release-notes=RELEASE_NOTES.md
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # The tag has a folder prefix (cli/v1.2.3); the archive names below drop it.
+          GORELEASER_CURRENT_TAG: ${{ github.ref_name }}

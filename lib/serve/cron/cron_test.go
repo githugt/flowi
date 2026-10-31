@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/githugt/flowi-lib/serve/cron"
+	"github.com/githugt/flowi/lib/serve/cron"
 )
 
 func at(t *testing.T, loc *time.Location, s string) time.Time {

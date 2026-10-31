@@ -9,7 +9,7 @@ import (
 	"slices"
 	"strconv"
 
-	"github.com/githugt/flowi-lib/diag"
+	"github.com/githugt/flowi/lib/diag"
 )
 
 // CurrentFormat is the collection format this version of Flowi writes.

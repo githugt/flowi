@@ -7,8 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/githugt/flowi-lib/model"
-	"github.com/githugt/flowi-lib/settings"
+	"github.com/githugt/flowi/lib/model"
+	"github.com/githugt/flowi/lib/settings"
 )
 
 // Dir is the directory of the named workspace.

@@ -14,7 +14,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/githugt/flowi-lib/internal/httpx"
+	"github.com/githugt/flowi/lib/internal/httpx"
 )
 
 // digest answers a Digest challenge (RFC 7616; qop auth or none, MD5, SHA-256

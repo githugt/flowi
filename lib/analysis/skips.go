@@ -5,9 +5,9 @@ package analysis
 import (
 	"strings"
 
-	"github.com/githugt/flowi-lib/internal/sites"
-	"github.com/githugt/flowi-lib/model"
-	"github.com/githugt/flowi-lib/template"
+	"github.com/githugt/flowi/lib/internal/sites"
+	"github.com/githugt/flowi/lib/model"
+	"github.com/githugt/flowi/lib/template"
 )
 
 // SkipReader is a step that reads something a skipped step would have made.

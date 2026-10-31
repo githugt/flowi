@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/githugt/flowi-cli/internal/cli"
+	"github.com/githugt/flowi/cli/internal/cli"
 )
 
 func TestExitCodeFor_should_map_results_to_exit_codes(t *testing.T) {

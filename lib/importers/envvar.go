@@ -3,8 +3,8 @@
 package importers
 
 import (
-	"github.com/githugt/flowi-lib/diag"
-	"github.com/githugt/flowi-lib/model"
+	"github.com/githugt/flowi/lib/diag"
+	"github.com/githugt/flowi/lib/model"
 )
 
 // EnvVar is an imported environment variable: a credential-like one (by name,

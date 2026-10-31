@@ -14,10 +14,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/githugt/flowi-lib/diag"
-	"github.com/githugt/flowi-lib/importers"
-	yamlcodec "github.com/githugt/flowi-lib/internal/codec/yaml"
-	"github.com/githugt/flowi-lib/settings"
+	"github.com/githugt/flowi/lib/diag"
+	"github.com/githugt/flowi/lib/importers"
+	yamlcodec "github.com/githugt/flowi/lib/internal/codec/yaml"
+	"github.com/githugt/flowi/lib/settings"
 )
 
 var update = flag.Bool("update", false, "rewrite golden files") //nolint:gochecknoglobals // test flag

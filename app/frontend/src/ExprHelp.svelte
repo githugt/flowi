@@ -2,7 +2,7 @@
   // A "?" that opens what an expression field can read: the names, the
   // operators and functions, and examples. What it shows depends on where the
   // field is (a flow step, a request, a message request, an "only if" filter).
-  import { SystemService } from '../bindings/github.com/githugt/flowi/internal/bridge'
+  import { SystemService } from '../bindings/github.com/githugt/flowi/app/internal/bridge'
   import type { ExprHelpView } from './lib/types'
 
   let { context }: { context: string } = $props()

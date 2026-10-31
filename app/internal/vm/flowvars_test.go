@@ -6,7 +6,7 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/githugt/flowi-lib/model"
+	"github.com/githugt/flowi/lib/model"
 )
 
 func param(k string, v any) model.Field { return model.Field{Key: k, Value: v} }

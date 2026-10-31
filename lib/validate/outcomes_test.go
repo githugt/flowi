@@ -5,8 +5,8 @@ package validate
 import (
 	"testing"
 
-	"github.com/githugt/flowi-lib/diag"
-	"github.com/githugt/flowi-lib/model"
+	"github.com/githugt/flowi/lib/diag"
+	"github.com/githugt/flowi/lib/model"
 )
 
 func TestOutcomes_should_report_what_is_wrong_with_a_list(t *testing.T) {

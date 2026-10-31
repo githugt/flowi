@@ -5,7 +5,7 @@ package canvas
 import (
 	"testing"
 
-	"github.com/githugt/flowi-lib/model"
+	"github.com/githugt/flowi/lib/model"
 )
 
 func sampleDiagram() Diagram {

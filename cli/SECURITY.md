@@ -9,7 +9,7 @@ Flowi is pre-alpha. Security fixes are made on the latest minor release only.
 Please **do not** open a public issue for security problems.
 
 Report them privately through GitHub's
-[private vulnerability reporting](https://github.com/githugt/flowi-cli/security/advisories/new)
+[private vulnerability reporting](https://github.com/githugt/flowi/security/advisories/new)
 for this repository. Include the affected version, steps to reproduce, and the impact you
 observed. You will get an acknowledgement within 7 days.
 

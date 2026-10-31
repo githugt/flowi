@@ -6,7 +6,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/githugt/flowi-lib/template"
+	"github.com/githugt/flowi/lib/template"
 )
 
 // Generator is a $function the suggestions can offer.

@@ -1,6 +1,6 @@
 <script lang="ts">
   // A request's own hooks: pre and post steps, and for message requests a step run for each message, each a small flow canvas.
-  import { HooksService } from '../bindings/github.com/githugt/flowi/internal/bridge'
+  import { HooksService } from '../bindings/github.com/githugt/flowi/app/internal/bridge'
   import { app } from './lib/app.svelte'
   import { ui } from './lib/ui.svelte'
   import type { HooksView } from './lib/types'

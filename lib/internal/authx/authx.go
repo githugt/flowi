@@ -19,8 +19,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/githugt/flowi-lib/internal/httpx"
-	"github.com/githugt/flowi-lib/model"
+	"github.com/githugt/flowi/lib/internal/httpx"
+	"github.com/githugt/flowi/lib/model"
 )
 
 // Applied is one thing a scheme added to a request.

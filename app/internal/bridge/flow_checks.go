@@ -9,12 +9,12 @@ import (
 	"slices"
 	"strings"
 
-	flowi "github.com/githugt/flowi-lib"
-	"github.com/githugt/flowi-lib/model"
-	"github.com/githugt/flowi-lib/report"
-	"github.com/githugt/flowi-lib/schemainfer"
+	flowi "github.com/githugt/flowi/lib"
+	"github.com/githugt/flowi/lib/model"
+	"github.com/githugt/flowi/lib/report"
+	"github.com/githugt/flowi/lib/schemainfer"
 
-	"github.com/githugt/flowi/internal/vm"
+	"github.com/githugt/flowi/app/internal/vm"
 )
 
 // The tools of an open flow that go beyond Run: a matrix of runs, the access check, the drift check and the sequence

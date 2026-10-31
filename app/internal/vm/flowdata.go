@@ -10,8 +10,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/githugt/flowi-lib/engine"
-	"github.com/githugt/flowi-lib/model"
+	"github.com/githugt/flowi/lib/engine"
+	"github.com/githugt/flowi/lib/model"
 )
 
 // What the Data tab of the flow editor shows for a node after a run, as plain

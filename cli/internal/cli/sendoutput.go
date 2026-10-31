@@ -12,10 +12,10 @@ import (
 	"time"
 	"unicode"
 
-	"github.com/githugt/flowi-lib/diag"
-	"github.com/githugt/flowi-lib/engine"
+	"github.com/githugt/flowi/lib/diag"
+	"github.com/githugt/flowi/lib/engine"
 
-	"github.com/githugt/flowi-cli/internal/tui"
+	"github.com/githugt/flowi/cli/internal/tui"
 )
 
 // textReport prints a send for people: progress and summary on stderr,

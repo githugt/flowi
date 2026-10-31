@@ -8,8 +8,8 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/githugt/flowi-lib/importers"
-	"github.com/githugt/flowi-lib/model"
+	"github.com/githugt/flowi/lib/importers"
+	"github.com/githugt/flowi/lib/model"
 )
 
 // translator turns one request's parts into Flowi values.

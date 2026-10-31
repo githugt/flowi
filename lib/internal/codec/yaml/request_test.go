@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/githugt/flowi-lib/diag"
+	"github.com/githugt/flowi/lib/diag"
 )
 
 const requestHeader = "id: 01J9ZA3M4N5P6Q7R8S9T0VWXYZ\nname: R\n"

@@ -2,7 +2,7 @@
 
 package tui
 
-import "github.com/githugt/flowi-lib/engine"
+import "github.com/githugt/flowi/lib/engine"
 
 // PromptText says what a request waits for the person to do, in one line a
 // terminal can show while it waits.

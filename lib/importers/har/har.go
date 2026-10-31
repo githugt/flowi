@@ -20,10 +20,10 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/githugt/flowi-lib/diag"
-	"github.com/githugt/flowi-lib/importers"
-	"github.com/githugt/flowi-lib/importers/jsonpos"
-	"github.com/githugt/flowi-lib/model"
+	"github.com/githugt/flowi/lib/diag"
+	"github.com/githugt/flowi/lib/importers"
+	"github.com/githugt/flowi/lib/importers/jsonpos"
+	"github.com/githugt/flowi/lib/model"
 )
 
 type archive struct {

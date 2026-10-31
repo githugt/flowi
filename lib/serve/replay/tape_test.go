@@ -11,7 +11,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/githugt/flowi-lib/serve/replay"
+	"github.com/githugt/flowi/lib/serve/replay"
 )
 
 func TestRecord_Given_a_tape_Then_each_call_is_written_to_a_har_file_in_order_with_credentials_masked(t *testing.T) {

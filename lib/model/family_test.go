@@ -5,7 +5,7 @@ package model_test
 import (
 	"testing"
 
-	"github.com/githugt/flowi-lib/model"
+	"github.com/githugt/flowi/lib/model"
 )
 
 func TestRequestVersion_Family_should_name_the_family_and_its_exchange(t *testing.T) {

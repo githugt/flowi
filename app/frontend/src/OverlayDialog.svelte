@@ -2,7 +2,7 @@
   // Save to spec overlay: what saving this version to its spec's overlay would change, each change
   // chosen or not, with what stays in Flowi and why. Saving replaces what the overlay said about
   // this operation, so a change already in it is chosen too: leaving it out takes it out.
-  import { RequestService } from '../bindings/github.com/githugt/flowi/internal/bridge'
+  import { RequestService } from '../bindings/github.com/githugt/flowi/app/internal/bridge'
   import { errorText } from './lib/errors'
   import type { OverlayPreview } from './lib/types'
 

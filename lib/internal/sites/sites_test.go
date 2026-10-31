@@ -5,8 +5,8 @@ package sites_test
 import (
 	"testing"
 
-	"github.com/githugt/flowi-lib/internal/sites"
-	"github.com/githugt/flowi-lib/model"
+	"github.com/githugt/flowi/lib/internal/sites"
+	"github.com/githugt/flowi/lib/model"
 )
 
 func TestNodeTemplates_should_carry_the_owning_node_id(t *testing.T) {

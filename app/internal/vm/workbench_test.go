@@ -6,11 +6,11 @@ import (
 	"testing"
 	"time"
 
-	flowi "github.com/githugt/flowi-lib"
-	"github.com/githugt/flowi-lib/engine"
+	flowi "github.com/githugt/flowi/lib"
+	"github.com/githugt/flowi/lib/engine"
 
-	"github.com/githugt/flowi/internal/vm"
-	"github.com/githugt/flowi/internal/vm/vmtest"
+	"github.com/githugt/flowi/app/internal/vm"
+	"github.com/githugt/flowi/app/internal/vm/vmtest"
 )
 
 func TestRequestVM_Configured_should_not_count_the_authorization_header_as_a_header(t *testing.T) {

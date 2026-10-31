@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/githugt/flowi-lib/model"
+	"github.com/githugt/flowi/lib/model"
 )
 
 // accessServer keeps notes. A note belongs to the user who made it (header X-User). leaky says whether another

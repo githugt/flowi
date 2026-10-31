@@ -13,7 +13,7 @@ import (
 
 	"github.com/theory/jsonpath"
 
-	"github.com/githugt/flowi-lib/internal/jsonschema"
+	"github.com/githugt/flowi/lib/internal/jsonschema"
 )
 
 // rank orders statuses: the worst one wins.

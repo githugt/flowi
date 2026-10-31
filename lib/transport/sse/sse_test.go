@@ -11,8 +11,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/githugt/flowi-lib/transport"
-	"github.com/githugt/flowi-lib/transport/sse"
+	"github.com/githugt/flowi/lib/transport"
+	"github.com/githugt/flowi/lib/transport/sse"
 )
 
 func stream(t *testing.T, body string, seen chan<- *http.Request) string {

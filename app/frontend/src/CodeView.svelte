@@ -1,7 +1,7 @@
 <script lang="ts">
   // The flow as text: the flow body (editable, applied as one undoable edit)
   // and the Arazzo file saving would write (read-only).
-  import { FlowService } from '../bindings/github.com/githugt/flowi/internal/bridge'
+  import { FlowService } from '../bindings/github.com/githugt/flowi/app/internal/bridge'
   import type { FlowView, StandaloneView } from './lib/types'
   import { ui } from './lib/ui.svelte'
   import { stepAtLine } from './lib/codeStep'

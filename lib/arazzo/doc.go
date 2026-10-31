@@ -10,8 +10,8 @@ package arazzo
 import (
 	"time"
 
-	"github.com/githugt/flowi-lib/diag"
-	"github.com/githugt/flowi-lib/model"
+	"github.com/githugt/flowi/lib/diag"
+	"github.com/githugt/flowi/lib/model"
 )
 
 // Operation is what export needs to know about a request: its OpenAPI

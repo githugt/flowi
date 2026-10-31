@@ -5,7 +5,7 @@ package engine
 import (
 	"testing"
 
-	"github.com/githugt/flowi-lib/model"
+	"github.com/githugt/flowi/lib/model"
 )
 
 // A WebDAV answer is XML: a value in it is read with an XML path, and a later step can use it.

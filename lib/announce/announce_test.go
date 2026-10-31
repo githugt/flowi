@@ -18,8 +18,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/githugt/flowi-lib/model"
-	"github.com/githugt/flowi-lib/settings"
+	"github.com/githugt/flowi/lib/model"
+	"github.com/githugt/flowi/lib/settings"
 )
 
 var now = time.Date(2026, 10, 9, 12, 0, 0, 0, time.UTC) //nolint:gochecknoglobals // a fixed instant shared by read-only tests

@@ -6,8 +6,8 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/githugt/flowi-lib/model"
-	"github.com/githugt/flowi-lib/settings"
+	"github.com/githugt/flowi/lib/model"
+	"github.com/githugt/flowi/lib/settings"
 )
 
 func TestNewConfig_Given_user_and_request_redirect_settings_When_resolved_Then_request_overrides_user(t *testing.T) {

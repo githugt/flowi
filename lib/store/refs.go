@@ -2,7 +2,7 @@
 
 package store
 
-import "github.com/githugt/flowi-lib/model"
+import "github.com/githugt/flowi/lib/model"
 
 // RefResolver returns the current path of a referenced entity, or false
 // when it cannot be resolved (the hint is then left unchanged).

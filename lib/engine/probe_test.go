@@ -7,8 +7,8 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/githugt/flowi-lib/internal/nodes"
-	"github.com/githugt/flowi-lib/model"
+	"github.com/githugt/flowi/lib/internal/nodes"
+	"github.com/githugt/flowi/lib/model"
 )
 
 // probe is a test node type: it records when each node instance starts

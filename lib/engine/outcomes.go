@@ -3,8 +3,8 @@
 package engine
 
 import (
-	"github.com/githugt/flowi-lib/model"
-	"github.com/githugt/flowi-lib/template"
+	"github.com/githugt/flowi/lib/model"
+	"github.com/githugt/flowi/lib/template"
 )
 
 // matchOutcomes are the names of the outcomes a finished request has, in list order: success when it

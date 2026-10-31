@@ -5,7 +5,7 @@
   import Icon from './Icon.svelte'
   import { ui } from './lib/ui.svelte'
   import { errorText } from './lib/errors'
-  import { RequestService } from '../bindings/github.com/githugt/flowi/internal/bridge'
+  import { RequestService } from '../bindings/github.com/githugt/flowi/app/internal/bridge'
   import type { GRPCInfo, GRPCMethod } from './lib/types'
 
   let { node, info }: { node: string; info: GRPCInfo } = $props()

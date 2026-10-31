@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/githugt/flowi-lib/diag"
-	"github.com/githugt/flowi-lib/report"
+	"github.com/githugt/flowi/lib/diag"
+	"github.com/githugt/flowi/lib/report"
 )
 
 func digestState() (*State, *recorder, *fakeRuntime) {

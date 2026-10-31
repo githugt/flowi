@@ -1,7 +1,7 @@
 <script lang="ts">
   // What the flow has to tell: errors, steps out of order, Flowi-only steps,
   // a change on disk, unsaved edits. A chip opens its message under it.
-  import { FlowService } from '../bindings/github.com/githugt/flowi/internal/bridge'
+  import { FlowService } from '../bindings/github.com/githugt/flowi/app/internal/bridge'
   import type { Chip, FlowView } from './lib/types'
 
   let { view }: { view: FlowView } = $props()

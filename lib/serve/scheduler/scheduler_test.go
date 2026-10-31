@@ -13,10 +13,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/githugt/flowi-lib/model"
-	"github.com/githugt/flowi-lib/serve/cron"
-	"github.com/githugt/flowi-lib/serve/runs"
-	"github.com/githugt/flowi-lib/serve/scheduler"
+	"github.com/githugt/flowi/lib/model"
+	"github.com/githugt/flowi/lib/serve/cron"
+	"github.com/githugt/flowi/lib/serve/runs"
+	"github.com/githugt/flowi/lib/serve/scheduler"
 )
 
 // fakeClock only moves when the test says so.

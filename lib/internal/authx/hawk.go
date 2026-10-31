@@ -14,7 +14,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/githugt/flowi-lib/internal/httpx"
+	"github.com/githugt/flowi/lib/internal/httpx"
 )
 
 // hawk signs a request with a Hawk header (the HTTP authentication scheme of

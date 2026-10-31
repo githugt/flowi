@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/githugt/flowi-lib/engine"
+	"github.com/githugt/flowi/lib/engine"
 )
 
 func TestStatusLine_should_say_how_many_rows_a_dataset_request_returned(t *testing.T) {

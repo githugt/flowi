@@ -7,9 +7,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/githugt/flowi-lib/diag"
-	"github.com/githugt/flowi-lib/internal/ids"
-	"github.com/githugt/flowi-lib/model"
+	"github.com/githugt/flowi/lib/diag"
+	"github.com/githugt/flowi/lib/internal/ids"
+	"github.com/githugt/flowi/lib/model"
 )
 
 // fixture builds small, valid collections in Go so each test states only

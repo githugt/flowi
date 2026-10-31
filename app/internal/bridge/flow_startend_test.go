@@ -6,10 +6,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/githugt/flowi-lib/model"
+	"github.com/githugt/flowi/lib/model"
 
-	"github.com/githugt/flowi/internal/bridge"
-	"github.com/githugt/flowi/internal/vm/vmtest"
+	"github.com/githugt/flowi/app/internal/bridge"
+	"github.com/githugt/flowi/app/internal/vm/vmtest"
 )
 
 // openWithIO opens a flow that declares three inputs and no outputs.

@@ -5,7 +5,7 @@ package vm
 import (
 	"slices"
 
-	"github.com/githugt/flowi-lib/model"
+	"github.com/githugt/flowi/lib/model"
 )
 
 // ParamValue is the value of parameter key, nil when the node has none.

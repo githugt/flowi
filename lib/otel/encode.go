@@ -9,7 +9,7 @@ import (
 )
 
 // scopeName identifies this instrumentation in the exported scope.
-const scopeName = "github.com/githugt/flowi-lib/otel"
+const scopeName = "github.com/githugt/flowi/lib/otel"
 
 // The types below are the OTLP/JSON encoding of an ExportTraceServiceRequest
 // (opentelemetry-proto, JSON mapping: ids as hex strings, 64-bit integers

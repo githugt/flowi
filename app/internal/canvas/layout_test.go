@@ -12,10 +12,10 @@ import (
 	"strings"
 	"testing"
 
-	flowi "github.com/githugt/flowi-lib"
-	"github.com/githugt/flowi-lib/examples"
-	"github.com/githugt/flowi-lib/model"
-	"github.com/githugt/flowi-lib/settings"
+	flowi "github.com/githugt/flowi/lib"
+	"github.com/githugt/flowi/lib/examples"
+	"github.com/githugt/flowi/lib/model"
+	"github.com/githugt/flowi/lib/settings"
 )
 
 var update = flag.Bool("update", false, "rewrite golden files") //nolint:gochecknoglobals // test flag

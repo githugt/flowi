@@ -5,7 +5,7 @@ package vm_test
 import (
 	"testing"
 
-	"github.com/githugt/flowi-lib/template"
+	"github.com/githugt/flowi/lib/template"
 )
 
 // matches is the index of the first case whose test is true when step b ends

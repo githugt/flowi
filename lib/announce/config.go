@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/githugt/flowi-lib/settings"
+	"github.com/githugt/flowi/lib/settings"
 )
 
 // ConfigFrom reads the announcements settings. on is false when the toggle

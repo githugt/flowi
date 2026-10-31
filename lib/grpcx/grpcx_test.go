@@ -13,8 +13,8 @@ import (
 
 	"google.golang.org/grpc/codes"
 
-	"github.com/githugt/flowi-lib/grpcx"
-	"github.com/githugt/flowi-lib/transport"
+	"github.com/githugt/flowi/lib/grpcx"
+	"github.com/githugt/flowi/lib/transport"
 )
 
 func call(f *fake, method, body string) grpcx.Call {

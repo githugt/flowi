@@ -4,7 +4,7 @@
   import { errorText } from './lib/errors'
   import { onMount } from 'svelte'
   import { live } from './lib/live'
-  import { TrashService } from '../bindings/github.com/githugt/flowi/internal/bridge'
+  import { TrashService } from '../bindings/github.com/githugt/flowi/app/internal/bridge'
   import { ui } from './lib/ui.svelte'
   import type { TrashView } from './lib/types'
 

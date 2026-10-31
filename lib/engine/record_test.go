@@ -13,7 +13,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/githugt/flowi-lib/vault"
+	"github.com/githugt/flowi/lib/vault"
 )
 
 func sampleRecord(secret string) Record {

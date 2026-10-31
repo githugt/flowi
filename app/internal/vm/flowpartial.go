@@ -3,7 +3,7 @@
 package vm
 
 import (
-	"github.com/githugt/flowi-lib/model"
+	"github.com/githugt/flowi/lib/model"
 )
 
 // RunScope says which part of a flow a partial run covers, around one step.

@@ -10,15 +10,15 @@ import (
 	"regexp"
 	"testing"
 
-	flowi "github.com/githugt/flowi-lib"
-	"github.com/githugt/flowi-lib/examples"
-	"github.com/githugt/flowi-lib/model"
-	"github.com/githugt/flowi-lib/settings"
+	flowi "github.com/githugt/flowi/lib"
+	"github.com/githugt/flowi/lib/examples"
+	"github.com/githugt/flowi/lib/model"
+	"github.com/githugt/flowi/lib/settings"
 
-	"github.com/githugt/flowi/internal/backend"
-	"github.com/githugt/flowi/internal/uithread"
-	"github.com/githugt/flowi/internal/vm"
-	"github.com/githugt/flowi/internal/vm/vmtest"
+	"github.com/githugt/flowi/app/internal/backend"
+	"github.com/githugt/flowi/app/internal/uithread"
+	"github.com/githugt/flowi/app/internal/vm"
+	"github.com/githugt/flowi/app/internal/vm/vmtest"
 )
 
 var idLine = regexp.MustCompile(`(?m)(x-flowi-flow:\n +)id: .*$`)

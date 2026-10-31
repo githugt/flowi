@@ -12,8 +12,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/githugt/flowi-lib/diag"
-	"github.com/githugt/flowi-lib/settings"
+	"github.com/githugt/flowi/lib/diag"
+	"github.com/githugt/flowi/lib/settings"
 )
 
 func copyCollection(t *testing.T, name string) string {

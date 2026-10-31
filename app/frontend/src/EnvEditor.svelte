@@ -1,6 +1,6 @@
 <script lang="ts">
   import HiddenChars from './HiddenChars.svelte'
-  import { EnvironmentService } from '../bindings/github.com/githugt/flowi/internal/bridge'
+  import { EnvironmentService } from '../bindings/github.com/githugt/flowi/app/internal/bridge'
   import type { EnvRow, EnvView, MissingVar } from './lib/types'
   import FileBanner from './FileBanner.svelte'
   import Hint from './Hint.svelte'

@@ -10,7 +10,7 @@ import (
 
 	amqp "github.com/Azure/go-amqp"
 
-	"github.com/githugt/flowi-lib/transport"
+	"github.com/githugt/flowi/lib/transport"
 )
 
 func TestTargetOf_should_read_the_server_channel_and_credentials(t *testing.T) {

@@ -6,7 +6,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/githugt/flowi-lib/model"
+	"github.com/githugt/flowi/lib/model"
 )
 
 // A method such as PROPFIND is only a verb to the library: it adds no headers and no body. WebDAV and CalDAV

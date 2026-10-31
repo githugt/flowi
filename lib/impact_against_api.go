@@ -9,11 +9,11 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/githugt/flowi-lib/analysis"
-	"github.com/githugt/flowi-lib/diag"
-	"github.com/githugt/flowi-lib/model"
-	"github.com/githugt/flowi-lib/openapi"
-	"github.com/githugt/flowi-lib/specoverlay"
+	"github.com/githugt/flowi/lib/analysis"
+	"github.com/githugt/flowi/lib/diag"
+	"github.com/githugt/flowi/lib/model"
+	"github.com/githugt/flowi/lib/openapi"
+	"github.com/githugt/flowi/lib/specoverlay"
 )
 
 // SpecImpact is what a changed API description does to the things that use it.

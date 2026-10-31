@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/githugt/flowi-lib/settings"
+	"github.com/githugt/flowi/lib/settings"
 )
 
 func TestParseRate(t *testing.T) {

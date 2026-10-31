@@ -13,8 +13,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/githugt/flowi-lib/serve/runs"
-	"github.com/githugt/flowi-lib/serve/shared/sharedtest"
+	"github.com/githugt/flowi/lib/serve/runs"
+	"github.com/githugt/flowi/lib/serve/shared/sharedtest"
 )
 
 func quiet() *slog.Logger { return slog.New(slog.NewTextHandler(io.Discard, nil)) }

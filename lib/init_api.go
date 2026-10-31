@@ -3,8 +3,8 @@
 package flowi
 
 import (
-	"github.com/githugt/flowi-lib/internal/migrate"
-	"github.com/githugt/flowi-lib/model"
+	"github.com/githugt/flowi/lib/internal/migrate"
+	"github.com/githugt/flowi/lib/model"
 )
 
 // InitCollection creates a new, empty collection in dir and optionally

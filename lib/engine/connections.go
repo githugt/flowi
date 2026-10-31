@@ -8,7 +8,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/githugt/flowi-lib/transport"
+	"github.com/githugt/flowi/lib/transport"
 )
 
 // connUse is how a request node uses a connection kept open between steps.

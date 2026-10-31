@@ -7,9 +7,9 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/githugt/flowi-lib/importers"
-	"github.com/githugt/flowi-lib/internal/loose"
-	"github.com/githugt/flowi-lib/model"
+	"github.com/githugt/flowi/lib/importers"
+	"github.com/githugt/flowi/lib/internal/loose"
+	"github.com/githugt/flowi/lib/model"
 )
 
 type translator struct {

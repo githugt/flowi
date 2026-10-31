@@ -9,7 +9,7 @@ import (
 
 	"github.com/goccy/go-yaml"
 
-	"github.com/githugt/flowi-lib/internal/textenc"
+	"github.com/githugt/flowi/lib/internal/textenc"
 )
 
 // Decode parses data and normalises it; the root must be a mapping.

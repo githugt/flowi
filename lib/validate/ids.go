@@ -6,8 +6,8 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/githugt/flowi-lib/diag"
-	"github.com/githugt/flowi-lib/model"
+	"github.com/githugt/flowi/lib/diag"
+	"github.com/githugt/flowi/lib/model"
 )
 
 // checkDuplicateIDs reports ids used by more than one entity anywhere in

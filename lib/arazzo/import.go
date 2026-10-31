@@ -14,10 +14,10 @@ import (
 
 	"github.com/pb33f/libopenapi"
 
-	"github.com/githugt/flowi-lib/diag"
-	"github.com/githugt/flowi-lib/internal/yamldoc"
-	"github.com/githugt/flowi-lib/model"
-	"github.com/githugt/flowi-lib/openapi"
+	"github.com/githugt/flowi/lib/diag"
+	"github.com/githugt/flowi/lib/internal/yamldoc"
+	"github.com/githugt/flowi/lib/model"
+	"github.com/githugt/flowi/lib/openapi"
 )
 
 // FlowPrefix is where imported workflows go, under flows/.

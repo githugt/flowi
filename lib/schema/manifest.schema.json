@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://github.com/githugt/flowi-lib/schema/manifest.schema.json",
+  "$id": "https://github.com/githugt/flowi/lib/schema/manifest.schema.json",
   "title": "Flowi collection manifest (flowi.yaml)",
   "type": "object",
   "additionalProperties": false,

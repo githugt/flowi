@@ -2,7 +2,7 @@
 
 package flowi
 
-import "github.com/githugt/flowi-lib/internal/nodes"
+import "github.com/githugt/flowi/lib/internal/nodes"
 
 // NodeSpec describes a flow node type for editors: its catalogue entry
 // and parameters. Typed fields (request, flow, with, body, branches, …)

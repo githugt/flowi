@@ -5,8 +5,8 @@ package validate
 import (
 	"testing"
 
-	"github.com/githugt/flowi-lib/diag"
-	"github.com/githugt/flowi-lib/model"
+	"github.com/githugt/flowi/lib/diag"
+	"github.com/githugt/flowi/lib/model"
 )
 
 // A blank header row crashed the CLI. Flow-i refuses the

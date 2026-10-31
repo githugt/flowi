@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/githugt/flowi-lib/diag"
+	"github.com/githugt/flowi/lib/diag"
 )
 
 func TestCheck(t *testing.T) {

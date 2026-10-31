@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/githugt/flowi-lib/diag"
-	"github.com/githugt/flowi-lib/model"
+	"github.com/githugt/flowi/lib/diag"
+	"github.com/githugt/flowi/lib/model"
 )
 
 func editOf(url string) model.RequestVersion { return model.RequestVersion{Method: "POST", URL: url} }

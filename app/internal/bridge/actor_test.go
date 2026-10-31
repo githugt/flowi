@@ -7,7 +7,7 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/githugt/flowi/internal/bridge"
+	"github.com/githugt/flowi/app/internal/bridge"
 )
 
 func TestActor_should_run_posted_functions_in_order_on_one_goroutine(t *testing.T) {

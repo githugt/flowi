@@ -13,8 +13,8 @@ import (
 
 	"github.com/pb33f/libopenapi"
 
-	"github.com/githugt/flowi-lib/diag"
-	"github.com/githugt/flowi-lib/model"
+	"github.com/githugt/flowi/lib/diag"
+	"github.com/githugt/flowi/lib/model"
 )
 
 var update = flag.Bool("update", false, "rewrite golden files") //nolint:gochecknoglobals // test flag

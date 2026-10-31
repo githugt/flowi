@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/githugt/flowi-lib/model"
+	"github.com/githugt/flowi/lib/model"
 )
 
 // scratchRequestAged makes a try-out request in Scratch and sets its file's age.

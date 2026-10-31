@@ -6,9 +6,9 @@ import (
 	"context"
 	"testing"
 
-	"github.com/githugt/flowi-lib/diag"
-	"github.com/githugt/flowi-lib/internal/nodes"
-	"github.com/githugt/flowi-lib/model"
+	"github.com/githugt/flowi/lib/diag"
+	"github.com/githugt/flowi/lib/internal/nodes"
+	"github.com/githugt/flowi/lib/model"
 )
 
 func batchOf(id string, params []model.Field, bodyNodes ...model.Node) model.Node {

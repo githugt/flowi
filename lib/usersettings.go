@@ -9,10 +9,10 @@ import (
 	"path/filepath"
 	"slices"
 
-	"github.com/githugt/flowi-lib/diag"
-	yamlcodec "github.com/githugt/flowi-lib/internal/codec/yaml"
-	"github.com/githugt/flowi-lib/model"
-	"github.com/githugt/flowi-lib/settings"
+	"github.com/githugt/flowi/lib/diag"
+	yamlcodec "github.com/githugt/flowi/lib/internal/codec/yaml"
+	"github.com/githugt/flowi/lib/model"
+	"github.com/githugt/flowi/lib/settings"
 )
 
 // UserSettings resolves settings from the user file, FLOWI_* variables and

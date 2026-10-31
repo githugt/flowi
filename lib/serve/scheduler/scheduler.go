@@ -11,7 +11,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/githugt/flowi-lib/serve/runs"
+	"github.com/githugt/flowi/lib/serve/runs"
 )
 
 // RunStarter is what the scheduler needs from the run manager.

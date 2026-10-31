@@ -22,9 +22,9 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
 	"github.com/Azure/azure-sdk-for-go/sdk/messaging/azservicebus"
 
-	"github.com/githugt/flowi-lib/model"
-	"github.com/githugt/flowi-lib/transport"
-	shared "github.com/githugt/flowi-lib/transport/internal/pull"
+	"github.com/githugt/flowi/lib/model"
+	"github.com/githugt/flowi/lib/transport"
+	shared "github.com/githugt/flowi/lib/transport/internal/pull"
 )
 
 const (

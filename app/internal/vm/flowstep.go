@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"slices"
 
-	"github.com/githugt/flowi-lib/model"
+	"github.com/githugt/flowi/lib/model"
 )
 
 // SetColor gives step id one of the colours the library knows ("" for its

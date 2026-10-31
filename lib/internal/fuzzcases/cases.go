@@ -11,7 +11,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/githugt/flowi-lib/internal/formats"
+	"github.com/githugt/flowi/lib/internal/formats"
 )
 
 // Case is a body with one thing wrong, and a name that says what.

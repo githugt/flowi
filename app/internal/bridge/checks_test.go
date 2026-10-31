@@ -8,14 +8,14 @@ import (
 	"strings"
 	"testing"
 
-	flowi "github.com/githugt/flowi-lib"
-	"github.com/githugt/flowi-lib/analysis"
-	"github.com/githugt/flowi-lib/engine"
-	"github.com/githugt/flowi-lib/model"
-	"github.com/githugt/flowi-lib/schemainfer"
+	flowi "github.com/githugt/flowi/lib"
+	"github.com/githugt/flowi/lib/analysis"
+	"github.com/githugt/flowi/lib/engine"
+	"github.com/githugt/flowi/lib/model"
+	"github.com/githugt/flowi/lib/schemainfer"
 
-	"github.com/githugt/flowi/internal/bridge"
-	"github.com/githugt/flowi/internal/vm/vmtest"
+	"github.com/githugt/flowi/app/internal/bridge"
+	"github.com/githugt/flowi/app/internal/vm/vmtest"
 )
 
 func checksApp(t *testing.T) (*bridge.App, *vmtest.Backend) {

@@ -6,9 +6,9 @@ import (
 	"context"
 	"strconv"
 
-	"github.com/githugt/flowi-lib/diag"
-	"github.com/githugt/flowi-lib/model"
-	"github.com/githugt/flowi-lib/template"
+	"github.com/githugt/flowi/lib/diag"
+	"github.com/githugt/flowi/lib/model"
+	"github.com/githugt/flowi/lib/template"
 )
 
 // maxBatchTimes bounds times: so a typo cannot start a billion iterations.

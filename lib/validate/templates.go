@@ -5,9 +5,9 @@ package validate
 import (
 	"errors"
 
-	"github.com/githugt/flowi-lib/diag"
-	"github.com/githugt/flowi-lib/internal/sites"
-	"github.com/githugt/flowi-lib/template"
+	"github.com/githugt/flowi/lib/diag"
+	"github.com/githugt/flowi/lib/internal/sites"
+	"github.com/githugt/flowi/lib/template"
 )
 
 // checkTemplates reports templates and expressions that do not compile,

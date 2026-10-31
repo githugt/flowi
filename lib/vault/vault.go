@@ -8,7 +8,7 @@ import (
 	"slices"
 	"sync"
 
-	"github.com/githugt/flowi-lib/model"
+	"github.com/githugt/flowi/lib/model"
 )
 
 // Entry names one secret: a variable of an environment of a collection.

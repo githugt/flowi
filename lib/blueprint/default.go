@@ -2,7 +2,7 @@
 
 package blueprint
 
-import "github.com/githugt/flowi-lib/model"
+import "github.com/githugt/flowi/lib/model"
 
 // Default is the blueprint new requests are seeded with. Its nodes become the
 // request's inline post hooks, which see the response: they write its status

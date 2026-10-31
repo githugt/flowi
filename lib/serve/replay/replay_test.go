@@ -11,8 +11,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/githugt/flowi-lib/model"
-	"github.com/githugt/flowi-lib/problem"
+	"github.com/githugt/flowi/lib/model"
+	"github.com/githugt/flowi/lib/problem"
 )
 
 func TestHandler_should_answer_a_matching_request_with_its_default_example(t *testing.T) {

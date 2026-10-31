@@ -5,7 +5,7 @@ package cli
 import (
 	"testing"
 
-	"github.com/githugt/flowi-lib/engine"
+	"github.com/githugt/flowi/lib/engine"
 )
 
 func TestWatchPrompts_should_open_the_page_of_a_sign_in_and_pass_every_event_on(t *testing.T) {

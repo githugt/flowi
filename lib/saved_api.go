@@ -7,8 +7,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/githugt/flowi-lib/engine"
-	"github.com/githugt/flowi-lib/internal/names"
+	"github.com/githugt/flowi/lib/engine"
+	"github.com/githugt/flowi/lib/internal/names"
 )
 
 // LastResponse is the response the last send of version of request t saved

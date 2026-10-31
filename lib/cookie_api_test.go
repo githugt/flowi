@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/githugt/flowi-lib/internal/httpx"
+	"github.com/githugt/flowi/lib/internal/httpx"
 )
 
 // seedJar saves a jar with two cookies for the first collection.

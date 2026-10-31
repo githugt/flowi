@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	flowi "github.com/githugt/flowi-lib"
+	flowi "github.com/githugt/flowi/lib"
 )
 
 func TestServeFlags_Given_fault_flags_Then_they_reach_the_serve_options(t *testing.T) {

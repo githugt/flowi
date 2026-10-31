@@ -10,11 +10,11 @@ import (
 	"path/filepath"
 	"slices"
 
-	"github.com/githugt/flowi-lib/diag"
-	"github.com/githugt/flowi-lib/internal/names"
-	"github.com/githugt/flowi-lib/model"
-	"github.com/githugt/flowi-lib/store"
-	"github.com/githugt/flowi-lib/workspace"
+	"github.com/githugt/flowi/lib/diag"
+	"github.com/githugt/flowi/lib/internal/names"
+	"github.com/githugt/flowi/lib/model"
+	"github.com/githugt/flowi/lib/store"
+	"github.com/githugt/flowi/lib/workspace"
 )
 
 // Environments are global: they belong to the workspace, live in its

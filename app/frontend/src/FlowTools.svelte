@@ -2,7 +2,7 @@
   // The tools of the open flow beyond Run: a matrix of runs, the access check, the drift check, and the sequence diagram
   // of the last run. Each opens a dialog; the checks run the saved flow, so an unsaved flow is refused with a message.
   import { errorText } from './lib/errors'
-  import { FlowService } from '../bindings/github.com/githugt/flowi/internal/bridge'
+  import { FlowService } from '../bindings/github.com/githugt/flowi/app/internal/bridge'
   import SequenceDiagram from './SequenceDiagram.svelte'
   import type { AccessView, ChecksChoices, DriftView, FlowView, MatrixView, SequenceView } from './lib/types'
 

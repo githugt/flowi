@@ -12,8 +12,8 @@ import (
 	"sync"
 	"time"
 
-	flowi "github.com/githugt/flowi-lib"
-	"github.com/githugt/flowi-lib/serve/replay"
+	flowi "github.com/githugt/flowi/lib"
+	"github.com/githugt/flowi/lib/serve/replay"
 )
 
 // MaxReplayerEntries is how many calls the traffic view keeps.

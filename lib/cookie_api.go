@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/githugt/flowi-lib/internal/httpx"
+	"github.com/githugt/flowi/lib/internal/httpx"
 )
 
 // CookieInfo is one cookie in a collection's saved jar, the one standalone

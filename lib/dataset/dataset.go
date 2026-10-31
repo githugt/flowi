@@ -14,8 +14,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/githugt/flowi-lib/dataset/readonly"
-	"github.com/githugt/flowi-lib/model"
+	"github.com/githugt/flowi/lib/dataset/readonly"
+	"github.com/githugt/flowi/lib/model"
 )
 
 // Query is one query to run. Statement is sent as written; Params are sent apart from it.

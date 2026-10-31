@@ -8,7 +8,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/githugt/flowi-lib/engine"
+	"github.com/githugt/flowi/lib/engine"
 )
 
 // A debug session runs a flow in parts. It stops before each step that has a breakpoint, and the person may read

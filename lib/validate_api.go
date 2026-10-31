@@ -10,10 +10,10 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/githugt/flowi-lib/diag"
-	"github.com/githugt/flowi-lib/model"
-	"github.com/githugt/flowi-lib/store"
-	"github.com/githugt/flowi-lib/validate"
+	"github.com/githugt/flowi/lib/diag"
+	"github.com/githugt/flowi/lib/model"
+	"github.com/githugt/flowi/lib/store"
+	"github.com/githugt/flowi/lib/validate"
 )
 
 // Validate returns every problem in the workspace: load diagnostics,

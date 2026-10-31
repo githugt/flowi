@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte'
   import { live } from './lib/live'
-  import { ManagerService } from '../bindings/github.com/githugt/flowi/internal/bridge'
+  import { ManagerService } from '../bindings/github.com/githugt/flowi/app/internal/bridge'
   import { ui } from './lib/ui.svelte'
   import type { KeptSpec, ManagerView } from './lib/types'
   import PathField from './PathField.svelte'

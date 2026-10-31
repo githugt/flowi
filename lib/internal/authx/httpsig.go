@@ -24,7 +24,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/githugt/flowi-lib/internal/httpx"
+	"github.com/githugt/flowi/lib/internal/httpx"
 )
 
 // httpSig signs a request as RFC 9421 (HTTP Message Signatures) says: it builds the signature base from the covered

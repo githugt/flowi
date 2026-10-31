@@ -10,7 +10,7 @@ import (
 	"runtime"
 	"time"
 
-	"github.com/githugt/flowi-lib/engine"
+	"github.com/githugt/flowi/lib/engine"
 )
 
 // browserWait bounds how long starting the browser may take.

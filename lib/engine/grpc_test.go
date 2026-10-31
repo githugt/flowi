@@ -21,10 +21,10 @@ import (
 
 	"google.golang.org/grpc/codes"
 
-	"github.com/githugt/flowi-lib/diag"
-	"github.com/githugt/flowi-lib/grpcx"
-	"github.com/githugt/flowi-lib/model"
-	"github.com/githugt/flowi-lib/transport"
+	"github.com/githugt/flowi/lib/diag"
+	"github.com/githugt/flowi/lib/grpcx"
+	"github.com/githugt/flowi/lib/model"
+	"github.com/githugt/flowi/lib/transport"
 )
 
 // scriptedGRPC is a gRPC runner that records the call it was given and

@@ -7,7 +7,7 @@ import (
 	"reflect"
 	"slices"
 
-	"github.com/githugt/flowi-lib/model"
+	"github.com/githugt/flowi/lib/model"
 )
 
 // hookPhase is the list of hook steps a version has under the name after

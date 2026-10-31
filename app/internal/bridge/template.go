@@ -6,7 +6,7 @@ import (
 	"slices"
 	"unicode/utf16"
 
-	"github.com/githugt/flowi/internal/vm"
+	"github.com/githugt/flowi/app/internal/vm"
 )
 
 // SpanView is a run of a URL or template, with what it is for colouring

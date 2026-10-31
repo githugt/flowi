@@ -1,7 +1,7 @@
 <script lang="ts">
   // Says before a send what it would lack: variables the selected environment
   // does not define. A send still goes (the person may mean it); this only warns.
-  import { RequestService } from '../bindings/github.com/githugt/flowi/internal/bridge'
+  import { RequestService } from '../bindings/github.com/githugt/flowi/app/internal/bridge'
   import { app } from './lib/app.svelte'
   import { promptNewEnvironment } from './lib/menus'
   import type { MissingView, RequestView } from './lib/types'

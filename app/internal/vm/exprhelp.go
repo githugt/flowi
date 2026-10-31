@@ -7,7 +7,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/githugt/flowi-lib/template"
+	"github.com/githugt/flowi/lib/template"
 )
 
 // ExprContext says where an expression is written, which decides the names it

@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte'
   import { live } from './lib/live'
-  import { SchedulesService } from '../bindings/github.com/githugt/flowi/internal/bridge'
+  import { SchedulesService } from '../bindings/github.com/githugt/flowi/app/internal/bridge'
   import { ui } from './lib/ui.svelte'
   import type { ScheduleView, SchedulesView } from './lib/types'
 

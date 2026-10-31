@@ -5,7 +5,7 @@ package bridge
 import (
 	"time"
 
-	"github.com/githugt/flowi/internal/vm"
+	"github.com/githugt/flowi/app/internal/vm"
 )
 
 // ReplayerForm is what the user chooses before starting.

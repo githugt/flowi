@@ -7,10 +7,10 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/githugt/flowi-lib/announce"
+	"github.com/githugt/flowi/lib/announce"
 
-	"github.com/githugt/flowi/internal/vm"
-	"github.com/githugt/flowi/internal/vm/vmtest"
+	"github.com/githugt/flowi/app/internal/vm"
+	"github.com/githugt/flowi/app/internal/vm/vmtest"
 )
 
 func TestAnnouncements_Load_should_list_the_items_the_backend_returns(t *testing.T) {

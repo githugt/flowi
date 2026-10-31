@@ -6,7 +6,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/githugt/flowi-lib/model"
+	"github.com/githugt/flowi/lib/model"
 )
 
 func TestRunFlow_Given_only_Then_runs_just_those_nodes_with_prior_outputs(t *testing.T) {

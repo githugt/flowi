@@ -18,7 +18,7 @@ import (
 
 	"golang.org/x/crypto/md4" //nolint:gosec,staticcheck // the NT hash is MD4 by definition
 
-	"github.com/githugt/flowi-lib/internal/httpx"
+	"github.com/githugt/flowi/lib/internal/httpx"
 )
 
 // NTLM flags (MS-NLMP 2.2.2.5) the client asks for and checks.

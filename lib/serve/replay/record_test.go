@@ -15,7 +15,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/githugt/flowi-lib/serve/replay"
+	"github.com/githugt/flowi/lib/serve/replay"
 )
 
 type upstream struct {

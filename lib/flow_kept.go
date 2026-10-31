@@ -9,8 +9,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/githugt/flowi-lib/model"
-	"github.com/githugt/flowi-lib/workspace"
+	"github.com/githugt/flowi/lib/model"
+	"github.com/githugt/flowi/lib/workspace"
 )
 
 // A flow has no edit slot in its file, as a request has, so the unsaved edits of

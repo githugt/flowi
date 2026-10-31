@@ -6,7 +6,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/githugt/flowi-lib/model"
+	"github.com/githugt/flowi/lib/model"
 )
 
 func inline(id string) model.HookStep {

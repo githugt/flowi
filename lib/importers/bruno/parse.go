@@ -9,7 +9,7 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"github.com/githugt/flowi-lib/internal/textenc"
+	"github.com/githugt/flowi/lib/internal/textenc"
 )
 
 // block is one top-level block of a .bru file: a dictionary of entries

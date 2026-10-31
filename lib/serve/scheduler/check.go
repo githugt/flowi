@@ -9,9 +9,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/githugt/flowi-lib/internal/names"
-	"github.com/githugt/flowi-lib/model"
-	"github.com/githugt/flowi-lib/serve/cron"
+	"github.com/githugt/flowi/lib/internal/names"
+	"github.com/githugt/flowi/lib/model"
+	"github.com/githugt/flowi/lib/serve/cron"
 )
 
 // neverCheckFrom is the date from which Check looks for a first fire time.

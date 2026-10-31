@@ -9,7 +9,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/githugt/flowi-lib/internal/yamldoc"
+	"github.com/githugt/flowi/lib/internal/yamldoc"
 )
 
 // isSwagger2 reports whether data is a Swagger 2.0 document.

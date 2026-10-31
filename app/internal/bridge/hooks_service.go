@@ -6,7 +6,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/githugt/flowi/internal/vm"
+	"github.com/githugt/flowi/app/internal/vm"
 )
 
 // HooksView is the editor of a request's own hooks: the pre and post steps

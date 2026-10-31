@@ -13,7 +13,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/githugt/flowi-lib/model"
+	"github.com/githugt/flowi/lib/model"
 )
 
 // fakeKeys is an in-memory KeyStore.

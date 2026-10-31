@@ -5,7 +5,7 @@ package engine
 import (
 	"testing"
 
-	"github.com/githugt/flowi-lib/internal/nodes"
+	"github.com/githugt/flowi/lib/internal/nodes"
 )
 
 func TestFrame_scope_should_merge_vars_and_nodes_up_the_chain_and_isolate_own_layers(t *testing.T) {

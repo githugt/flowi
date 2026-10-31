@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { FlowService } from '../bindings/github.com/githugt/flowi/internal/bridge'
+  import { FlowService } from '../bindings/github.com/githugt/flowi/app/internal/bridge'
   import type { FlowView, NodeData } from './lib/types'
   import Parts from './Parts.svelte'
 

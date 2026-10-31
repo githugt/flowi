@@ -3,7 +3,7 @@
   // announcements off, nothing shows.
   import { onMount } from 'svelte'
   import { Browser } from '@wailsio/runtime'
-  import { WelcomeService } from '../bindings/github.com/githugt/flowi/internal/bridge'
+  import { WelcomeService } from '../bindings/github.com/githugt/flowi/app/internal/bridge'
   import { live } from './lib/live'
 
   interface Item {

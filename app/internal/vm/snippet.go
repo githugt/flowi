@@ -5,11 +5,11 @@ package vm
 import (
 	"strings"
 
-	flowi "github.com/githugt/flowi-lib"
-	"github.com/githugt/flowi-lib/engine"
-	"github.com/githugt/flowi-lib/model"
-	"github.com/githugt/flowi-lib/snippet"
-	"github.com/githugt/flowi-lib/vault"
+	flowi "github.com/githugt/flowi/lib"
+	"github.com/githugt/flowi/lib/engine"
+	"github.com/githugt/flowi/lib/model"
+	"github.com/githugt/flowi/lib/snippet"
+	"github.com/githugt/flowi/lib/vault"
 )
 
 // secretPlaceholder stands for a secret value in a snippet that excludes

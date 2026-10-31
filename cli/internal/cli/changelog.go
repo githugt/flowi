@@ -7,9 +7,9 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/githugt/flowi-lib/changelog"
+	"github.com/githugt/flowi/lib/changelog"
 
-	flowicli "github.com/githugt/flowi-cli"
+	flowicli "github.com/githugt/flowi/cli"
 )
 
 func newChangelogCommand(g *GlobalOptions) *cobra.Command {

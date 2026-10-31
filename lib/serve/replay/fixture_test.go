@@ -15,8 +15,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/githugt/flowi-lib/model"
-	"github.com/githugt/flowi-lib/serve/replay"
+	"github.com/githugt/flowi/lib/model"
+	"github.com/githugt/flowi/lib/serve/replay"
 )
 
 // ver is one version of a fixture request.

@@ -2,7 +2,7 @@
 // or the selection bar. Their tabs close first, since the move gives them new rows. A move takes each
 // request's edit slot along, so open edits are stored in it first rather than refusing to move a
 // request with unsaved changes (a draft that was never saved always has some).
-import { RequestService, WorkspaceService } from '../../bindings/github.com/githugt/flowi/internal/bridge'
+import { RequestService, WorkspaceService } from '../../bindings/github.com/githugt/flowi/app/internal/bridge'
 import { app } from './app.svelte'
 import { ui } from './ui.svelte'
 import { tabsAffected } from './menus'

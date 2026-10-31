@@ -6,7 +6,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/githugt/flowi-lib/dataset/readonly"
+	"github.com/githugt/flowi/lib/dataset/readonly"
 )
 
 func TestCheck_should_accept_statements_that_only_read(t *testing.T) {

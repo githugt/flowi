@@ -12,11 +12,11 @@ import (
 
 	"golang.org/x/net/http/httpguts"
 
-	"github.com/githugt/flowi-lib/diag"
-	"github.com/githugt/flowi-lib/internal/httpx"
-	"github.com/githugt/flowi-lib/model"
-	"github.com/githugt/flowi-lib/template"
-	"github.com/githugt/flowi-lib/vault"
+	"github.com/githugt/flowi/lib/diag"
+	"github.com/githugt/flowi/lib/internal/httpx"
+	"github.com/githugt/flowi/lib/model"
+	"github.com/githugt/flowi/lib/template"
+	"github.com/githugt/flowi/lib/vault"
 )
 
 // buildInput is everything needed to turn a request version into an HTTP

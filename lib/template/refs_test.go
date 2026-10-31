@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/githugt/flowi-lib/template"
+	"github.com/githugt/flowi/lib/template"
 )
 
 func TestReferences_should_list_constant_chains(t *testing.T) {

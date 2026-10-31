@@ -8,9 +8,9 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/githugt/flowi-lib/diag"
-	"github.com/githugt/flowi-lib/internal/fuzzcases"
-	"github.com/githugt/flowi-lib/model"
+	"github.com/githugt/flowi/lib/diag"
+	"github.com/githugt/flowi/lib/internal/fuzzcases"
+	"github.com/githugt/flowi/lib/model"
 )
 
 const (

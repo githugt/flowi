@@ -8,7 +8,7 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/githugt/flowi-lib/model"
+	"github.com/githugt/flowi/lib/model"
 )
 
 // randomList builds a node list: random needs to earlier siblings, random

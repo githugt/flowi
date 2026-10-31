@@ -7,8 +7,8 @@ import (
 	"fmt"
 	"slices"
 
-	flowi "github.com/githugt/flowi-lib"
-	"github.com/githugt/flowi-lib/model"
+	flowi "github.com/githugt/flowi/lib"
+	"github.com/githugt/flowi/lib/model"
 )
 
 // outcomesOf are the outcomes of request step n: its own when it has some, else the version's it runs. own

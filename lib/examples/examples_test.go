@@ -12,11 +12,11 @@ import (
 	"strings"
 	"testing"
 
-	flowi "github.com/githugt/flowi-lib"
-	"github.com/githugt/flowi-lib/diag"
-	"github.com/githugt/flowi-lib/examples"
-	"github.com/githugt/flowi-lib/settings"
-	"github.com/githugt/flowi-lib/workspace"
+	flowi "github.com/githugt/flowi/lib"
+	"github.com/githugt/flowi/lib/diag"
+	"github.com/githugt/flowi/lib/examples"
+	"github.com/githugt/flowi/lib/settings"
+	"github.com/githugt/flowi/lib/workspace"
 )
 
 func TestExamples_should_load_validate_and_format_without_changes(t *testing.T) {

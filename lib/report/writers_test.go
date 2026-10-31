@@ -13,7 +13,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/githugt/flowi-lib/report"
+	"github.com/githugt/flowi/lib/report"
 )
 
 func TestWriteJSON_should_match_golden(t *testing.T) {

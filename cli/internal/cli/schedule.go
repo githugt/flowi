@@ -12,8 +12,8 @@ import (
 	"github.com/samber/do/v2"
 	"github.com/spf13/cobra"
 
-	"github.com/githugt/flowi-lib/model"
-	"github.com/githugt/flowi-lib/serve/scheduler"
+	"github.com/githugt/flowi/lib/model"
+	"github.com/githugt/flowi/lib/serve/scheduler"
 )
 
 func newScheduleCommand(i do.Injector) *cobra.Command {

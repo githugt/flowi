@@ -16,12 +16,12 @@ import (
 	"github.com/samber/do/v2"
 	"github.com/spf13/cobra"
 
-	flowi "github.com/githugt/flowi-lib"
-	"github.com/githugt/flowi-lib/engine"
-	"github.com/githugt/flowi-lib/settings"
-	"github.com/githugt/flowi-lib/telemetry"
+	flowi "github.com/githugt/flowi/lib"
+	"github.com/githugt/flowi/lib/engine"
+	"github.com/githugt/flowi/lib/settings"
+	"github.com/githugt/flowi/lib/telemetry"
 
-	"github.com/githugt/flowi-cli/internal/buildinfo"
+	"github.com/githugt/flowi/cli/internal/buildinfo"
 )
 
 // Telemetry is the process's opt-in usage report: it collects while the

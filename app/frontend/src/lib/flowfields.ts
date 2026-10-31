@@ -1,6 +1,6 @@
 // What the step form's fields share: the completions and vocabulary a template or expression field offers, and
 // which help page a parameter points at. The side inspector and the card rows both use them.
-import { FlowService, SystemService } from '../../bindings/github.com/githugt/flowi/internal/bridge'
+import { FlowService, SystemService } from '../../bindings/github.com/githugt/flowi/app/internal/bridge'
 import type { Item } from './exprcomplete'
 
 /** What a step's field can read depends on what the field is. */

@@ -12,7 +12,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/githugt/flowi-lib/diag"
+	"github.com/githugt/flowi/lib/diag"
 )
 
 func TestLoad_should_load_tree_with_nested_folders(t *testing.T) {

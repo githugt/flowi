@@ -5,10 +5,10 @@ package engine
 import (
 	"context"
 
-	"github.com/githugt/flowi-lib/diag"
-	"github.com/githugt/flowi-lib/model"
-	"github.com/githugt/flowi-lib/report"
-	"github.com/githugt/flowi-lib/template"
+	"github.com/githugt/flowi/lib/diag"
+	"github.com/githugt/flowi/lib/model"
+	"github.com/githugt/flowi/lib/report"
+	"github.com/githugt/flowi/lib/template"
 )
 
 // keepOutputs works out the flow's declared outputs in its final scope, in

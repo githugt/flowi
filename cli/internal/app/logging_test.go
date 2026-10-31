@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/githugt/flowi-lib/settings"
+	"github.com/githugt/flowi/lib/settings"
 )
 
 func resolved(t *testing.T, values map[string]any) settings.Resolved {

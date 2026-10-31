@@ -1,4 +1,4 @@
-import { RequestService, SystemService } from '../../bindings/github.com/githugt/flowi/internal/bridge'
+import { RequestService, SystemService } from '../../bindings/github.com/githugt/flowi/app/internal/bridge'
 import { bodyPaths, type Item } from './exprcomplete'
 import type { ResponseView } from './types'
 

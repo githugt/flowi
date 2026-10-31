@@ -3,7 +3,7 @@
   // (an example, a colleague's folder) offers to add them. The workspace's
   // environments are global, so without this they would be silently unused.
   import { errorText } from './lib/errors'
-  import { WorkspaceService } from '../bindings/github.com/githugt/flowi/internal/bridge'
+  import { WorkspaceService } from '../bindings/github.com/githugt/flowi/app/internal/bridge'
   import { app } from './lib/app.svelte'
   import { ui } from './lib/ui.svelte'
   import type { EnvOffer } from './lib/types'

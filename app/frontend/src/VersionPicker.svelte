@@ -1,7 +1,7 @@
 <script lang="ts">
   // One picker for the version and the overlays laid over it. Versions are chosen one at a time; overlays toggle,
   // so stacking ("vip+slow") works from the same list: they apply in the order they were ticked, the later one wins.
-  import { RequestService } from '../bindings/github.com/githugt/flowi/internal/bridge'
+  import { RequestService } from '../bindings/github.com/githugt/flowi/app/internal/bridge'
   import type { RequestView } from './lib/types'
   import { pickerItems, pickerLabel, toggleOverlay } from './lib/versionpicker'
 

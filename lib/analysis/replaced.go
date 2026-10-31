@@ -3,8 +3,8 @@
 package analysis
 
 import (
-	"github.com/githugt/flowi-lib/diag"
-	"github.com/githugt/flowi-lib/model"
+	"github.com/githugt/flowi/lib/diag"
+	"github.com/githugt/flowi/lib/model"
 )
 
 // Replaced answers with the contracts in By where it has one and with Base for everything else. It is how a

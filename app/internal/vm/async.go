@@ -5,7 +5,7 @@ package vm
 import (
 	"slices"
 
-	"github.com/githugt/flowi-lib/model"
+	"github.com/githugt/flowi/lib/model"
 )
 
 // The sections only an async request has.

@@ -1,7 +1,7 @@
 # flowi-lib
 
 The core library of **Flowi**: everything that is not a user interface. The
-[CLI](https://github.com/githugt/flowi-cli) and the [desktop app](https://github.com/githugt/flowi)
+[CLI](https://github.com/githugt/flowi/tree/master/cli) and the [desktop app](https://github.com/githugt/flowi)
 are thin layers over it, and other Go programs can embed it.
 
 > Status: **pre-alpha**. The file format and the API will change.
@@ -39,7 +39,7 @@ The Go API is the `flowi` package itself (`Workspace` and its methods).
 ## Use it from Go
 
 ```bash
-go get github.com/githugt/flowi-lib@latest
+go get github.com/githugt/flowi/lib@latest
 ```
 
 ```go
@@ -60,7 +60,7 @@ fmt.Println(run.Wait().Status) // run.Events() streams progress while it runs
 ## Try it
 
 `examples/user-creation` is a complete collection, and `examples/demoserver` is the small API it talks to.
-With the [CLI](https://github.com/githugt/flowi-cli) installed:
+With the [CLI](https://github.com/githugt/flowi/tree/master/cli) installed:
 
 ```bash
 go run ./examples/demoserver/cmd/flowi-demo-server &   # http://127.0.0.1:8080, password "demo"

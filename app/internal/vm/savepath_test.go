@@ -5,7 +5,7 @@ package vm_test
 import (
 	"testing"
 
-	"github.com/githugt/flowi/internal/vm"
+	"github.com/githugt/flowi/app/internal/vm"
 )
 
 // Behaviour change: the Wails window offered "pokeapi.co/api/v2/pokemon/ditto",

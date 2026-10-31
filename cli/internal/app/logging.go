@@ -8,7 +8,7 @@ import (
 	"log/slog"
 	"os"
 
-	"github.com/githugt/flowi-lib/settings"
+	"github.com/githugt/flowi/lib/settings"
 )
 
 const logFileMode = 0o600 // logs may contain request details; keep them private

@@ -6,7 +6,7 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/githugt/flowi-lib/model"
+	"github.com/githugt/flowi/lib/model"
 )
 
 // A step could only be given a colour; "no colour" meant the category's own, which is blue for a request,

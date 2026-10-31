@@ -7,10 +7,10 @@ import (
 	"strings"
 	"testing"
 
-	yamlcodec "github.com/githugt/flowi-lib/internal/codec/yaml"
-	"github.com/githugt/flowi-lib/model"
-	"github.com/githugt/flowi-lib/settings"
-	"github.com/githugt/flowi-lib/store"
+	yamlcodec "github.com/githugt/flowi/lib/internal/codec/yaml"
+	"github.com/githugt/flowi/lib/model"
+	"github.com/githugt/flowi/lib/settings"
+	"github.com/githugt/flowi/lib/store"
 )
 
 const (

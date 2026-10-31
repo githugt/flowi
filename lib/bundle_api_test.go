@@ -10,10 +10,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/githugt/flowi-lib/diag"
-	"github.com/githugt/flowi-lib/engine"
-	"github.com/githugt/flowi-lib/internal/bundle"
-	"github.com/githugt/flowi-lib/internal/tapeplayer"
+	"github.com/githugt/flowi/lib/diag"
+	"github.com/githugt/flowi/lib/engine"
+	"github.com/githugt/flowi/lib/internal/bundle"
+	"github.com/githugt/flowi/lib/internal/tapeplayer"
 )
 
 func runToEnd(t *testing.T, w *Workspace, target FlowTarget, o RunOptions) engine.RunResult {

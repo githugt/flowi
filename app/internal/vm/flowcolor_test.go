@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/githugt/flowi/internal/vm"
+	"github.com/githugt/flowi/app/internal/vm"
 )
 
 func TestSetColor_Given_a_valid_name_Then_it_is_saved_and_undoable(t *testing.T) {

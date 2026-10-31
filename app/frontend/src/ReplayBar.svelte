@@ -3,7 +3,7 @@
   // and see the address a client calls to get this request's saved answer.
   import { onMount } from 'svelte'
   import { live } from './lib/live'
-  import { ReplayerService } from '../bindings/github.com/githugt/flowi/internal/bridge'
+  import { ReplayerService } from '../bindings/github.com/githugt/flowi/app/internal/bridge'
   import { ui } from './lib/ui.svelte'
   import type { ReplayerView } from './lib/types'
 

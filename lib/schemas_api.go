@@ -13,12 +13,12 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/githugt/flowi-lib/diag"
-	"github.com/githugt/flowi-lib/engine"
-	"github.com/githugt/flowi-lib/internal/names"
-	"github.com/githugt/flowi-lib/model"
-	"github.com/githugt/flowi-lib/schemainfer"
-	"github.com/githugt/flowi-lib/store"
+	"github.com/githugt/flowi/lib/diag"
+	"github.com/githugt/flowi/lib/engine"
+	"github.com/githugt/flowi/lib/internal/names"
+	"github.com/githugt/flowi/lib/model"
+	"github.com/githugt/flowi/lib/schemainfer"
+	"github.com/githugt/flowi/lib/store"
 )
 
 // SchemaPart names one schema of a request version: the body it sends, the

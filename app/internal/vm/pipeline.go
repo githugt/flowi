@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/githugt/flowi-lib/engine"
-	"github.com/githugt/flowi-lib/model"
+	"github.com/githugt/flowi/lib/engine"
+	"github.com/githugt/flowi/lib/model"
 )
 
 // StepState is how far a step of the request's pipeline got in the last send.

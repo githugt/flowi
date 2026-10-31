@@ -5,7 +5,7 @@ package uithread_test
 import (
 	"testing"
 
-	"github.com/githugt/flowi/internal/uithread"
+	"github.com/githugt/flowi/app/internal/uithread"
 )
 
 func TestCheck_Given_debug_and_ui_goroutine_Then_panics(t *testing.T) {

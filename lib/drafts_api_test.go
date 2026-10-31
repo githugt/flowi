@@ -10,8 +10,8 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/githugt/flowi-lib/model"
-	"github.com/githugt/flowi-lib/workspace"
+	"github.com/githugt/flowi/lib/model"
+	"github.com/githugt/flowi/lib/workspace"
 )
 
 func TestNewDraft_should_mount_a_collection_under_the_drafts_dir(t *testing.T) {

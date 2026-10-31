@@ -1,7 +1,7 @@
 <script lang="ts">
   // The test of one case of a Route, edited where its port is: a line that is true or false, written without braces.
   // The edit applies to the selected Route, which the canvas selected when the label was clicked.
-  import { FlowService } from '../bindings/github.com/githugt/flowi/internal/bridge'
+  import { FlowService } from '../bindings/github.com/githugt/flowi/app/internal/bridge'
   import type { FlowView } from './lib/types'
 
   let { view, index, x, y, onclose }: { view: FlowView; index: number; x: number; y: number; onclose: () => void } = $props()

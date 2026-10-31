@@ -16,7 +16,7 @@ import (
 	"strconv"
 	"sync"
 
-	"github.com/githugt/flowi-lib/engine"
+	"github.com/githugt/flowi/lib/engine"
 )
 
 // ErrNotRecorded is returned for a call the recording has no answer for.

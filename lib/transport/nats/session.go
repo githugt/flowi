@@ -10,7 +10,7 @@ import (
 
 	natsgo "github.com/nats-io/nats.go"
 
-	"github.com/githugt/flowi-lib/transport"
+	"github.com/githugt/flowi/lib/transport"
 )
 
 // Open connects, subscribes (to reply_to when set, else the channel) and keeps

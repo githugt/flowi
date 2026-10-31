@@ -1,7 +1,7 @@
 <script lang="ts">
   // Move to…: where one or more requests go, any collection or request folder. The old "Rename / move"
   // asked only for a path, inside the request's own collection.
-  import { WorkspaceService } from '../bindings/github.com/githugt/flowi/internal/bridge'
+  import { WorkspaceService } from '../bindings/github.com/githugt/flowi/app/internal/bridge'
   import { ui } from './lib/ui.svelte'
   import { moveRequests } from './lib/move'
   import type { MoveTarget } from './lib/types'

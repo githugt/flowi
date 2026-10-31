@@ -23,8 +23,8 @@ import (
 	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/types/dynamicpb"
 
-	"github.com/githugt/flowi-lib/grpcx"
-	"github.com/githugt/flowi-lib/transport"
+	"github.com/githugt/flowi/lib/grpcx"
+	"github.com/githugt/flowi/lib/transport"
 )
 
 func webFrame(flag byte, payload []byte) []byte {

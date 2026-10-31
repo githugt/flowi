@@ -5,7 +5,7 @@ package vm
 import (
 	"fmt"
 
-	"github.com/githugt/flowi-lib/model"
+	"github.com/githugt/flowi/lib/model"
 )
 
 // ChipKind is what a chip in the flow header reports.

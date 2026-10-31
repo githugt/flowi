@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/githugt/flowi-lib/diag"
-	"github.com/githugt/flowi-lib/model"
+	"github.com/githugt/flowi/lib/diag"
+	"github.com/githugt/flowi/lib/model"
 )
 
 const blueprintFile = `id: 01J9ZB3M4N5P6Q7R8S9T0VWXYZ

@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/githugt/flowi-lib/transport"
+	"github.com/githugt/flowi/lib/transport"
 )
 
 func TestTargetOf_should_map_the_binding_to_an_exchange_key_and_queue(t *testing.T) {

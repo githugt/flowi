@@ -15,17 +15,17 @@ import (
 	"sync/atomic"
 	"syscall"
 
-	flowi "github.com/githugt/flowi-lib"
-	"github.com/githugt/flowi-lib/diag"
-	"github.com/githugt/flowi-lib/settings"
-	"github.com/githugt/flowi-lib/vault"
+	flowi "github.com/githugt/flowi/lib"
+	"github.com/githugt/flowi/lib/diag"
+	"github.com/githugt/flowi/lib/settings"
+	"github.com/githugt/flowi/lib/vault"
 	"github.com/wailsapp/wails/v3/pkg/application"
 	"github.com/wailsapp/wails/v3/pkg/events"
 
-	"github.com/githugt/flowi/internal/backend"
-	"github.com/githugt/flowi/internal/bridge"
-	"github.com/githugt/flowi/internal/buildinfo"
-	"github.com/githugt/flowi/internal/uithread"
+	"github.com/githugt/flowi/app/internal/backend"
+	"github.com/githugt/flowi/app/internal/bridge"
+	"github.com/githugt/flowi/app/internal/buildinfo"
+	"github.com/githugt/flowi/app/internal/uithread"
 )
 
 //go:embed all:frontend/dist

@@ -5,9 +5,9 @@ package bridge
 import (
 	"errors"
 
-	flowi "github.com/githugt/flowi-lib"
+	flowi "github.com/githugt/flowi/lib"
 
-	"github.com/githugt/flowi/internal/vm"
+	"github.com/githugt/flowi/app/internal/vm"
 )
 
 // SecretView is a secret declared by an environment. Values are not part of it:

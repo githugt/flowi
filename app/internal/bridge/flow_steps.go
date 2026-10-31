@@ -5,9 +5,9 @@ package bridge
 import (
 	"fmt"
 
-	"github.com/githugt/flowi-lib/model"
+	"github.com/githugt/flowi/lib/model"
 
-	"github.com/githugt/flowi/internal/vm"
+	"github.com/githugt/flowi/app/internal/vm"
 )
 
 // StepChoice is one thing the step popup offers.

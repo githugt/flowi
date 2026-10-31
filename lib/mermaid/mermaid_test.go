@@ -9,12 +9,12 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/githugt/flowi-lib/arazzo"
-	"github.com/githugt/flowi-lib/diag"
-	"github.com/githugt/flowi-lib/importers/importerstest"
-	yamlcodec "github.com/githugt/flowi-lib/internal/codec/yaml"
-	"github.com/githugt/flowi-lib/model"
-	"github.com/githugt/flowi-lib/settings"
+	"github.com/githugt/flowi/lib/arazzo"
+	"github.com/githugt/flowi/lib/diag"
+	"github.com/githugt/flowi/lib/importers/importerstest"
+	yamlcodec "github.com/githugt/flowi/lib/internal/codec/yaml"
+	"github.com/githugt/flowi/lib/model"
+	"github.com/githugt/flowi/lib/settings"
 )
 
 // fakeResolver knows two requests and one flow.

@@ -13,7 +13,7 @@ import (
 	"path"
 	"strings"
 
-	"github.com/githugt/flowi-lib/engine"
+	"github.com/githugt/flowi/lib/engine"
 )
 
 // SavedBody is a response body ready to be written to a file: its bytes and a

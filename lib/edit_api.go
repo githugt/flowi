@@ -5,9 +5,9 @@ package flowi
 import (
 	"slices"
 
-	"github.com/githugt/flowi-lib/diag"
-	"github.com/githugt/flowi-lib/model"
-	"github.com/githugt/flowi-lib/version"
+	"github.com/githugt/flowi/lib/diag"
+	"github.com/githugt/flowi/lib/model"
+	"github.com/githugt/flowi/lib/version"
 )
 
 // StoreEdit replaces the request's one dirty edit with v, started from the

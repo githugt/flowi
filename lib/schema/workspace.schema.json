@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://github.com/githugt/flowi-lib/schema/workspace.schema.json",
+  "$id": "https://github.com/githugt/flowi/lib/schema/workspace.schema.json",
   "title": "Flowi workspace (workspace.yaml)",
   "type": "object",
   "additionalProperties": false,

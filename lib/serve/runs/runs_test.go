@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/githugt/flowi-lib/serve/runs"
+	"github.com/githugt/flowi/lib/serve/runs"
 )
 
 // fakeRun is a run the test finishes by hand.

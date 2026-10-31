@@ -27,12 +27,12 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 
-	"github.com/githugt/flowi-lib/transport"
-	pubsubtransport "github.com/githugt/flowi-lib/transport/pubsub"
-	"github.com/githugt/flowi-lib/transport/redis"
-	"github.com/githugt/flowi-lib/transport/servicebus"
-	snstransport "github.com/githugt/flowi-lib/transport/sns"
-	sqstransport "github.com/githugt/flowi-lib/transport/sqs"
+	"github.com/githugt/flowi/lib/transport"
+	pubsubtransport "github.com/githugt/flowi/lib/transport/pubsub"
+	"github.com/githugt/flowi/lib/transport/redis"
+	"github.com/githugt/flowi/lib/transport/servicebus"
+	snstransport "github.com/githugt/flowi/lib/transport/sns"
+	sqstransport "github.com/githugt/flowi/lib/transport/sqs"
 )
 
 func TestRedis_against_redis_pubsub_and_streams(t *testing.T) {

@@ -3,7 +3,7 @@
 package yamlcodec
 
 import (
-	"github.com/githugt/flowi-lib/model"
+	"github.com/githugt/flowi/lib/model"
 )
 
 func (m *mapping) hooks() model.Hooks {

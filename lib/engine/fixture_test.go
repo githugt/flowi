@@ -17,10 +17,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/githugt/flowi-lib/model"
-	"github.com/githugt/flowi-lib/settings"
-	"github.com/githugt/flowi-lib/transport"
-	"github.com/githugt/flowi-lib/vault"
+	"github.com/githugt/flowi/lib/model"
+	"github.com/githugt/flowi/lib/settings"
+	"github.com/githugt/flowi/lib/transport"
+	"github.com/githugt/flowi/lib/vault"
 )
 
 const (

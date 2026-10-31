@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/githugt/flowi/internal/vm"
-	"github.com/githugt/flowi/internal/vm/vmtest"
+	"github.com/githugt/flowi/app/internal/vm"
+	"github.com/githugt/flowi/app/internal/vm/vmtest"
 )
 
 func newSettingsVM(t *testing.T, values map[string]any) (*vm.Settings, *vmtest.Backend, *vm.Worker) {

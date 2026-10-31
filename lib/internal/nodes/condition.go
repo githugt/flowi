@@ -6,8 +6,8 @@ import (
 	"context"
 	"strconv"
 
-	"github.com/githugt/flowi-lib/model"
-	"github.com/githugt/flowi-lib/template"
+	"github.com/githugt/flowi/lib/model"
+	"github.com/githugt/flowi/lib/template"
 )
 
 func conditionSpec() Spec {

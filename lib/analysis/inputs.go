@@ -5,8 +5,8 @@ package analysis
 import (
 	"slices"
 
-	"github.com/githugt/flowi-lib/internal/sites"
-	"github.com/githugt/flowi-lib/model"
+	"github.com/githugt/flowi/lib/internal/sites"
+	"github.com/githugt/flowi/lib/model"
 )
 
 // need is an input a request version's templates read.

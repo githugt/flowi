@@ -14,10 +14,10 @@ import (
 
 	"github.com/goccy/go-yaml"
 
-	"github.com/githugt/flowi-lib/model"
-	"github.com/githugt/flowi-lib/openapi"
-	"github.com/githugt/flowi-lib/specoverlay"
-	"github.com/githugt/flowi-lib/store"
+	"github.com/githugt/flowi/lib/model"
+	"github.com/githugt/flowi/lib/openapi"
+	"github.com/githugt/flowi/lib/specoverlay"
+	"github.com/githugt/flowi/lib/store"
 )
 
 // A request imported from a kept spec can save its edits to the spec, as an

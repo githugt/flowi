@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { SettingsService } from '../bindings/github.com/githugt/flowi/internal/bridge'
+  import { SettingsService } from '../bindings/github.com/githugt/flowi/app/internal/bridge'
   import { app } from './lib/app.svelte'
   import { SECTIONS, labelOf, matches, sectionOf, type Section } from './lib/settings'
   import type { SettingView } from './lib/types'

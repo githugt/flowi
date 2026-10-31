@@ -12,10 +12,10 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/githugt/flowi-lib/diag"
-	"github.com/githugt/flowi-lib/importers"
-	"github.com/githugt/flowi-lib/internal/yamldoc"
-	"github.com/githugt/flowi-lib/model"
+	"github.com/githugt/flowi/lib/diag"
+	"github.com/githugt/flowi/lib/importers"
+	"github.com/githugt/flowi/lib/internal/yamldoc"
+	"github.com/githugt/flowi/lib/model"
 )
 
 // Import reads an Insomnia export. A file that does not parse is

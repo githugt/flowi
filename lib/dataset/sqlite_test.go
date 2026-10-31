@@ -11,9 +11,9 @@ import (
 
 	_ "modernc.org/sqlite"
 
-	"github.com/githugt/flowi-lib/dataset"
-	"github.com/githugt/flowi-lib/dataset/readonly"
-	"github.com/githugt/flowi-lib/model"
+	"github.com/githugt/flowi/lib/dataset"
+	"github.com/githugt/flowi/lib/dataset/readonly"
+	"github.com/githugt/flowi/lib/model"
 )
 
 // seededDatabase is a SQLite file in a temporary directory with a few rows; it returns the directory.

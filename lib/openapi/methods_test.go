@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/githugt/flowi-lib/model"
+	"github.com/githugt/flowi/lib/model"
 )
 
 const queryDoc = `openapi: 3.2.0

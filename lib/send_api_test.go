@@ -18,12 +18,12 @@ import (
 
 	"github.com/coder/websocket"
 
-	"github.com/githugt/flowi-lib/diag"
-	"github.com/githugt/flowi-lib/engine"
-	"github.com/githugt/flowi-lib/examples/demoserver"
-	"github.com/githugt/flowi-lib/model"
-	"github.com/githugt/flowi-lib/vault"
-	"github.com/githugt/flowi-lib/workspace"
+	"github.com/githugt/flowi/lib/diag"
+	"github.com/githugt/flowi/lib/engine"
+	"github.com/githugt/flowi/lib/examples/demoserver"
+	"github.com/githugt/flowi/lib/model"
+	"github.com/githugt/flowi/lib/vault"
+	"github.com/githugt/flowi/lib/workspace"
 )
 
 // memKeys is an in-memory OS keychain.

@@ -16,14 +16,14 @@ import (
 
 	"github.com/pb33f/libopenapi"
 
-	"github.com/githugt/flowi-lib/diag"
-	"github.com/githugt/flowi-lib/importers"
-	"github.com/githugt/flowi-lib/internal/formats"
-	"github.com/githugt/flowi-lib/internal/jsonschema"
-	"github.com/githugt/flowi-lib/internal/textenc"
-	"github.com/githugt/flowi-lib/internal/yamldoc"
-	"github.com/githugt/flowi-lib/model"
-	"github.com/githugt/flowi-lib/version"
+	"github.com/githugt/flowi/lib/diag"
+	"github.com/githugt/flowi/lib/importers"
+	"github.com/githugt/flowi/lib/internal/formats"
+	"github.com/githugt/flowi/lib/internal/jsonschema"
+	"github.com/githugt/flowi/lib/internal/textenc"
+	"github.com/githugt/flowi/lib/internal/yamldoc"
+	"github.com/githugt/flowi/lib/model"
+	"github.com/githugt/flowi/lib/version"
 )
 
 // Options configure Import.

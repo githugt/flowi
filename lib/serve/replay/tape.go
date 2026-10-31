@@ -11,8 +11,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/githugt/flowi-lib/engine"
-	"github.com/githugt/flowi-lib/importers"
+	"github.com/githugt/flowi/lib/engine"
+	"github.com/githugt/flowi/lib/importers"
 )
 
 // Tape keeps the calls of a recording session as a HAR file, in the order they were made, so the session can

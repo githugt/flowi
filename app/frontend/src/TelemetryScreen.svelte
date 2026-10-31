@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte'
-  import { WelcomeService } from '../bindings/github.com/githugt/flowi/internal/bridge'
+  import { WelcomeService } from '../bindings/github.com/githugt/flowi/app/internal/bridge'
   import { live } from './lib/live'
 
   interface TelemetryView {

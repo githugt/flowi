@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/githugt/flowi-lib/transport"
-	"github.com/githugt/flowi-lib/transport/internal/awscfg"
+	"github.com/githugt/flowi/lib/transport"
+	"github.com/githugt/flowi/lib/transport/internal/awscfg"
 )
 
 func TestLoad_should_refuse_an_unknown_auth_mode(t *testing.T) {

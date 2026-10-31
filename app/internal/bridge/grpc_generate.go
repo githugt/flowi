@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"time"
 
-	flowi "github.com/githugt/flowi-lib"
+	flowi "github.com/githugt/flowi/lib"
 )
 
 // generateTimeout bounds GenerateRequests: it writes a file per method, so

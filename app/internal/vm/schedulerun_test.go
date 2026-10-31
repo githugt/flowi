@@ -6,8 +6,8 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/githugt/flowi/internal/vm"
-	"github.com/githugt/flowi/internal/vm/vmtest"
+	"github.com/githugt/flowi/app/internal/vm"
+	"github.com/githugt/flowi/app/internal/vm/vmtest"
 )
 
 func startScheduleRunner(t *testing.T, b *vmtest.Backend) (*vm.ScheduleRunner, *uiQueue) {

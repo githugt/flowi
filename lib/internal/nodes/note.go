@@ -5,8 +5,8 @@ package nodes
 import (
 	"context"
 
-	"github.com/githugt/flowi-lib/model"
-	"github.com/githugt/flowi-lib/template"
+	"github.com/githugt/flowi/lib/model"
+	"github.com/githugt/flowi/lib/template"
 )
 
 func noteSpec() Spec {

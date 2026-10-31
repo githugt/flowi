@@ -1,7 +1,7 @@
 <script lang="ts">
   // The parameters of a step as form fields: a template or expression field, a choice, a switch. A list or mapping
   // is edited in the file. Used by the side inspector and by the rows of a card.
-  import { FlowService } from '../bindings/github.com/githugt/flowi/internal/bridge'
+  import { FlowService } from '../bindings/github.com/githugt/flowi/app/internal/bridge'
   import type { FlowView, Param } from './lib/types'
   import TemplateField from './TemplateField.svelte'
   import { completeFor, exprHint, helpFor, vocabularyFor } from './lib/flowfields'

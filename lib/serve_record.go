@@ -10,9 +10,9 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/githugt/flowi-lib/importers/har"
-	"github.com/githugt/flowi-lib/model"
-	"github.com/githugt/flowi-lib/serve/replay"
+	"github.com/githugt/flowi/lib/importers/har"
+	"github.com/githugt/flowi/lib/model"
+	"github.com/githugt/flowi/lib/serve/replay"
 )
 
 // recordedFolder is where requests made of recorded calls go, under requests/.

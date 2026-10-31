@@ -7,8 +7,8 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/githugt/flowi-lib/model"
-	"github.com/githugt/flowi-lib/report"
+	"github.com/githugt/flowi/lib/model"
+	"github.com/githugt/flowi/lib/report"
 )
 
 // Coverage says how much of an API description the flows use: which operations some flow calls, which of their

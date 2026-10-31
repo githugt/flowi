@@ -1,6 +1,6 @@
 <script lang="ts">
   import { errorText } from './lib/errors'
-  import { FlowService } from '../bindings/github.com/githugt/flowi/internal/bridge'
+  import { FlowService } from '../bindings/github.com/githugt/flowi/app/internal/bridge'
   import type { FlowView } from './lib/types'
   import { ui } from './lib/ui.svelte'
 

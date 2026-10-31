@@ -3,8 +3,8 @@
 package validate
 
 import (
-	"github.com/githugt/flowi-lib/blueprint"
-	"github.com/githugt/flowi-lib/diag"
+	"github.com/githugt/flowi/lib/blueprint"
+	"github.com/githugt/flowi/lib/diag"
 )
 
 // checkBlueprints reports problems in each blueprint's parameters and in

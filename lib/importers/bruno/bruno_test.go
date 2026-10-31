@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/githugt/flowi-lib/importers/importerstest"
+	"github.com/githugt/flowi/lib/importers/importerstest"
 )
 
 func TestParse_should_read_dictionary_text_and_list_blocks(t *testing.T) {

@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/githugt/flowi-lib/engine"
+	"github.com/githugt/flowi/lib/engine"
 )
 
 // OTLP span status codes and kinds.

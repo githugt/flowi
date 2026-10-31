@@ -7,8 +7,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/githugt/flowi-lib/diag"
-	"github.com/githugt/flowi-lib/settings"
+	"github.com/githugt/flowi/lib/diag"
+	"github.com/githugt/flowi/lib/settings"
 )
 
 func TestUserSettings_should_layer_file_env_and_flags_without_creating_a_workspace(t *testing.T) {

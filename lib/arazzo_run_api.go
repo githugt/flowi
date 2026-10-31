@@ -16,9 +16,9 @@ import (
 
 	"github.com/goccy/go-yaml"
 
-	"github.com/githugt/flowi-lib/diag"
-	"github.com/githugt/flowi-lib/internal/migrate"
-	"github.com/githugt/flowi-lib/model"
+	"github.com/githugt/flowi/lib/diag"
+	"github.com/githugt/flowi/lib/internal/migrate"
+	"github.com/githugt/flowi/lib/model"
 )
 
 // ArazzoDoc is a standalone Arazzo document opened to run. Its workflows are flows of a temporary

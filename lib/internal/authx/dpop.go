@@ -18,7 +18,7 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 
-	"github.com/githugt/flowi-lib/internal/httpx"
+	"github.com/githugt/flowi/lib/internal/httpx"
 )
 
 // dpop adds a DPoP proof (RFC 9449): a JWT signed with a key of the client's own, carrying the method and URL of this

@@ -5,7 +5,7 @@ package openapi
 import (
 	"errors"
 
-	"github.com/githugt/flowi-lib/internal/yamldoc"
+	"github.com/githugt/flowi/lib/internal/yamldoc"
 )
 
 // OperationRef is the operation an imported request version came from, as

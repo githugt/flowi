@@ -7,9 +7,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/githugt/flowi-lib/model"
-	"github.com/githugt/flowi/internal/bridge"
-	"github.com/githugt/flowi/internal/vm/vmtest"
+	"github.com/githugt/flowi/app/internal/bridge"
+	"github.com/githugt/flowi/app/internal/vm/vmtest"
+	"github.com/githugt/flowi/lib/model"
 )
 
 // fakeWorkspaceFile renames the fake backend, as the real file renames the

@@ -10,8 +10,8 @@ import (
 
 	"github.com/samber/do/v2"
 
-	flowi "github.com/githugt/flowi-lib"
-	"github.com/githugt/flowi-lib/engine"
+	flowi "github.com/githugt/flowi/lib"
+	"github.com/githugt/flowi/lib/engine"
 )
 
 // logRun logs the run's outcome, and the abort when there was one. No

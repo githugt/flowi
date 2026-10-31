@@ -29,7 +29,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/githugt/flowi-lib/serve/runs"
+	"github.com/githugt/flowi/lib/serve/runs"
 )
 
 // ErrNoToken is returned by New when the token is empty: triggers without

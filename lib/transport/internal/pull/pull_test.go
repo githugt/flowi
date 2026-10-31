@@ -10,8 +10,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/githugt/flowi-lib/transport"
-	"github.com/githugt/flowi-lib/transport/internal/pull"
+	"github.com/githugt/flowi/lib/transport"
+	"github.com/githugt/flowi/lib/transport/internal/pull"
 )
 
 func msg(id string) transport.Message {

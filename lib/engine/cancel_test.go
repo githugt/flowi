@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/githugt/flowi-lib/internal/nodes"
-	"github.com/githugt/flowi-lib/model"
+	"github.com/githugt/flowi/lib/internal/nodes"
+	"github.com/githugt/flowi/lib/model"
 )
 
 // drain collects a run's events and result.

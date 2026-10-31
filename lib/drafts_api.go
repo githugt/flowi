@@ -11,8 +11,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/githugt/flowi-lib/model"
-	"github.com/githugt/flowi-lib/workspace"
+	"github.com/githugt/flowi/lib/model"
+	"github.com/githugt/flowi/lib/workspace"
 )
 
 // A draft is a collection kept in Flowi's own directory

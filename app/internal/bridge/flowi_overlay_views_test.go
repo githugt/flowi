@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	flowi "github.com/githugt/flowi-lib"
+	flowi "github.com/githugt/flowi/lib"
 )
 
 func TestSpecExportView_should_name_the_files_and_say_why_each_change_was_left_out(t *testing.T) {

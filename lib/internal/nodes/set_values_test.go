@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/githugt/flowi-lib/model"
+	"github.com/githugt/flowi/lib/model"
 )
 
 func setNode(values ...model.SetValue) model.Node {

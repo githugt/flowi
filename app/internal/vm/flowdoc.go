@@ -11,13 +11,13 @@ import (
 	"strconv"
 	"strings"
 
-	flowi "github.com/githugt/flowi-lib"
-	"github.com/githugt/flowi-lib/diag"
-	"github.com/githugt/flowi-lib/mermaid"
-	"github.com/githugt/flowi-lib/model"
+	flowi "github.com/githugt/flowi/lib"
+	"github.com/githugt/flowi/lib/diag"
+	"github.com/githugt/flowi/lib/mermaid"
+	"github.com/githugt/flowi/lib/model"
 
-	"github.com/githugt/flowi/internal/canvas"
-	"github.com/githugt/flowi/internal/card"
+	"github.com/githugt/flowi/app/internal/canvas"
+	"github.com/githugt/flowi/app/internal/card"
 )
 
 // maxUndo bounds the undo history.

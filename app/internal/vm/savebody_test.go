@@ -9,9 +9,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/githugt/flowi-lib/engine"
+	"github.com/githugt/flowi/lib/engine"
 
-	"github.com/githugt/flowi/internal/vm"
+	"github.com/githugt/flowi/app/internal/vm"
 )
 
 func TestResponseBodyFile_should_give_the_bytes_of_the_response_and_a_name_to_save_it_under(t *testing.T) {

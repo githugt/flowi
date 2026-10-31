@@ -2,7 +2,7 @@
   // Save as flowi overlay: the changes of the working copy against its saved version, each with a
   // choice. Ticked changes go to the overlay's shared part (every request that uses it gets them);
   // the others stay with this request. An existing overlay keeps what it holds for other requests.
-  import { RequestService } from '../bindings/github.com/githugt/flowi/internal/bridge'
+  import { RequestService } from '../bindings/github.com/githugt/flowi/app/internal/bridge'
   import { errorText } from './lib/errors'
   import { ui } from './lib/ui.svelte'
   import type { FlowiOverlayDiff } from './lib/types'

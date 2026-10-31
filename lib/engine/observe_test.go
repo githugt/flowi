@@ -8,7 +8,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/githugt/flowi-lib/model"
+	"github.com/githugt/flowi/lib/model"
 )
 
 func TestSend_should_pass_every_event_to_Observe_in_order(t *testing.T) {

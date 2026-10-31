@@ -11,8 +11,8 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/githugt/flowi-lib/serve/replay"
-	"github.com/githugt/flowi-lib/serve/scheduler"
+	"github.com/githugt/flowi/lib/serve/replay"
+	"github.com/githugt/flowi/lib/serve/scheduler"
 )
 
 // ErrInvalidServeOptions is returned by Serve for options that cannot work

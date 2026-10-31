@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"time"
 
-	flowi "github.com/githugt/flowi-lib"
+	flowi "github.com/githugt/flowi/lib"
 )
 
 // RunHistory is the list of a flow's saved runs, newest first, and the

@@ -11,8 +11,8 @@ import (
 	"path"
 	"strings"
 
-	"github.com/githugt/flowi-lib/internal/yamlpath"
-	"github.com/githugt/flowi-lib/model"
+	"github.com/githugt/flowi/lib/internal/yamlpath"
+	"github.com/githugt/flowi/lib/model"
 )
 
 // Located is any value together with the file and YAML path it came from.

@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/githugt/flowi-lib/model"
+	"github.com/githugt/flowi/lib/model"
 )
 
 func completionTexts(t *testing.T, w *Workspace, flow, nodePath string) []string {

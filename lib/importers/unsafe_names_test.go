@@ -7,13 +7,13 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/githugt/flowi-lib/diag"
-	"github.com/githugt/flowi-lib/importers"
-	"github.com/githugt/flowi-lib/importers/hoppscotch"
-	"github.com/githugt/flowi-lib/importers/insomnia"
-	"github.com/githugt/flowi-lib/importers/openrpc"
-	"github.com/githugt/flowi-lib/importers/postman"
-	"github.com/githugt/flowi-lib/importers/thunderclient"
+	"github.com/githugt/flowi/lib/diag"
+	"github.com/githugt/flowi/lib/importers"
+	"github.com/githugt/flowi/lib/importers/hoppscotch"
+	"github.com/githugt/flowi/lib/importers/insomnia"
+	"github.com/githugt/flowi/lib/importers/openrpc"
+	"github.com/githugt/flowi/lib/importers/postman"
+	"github.com/githugt/flowi/lib/importers/thunderclient"
 )
 
 const hostileName = `../../etc/pass wd/..\x:*?"<>|` + "\x00"

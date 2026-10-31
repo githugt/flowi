@@ -19,7 +19,7 @@ import (
 
 	amqp "github.com/Azure/go-amqp"
 
-	"github.com/githugt/flowi-lib/transport"
+	"github.com/githugt/flowi/lib/transport"
 )
 
 const (

@@ -18,8 +18,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/githugt/flowi-lib/dataset"
-	"github.com/githugt/flowi-lib/model"
+	"github.com/githugt/flowi/lib/dataset"
+	"github.com/githugt/flowi/lib/model"
 
 	_ "github.com/go-sql-driver/mysql"
 	_ "github.com/jackc/pgx/v5/stdlib"

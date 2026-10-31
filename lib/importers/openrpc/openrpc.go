@@ -12,12 +12,12 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/githugt/flowi-lib/diag"
-	"github.com/githugt/flowi-lib/importers"
-	"github.com/githugt/flowi-lib/internal/loose"
-	"github.com/githugt/flowi-lib/internal/yamldoc"
-	"github.com/githugt/flowi-lib/jsonrpc"
-	"github.com/githugt/flowi-lib/model"
+	"github.com/githugt/flowi/lib/diag"
+	"github.com/githugt/flowi/lib/importers"
+	"github.com/githugt/flowi/lib/internal/loose"
+	"github.com/githugt/flowi/lib/internal/yamldoc"
+	"github.com/githugt/flowi/lib/jsonrpc"
+	"github.com/githugt/flowi/lib/model"
 )
 
 // Import reads an OpenRPC document (JSON or YAML). A file that does not parse

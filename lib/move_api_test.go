@@ -8,7 +8,7 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/githugt/flowi-lib/diag"
+	"github.com/githugt/flowi/lib/diag"
 )
 
 func TestMoveRequest_should_move_a_request_to_another_collection_keeping_its_id_and_edit(t *testing.T) {

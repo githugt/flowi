@@ -12,10 +12,10 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/githugt/flowi-lib/diag"
-	"github.com/githugt/flowi-lib/importers"
-	"github.com/githugt/flowi-lib/internal/loose"
-	"github.com/githugt/flowi-lib/model"
+	"github.com/githugt/flowi/lib/diag"
+	"github.com/githugt/flowi/lib/importers"
+	"github.com/githugt/flowi/lib/internal/loose"
+	"github.com/githugt/flowi/lib/model"
 )
 
 // Import reads a Hoppscotch collection or environment export. A file that

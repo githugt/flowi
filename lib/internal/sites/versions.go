@@ -3,8 +3,8 @@
 package sites
 
 import (
-	"github.com/githugt/flowi-lib/model"
-	"github.com/githugt/flowi-lib/version"
+	"github.com/githugt/flowi/lib/model"
+	"github.com/githugt/flowi/lib/version"
 )
 
 // ResolvedVersion is the version a node runs without a run preference.

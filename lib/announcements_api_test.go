@@ -13,7 +13,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/githugt/flowi-lib/announce"
+	"github.com/githugt/flowi/lib/announce"
 )
 
 func TestAnnouncements_should_fetch_the_configured_feed_and_cache_it_in_the_config_dir(t *testing.T) {

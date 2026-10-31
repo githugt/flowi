@@ -2,7 +2,7 @@
   // The Details tab of the footer: what the tab in front is, in plain labelled values (a request's method, URL,
   // version, overlay, auth, environment, hooks and last result; a flow's inputs, steps and last run), where the
   // headers only hint at them. It reads the values again when the request or flow changes or another tab comes forward.
-  import { PanelsService } from '../bindings/github.com/githugt/flowi/internal/bridge'
+  import { PanelsService } from '../bindings/github.com/githugt/flowi/app/internal/bridge'
   import { app } from './lib/app.svelte'
   import type { DetailsView } from './lib/types'
 

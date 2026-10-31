@@ -9,10 +9,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/githugt/flowi-lib/diag"
-	"github.com/githugt/flowi-lib/model"
-	"github.com/githugt/flowi-lib/vault"
-	"github.com/githugt/flowi-lib/workspace"
+	"github.com/githugt/flowi/lib/diag"
+	"github.com/githugt/flowi/lib/model"
+	"github.com/githugt/flowi/lib/vault"
+	"github.com/githugt/flowi/lib/workspace"
 )
 
 const sharedEnv = "id: 01JA0000000000000000000009\nvars:\n  base_url: http://shared.example\n  token:\n    secret: true\n"

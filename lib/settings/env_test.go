@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/githugt/flowi-lib/diag"
+	"github.com/githugt/flowi/lib/diag"
 )
 
 func TestEnvVarName(t *testing.T) {

@@ -9,22 +9,22 @@ export API descriptions, and serve a fake API from your saved responses.
 
 The [desktop app](https://github.com/githugt/flowi) is where you build requests and flows. The CLI runs
 the same collections where the app cannot: in CI, on a server, in a script, or on a schedule. All logic
-lives in [flowi-lib](https://github.com/githugt/flowi-lib), so a flow behaves the same everywhere. The
+lives in [flowi-lib](https://github.com/githugt/flowi/tree/master/lib), so a flow behaves the same everywhere. The
 CLI builds without cgo, so it is one static binary on every platform.
 
 ## Install
 
 ```bash
-go install github.com/githugt/flowi-cli/cmd/flowi@latest
+go install github.com/githugt/flowi/cli/cmd/flowi@latest
 ```
 
 Needs Go 1.27 or later; the binary lands in `$(go env GOPATH)/bin`. Release builds for macOS, Linux and Windows are
-attached to each [GitHub release](https://github.com/githugt/flowi-cli/releases).
+attached to each [GitHub release](https://github.com/githugt/flowi/releases).
 
 To build from a clone instead:
 
 ```bash
-git clone https://github.com/githugt/flowi-cli && cd flowi-cli
+git clone https://github.com/githugt/flowi && cd flowi/cli
 just build        # puts the binary in ./bin/flowi
 ```
 
@@ -113,7 +113,7 @@ just check       # tidy, lint and test with the race detector
 ```
 
 Optional extras (OpenTelemetry traces, usage reporting, signed announcements) are off until configured;
-see [flowi-lib](https://github.com/githugt/flowi-lib).
+see [flowi-lib](https://github.com/githugt/flowi/tree/master/lib).
 
 ## Licence
 

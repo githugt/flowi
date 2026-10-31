@@ -2,7 +2,7 @@
   // The first screen: what to do next, worked out from the workspace, with the
   // changelog folded away below for those who want it.
   import { onMount } from 'svelte'
-  import { WelcomeService } from '../bindings/github.com/githugt/flowi/internal/bridge'
+  import { WelcomeService } from '../bindings/github.com/githugt/flowi/app/internal/bridge'
   import { app } from './lib/app.svelte'
   import { live } from './lib/live'
   import { promptNewEnvironment } from './lib/menus'

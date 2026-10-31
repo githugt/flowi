@@ -10,8 +10,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/githugt/flowi-lib/transport"
-	"github.com/githugt/flowi-lib/transport/sqs"
+	"github.com/githugt/flowi/lib/transport"
+	"github.com/githugt/flowi/lib/transport/sqs"
 )
 
 const secretKey = "wJalrXUtnFEMI-s3cret-key"

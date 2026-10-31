@@ -1,7 +1,7 @@
 <script lang="ts">
   // A value wire was dropped from one step onto another: say which part of what the first makes to take, and where
   // in the second to put it. The result is a template written into that field, as one change that Undo takes back.
-  import { FlowService } from '../bindings/github.com/githugt/flowi/internal/bridge'
+  import { FlowService } from '../bindings/github.com/githugt/flowi/app/internal/bridge'
   import { errorText } from './lib/errors'
   import type { WireChoices } from './lib/types'
 

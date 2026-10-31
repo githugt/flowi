@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/githugt/flowi-lib/engine"
-	"github.com/githugt/flowi-lib/report"
+	"github.com/githugt/flowi/lib/engine"
+	"github.com/githugt/flowi/lib/report"
 )
 
 func sample() Bundle {

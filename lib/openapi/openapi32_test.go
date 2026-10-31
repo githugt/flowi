@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/githugt/flowi-lib/model"
+	"github.com/githugt/flowi/lib/model"
 )
 
 // What OpenAPI 3.2 adds beyond QUERY and additionalOperations (methods_test.go): nested tags, dataValue examples,

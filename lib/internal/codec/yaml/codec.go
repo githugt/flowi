@@ -19,8 +19,8 @@ import (
 	"github.com/goccy/go-yaml/parser"
 	"github.com/goccy/go-yaml/token"
 
-	"github.com/githugt/flowi-lib/diag"
-	"github.com/githugt/flowi-lib/settings"
+	"github.com/githugt/flowi/lib/diag"
+	"github.com/githugt/flowi/lib/settings"
 )
 
 // utf8BOM is the byte order mark some Windows editors prepend.

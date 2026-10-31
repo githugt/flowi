@@ -1,6 +1,6 @@
 <script lang="ts">
   // A path typed in, or chosen with the system's dialog when there is one.
-  import { SystemService } from '../bindings/github.com/githugt/flowi/internal/bridge'
+  import { SystemService } from '../bindings/github.com/githugt/flowi/app/internal/bridge'
 
   let {
     value = $bindable(''),

@@ -12,7 +12,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/githugt/flowi-lib/transport"
+	"github.com/githugt/flowi/lib/transport"
 )
 
 // Transport runs SSE operations.

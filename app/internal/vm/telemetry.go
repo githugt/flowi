@@ -5,7 +5,7 @@ package vm
 import (
 	"encoding/json"
 
-	"github.com/githugt/flowi-lib/telemetry"
+	"github.com/githugt/flowi/lib/telemetry"
 )
 
 // Telemetry is the dialog where the user chooses what usage reporting may

@@ -11,8 +11,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/githugt/flowi-lib/diag"
-	"github.com/githugt/flowi-lib/settings"
+	"github.com/githugt/flowi/lib/diag"
+	"github.com/githugt/flowi/lib/settings"
 )
 
 func TestFormat_should_refuse_files_whose_content_it_would_lose(t *testing.T) {
