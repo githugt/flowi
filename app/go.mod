@@ -4,7 +4,7 @@ go 1.27
 
 require (
 	github.com/githugt/flowi/lib v0.0.0
-	github.com/wailsapp/wails/v3 v3.0.0-beta.30
+	github.com/wailsapp/wails/v3 v3.1.0-nightly.20261027
 )
 
 require (
@@ -89,7 +89,6 @@ require (
 	github.com/redis/go-redis/v9 v9.23.0 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
 	github.com/santhosh-tekuri/jsonschema/v6 v6.0.3 // indirect
-	github.com/stretchr/objx v0.5.3 // indirect
 	github.com/theory/jsonpath v0.12.1 // indirect
 	github.com/twmb/franz-go v1.22.2 // indirect
 	github.com/twmb/franz-go/pkg/kadm v1.19.0 // indirect
