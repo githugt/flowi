@@ -84,7 +84,7 @@ jobs:
           mv bin/flowi-app.rpm "bin/flowi-app_${VERSION}_linux_amd64.rpm"
           mv bin/flowi-app.pkg.tar.zst "bin/flowi-app_${VERSION}_linux_amd64.pkg.tar.zst"
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: flowi-${{ matrix.os }}
           retention-days: 7
