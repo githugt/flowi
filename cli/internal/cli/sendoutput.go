@@ -112,6 +112,9 @@ func statusLine(rec *engine.Record) string {
 	if rec.Kind == engine.KindAsync {
 		return asyncStatusLine(rec)
 	}
+	if rec.Kind == engine.KindDataset {
+		return datasetStatusLine(rec)
+	}
 	if rec.Status == 0 {
 		return fmt.Sprintf("%s %s → no response", rec.Request.Method, rec.Request.URL)
 	}
@@ -155,6 +158,22 @@ func grpcStatusLine(rec *engine.Record) string {
 	}
 	return fmt.Sprintf("%s %s → %s  %d %s  %s  (version %s, %s)", rec.Request.Method, rec.Request.URL,
 		code, received, noun, roundDuration(rec.Timings.Total), rec.Version, rec.VersionSource)
+}
+
+// datasetStatusLine is "SQL postgres://h/db → ok  2 rows  3ms  (version 1, default)": the rows kept, and a note when
+// the store had more.
+func datasetStatusLine(rec *engine.Record) string {
+	rows, truncated := rec.Rows()
+	noun := "rows"
+	if rows == 1 && !truncated {
+		noun = "row"
+	}
+	cut := ""
+	if truncated {
+		cut = " (more were cut)"
+	}
+	return fmt.Sprintf("%s %s → %s  %d %s%s  %s  (version %s, %s)", rec.Request.Method, rec.Request.URL,
+		rec.Outcome, rows, noun, cut, roundDuration(rec.Timings.Total), rec.Version, rec.VersionSource)
 }
 
 func roundDuration(d time.Duration) time.Duration {
