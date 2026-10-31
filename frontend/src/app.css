@@ -11,7 +11,7 @@
   --container: #4a3a2a;
   --fail: #e5534b;
   /* The colours a person may give a step (card header tile); the same in every theme, as saturated mid-tones. */
-  --c-blue: #3d6fd6; --c-green: #2e9d6a; --c-amber: #d4912a; --c-pink: #d6558a; --c-purple: #8a63d2; --c-teal: #1f9bab; --on-tile: #fff;
+  --c-blue: #3d6fd6; --c-green: #2e9d6a; --c-amber: #d4912a; --c-pink: #d6558a; --c-purple: #8a63d2; --c-teal: #1f9bab; --c-black: #2a2d34; --c-red: #d6453d; --c-sky: #5bc0de; --on-tile: #fff;
   color-scheme: dark;
 }
 @media (prefers-color-scheme: light) {
@@ -54,15 +54,15 @@
 
 /* Status colours. The dark set is the default; light themes get a darker set that reads on white. */
 :root {
-  --ok: #4caf84; --warn: #e0a43a; --dirty: #f0a35e; --info: #5bc0de; --literal: #c586c0; --pending: #e0c34a; --data: #2dd4bf;
+  --ok: #4caf84; --warn: #e0a43a; --dirty: #f0a35e; --info: #5bc0de; --literal: #c586c0; --pending: #e0c34a; --data: #b794f6;
   --on-accent: #fff;
   /* The send button, one colour per mode. Each keeps white text at 4.5:1 or better; the accent
      itself (#6ea8fe) gave white text only about 2.3:1, which read as washed out. */
   --act-send: #2f6fe0; --act-receive: #0e7d6b; --act-both: #7a4fd6; --on-act: #fff;
 }
-@media (prefers-color-scheme: light) { :root:not([data-theme]) { --ok: #1f8a5a; --warn: #a16207; --dirty: #c2620a; --info: #0e7490; --literal: #8b3fa0; --pending: #8a6d00; --data: #0f766e; --shadow: 0 8px 24px rgb(0 0 0 / 0.12); } }
+@media (prefers-color-scheme: light) { :root:not([data-theme]) { --ok: #1f8a5a; --warn: #a16207; --dirty: #c2620a; --info: #0e7490; --literal: #8b3fa0; --pending: #8a6d00; --data: #6d28d9; --shadow: 0 8px 24px rgb(0 0 0 / 0.12); } }
 :root[data-theme='light'], :root[data-theme='flowi-light'], :root[data-theme='solarized-light'], :root[data-theme='anuppuccin-light'] {
-  --ok: #1f8a5a; --warn: #a16207; --dirty: #c2620a; --info: #0e7490; --literal: #8b3fa0; --pending: #8a6d00; --data: #0f766e; --shadow: 0 8px 24px rgb(0 0 0 / 0.12);
+  --ok: #1f8a5a; --warn: #a16207; --dirty: #c2620a; --info: #0e7490; --literal: #8b3fa0; --pending: #8a6d00; --data: #6d28d9; --shadow: 0 8px 24px rgb(0 0 0 / 0.12);
 }
 :root[data-theme='high-contrast'] { --on-accent: #000; --act-send: var(--accent); --act-receive: var(--accent); --act-both: var(--accent); --on-act: #000; }
 
@@ -133,9 +133,9 @@ body {
 }
 
 /* Colours of the verbs (HTTP methods and message protocols); the light set reads on a light background. */
-:root { --v-GET: #35c58a; --v-POST: #f4b84a; --v-PUT: #60a5fa; --v-PATCH: #b59af7; --v-DELETE: #f06470; --v-QUERY: #e0b0ff; --v-WS: #2dd4bf; --v-SSE: #38bdf8; --v-MQTT: #ff8a5b; --v-KAFKA: #e879f9; --v-AMQP: #a3e635; --v-NATS: #818cf8; --v-GRPC: #5eead4; --v-REDIS: #ff6b6b; --v-SQS: #fb923c; --v-SNS: #fb7185; --v-BUS: #4aa8ff; --v-PUBSUB: #22d3ee; --v-OTHER: #a7b3c6; }
-@media (prefers-color-scheme: light) { :root:not([data-theme]) { --v-GET: #147d57; --v-POST: #8a5700; --v-PUT: #245ddb; --v-PATCH: #7042b8; --v-DELETE: #c43142; --v-QUERY: #8e3fb8; --v-WS: #0f766e; --v-SSE: #0369a1; --v-MQTT: #b4441a; --v-KAFKA: #a21caf; --v-AMQP: #4d7c0f; --v-NATS: #4338ca; --v-GRPC: #0f766e; --v-REDIS: #b91c1c; --v-SQS: #b45309; --v-SNS: #be123c; --v-BUS: #0b5cad; --v-PUBSUB: #0e7490; --v-OTHER: #536178; } }
-:root[data-theme='light'], :root[data-theme='flowi-light'], :root[data-theme='solarized-light'], :root[data-theme='anuppuccin-light'] { --v-GET: #147d57; --v-POST: #8a5700; --v-PUT: #245ddb; --v-PATCH: #7042b8; --v-DELETE: #c43142; --v-QUERY: #8e3fb8; --v-WS: #0f766e; --v-SSE: #0369a1; --v-MQTT: #b4441a; --v-KAFKA: #a21caf; --v-AMQP: #4d7c0f; --v-NATS: #4338ca; --v-GRPC: #0f766e; --v-REDIS: #b91c1c; --v-SQS: #b45309; --v-SNS: #be123c; --v-BUS: #0b5cad; --v-PUBSUB: #0e7490; --v-OTHER: #536178; }
+:root { --v-GET: #35c58a; --v-POST: #f4b84a; --v-PUT: #60a5fa; --v-PATCH: #b59af7; --v-DELETE: #f06470; --v-QUERY: #e0b0ff; --v-WS: #2dd4bf; --v-SSE: #38bdf8; --v-MQTT: #ff8a5b; --v-KAFKA: #e879f9; --v-AMQP: #a3e635; --v-NATS: #818cf8; --v-GRPC: #5eead4; --v-SQL: #f2c14e; --v-REDIS: #ff6b6b; --v-SQS: #fb923c; --v-SNS: #fb7185; --v-BUS: #4aa8ff; --v-PUBSUB: #22d3ee; --v-OTHER: #a7b3c6; }
+@media (prefers-color-scheme: light) { :root:not([data-theme]) { --v-GET: #147d57; --v-POST: #8a5700; --v-PUT: #245ddb; --v-PATCH: #7042b8; --v-DELETE: #c43142; --v-QUERY: #8e3fb8; --v-WS: #0f766e; --v-SSE: #0369a1; --v-MQTT: #b4441a; --v-KAFKA: #a21caf; --v-AMQP: #4d7c0f; --v-NATS: #4338ca; --v-GRPC: #0f766e; --v-SQL: #9a6b00; --v-REDIS: #b91c1c; --v-SQS: #b45309; --v-SNS: #be123c; --v-BUS: #0b5cad; --v-PUBSUB: #0e7490; --v-OTHER: #536178; } }
+:root[data-theme='light'], :root[data-theme='flowi-light'], :root[data-theme='solarized-light'], :root[data-theme='anuppuccin-light'] { --v-GET: #147d57; --v-POST: #8a5700; --v-PUT: #245ddb; --v-PATCH: #7042b8; --v-DELETE: #c43142; --v-QUERY: #8e3fb8; --v-WS: #0f766e; --v-SSE: #0369a1; --v-MQTT: #b4441a; --v-KAFKA: #a21caf; --v-AMQP: #4d7c0f; --v-NATS: #4338ca; --v-GRPC: #0f766e; --v-SQL: #9a6b00; --v-REDIS: #b91c1c; --v-SQS: #b45309; --v-SNS: #be123c; --v-BUS: #0b5cad; --v-PUBSUB: #0e7490; --v-OTHER: #536178; }
 
 /* Flows have a pill too. */
 :root { --v-FLOW: #e0b0ff; }

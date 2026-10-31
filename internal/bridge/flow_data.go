@@ -211,6 +211,10 @@ func fieldsOfStep(n model.Node) []WireField {
 		}
 	}
 	for _, p := range catalog().byType[string(n.Type)].Params {
+		// A set's target names the variable it writes: it is not read as a template, so a value put there makes no link.
+		if n.Type == "set" && p.Name == "target" {
+			continue
+		}
 		if p.Kind == "text" || p.Kind == "any" || p.Kind == "string" || p.Kind == "expr" {
 			out = append(out, WireField{ID: "param." + p.Name, Label: p.Name})
 		}

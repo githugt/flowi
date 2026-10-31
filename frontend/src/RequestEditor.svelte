@@ -2,6 +2,7 @@
   import { errorText } from './lib/errors'
   import { app } from './lib/app.svelte'
   import { ui } from './lib/ui.svelte'
+  import { parseXml } from './lib/xml'
   import { RequestService } from '../bindings/github.com/githugt/flowi/internal/bridge'
   import type { Extraction, RequestView } from './lib/types'
   import TextField from './TextField.svelte'
@@ -16,6 +17,7 @@
   import AreaField from './AreaField.svelte'
   import Markdown from './Markdown.svelte'
   import AssertCards from './AssertCards.svelte'
+  import OutcomesEditor from './OutcomesEditor.svelte'
   import { requestVocabulary } from './lib/vocabulary'
   import { sectionCounts } from './lib/tabcounts'
   import Dropdown from './Dropdown.svelte'
@@ -40,6 +42,7 @@
   import OverlayDialog from './OverlayDialog.svelte'
   import VersionPicker from './VersionPicker.svelte'
   import PartsEditor from './PartsEditor.svelte'
+  import DatasetSections from './DatasetSections.svelte'
   import SpecUpdateDialog from './SpecUpdateDialog.svelte'
   import FlowiOverlayDialog from './FlowiOverlayDialog.svelte'
   import FlowiOverlayEditor from './FlowiOverlayEditor.svelte'
@@ -51,13 +54,17 @@
   const methods = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS', 'QUERY']
   // The registered WebDAV, CalDAV and other methods are not listed: they go through Custom…, which keeps their registered spelling.
   const CUSTOM = '\u0000custom'
-  const httpSections = ['Params', 'Headers', 'Body', 'Auth', 'Extract', 'Assert', 'Variables', 'Settings', 'Hooks', 'Schema', 'Docs', 'Code', 'Responses', 'Used by', 'Cookies']
+  const httpSections = ['Params', 'Headers', 'Body', 'Auth', 'Extract', 'Assert', 'Outcomes', 'Variables', 'Settings', 'Hooks', 'Schema', 'Docs', 'Code', 'Responses', 'Used by', 'Cookies']
   type Section = string
+  // What a check or an extract on this kind of request can read, and the example its help gives.
+  const checkContext = $derived(view.kind === 'http' ? 'request.check' : view.kind === 'dataset' ? 'dataset.check' : 'message.check')
+  const checkExample = $derived(view.kind === 'http' ? 'status == 200' : view.kind === 'dataset' ? 'row_count >= 1' : 'received >= 1')
   const sections = $derived.by(() => {
-    if (view.kind === 'grpc') return ['Message', 'Headers', 'Receive', 'Auth', 'Proto', 'Variables', 'Extract', 'Assert', 'Settings', 'Hooks', 'Schema', 'Docs', 'Responses', 'Used by']
+    if (view.kind === 'dataset') return ['Query', 'Values', 'Extract', 'Assert', 'Outcomes', 'Variables', 'Settings', 'Hooks', 'Docs', 'Responses', 'Used by']
+    if (view.kind === 'grpc') return ['Message', 'Headers', 'Receive', 'Auth', 'Proto', 'Variables', 'Extract', 'Assert', 'Outcomes', 'Settings', 'Hooks', 'Schema', 'Docs', 'Responses', 'Used by']
     if (view.kind === 'async') {
       const p = view.async?.block.Protocol
-      return ['Message', 'Headers', 'Receive', ...(view.async?.credentials.length ? ['Credentials'] : []), 'Binding', 'Variables', 'Extract', 'Assert', 'Settings', 'Hooks', 'Schema', 'Docs', 'Responses', 'Used by'].filter(
+      return ['Message', 'Headers', 'Receive', ...(view.async?.credentials.length ? ['Credentials'] : []), 'Binding', 'Variables', 'Extract', 'Assert', 'Outcomes', 'Settings', 'Hooks', 'Schema', 'Docs', 'Responses', 'Used by'].filter(
         (s) => !(s === 'Receive' && p === 'sns') && !(s === 'Message' && p === 'sse' && !view.async?.block.Send),
       )
     }
@@ -65,11 +72,13 @@
   })
   // The sections shown as tabs: what most sends need. The rest are under "More", in their usual order.
   const mainOf = $derived(
-    view.kind === 'grpc'
-      ? ['Message', 'Headers', 'Receive', 'Auth', 'Extract', 'Assert']
-      : view.kind === 'async'
-        ? ['Message', 'Headers', 'Receive', 'Credentials', 'Extract', 'Assert']
-        : ['Params', 'Headers', 'Body', 'Auth', 'Extract', 'Assert'],
+    view.kind === 'dataset'
+      ? ['Query', 'Values', 'Extract', 'Assert']
+      : view.kind === 'grpc'
+        ? ['Message', 'Headers', 'Receive', 'Auth', 'Extract', 'Assert']
+        : view.kind === 'async'
+          ? ['Message', 'Headers', 'Receive', 'Credentials', 'Extract', 'Assert']
+          : ['Params', 'Headers', 'Body', 'Auth', 'Extract', 'Assert'],
   )
   const ICON_TAB_W = 37 // an icon tab and the gap after it
   const LABEL_W = 90 // room for the open tab's name
@@ -96,13 +105,15 @@
   // A gRPC request's message is its Body and what it waits for is a Stream.
   const titleOf = (s: string) => (view.kind === 'grpc' ? ({ Message: 'Body', Receive: 'Stream' } as Record<string, string>)[s] ?? s : s)
   const iconOf = (s: string) =>
-    ({ Params: 'params', Headers: 'headers', Body: 'body', Message: 'body', Auth: 'auth', Credentials: 'auth', Extract: 'extract', Assert: 'assert', Variables: 'variables', Hooks: 'hooks', Docs: 'docs', Schema: 'schema', Receive: 'stream', Proto: 'proto', Binding: 'binding', Code: 'code', Cookies: 'cookie', Responses: 'clock', 'Used by': 'usedby', Settings: 'settings' } as Record<string, string>)[s] ?? 'list'
+    ({ Params: 'params', Headers: 'headers', Body: 'body', Message: 'body', Query: 'body', Values: 'params', Auth: 'auth', Credentials: 'auth', Extract: 'extract', Assert: 'assert', Outcomes: 'checks', Variables: 'variables', Hooks: 'hooks', Docs: 'docs', Schema: 'schema', Receive: 'stream', Proto: 'proto', Binding: 'binding', Code: 'code', Cookies: 'cookie', Responses: 'clock', 'Used by': 'usedby', Settings: 'settings' } as Record<string, string>)[s] ?? 'list'
   // The green dot: the section has content.
   const configured = (s: string) =>
     ({
       Params: !!v.Query?.length,
       Headers: !!(view.async && !view.async.headersAreConnection ? view.async.block.Send?.Headers?.length : v.Headers?.length),
       Body: view.bodyKind !== 'none',
+      Query: !!view.dataset?.block.Query.trim(),
+      Values: !!view.dataset?.block.Params?.length,
       Message: !!(view.async?.block.Send || (view.grpc?.block.Body.JSON || view.grpc?.block.Body.Text)),
       Auth: view.auth.kind !== 'none',
       Hooks: view.hookChain.length > 0,
@@ -110,6 +121,7 @@
       Variables: !!v.Variables?.length,
       Extract: !!v.Extract?.length,
       Assert: !!v.Assert?.length,
+      Outcomes: !!v.Outcomes?.length,
     })[s] ?? false
   // The count badge: how many rows the section holds. Sections that are not lists keep the dot.
   const counts = $derived(sectionCounts(view))
@@ -174,8 +186,14 @@
   const formats = ['json', 'xml', 'yaml', 'raw']
   const authKinds: [string, string][] = [['none', 'None'], ['bearer', 'Bearer token'], ['basic', 'Basic'], ['other', 'Other']]
   const bodyText = $derived(v.Body.JSON || v.Body.Text)
-  // xml and raw have no colouring of their own; their {{templates}} are still marked.
-  const codeLangOf = (format: string): CodeLang => (format === 'json' ? 'json' : format === 'yaml' ? 'yaml' : 'text')
+  // raw has no colouring of its own; its {{templates}} are still marked.
+  // A body typed as XML is checked as it is written: the first problem and its line, or a quiet word that it reads.
+  const xmlProblem = $derived.by(() => {
+    if (view.bodyFormat !== 'xml' || !bodyText.trim()) return null
+    const got = parseXml(bodyText)
+    return 'error' in got ? got.error : null
+  })
+  const codeLangOf = (format: string): CodeLang => (format === 'json' ? 'json' : format === 'yaml' ? 'yaml' : format === 'xml' ? 'xml' : 'text')
 
   // A method the lists lack (typed through Custom…) shows as the current choice, so the button is never blank.
   const methodOptions = $derived<DropOption[]>([
@@ -274,16 +292,29 @@
     extract = (v.Extract ?? []).map((e) => ({ ...e }))
   })
 
-  // A try-out request is kept by choosing where; its path starts from its name or its URL.
+  // A try-out request is kept by choosing where; its name starts from its name or its URL.
   async function saveTo() {
-    const collections = (app.tree?.roots ?? []).filter((n) => n.kind === 'collection').map((n) => ({ id: n.id, label: n.label }))
-    ui.prompt({
+    ui.place = {
       title: 'Save request',
-      label: 'Path',
-      initial: await RequestService.SuggestSavePath(node),
-      select: { label: 'Save to', options: collections },
-      done: (path, _p, collection) => RequestService.SaveTo(node, collection, path),
-    })
+      action: 'Save',
+      tree: 'requests',
+      name: { label: 'Name', initial: await RequestService.SuggestSavePath(node), required: true },
+      done: (row, name) => RequestService.SaveTo(node, row, name),
+    }
+  }
+
+  // A copy of a request that is kept somewhere: another name, another folder or another collection. The
+  // original stays as it is.
+  async function saveAsNew() {
+    ui.place = {
+      title: 'Save as new request',
+      action: 'Save a copy',
+      tree: 'requests',
+      name: { label: 'Name', initial: await RequestService.SuggestCopyName(node), required: true },
+      note: view.dirty ? 'Unsaved changes stay in this tab and are not in the copy.' : undefined,
+      row: await RequestService.PlaceOf(node),
+      done: (row, name) => RequestService.SaveAsNew(node, row, name),
+    }
   }
 
   // A curl command, a .http request or an API description pasted into the address is offered for
@@ -333,6 +364,14 @@
       <div class="url2">
         <TextField mono value={ab.Server} placeholder={'{{env.broker}}'} oninput={(t) => RequestService.SetAsync(node, { ...ab, Server: t } as never)} />
         <TextField mono value={ab.Channel} placeholder="topic, subject, queue…" oninput={(t) => RequestService.SetAsync(node, { ...ab, Channel: t } as never)} />
+      </div>
+    {:else if view.dataset}
+      {@const db = view.dataset.block}
+      <Dropdown pill title="Database" options={view.dataset.drivers.map((x) => ({ value: x.id, label: x.label, tone: protocolVerb(x.id) }))} value={db.Driver} width="130px"
+        onpick={(id) => RequestService.SetDataset(node, { ...db, Driver: id } as never)} />
+      <div class="url">
+        <TextField mono value={db.Server} placeholder={db.Driver === 'sqlite' ? 'shop.db (a file in the collection)' : '{{env.database_url}}'}
+          oninput={(t) => RequestService.SetDataset(node, { ...db, Server: t } as never)} onenter={() => RequestService.Send(node, hooks)} />
       </div>
     {:else if view.grpc}
       {@const gb = view.grpc.block}
@@ -389,6 +428,7 @@
           {/if}
           <button role="menuitem" onclick={() => menuAction(newVersion)}><span class="tick"></span>Save as new version…</button>
           {#if !view.inScratch}
+            <button role="menuitem" title="Copies the request as saved, under a new name or in another place" onclick={() => menuAction(saveAsNew)}><span class="tick"></span>Save as new request…</button>
             <button role="menuitem" disabled={!view.dirty && !view.flowiOverlay} title="Keeps the changes apart from the version, to lay over it when sending" onclick={() => menuAction(() => (saveOverlayOpen = true))}><span class="tick"></span>Save as flowi overlay…</button>
           {/if}
           {#if origin?.spec}
@@ -466,6 +506,8 @@
         <div class="section">
           {#if ['Message', 'Receive', 'Credentials', 'Binding', 'Proto'].includes(section)}
             <MessageSections {view} {section} />
+          {:else if ['Query', 'Values'].includes(section)}
+            <DatasetSections {view} {section} />
           {:else if section === 'Params'}
             <KVRows rows={v.Query} describe marks={overlayMarks('query', v.Query)} onchange={(r) => RequestService.SetRows(node, 'query', r)}
               empty={{ icon: 'params', title: 'No query parameters', hint: 'Add one here, or type ?name=value at the end of the address.', add: 'Add parameter' }} />
@@ -479,6 +521,8 @@
             {#if view.bodyKind === 'text'}
               <CodeArea value={bodyText} lang={codeLangOf(view.bodyFormat)} oninput={(t) => RequestService.SetBodyText(node, t)}
                 empty={{ icon: 'body', title: 'Empty body', hint: 'Click to write the body to send.' }} />
+              {#if xmlProblem}<p class="xmlnote bad" role="status">Not well-formed XML: line {xmlProblem.line}, column {xmlProblem.column}: {xmlProblem.message}</p>
+              {:else if view.bodyFormat === 'xml' && bodyText.trim()}<p class="xmlnote" role="status">Well-formed XML</p>{/if}
             {:else if view.bodyKind === 'form' && !view.multipart}
               <KVRows rows={v.Body.Form} onchange={(r) => RequestService.SetFormRows(node, r)}
                 empty={{ icon: 'list', title: 'No form fields', hint: 'Each field is sent as name=value.', add: 'Add field' }} />
@@ -507,7 +551,7 @@
               <button onclick={() => extract.push(newExtraction())}>Add extraction</button>
             </EmptyState>
           {:else if section === 'Extract'}
-            <p class="muted">Take a value out of the response into a variable, for later requests and steps.{#if view.kind !== 'http'} <ExprHelp context="message.check" />{/if}</p>
+            <p class="muted">Take a value out of the response into a variable, for later requests and steps.{#if view.kind !== 'http'} <ExprHelp context={checkContext} />{/if}</p>
             {#each extract as e, i}
               <div class="row">
                 <input class="k" placeholder="variable" bind:value={e.Name} oninput={() => RequestService.SetExtract(node, extract)} spellcheck="false" />
@@ -522,10 +566,12 @@
             {/each}
             <button class="add" onclick={() => { extract.push(newExtraction()) }}>+ Add</button>
           {:else if section === 'Assert'}
-            <p class="muted">One card per check, for example <code>{view.kind === 'http' ? 'status == 200' : 'received >= 1'}</code>. A failing check fails the send. <ExprHelp context={view.kind === 'http' ? 'request.check' : 'message.check'} /></p>
-            <AssertCards checks={v.Assert ?? []} outcome={view.response ?? undefined} example={view.kind === 'http' ? 'status == 200' : 'received >= 1'}
-              vocabulary={requestVocabulary(view.kind === 'http' ? 'request.check' : 'message.check', node, view.response, view.kind)}
+            <p class="muted">One card per check, for example <code>{checkExample}</code>. A failing check fails the send. <ExprHelp context={checkContext} /></p>
+            <AssertCards checks={v.Assert ?? []} outcome={view.response ?? undefined} example={checkExample}
+              vocabulary={requestVocabulary(checkContext, node, view.response, view.kind)}
               onchange={(c) => RequestService.SetAssert(node, c)} />
+          {:else if section === 'Outcomes'}
+            <OutcomesEditor outcomes={v.Outcomes} ruleKind={view.kind === 'dataset' ? 'dataset' : view.kind === 'http' ? 'http' : 'message'} onchange={(rows) => RequestService.SetOutcomes(node, rows)} />
           {:else if section === 'Variables'}
             {#if v.Variables?.length}<p class="muted">Default values for {'{{var.name}}'}; the environment's variable of the same name wins.</p>{/if}
             <KVRows rows={v.Variables} describe onchange={(r) => RequestService.SetRows(node, 'variables', r)}
@@ -597,6 +643,8 @@
 </div>
 
 <style>
+  .xmlnote { margin: 4px 0 0; font-size: var(--fs-xs); color: var(--muted); }
+  .xmlnote.bad { color: var(--warn); }
   .req { position: absolute; inset: 0; display: flex; flex-direction: column; }
   header { display: flex; gap: 8px; padding: 10px 12px; border-bottom: 1px solid var(--line); align-items: center; }
   .url { flex: 1; min-width: 0; }

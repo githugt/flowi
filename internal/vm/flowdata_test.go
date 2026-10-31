@@ -216,3 +216,26 @@ func TestInputParts_Given_an_http_request_Then_secrets_in_the_input_view_are_mas
 		t.Fatalf("input view:\n%s", got)
 	}
 }
+
+func TestOutputParts_Given_a_dataset_step_Then_the_status_line_says_the_outcome_and_the_rows(t *testing.T) {
+	request := model.Node{ID: "read", Type: "request", Request: &model.RequestCall{}}
+	rec := engine.Record{Kind: engine.KindDataset, Outcome: engine.OutcomeOK, Timings: engine.Timings{Total: 12 * time.Millisecond},
+		Body: engine.Body{JSON: map[string]any{"row_count": 3, "truncated": false}}}
+
+	got := partTexts(vm.OutputParts(request, vm.NodeDetail{Status: "passed", Record: &rec}, vm.ViewJSON))
+
+	if !strings.Contains(got, "ok · 3 rows · 12ms") || strings.Contains(got, "0 ·") {
+		t.Fatalf("status line missing in:\n%s", got)
+	}
+}
+
+func TestOutputParts_Given_a_dataset_step_that_failed_Then_the_status_line_has_no_row_count(t *testing.T) {
+	request := model.Node{ID: "read", Type: "request", Request: &model.RequestCall{}}
+	rec := engine.Record{Kind: engine.KindDataset, Outcome: engine.OutcomeError, Timings: engine.Timings{Total: 2 * time.Millisecond}}
+
+	got := partTexts(vm.OutputParts(request, vm.NodeDetail{Status: "failed", Record: &rec}, vm.ViewJSON))
+
+	if !strings.Contains(got, "error · 2ms") || strings.Contains(got, "rows") {
+		t.Fatalf("status line wrong in:\n%s", got)
+	}
+}

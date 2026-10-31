@@ -13,6 +13,9 @@ import { Call as $Call, CancellablePromise as $CancellablePromise, Create as $Cr
 
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
+import * as model$0 from "../../../flowi-lib/model/models.js";
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore: Unused imports
 import * as canvas$0 from "../canvas/models.js";
 
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
@@ -137,6 +140,20 @@ export function AddStep(node, typ, x, y, snap, placed) {
  */
 export function AddStepNear(node, typ, step, before) {
     return $Call.ByID(3375869874, node, typ, step, before);
+}
+
+/**
+ * AddStepOnOutcome adds a step of type typ that runs when step `from` ends with the outcome ("success",
+ * "failure" or a name), selects it and returns its id. It goes right after `from`; the step that followed
+ * `from` by itself keeps waiting for `from`, not for the new step, so the main line is not changed.
+ * @param {string} node
+ * @param {string} typ
+ * @param {string} $from
+ * @param {string} outcome
+ * @returns {$CancellablePromise<string>}
+ */
+export function AddStepOnOutcome(node, typ, $from, outcome) {
+    return $Call.ByID(2520060655, node, typ, $from, outcome);
 }
 
 /**
@@ -305,6 +322,19 @@ export function Connect(node, $from, to) {
  */
 export function ConnectData(node, fromStep, outPath, toStep, field) {
     return $Call.ByID(3752738979, node, fromStep, outPath, toStep, field);
+}
+
+/**
+ * ConnectOutcome makes step `to` run when step `from` ends with the outcome (dragging from that outcome's
+ * port: "success", "failure" or a name).
+ * @param {string} node
+ * @param {string} $from
+ * @param {string} outcome
+ * @param {string} to
+ * @returns {$CancellablePromise<void>}
+ */
+export function ConnectOutcome(node, $from, outcome, to) {
+    return $Call.ByID(2915882153, node, $from, outcome, to);
 }
 
 /**
@@ -607,6 +637,19 @@ export function Revert(node) {
 }
 
 /**
+ * RouteFailure makes step go on at target when it fails (dragging from its Fail port to a step); an
+ * empty target puts the default back: the failure stops the flow. It names the step because the arrow
+ * being dragged or deleted is not necessarily the selected one.
+ * @param {string} node
+ * @param {string} step
+ * @param {string} target
+ * @returns {$CancellablePromise<void>}
+ */
+export function RouteFailure(node, step, target) {
+    return $Call.ByID(3497094710, node, step, target);
+}
+
+/**
  * Run runs the saved flow in the selected environment. inputs override the
  * flow's defaults.
  * @param {string} node
@@ -683,6 +726,18 @@ export function SaveStandaloneArazzo(node) {
 }
 
 /**
+ * SaveStepOutcomesToRequest writes the outcomes request step `step` shows into the version of the request it
+ * runs, and drops the step's own list: the request and the step then say the same. The request's file is
+ * rewritten, so any other flow using it sees the new outcomes.
+ * @param {string} node
+ * @param {string} step
+ * @returns {$CancellablePromise<void>}
+ */
+export function SaveStepOutcomesToRequest(node, step) {
+    return $Call.ByID(3618858125, node, step);
+}
+
+/**
  * Select chooses the step shown in the inspector ("" for the flow itself).
  * @param {string} node
  * @param {string} step
@@ -702,6 +757,19 @@ export function Sequence(node) {
     return $Call.ByID(2056355470, node).then(/** @type {($result: any) => any} */(($result) => {
         return $$createType15($result);
     }));
+}
+
+/**
+ * SetArrow sets which outcomes of step `from` take the arrow into step `to`: "success", "failure", any named
+ * outcome of its request, or none (removed). Like Connect it names the steps, not the selection.
+ * @param {string} node
+ * @param {string} $from
+ * @param {string} to
+ * @param {string[]} outcomes
+ * @returns {$CancellablePromise<void>}
+ */
+export function SetArrow(node, $from, to, outcomes) {
+    return $Call.ByID(995033294, node, $from, to, outcomes);
 }
 
 /**
@@ -916,6 +984,18 @@ export function SetParam(node, name, value) {
  */
 export function SetPosition(node, unit, x, y) {
     return $Call.ByID(679183938, node, unit, x, y);
+}
+
+/**
+ * SetStepOutcomes gives request step `step` its own outcomes, in place of its request's (the same request can
+ * end in different ways in different flows). An empty list takes them away again.
+ * @param {string} node
+ * @param {string} step
+ * @param {model$0.Outcome[]} outcomes
+ * @returns {$CancellablePromise<void>}
+ */
+export function SetStepOutcomes(node, step, outcomes) {
+    return $Call.ByID(3790959466, node, step, outcomes);
 }
 
 /**

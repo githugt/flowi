@@ -49,13 +49,16 @@ func pastedKinds() []flowi.ImportKind {
 // request (kind curl or http). Its name, checks and the rest stay. It returns
 // how many requests text holds, so the window can say the others were left.
 func (s *RequestService) FillFromPaste(node, kind, text string) (int, error) {
+	if kind == pasteKindRequestFile {
+		return s.fillFromRequestFile(node, text)
+	}
 	from, count, err := firstPastedRequest(kind, text)
 	if err != nil {
 		return 0, err
 	}
 	s.with(node, func(o *openRequest) {
 		cur := o.req.Current()
-		if cur.Async != nil || cur.GRPC != nil {
+		if cur.Family() != model.FamilyHTTP {
 			err = ErrPasteNotHTTP
 			return
 		}
@@ -64,6 +67,31 @@ func (s *RequestService) FillFromPaste(node, kind, text string) (int, error) {
 		})
 	})
 	return count, err
+}
+
+// pasteKindRequestFile is the kind of text that is a Flowi request file (the YAML of a `*.req.yaml`).
+const pasteKindRequestFile = "flowi"
+
+// fillFromRequestFile replaces the open request's version with the default version of a pasted request
+// file: any kind (HTTP, message or gRPC), so a message request can be filled from the file of another.
+// The version's label and the request's name, id and other versions stay.
+func (s *RequestService) fillFromRequestFile(node, text string) (int, error) {
+	req, diags := flowi.ParseRequest([]byte(text), "pasted request")
+	if diags.HasErrors() {
+		return 0, fmt.Errorf("reading the pasted request: %w", diags.Err())
+	}
+	if len(req.Versions) == 0 {
+		return 0, ErrPasteNoRequest
+	}
+	from := defaultVersion(req)
+	s.with(node, func(o *openRequest) {
+		o.req.Edit(func(v *model.RequestVersion) {
+			label := v.Label
+			*v = from
+			v.Label = label
+		})
+	})
+	return 1, nil
 }
 
 // firstPastedRequest parses text and returns its first request's default
@@ -99,11 +127,11 @@ func defaultVersion(r model.Request) model.RequestVersion {
 	return r.Versions[0]
 }
 
-// PreviewPasted sets the import wizard to import text of the given kind into
-// the collection of the tree row node, and previews it; the plan arrives as
-// the "import" event. Kinds the wizard reads only from a file are given one
-// holding text, kept until the next paste or Close.
-func (s *ImportService) PreviewPasted(kind, text, node string) error {
+// PreparePasted sets the import wizard to import text of the given kind into
+// the collection of the tree row node, without previewing: the import screen
+// opens with the text as its source. Kinds the wizard reads only from a file
+// are given one holding text, kept until the next paste or Close.
+func (s *ImportService) PreparePasted(kind, text, node string) error {
 	k := flowi.ImportKind(kind)
 	if !slices.Contains(pastedKinds(), k) {
 		return fmt.Errorf("importing %q: %w", kind, ErrPasteKind)
@@ -123,9 +151,26 @@ func (s *ImportService) PreviewPasted(kind, text, node string) error {
 		if c := s.app.workspace.Node(node).Collection; c != "" {
 			s.vm.SetCollection(c)
 		}
-		s.vm.Preview()
 	})
 	return nil
+}
+
+// PreviewPasted is PreparePasted, then previews; the plan arrives as the
+// "import" event.
+func (s *ImportService) PreviewPasted(kind, text, node string) error {
+	if err := s.PreparePasted(kind, text, node); err != nil {
+		return err
+	}
+	s.app.actor.Do(s.vm.Preview)
+	return nil
+}
+
+// isPasted says whether the wizard's source is text the window handed it: the
+// paste box, or the file this service wrote the text to.
+func (s *ImportService) isPasted(file, paste string) bool {
+	s.pasteMu.Lock()
+	defer s.pasteMu.Unlock()
+	return paste != "" || (s.pasteFile != "" && file == s.pasteFile)
 }
 
 // writePasted writes text to the service's file for pasted documents.

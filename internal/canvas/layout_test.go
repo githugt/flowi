@@ -8,6 +8,7 @@ import (
 	"flag"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -469,5 +470,153 @@ func TestCellAt_should_find_the_cell_under_a_point_and_the_nearest_in_a_gap(t *t
 				t.Fatalf("got %s, want %s", got, c.want)
 			}
 		})
+	}
+}
+
+// A flow without steps gave the window `"edges": null` and `"lanes": null`, and the canvas, which calls
+// .filter and .find on them, threw: a new flow could not get its first step.
+func TestLayout_Given_a_flow_without_steps_Then_the_diagram_lists_are_empty_not_null(t *testing.T) {
+	d := Layout(model.Flow{}, nil, nil)
+
+	got, err := json.Marshal(d)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := `{"units":[],"edges":[],"lanes":[]}`; string(got) != want {
+		t.Fatalf("got %s, want %s", got, want)
+	}
+}
+
+func arrowEdges(t *testing.T, nodes ...model.Node) []Edge {
+	t.Helper()
+	d := Layout(model.Flow{Nodes: nodes}, nil, nil)
+	var out []Edge
+	for _, e := range d.Edges {
+		if !e.Into {
+			out = append(out, e)
+		}
+	}
+	return out
+}
+
+func noteNode(id string) model.Node { return model.Node{ID: id, Type: "note"} }
+
+func TestLayout_Given_a_failure_arrow_Then_the_edge_leaves_by_the_fail_port_and_the_step_stands_alone(t *testing.T) {
+	alert := noteNode("alert")
+	alert.AfterFailureOf = []string{"a"}
+
+	got := arrowEdges(t, noteNode("a"), alert)
+
+	if len(got) != 1 || got[0] != (Edge{From: "a", To: "alert", Fail: true, FromStep: "a", Curve: true}) {
+		t.Fatalf("edges %+v", got)
+	}
+}
+
+func TestLayout_Given_an_arrow_taken_either_way_Then_there_is_a_success_edge_and_a_failure_edge(t *testing.T) {
+	alert := noteNode("alert")
+	alert.Needs = []string{"a"}
+	alert.AfterFailureOf = []string{"a"}
+
+	got := arrowEdges(t, noteNode("a"), alert)
+
+	want := []Edge{{From: "a", To: "alert", Needs: true}, {From: "a", To: "alert", Fail: true, FromStep: "a"}}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("edges %+v, want %+v", got, want)
+	}
+}
+
+func TestLayout_Given_a_goto_route_Then_its_edge_is_marked_as_a_goto(t *testing.T) {
+	standalone := func(id string) model.Node { return model.Node{ID: id, Type: "fetch"} } // not folded into a strip
+	a := standalone("a")
+	a.OnError = "goto:c"
+
+	got := arrowEdges(t, a, standalone("b"), standalone("c"))
+
+	var failing []Edge
+	for _, e := range got {
+		if e.Fail {
+			failing = append(failing, e)
+		}
+	}
+	if len(failing) != 1 || !failing[0].Goto {
+		t.Fatalf("fail edges %+v", failing)
+	}
+}
+
+func TestLayout_Given_an_arrow_for_a_named_outcome_Then_the_edge_names_it_and_the_step_stands_alone(t *testing.T) {
+	alert := noteNode("alert")
+	alert.AfterOutcome = []string{"a:not-found", "a:auth"}
+
+	got := arrowEdges(t, noteNode("a"), alert)
+
+	want := []Edge{
+		{From: "a", To: "alert", Outcome: "not-found", FromStep: "a", Curve: true},
+		{From: "a", To: "alert", Outcome: "auth", FromStep: "a", Curve: true},
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("edges %+v, want %+v", got, want)
+	}
+}
+
+func unitNamed(t *testing.T, d Diagram, id string) Unit {
+	t.Helper()
+	u, ok := d.Unit(id)
+	if !ok {
+		t.Fatalf("no unit %s in %+v", id, d.Units)
+	}
+	return u
+}
+
+// A step that runs only on an outcome sat on the main line between its source and the next step, so the
+// arrow joining those two ran straight through it. It now hangs below the line, in a column after its source
+// that the steps after it make room for; a second one is stacked under the first.
+func TestLayout_Given_steps_that_run_only_on_an_outcome_Then_they_hang_below_the_line_in_one_column(t *testing.T) {
+	standalone := func(id string) model.Node { return model.Node{ID: id, Type: "fetch"} }
+	c := standalone("c")
+	c.AfterOutcome = []string{"a:not-found"}
+	d := standalone("d")
+	d.AfterFailureOf = []string{"a"}
+	b := standalone("b")
+	b.Needs = []string{"a"} // b waits for a, as it did before the handlers were put in front of it
+
+	diagram := Layout(model.Flow{Nodes: []model.Node{standalone("a"), c, d, b}}, nil, nil)
+
+	ua, uc, ud, ub := unitNamed(t, diagram, "a"), unitNamed(t, diagram, "c"), unitNamed(t, diagram, "d"), unitNamed(t, diagram, "b")
+	if ub.Y != ua.Y {
+		t.Errorf("the main line is level: a at %d, b at %d", ua.Y, ub.Y)
+	}
+	if uc.X <= ua.X+ua.W || uc.X+uc.W >= ub.X {
+		t.Errorf("c (x %d..%d) is between a (ends %d) and b (starts %d): b makes room for it", uc.X, uc.X+uc.W, ua.X+ua.W, ub.X)
+	}
+	if uc.Y <= ua.Y+ua.H {
+		t.Errorf("c is below the line: at %d, a ends at %d", uc.Y, ua.Y+ua.H)
+	}
+	if ud.X != uc.X || ud.Y < uc.Y+uc.H {
+		t.Errorf("d is under c: c at (%d, %d) %dx%d, d at (%d, %d)", uc.X, uc.Y, uc.W, uc.H, ud.X, ud.Y)
+	}
+}
+
+func TestLayout_Given_a_step_with_a_success_arrow_Then_it_stays_on_the_line(t *testing.T) {
+	standalone := func(id string) model.Node { return model.Node{ID: id, Type: "fetch"} }
+	both := standalone("both")
+	both.Needs = []string{"a"}
+	both.AfterFailureOf = []string{"a"}
+
+	diagram := Layout(model.Flow{Nodes: []model.Node{standalone("a"), both}}, nil, nil)
+
+	if ua, ub := unitNamed(t, diagram, "a"), unitNamed(t, diagram, "both"); ub.Y != ua.Y {
+		t.Errorf("a step that also follows on success is on the main line: a at %d, both at %d", ua.Y, ub.Y)
+	}
+}
+
+func TestLayout_Given_an_unlinked_step_Then_no_arrow_is_drawn_into_it(t *testing.T) {
+	b := noteNode("b")
+	b.Unlinked = true
+
+	got := arrowEdges(t, noteNode("a"), b)
+
+	if len(got) != 0 {
+		t.Fatalf("edges %+v", got)
 	}
 }

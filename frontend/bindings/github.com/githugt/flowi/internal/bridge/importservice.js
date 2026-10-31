@@ -35,6 +35,20 @@ export function Import(existing, partial) {
 }
 
 /**
+ * PreparePasted sets the import wizard to import text of the given kind into
+ * the collection of the tree row node, without previewing: the import screen
+ * opens with the text as its source. Kinds the wizard reads only from a file
+ * are given one holding text, kept until the next paste or Close.
+ * @param {string} kind
+ * @param {string} text
+ * @param {string} node
+ * @returns {$CancellablePromise<void>}
+ */
+export function PreparePasted(kind, text, node) {
+    return $Call.ByID(2474813756, kind, text, node);
+}
+
+/**
  * Preview reads the source and plans the import.
  * @returns {$CancellablePromise<void>}
  */
@@ -43,10 +57,8 @@ export function Preview() {
 }
 
 /**
- * PreviewPasted sets the import wizard to import text of the given kind into
- * the collection of the tree row node, and previews it; the plan arrives as
- * the "import" event. Kinds the wizard reads only from a file are given one
- * holding text, kept until the next paste or Close.
+ * PreviewPasted is PreparePasted, then previews; the plan arrives as the
+ * "import" event.
  * @param {string} kind
  * @param {string} text
  * @param {string} node

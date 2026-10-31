@@ -41,6 +41,9 @@ type Port struct {
 	ID    string `json:"id"`
 	Label string `json:"label"`
 	Tone  string `json:"tone"`
+	// Color and Description come from the outcome the port stands for; Color is one of the step colours.
+	Color       string `json:"color,omitempty"`
+	Description string `json:"description,omitempty"`
 }
 
 // Card is what one step shows. More lists the rows the person can add or open
@@ -85,6 +88,18 @@ type Facts struct {
 
 	// Returns is the number of values a flow step returns.
 	Returns int
+
+	// Outcomes are the outcomes the request's version writes; none when it writes none, which is success
+	// and failure (the Done and Fail ports).
+	Outcomes []OutcomeFact
+}
+
+// OutcomeFact is one outcome of a request, as the card needs it.
+type OutcomeFact struct {
+	Name        string
+	Disabled    bool
+	Color       string // one of the step colours, or "" for the outcome's own
+	Description string
 }
 
 // Summarize is the card for node n.
@@ -128,6 +143,24 @@ func cut(s string, limit int) string {
 		return s
 	}
 	return string(runes[:limit-1]) + "…"
+}
+
+// outcomePorts are the ports of a request that writes its outcomes: success is Done, failure is Fail, every
+// other name has a port of its own, in the order written; a disabled outcome has none.
+func outcomePorts(os []OutcomeFact) []Port {
+	out := []Port{}
+	for _, o := range os {
+		switch {
+		case o.Disabled:
+		case o.Name == model.OutcomeSuccess:
+			out = append(out, Port{ID: "done", Label: "Done", Tone: "done", Color: o.Color, Description: o.Description})
+		case o.Name == model.OutcomeFailure:
+			out = append(out, Port{ID: "fail", Label: "Fail", Tone: "fail", Color: o.Color, Description: o.Description})
+		default:
+			out = append(out, Port{ID: "outcome-" + o.Name, Label: o.Name, Tone: "outcome", Color: o.Color, Description: o.Description})
+		}
+	}
+	return out
 }
 
 func donePorts() []Port {

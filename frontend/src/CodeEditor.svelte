@@ -9,6 +9,8 @@
   import { classHighlighter } from '@lezer/highlight'
   import { yaml } from '@codemirror/lang-yaml'
   import { json } from '@codemirror/lang-json'
+  import { xmlLanguage } from './lib/xmllang'
+  import { sqlLanguage } from './lib/sqllang'
   import { onMount } from 'svelte'
   import { templatePattern, type CodeLang } from './lib/highlight'
 
@@ -37,7 +39,7 @@
   const access = new Compartment()
   // Read-only text stays focusable, so its caret can be placed (the flow's code view selects the step under it) and its text copied.
   const accessFor = (ro: boolean) => [EditorState.readOnly.of(ro)]
-  const languageFor = (l: CodeLang) => (l === 'yaml' ? yaml() : l === 'json' ? json() : [])
+  const languageFor = (l: CodeLang) => (l === 'yaml' ? yaml() : l === 'json' ? json() : l === 'xml' ? xmlLanguage : l === 'sql' ? sqlLanguage : [])
 
   // {{templates}} are Flowi's own, so they are marked in every language.
   const templates = new MatchDecorator({ regexp: new RegExp(templatePattern.source, 'g'), decoration: Decoration.mark({ class: 'tok-template' }) })

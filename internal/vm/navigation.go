@@ -33,6 +33,7 @@ const (
 	ActNewFolder
 	ActNewAsyncRequest
 	ActNewGRPCRequest
+	ActNewDatasetRequest
 )
 
 // MenuItem is one entry of the context menu. Count is how many rows or
@@ -84,9 +85,9 @@ func (ws *Workspace) menuForOne(n TreeNode) []MenuItem {
 		if n.Tree == "flows" {
 			return withDelete(n, items(ActNewFlow, ActNewFolder))
 		}
-		return withDelete(n, append(items(ActNewRequest, ActNewAsyncRequest, ActNewGRPCRequest, ActNewFolder), ws.flowFromRequestsItem(n.ID)...))
+		return withDelete(n, append(items(ActNewRequest, ActNewAsyncRequest, ActNewGRPCRequest, ActNewDatasetRequest, ActNewFolder), ws.flowFromRequestsItem(n.ID)...))
 	case NodeCollection:
-		out := append(items(ActNewRequest, ActNewAsyncRequest, ActNewGRPCRequest, ActNewFlow, ActNewFolder), ws.flowFromRequestsItem(n.ID)...)
+		out := append(items(ActNewRequest, ActNewAsyncRequest, ActNewGRPCRequest, ActNewDatasetRequest, ActNewFlow, ActNewFolder), ws.flowFromRequestsItem(n.ID)...)
 		if n.Draft {
 			out = append(out, items(ActMoveToFolder, ActDiscardDraft)...)
 		}
@@ -302,6 +303,15 @@ func (ws *Workspace) deleteNode(n TreeNode) error {
 func (ws *Workspace) DuplicateRequest(t flowi.RequestTarget, path string, open func(nodeID string), fail func(error)) {
 	ws.create(func() (string, error) {
 		copied, err := ws.b.DuplicateRequest(t, path)
+		return requestNodeID(copied), err
+	}, open, fail)
+}
+
+// DuplicateRequestTo copies request t to path in collection to (which may be
+// its own), then calls open with the copy's node id. The original is untouched.
+func (ws *Workspace) DuplicateRequestTo(t flowi.RequestTarget, to model.ID, path string, open func(nodeID string), fail func(error)) {
+	ws.create(func() (string, error) {
+		copied, err := ws.b.DuplicateRequestTo(t, to, path)
 		return requestNodeID(copied), err
 	}, open, fail)
 }

@@ -83,6 +83,10 @@ func templatedTexts(v model.RequestVersion) []string {
 	if g := v.GRPC; g != nil {
 		texts = append(texts, g.Server)
 	}
+	if d := v.Dataset; d != nil {
+		texts = append(texts, d.Server)
+		texts = append(texts, d.Params...)
+	}
 	return texts
 }
 

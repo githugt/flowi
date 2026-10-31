@@ -22,9 +22,15 @@ const (
 	ExprRequestFields  ExprContext = "request.fields"
 	ExprRequestCheck   ExprContext = "request.check"   // a request's assert and extract
 	ExprMessageCheck   ExprContext = "message.check"   // a message request's assert and extract
+	ExprDatasetCheck   ExprContext = "dataset.check"   // a dataset request's assert and extract
 	ExprMessageFilter  ExprContext = "message.filter"  // the "only if" of Receive
 	ExprFlowTransform  ExprContext = "flow.transform"  // transform and calc values
 	ExprFlowCollection ExprContext = "flow.collection" // batch "over"
+
+	// The rule of a named outcome of a request, by the kind of request it is on.
+	ExprOutcomeRule        ExprContext = "outcome.rule"
+	ExprOutcomeRuleMessage ExprContext = "outcome.rule.message"
+	ExprOutcomeRuleDataset ExprContext = "outcome.rule.dataset"
 )
 
 // HelpItem is one name, function or operator with what it is and how to write it.
@@ -96,7 +102,7 @@ func ExpressionHelp(ctx ExprContext) ExprHelp {
 
 func helpByContext() map[ExprContext]ExprHelp {
 	flowNames := []HelpItem{helpNodes(), helpVars(), helpInputs(), helpEnv(), helpSecret(), helpItem(), helpRun()}
-	return map[ExprContext]ExprHelp{
+	m := map[ExprContext]ExprHelp{
 		ExprFlowTemplate: {
 			Title:    "Values you can use in a step's fields",
 			Intro:    "Put an expression between {{ and }} anywhere a field takes text. Everything outside the braces stays as it is.",
@@ -163,6 +169,20 @@ func helpByContext() map[ExprContext]ExprHelp {
 			},
 			Examples: []string{"received >= 1", `messages[0].body.event == "created"`, `outcome != "timeout"`},
 		},
+		ExprDatasetCheck: {
+			Title: "What you can check or read in a dataset request",
+			Intro: "Assert checks are tests written without braces. Hooks, extract and assert see the rows of the query once it has run. A query has no HTTP status: use outcome and the rows.",
+			Names: []HelpItem{
+				{"rows", "The rows, as a list. Each row is read by column name.", "rows[0].name"},
+				{"columns", "The column names, in order.", `columns[0] == "id"`},
+				{"row_count", "How many rows were kept.", "row_count == 1"},
+				{"truncated", "True when the store had more rows than the limit kept.", "truncated == false"},
+				{"outcome", "How the query ended: ok, timeout or error.", `outcome == "ok"`},
+				{"body", "All of the above as one value (the same as response.body).", "body.rows[0].id"},
+				helpEnv(), helpVars(),
+			},
+			Examples: []string{"row_count >= 1", `rows[0].status == "active"`, "len(filter(rows, .balance < 0)) == 0"},
+		},
 		ExprMessageFilter: {
 			Title: "Which messages to keep",
 			Intro: "One test written without braces, asked about each message on its own, in the same language as the checks of Assert. A message that lacks a field the test reads is skipped, not an error: a mistyped field name shows as a timeout with “received 0 of N”. The test cannot depend on several messages.",
@@ -179,6 +199,28 @@ func helpByContext() map[ExprContext]ExprHelp {
 			},
 		},
 	}
+	addOutcomeHelp(m)
+	return m
+}
+
+// addOutcomeHelp adds the help for the rule of an outcome, which reads what the check of the same kind of
+// request reads, after the hooks have run.
+func addOutcomeHelp(m map[ExprContext]ExprHelp) {
+	rule := func(from ExprContext, examples ...string) ExprHelp {
+		h := m[from]
+		h.Title = "When does this outcome hold?"
+		h.Intro = "A test written without braces. A send has every outcome whose rule is true, so one send can be several at once (a 404 is failure and not-found). The arrows on the flow canvas follow the outcomes they name. A rule that cannot be worked out, such as reading a body that is not there, is false."
+		h.Examples = examples
+		h.Tools = []HelpItem{
+			{"x in [a, b]", "True when x is one of the values.", "status in [200, 201]"},
+			{"x not in [a, b]", "True when x is none of them.", "status not in [500, 502, 503]"},
+			{"and, &&   or, ||   not, !", "Combine tests; parentheses group them.", "status >= 400 and status < 500"},
+		}
+		return h
+	}
+	m[ExprOutcomeRule] = rule(ExprRequestCheck, "status == 404", "status in [401, 403]", "status >= 500 or body.error != empty")
+	m[ExprOutcomeRuleMessage] = rule(ExprMessageCheck, "received == 0", `outcome == "timeout"`, `messages[0].body.event not in ["created", "updated"]`)
+	m[ExprOutcomeRuleDataset] = rule(ExprDatasetCheck, "row_count == 0", "row_count > 100", `rows[0].status not in ["active"]`)
 }
 
 // GeneratorHelp lists the $generators with their description, for the pop-up's second tab.

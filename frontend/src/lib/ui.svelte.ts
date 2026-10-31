@@ -15,6 +15,8 @@ export interface PromptDialog {
   label: string
   initial: string
   protocols?: { id: string; label: string }[]
+  /** What the choice is called ('Protocol' when absent): a dataset query asks for the Database. */
+  protocolsLabel?: string
   /** An extra choice asked with the text (a collection), answered as the third argument. */
   select?: { label: string; options: { id: string; label: string }[] }
   /** A caution shown under the field (what the answer commits or reveals); "" or absent for none. */
@@ -47,11 +49,33 @@ export interface UnsavedDialog {
   discardLabel?: string
 }
 
+/** The place chooser: a searchable tree of collections and folders, with a name, and New collection / New folder made inside it. */
+export interface PlaceDialog {
+  title: string
+  /** The confirming button: "Create", "Save", "Choose". */
+  action: string
+  /** Which folders are listed: those of the requests or of the flows. */
+  tree: 'requests' | 'flows'
+  /** A name or path box under the tree; absent when only a place is asked for. */
+  name?: { label: string; initial: string; /** An empty name is refused. */ required?: boolean }
+  protocols?: { id: string; label: string }[]
+  protocolsLabel?: string
+  /** Only whole collections are offered (no folders, no New folder). */
+  collectionsOnly?: boolean
+  /** A row to start on; the selected row of the tree when absent. */
+  row?: string
+  /** A line under the title. */
+  note?: string
+  done: (row: string, name: string, protocol: string) => void
+}
+
 class UIState {
   menu = $state<{ x: number; y: number; items: MenuItem[] } | null>(null)
   dialog = $state<PromptDialog | ConfirmDialog | UnsavedDialog | null>(null)
   /** The "New flow from blueprint" dialog: where it was asked from, and a blueprint to start with. */
   blueprint = $state<{ collection: string; folder: string; blueprint?: string } | null>(null)
+  /** The place chooser (New request, Save…, Import). */
+  place = $state<PlaceDialog | null>(null)
   /** The Move dialog: the request rows to move. */
   moving = $state<string[] | null>(null)
   toasts = $state<{ id: number; level: string; text: string }[]>([])

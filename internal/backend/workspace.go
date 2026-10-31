@@ -117,6 +117,11 @@ func (b *Workspace) DuplicateRequest(t flowi.RequestTarget, path string) (flowi.
 	return b.ws.DuplicateRequest(t, path)
 }
 
+func (b *Workspace) DuplicateRequestTo(t flowi.RequestTarget, to model.ID, path string) (flowi.RequestTarget, error) {
+	b.guard.Check("DuplicateRequestTo")
+	return b.ws.DuplicateRequestTo(t, to, path)
+}
+
 func (b *Workspace) DeleteRequest(t flowi.RequestTarget) error {
 	b.guard.Check("DeleteRequest")
 	return b.ws.DeleteRequest(t)
@@ -157,6 +162,12 @@ func (b *Workspace) NewAsyncRequest(collection model.ID, path, protocol string) 
 func (b *Workspace) NewGRPCRequest(collection model.ID, path string) (flowi.RequestTarget, error) {
 	b.guard.Check("NewGRPCRequest")
 	return b.ws.NewGRPCRequest(collection, path)
+}
+
+// NewDatasetRequest creates a dataset request of the given driver.
+func (b *Workspace) NewDatasetRequest(collection model.ID, path, driver string) (flowi.RequestTarget, error) {
+	b.guard.Check("NewDatasetRequest")
+	return b.ws.NewDatasetRequest(collection, path, driver)
 }
 
 // GenerateGRPCRequests creates a gRPC request for each method.

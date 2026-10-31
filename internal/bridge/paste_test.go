@@ -133,6 +133,46 @@ func TestImportService_PreviewPasted_should_preview_the_text_into_the_rows_colle
 	}
 }
 
+func TestImportService_PreparePasted_should_fill_the_wizard_with_the_text_and_not_preview(t *testing.T) {
+	tests := []struct {
+		name string
+		kind flowi.ImportKind
+		text string
+	}{
+		{name: "a kind the wizard takes pasted", kind: flowi.ImportCurl, text: "curl https://example.com"},
+		{name: "a kind the wizard reads from a file", kind: flowi.ImportOpenAPI, text: "openapi: 3.1.0\ninfo: {title: Shop, version: '1'}\npaths: {}\n"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, v, _, app, b := openLoginWith(t)
+			importer := app.Import()
+			t.Cleanup(func() { _ = importer.Close() })
+
+			err := importer.PreparePasted(string(tt.kind), tt.text, v.Node)
+
+			got := importer.State()
+			if err != nil || len(b.PreviewedSources) != 0 {
+				t.Fatalf("got %v and %d previews, want none yet", err, len(b.PreviewedSources))
+			}
+			if got.Kind != string(tt.kind) || !got.Pasted || got.Collection != "C1" {
+				t.Fatalf("kind %q pasted %v collection %q", got.Kind, got.Pasted, got.Collection)
+			}
+		})
+	}
+}
+
+func TestImportService_State_Given_a_chosen_file_Then_it_is_not_marked_pasted(t *testing.T) {
+	_, _, _, app, _ := openLoginWith(t)
+	importer := app.Import()
+	importer.SetFile("/some/spec.yaml")
+
+	got := importer.State()
+
+	if got.Pasted {
+		t.Fatalf("a file the person chose reads as pasted text")
+	}
+}
+
 func TestImportService_PreviewPasted_should_refuse_kinds_that_make_no_requests(t *testing.T) {
 	_, v, _, app, b := openLoginWith(t)
 
@@ -178,4 +218,56 @@ func childNamed(t *testing.T, app *bridge.App, label string) string {
 	}
 	t.Fatalf("no request %q", label)
 	return ""
+}
+
+const pastedFlowiRequest = `id: 01M63D04BXES8ME7EM4FSWYBEJ
+name: Listen
+versions:
+  "1":
+    async:
+      protocol: amqp
+      server: "amqp://127.0.0.1:5672"
+      channel: "flowi.test"
+      receive:
+        count: 1
+        timeout: "30s"
+      binding:
+        username: "flowi"
+        password: "{{secret.broker_password}}"
+        queue: "flowi.test"
+`
+
+func TestRequestService_FillFromPaste_Given_a_request_file_Then_the_open_request_takes_its_version_and_keeps_its_name(t *testing.T) {
+	// Arrange
+	reqs, v, _, _ := openLogin(t)
+
+	// Act
+	count, err := reqs.FillFromPaste(v.Node, "flowi", pastedFlowiRequest)
+	got, _ := reqs.Open(v.Node)
+
+	// Assert
+	if err != nil || count != 1 {
+		t.Fatalf("got (%d, %v)", count, err)
+	}
+	a := got.Current.Async
+	if a == nil || a.Protocol != "amqp" || a.Server != "amqp://127.0.0.1:5672" || a.Channel != "flowi.test" || len(a.Binding) != 3 {
+		t.Fatalf("async %+v", a)
+	}
+	if got.Name != "Login" || got.Current.Method != "" || got.Current.URL != "" || !got.Dirty {
+		t.Fatalf("name %q method %q url %q dirty %v: want the name kept, no HTTP left over, dirty", got.Name, got.Current.Method, got.Current.URL, got.Dirty)
+	}
+}
+
+func TestRequestService_FillFromPaste_Given_text_that_is_not_a_request_file_Then_nothing_changes(t *testing.T) {
+	// Arrange
+	reqs, v, _, _ := openLogin(t)
+
+	// Act
+	_, err := reqs.FillFromPaste(v.Node, "flowi", "just: some\nother: yaml\n")
+	got, _ := reqs.Open(v.Node)
+
+	// Assert
+	if err == nil || got.Dirty {
+		t.Fatalf("err %v dirty %v", err, got.Dirty)
+	}
 }

@@ -377,6 +377,16 @@ export function PinWarning(node) {
 }
 
 /**
+ * PlaceOf is the tree row of the folder the request is in (its collection's row at the top): the
+ * place a copy starts from.
+ * @param {string} node
+ * @returns {$CancellablePromise<string>}
+ */
+export function PlaceOf(node) {
+    return $Call.ByID(3622206064, node);
+}
+
+/**
  * PrettyJSON indents a JSON message; ok is false for text that is not JSON.
  * @param {string} text
  * @returns {$CancellablePromise<[string, boolean]>}
@@ -433,6 +443,19 @@ export function SaveAsFlowiOverlay(node, name, description, shared, dropComments
 }
 
 /**
+ * SaveAsNew copies the open request, as last saved, to the place a tree row stands for (a
+ * collection or a request folder) under the name text, and opens the copy. The original and its
+ * tab stay as they are, unsaved edits included: they are not in the copy.
+ * @param {string} node
+ * @param {string} placeRow
+ * @param {string} text
+ * @returns {$CancellablePromise<void>}
+ */
+export function SaveAsNew(node, placeRow, text) {
+    return $Call.ByID(1471455515, node, placeRow, text);
+}
+
+/**
  * SaveBody writes the body of the response shown to a file the user picks in the
  * system's save dialog, and returns the file ("" when the user cancelled).
  * @param {string} node
@@ -476,15 +499,16 @@ export function SaveSpecExport(file, text) {
 
 /**
  * SaveTo saves the open request (its pending edits too), then moves it to
- * path in a collection (by its tree row) unless it is already there; the
+ * the place a tree row stands for (a collection or a request folder), under
+ * the name text, unless it is already there; the
  * moved request opens in place of this tab ("open" event, then close it).
  * @param {string} node
- * @param {string} collectionRow
- * @param {string} path
+ * @param {string} placeRow
+ * @param {string} text
  * @returns {$CancellablePromise<void>}
  */
-export function SaveTo(node, collectionRow, path) {
-    return $Call.ByID(2013021338, node, collectionRow, path);
+export function SaveTo(node, placeRow, text) {
+    return $Call.ByID(2013021338, node, placeRow, text);
 }
 
 /**
@@ -586,7 +610,7 @@ export function SetAuthParam(node, name, value) {
 
 /**
  * SetAuthScheme chooses the scheme of the version's auth block ("" removes the
- * block): apikey, digest, oauth2, oauth1, aws_sigv4, jwt, hawk or mtls.
+ * block): apikey, digest, oauth2, oauth1, aws_sigv4, jwt, hawk, mtls, ntlm, httpsig or dpop.
  * @param {string} node
  * @param {string} scheme
  * @returns {$CancellablePromise<void>}
@@ -633,6 +657,16 @@ export function SetBodyKind(node, kind) {
  */
 export function SetBodyText(node, text) {
     return $Call.ByID(2142047509, node, text);
+}
+
+/**
+ * SetDataset replaces the dataset block of the selected version.
+ * @param {string} node
+ * @param {model$0.Dataset} d
+ * @returns {$CancellablePromise<void>}
+ */
+export function SetDataset(node, d) {
+    return $Call.ByID(3107416866, node, d);
 }
 
 /**
@@ -706,7 +740,11 @@ export function SetJSONRPC(node, field, value) {
 }
 
 /**
- * SetMethod sets the HTTP verb.
+ * SetMethod sets the HTTP verb: any method name is accepted, so QUERY and the ones nobody has registered work. A known
+ * method is stored in its registered spelling ("query" becomes QUERY); any other name is a case-sensitive token and is
+ * kept as typed, so one that could not go on the wire is refused here rather than at the first send.
+ * A WebDAV or CalDAV method also fills in the headers and example body it usually needs (vm.ApplyMethodPreset); what
+ * the request already has stays as it is.
  * @param {string} node
  * @param {string} method
  * @returns {$CancellablePromise<void>}
@@ -733,6 +771,17 @@ export function SetMode(node, mode) {
  */
 export function SetMultipart(node, on) {
     return $Call.ByID(176018366, node, on);
+}
+
+/**
+ * SetOutcomes replaces the named ways the version can end, in order. An empty list (or nil) is the defaults,
+ * success and failure.
+ * @param {string} node
+ * @param {model$0.Outcome[]} outcomes
+ * @returns {$CancellablePromise<void>}
+ */
+export function SetOutcomes(node, outcomes) {
+    return $Call.ByID(3166890239, node, outcomes);
 }
 
 /**
@@ -915,6 +964,15 @@ export function Suggest(node, text, caret) {
     return $Call.ByID(170145176, node, text, caret).then(/** @type {($result: any) => any} */(($result) => {
         return $$createType16($result);
     }));
+}
+
+/**
+ * SuggestCopyName is the name offered for a copy of the open request: its own with "-copy".
+ * @param {string} node
+ * @returns {$CancellablePromise<string>}
+ */
+export function SuggestCopyName(node) {
+    return $Call.ByID(2288980790, node);
 }
 
 /**

@@ -52,6 +52,9 @@ export interface Edge {
   needs?: boolean
   into?: boolean
   fail?: boolean
+  outcome?: string // the named outcome of the step's request that takes the arrow
+  fromStep?: string // the step an after_failure_of arrow names, when its card holds several
+  goto?: boolean // a fail edge that is the step's on_error goto, not an arrow written on the step it leads to
   fromPort?: string // the card port it leaves from: done, fail, case-<n>, else
 }
 
@@ -95,6 +98,9 @@ export interface FacePort {
   id: string
   label: string
   tone: string
+  /** The colour the port's outcome was given, and what it was described as. */
+  color?: string
+  description?: string
 }
 
 /** What a step's card shows (see internal/card). */
@@ -153,6 +159,10 @@ export interface Param {
 
 export interface Call {
   kind: 'request' | 'subflow'
+  /** For a request step: the outcomes it has (its own, else its request's), whether they are its own, and the kind its rules are about. */
+  outcomes?: { Name: string; When: string; Disabled: boolean; Color?: string; Description?: string }[]
+  outcomesOwn?: boolean
+  ruleKind?: string
   ref: string
   choices: Choice[]
   version?: string
@@ -430,10 +440,13 @@ export interface RequestVersion {
   Body: { JSON: string; Text: string; File: string; Form: KV[] | null; Multipart: unknown[] | null }
   Extract: Extraction[] | null
   Assert: string[] | null
+  /** The named ways the request can end; null: success and failure. */
+  Outcomes?: { Name: string; When: string; Disabled: boolean; Color?: string; Description?: string }[] | null
   Variables: KV[] | null
   Docs: string
   Async?: unknown
   GRPC?: unknown
+  Dataset?: unknown
 }
 
 export interface ResponseView {
@@ -449,8 +462,21 @@ export interface ResponseView {
   received: PartView[]
   diags: string[]
   bodyJson?: unknown
+  /** The body text of an XML response, for the tree and the multi-status list. */
+  bodyXml?: string
   phases: { name: string; startMs: number; ms: number }[]
   messages: { direction: string; at: string; body: string; key?: string }[]
+  /** The rows of a dataset response, one value per column. */
+  table?: TableView
+}
+
+/** The rows of a dataset response: a value per column (a number, text, true or false, or null). */
+export interface TableView {
+  columns: string[]
+  rows: unknown[][]
+  rowCount: number
+  /** The store had more rows than were kept. */
+  truncated: boolean
 }
 
 /** A flowi overlay as the request screen lists it. */
@@ -491,7 +517,7 @@ export interface RequestView {
   node: string
   name: string
   path: string
-  kind: 'http' | 'async' | 'grpc'
+  kind: 'http' | 'async' | 'grpc' | 'dataset'
   verb: string
   versions: string[]
   versionNames: string[]
@@ -517,6 +543,7 @@ export interface RequestView {
   response?: ResponseView
   async?: AsyncInfo
   grpc?: GRPCInfo
+  dataset?: DatasetInfo
   pipeline: { kind: string; title: string; detail: string; method?: string; tip?: string; state: string; reason?: string; ms: number }[]
   showingHistory: boolean
   inScratch: boolean
@@ -632,6 +659,8 @@ export interface ImportView {
   kind: string
   file: string
   paste: string
+  /** The source is text the window handed over: no file to choose. */
+  pasted: boolean
   collections: Choice[]
   collection: string
   previewed: boolean
@@ -726,6 +755,8 @@ export interface AsyncInfo {
   mode: string
   bindings: string[]
   credentials: string[]
+  /** A cloud service: signs in with the provider's own lookup, or the credentials written in the request. */
+  cloud: boolean
   headersAreConnection: boolean
   block: AsyncBlock
 }
@@ -750,6 +781,21 @@ export interface GRPCMethod {
   serverStream: boolean
   input: string
   output: string
+}
+
+/** What a dataset request runs: one read-only query, with its values sent apart from the statement. */
+export interface DatasetBlock {
+  Driver: string
+  Server: string
+  Query: string
+  Params: string[] | null
+  /** The most rows kept; 0 is the default. */
+  Limit: number
+}
+
+export interface DatasetInfo {
+  block: DatasetBlock
+  drivers: { id: string; label: string }[]
 }
 
 export interface GRPCInfo {

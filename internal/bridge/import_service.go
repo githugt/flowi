@@ -44,10 +44,13 @@ type ImportFileView struct {
 
 // ImportView is the import wizard.
 type ImportView struct {
-	Kinds       []ImportKindView `json:"kinds"`
-	Kind        string           `json:"kind"`
-	File        string           `json:"file"`
-	Paste       string           `json:"paste"`
+	Kinds []ImportKindView `json:"kinds"`
+	Kind  string           `json:"kind"`
+	File  string           `json:"file"`
+	Paste string           `json:"paste"`
+	// Pasted is true when the source is text handed over by the window (a pasted curl command or
+	// document), so the screen shows no file to choose.
+	Pasted      bool             `json:"pasted"`
 	Collections []Choice         `json:"collections"`
 	Collection  string           `json:"collection"`
 	Previewed   bool             `json:"previewed"`
@@ -135,6 +138,7 @@ func (s *ImportService) view() ImportView {
 		Files: []ImportFileView{}, Items: []ImportItemView{}, Lossy: nonNil(w.Lossy()), Summary: w.Summary(), Skipped: w.Skipped(),
 		Existing: w.Existing(), CanImport: w.CanImport(), Error: w.Err(), Done: w.Done(),
 	}
+	v.Pasted = s.isPasted(w.File(), w.Paste())
 	v.Previewed = w.Summary() != "" // the summary exists once a preview is shown
 	for _, k := range vm.ImportKinds() {
 		src := "file"

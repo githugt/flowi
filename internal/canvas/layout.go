@@ -118,7 +118,13 @@ type Edge struct {
 	Curve bool   `json:"curve,omitempty"` // the ports are on different rows
 	Needs bool   `json:"needs,omitempty"` // an explicit needs, not list order
 	Into  bool   `json:"into,omitempty"`  // from a container to the first step of one of its lanes: not drawn, the lane box says it
-	Fail  bool   `json:"fail,omitempty"`  // the on_error goto route of a step, taken when it fails
+	Fail  bool   `json:"fail,omitempty"`  // taken when the step it leaves fails: an after_failure_of arrow, or the on_error goto route
+	Goto  bool   `json:"goto,omitempty"`  // …the on_error goto route (a Fail edge that is not an after_failure_of arrow)
+	// FromStep is the step an after_failure_of arrow names: the unit it leaves may hold several steps.
+	FromStep string `json:"fromStep,omitempty"`
+	// Outcome is the named outcome of the step's request that takes the arrow (after_outcome); "" for the
+	// success and failure arrows.
+	Outcome string `json:"outcome,omitempty"`
 	// FromPort is the card port the edge leaves from (done, fail, case-i, else);
 	// "" for units that are not cards.
 	FromPort string `json:"fromPort,omitempty"`
@@ -179,11 +185,19 @@ func Layout(f model.Flow, manual map[string]Point, collapsed map[string]bool, op
 	}
 	l.list(f.Nodes, key("$", "nodes"), 0, 0, "", 0)
 	l.failEdges(f.Nodes)
-	d := Diagram{Units: l.units, Edges: l.edges, Lanes: l.lanes}
+	// Lists, never null: the window reads them with .filter and .find, and Go writes a nil slice as null.
+	d := Diagram{Units: orEmpty(l.units), Edges: orEmpty(l.edges), Lanes: orEmpty(l.lanes)}
 	portEdges(&d)
 	applyManual(&d, manual)
 	markCurves(&d)
 	return d
+}
+
+func orEmpty[T any](list []T) []T {
+	if list == nil {
+		return []T{}
+	}
+	return list
 }
 
 // Option changes how Layout draws a flow.
@@ -227,7 +241,7 @@ func (l *layouter) failEdges(nodes []model.Node) {
 			target, ok := strings.CutPrefix(n.OnError, "goto:")
 			from, to := unitOf[n.ID], unitOf[strings.TrimSpace(target)]
 			if ok && from != "" && to != "" && from != to {
-				l.edges = append(l.edges, Edge{From: from, To: to, Fail: true})
+				l.edges = append(l.edges, Edge{From: from, To: to, Fail: true, Goto: true})
 			}
 			for _, child := range n.Children() {
 				walk(child)
@@ -265,8 +279,14 @@ func (l *layouter) list(nodes []model.Node, path string, x, y int64, parent stri
 	unitOf := map[string]string{} // node id → unit id, for needs edges
 	var prevLasts []string
 	cursor := x
+	var column handlerColumn
 	for _, g := range groups {
 		n := nodes[g.start]
+		source, handler := handlerSource(groupNeeds(nodes[g.start:g.end], n), unitOf)
+		at, row := cursor, y
+		if handler {
+			at, row = column.slot(source, cursor, l.bottomOf(source)+handlerDrop)
+		}
 		u := Unit{ID: n.ID, Kind: g.kind, Path: index(path, g.start), Parent: parent, Lane: lane, Concurrent: n.Concurrent, Core: g.core}
 		for _, m := range nodes[g.start:g.end] {
 			u.Nodes = append(u.Nodes, m.ID)
@@ -277,16 +297,35 @@ func (l *layouter) list(nodes []model.Node, path string, x, y int64, parent stri
 			u.Cells, u.W, u.H, u.Above = blockCells(nodes[g.start:g.end], g.core)
 		}
 		var lasts []string
-		u, lasts = l.place(u, n, cursor, y)
+		u, lasts = l.place(u, n, at, row)
 		from, explicit := deps(groupNeeds(nodes[g.start:g.end], n), prevLasts, unitOf)
 		for _, dep := range from {
 			l.edges = append(l.edges, Edge{From: dep, To: u.ID, Needs: explicit})
+		}
+		grouped := groupNeeds(nodes[g.start:g.end], n)
+		for _, id := range grouped.AfterFailureOf {
+			if from, ok := unitOf[id]; ok && from != u.ID {
+				l.edges = append(l.edges, Edge{From: from, To: u.ID, Fail: true, FromStep: id})
+			}
+		}
+		for _, entry := range grouped.AfterOutcome {
+			id, name, _ := strings.Cut(entry, ":")
+			if from, ok := unitOf[id]; ok && from != u.ID {
+				l.edges = append(l.edges, Edge{From: from, To: u.ID, Outcome: name, FromStep: id})
+			}
 		}
 		if res.first == "" {
 			res.first = u.ID
 		}
 		prevLasts = lasts
-		cursor += u.W + gapX
+		if handler {
+			if column.advance(u) {
+				cursor += u.W + gapX
+			}
+		} else {
+			column = handlerColumn{}
+			cursor += u.W + gapX
+		}
 		res.h = max(res.h, u.Y+u.H-y0)
 	}
 	res.w = max(0, cursor-x-gapX)
@@ -465,6 +504,9 @@ func lanes(n model.Node, p string, chain bool) []laneSpec {
 // there (the header offers to repair it).
 func deps(n model.Node, prev []string, unitOf map[string]string) (units []string, explicit bool) {
 	if len(n.Needs) == 0 {
+		if len(n.AfterFailureOf)+len(n.AfterOutcome) > 0 || n.Unlinked {
+			return nil, true // it has arrows of its own, none on success, or none at all: it no longer follows the step before it
+		}
 		return prev, false
 	}
 	for _, id := range n.Needs {
@@ -482,7 +524,7 @@ func deps(n model.Node, prev []string, unitOf map[string]string) (units []string
 func withoutRedundantNeeds(nodes []model.Node) []model.Node {
 	var out []model.Node
 	for i := 1; i < len(nodes); i++ {
-		if len(nodes[i].Needs) != 1 || nodes[i].Needs[0] != nodes[i-1].ID {
+		if len(nodes[i].Needs) != 1 || nodes[i].Needs[0] != nodes[i-1].ID || len(nodes[i].AfterFailureOf)+len(nodes[i].AfterOutcome) > 0 {
 			continue
 		}
 		if out == nil {
@@ -508,11 +550,13 @@ func groupNeeds(span []model.Node, first model.Node) model.Node {
 	if len(span) < 2 {
 		return first
 	}
-	var needs []string
+	var needs, failures, named []string
 	for _, n := range span {
 		needs = append(needs, n.Needs...)
+		failures = append(failures, n.AfterFailureOf...)
+		named = append(named, n.AfterOutcome...)
 	}
-	first.Needs = needs
+	first.Needs, first.AfterFailureOf, first.AfterOutcome = needs, failures, named
 	return first
 }
 
@@ -589,7 +633,7 @@ func unitKind(n model.Node) string {
 		return KindRequest
 	case n.Type == "parallel" || n.Type == "condition" || n.Type == "batch" || n.Type == "run_till":
 		return KindContainer
-	case n.Type == "fetch" || n.Type == "webhook" || len(n.Needs) > 0 || n.Concurrent:
+	case n.Type == "fetch" || n.Type == "webhook" || len(n.Needs) > 0 || len(n.AfterFailureOf)+len(n.AfterOutcome) > 0 || n.Unlinked || n.Concurrent:
 		return KindAction
 	}
 	return KindStrip
@@ -731,4 +775,63 @@ func blockCells(span []model.Node, core int) (cells []Cell, w, h, above int64) {
 		h += stackGap + down*(stackH+stackGap) - stackGap
 	}
 	return cells, w, h, above
+}
+
+// The room between the main line and a step that hangs below it, and between two of those stacked.
+const (
+	handlerDrop = 44
+	handlerGap  = 24
+)
+
+// handlerSource says whether a unit only runs on an outcome of another step (it has arrows after a failure or a
+// named outcome and none on success) and, if so, the unit it hangs from.
+func handlerSource(n model.Node, unitOf map[string]string) (string, bool) {
+	if len(n.Needs) > 0 || len(n.AfterFailureOf)+len(n.AfterOutcome) == 0 {
+		return "", false
+	}
+	first := ""
+	if len(n.AfterFailureOf) > 0 {
+		first = n.AfterFailureOf[0]
+	} else if id, _, ok := strings.Cut(n.AfterOutcome[0], ":"); ok {
+		first = id
+	}
+	unit, ok := unitOf[first]
+	return unit, ok
+}
+
+// bottomOf is the bottom edge of an already placed unit.
+func (l *layouter) bottomOf(id string) int64 {
+	for _, u := range l.units {
+		if u.ID == id {
+			return u.Y + u.H
+		}
+	}
+	return 0
+}
+
+// handlerColumn is where the steps that hang below the line from one source go: one column right after the
+// source, the first one at the top and each next one under it.
+type handlerColumn struct {
+	source string
+	x      int64
+	nextY  int64
+	placed bool
+}
+
+// slot is where the next step hanging from source goes: the cursor and the given top when it starts a column,
+// else the column's x and the next free row.
+func (c *handlerColumn) slot(source string, cursor, top int64) (x, y int64) {
+	if c.placed && c.source == source {
+		return c.x, c.nextY
+	}
+	c.source, c.placed = source, false // a new column, opened by the unit that goes here
+	return cursor, top
+}
+
+// advance records the unit just placed and says whether it opened a column, which the steps after it make
+// room for; a step stacked in an open column takes none.
+func (c *handlerColumn) advance(u Unit) bool {
+	opened := !c.placed || c.x != u.X
+	*c = handlerColumn{source: c.source, x: u.X, nextY: u.Y + u.H + handlerGap, placed: true}
+	return opened
 }

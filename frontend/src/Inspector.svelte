@@ -11,6 +11,7 @@
   import TemplateField from './TemplateField.svelte'
   import ExprHelp from './ExprHelp.svelte'
   import PairsEditor from './PairsEditor.svelte'
+  import OutcomesEditor from './OutcomesEditor.svelte'
   import { ui } from './lib/ui.svelte'
   import { lostText, modesOf } from './lib/modes'
 
@@ -140,6 +141,14 @@
         </label>
         <span class="label">Extra headers</span>
         <PairsEditor rows={step.call.headers ?? []} onchange={pairs('headers')} keyLabel="header" valueLabel="value (template)" />
+        <h4>Outcomes<Hint>The ways this request ends, which the arrows leaving it follow. {step.call.outcomesOwn ? 'This step has its own list, used in this flow only.' : "These are the request's. Change one and this step gets its own list, used in this flow only."}</Hint></h4>
+        <OutcomesEditor outcomes={step.call.outcomes} ruleKind={step.call.ruleKind} resetLabel="Use the request's" hideReset={!step.call.outcomesOwn}
+          onchange={(rows) => FlowService.SetStepOutcomes(node, step.id, rows as never).catch((e) => ui.toast(errorText(e)))}>
+          {#snippet footer()}
+            <button title="Write this list into the request, so every flow that uses it has these outcomes" disabled={!step.call?.outcomesOwn}
+              onclick={() => FlowService.SaveStepOutcomesToRequest(node, step.id).then(() => ui.toast('Saved to the request.')).catch((e) => ui.toast(errorText(e)))}>Save to the request</button>
+          {/snippet}
+        </OutcomesEditor>
       {/if}
     {/if}
 

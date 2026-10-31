@@ -6,6 +6,9 @@
   import PairsEditor from './PairsEditor.svelte'
   import ValuesEditor from './ValuesEditor.svelte'
   import ParamFields from './ParamFields.svelte'
+  import OutcomesEditor from './OutcomesEditor.svelte'
+  import { ui } from './lib/ui.svelte'
+  import { errorText } from './lib/errors'
   import TextField from './TextField.svelte'
   import TemplateField from './TemplateField.svelte'
   import { completeFor, vocabularyFor } from './lib/flowfields'
@@ -15,7 +18,7 @@
   const step = $derived(view.form.step)
   const call = $derived(step?.call)
   const TITLES: Record<string, string> = {
-    inputs: 'Inputs', send: 'Message', receive: 'Receive', connection: 'Connection', hooks: 'Hooks',
+    inputs: 'Inputs', send: 'Message', receive: 'Receive', connection: 'Connection', hooks: 'Hooks', outcomes: 'Outcomes',
     settings: 'Settings', values: 'Values', checks: 'Checks', steps: 'Steps', message: 'Message',
   }
   const text = (field: string, value: string) => FlowService.SetText(node, field, value)
@@ -44,6 +47,15 @@
           <option value="all">all of them</option><option value="none">none</option><option value="skip-pre">all but the ones before</option><option value="skip-post">all but the ones after</option>
         </select>
       </label>
+    {:else if row === 'outcomes' && call?.kind === 'request'}
+      <p class="hint">{call.outcomesOwn ? 'This step has its own outcomes, used in this flow only.' : "The request's outcomes. Change one and this step gets its own list, used in this flow only."} The arrows leaving the card follow them.</p>
+      <OutcomesEditor outcomes={call.outcomes} ruleKind={call.ruleKind} resetLabel="Use the request's" hideReset={!call.outcomesOwn}
+        onchange={(rows) => FlowService.SetStepOutcomes(node, step.id, rows as never).catch((e) => ui.toast(errorText(e)))}>
+        {#snippet footer()}
+          <button title="Write this list into the request, so every flow that uses it has these outcomes" disabled={!call.outcomesOwn}
+            onclick={() => FlowService.SaveStepOutcomesToRequest(node, step.id).then(() => ui.toast('Saved to the request.')).catch((e) => ui.toast(errorText(e)))}>Save to the request</button>
+        {/snippet}
+      </OutcomesEditor>
     {:else if row === 'connection' && call?.kind === 'request'}
       <TextField label="Open connection" value={call.open ?? ''} oninput={(v) => text('open', v)} placeholder="name (WebSocket, MQTT 5, NATS)" />
       <TextField label="Use connection" value={call.over ?? ''} oninput={(v) => text('over', v)} placeholder="a name opened by an earlier step" />

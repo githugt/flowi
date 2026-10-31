@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { dropIndex, edgeCards, edgeHeight } from './edgecards'
+import { dropIndex, edgeCards, edgeHeight, keepStart } from './edgecards'
 
 const unit = (id: string, x: number, y: number, w = 280, h = 100) => ({ id, x, y, w, h })
 
@@ -56,5 +56,24 @@ describe('dropIndex', () => {
   })
   it('stays put for a small move', () => {
     expect(dropIndex(2, 10, 1, 5)).toBe(2)
+  })
+})
+
+describe('keepStart', () => {
+  const beside = { x: -320, y: 20, w: 280, h: 100 }
+  it('leaves Start where it was while the first step moves right', () => {
+    const got = keepStart({ x: -320, y: 20 }, { ...beside, x: -20, y: 90 }, unit('a', 300, 90))
+    expect(got.x).toBe(-320)
+    expect(got.y).toBe(20)
+  })
+  it('uses the placing beside the step when nothing was kept yet', () => {
+    expect(keepStart(null, beside, unit('a', 40, 20))).toBe(beside)
+  })
+  it('gives way when the first step comes up to the kept Start, so the arrow never runs backwards', () => {
+    const got = keepStart({ x: -320, y: 20 }, { ...beside, x: -240 }, unit('a', -30, 20))
+    expect(got.x).toBe(-240)
+  })
+  it('keeps the height Start has now, not the one it had', () => {
+    expect(keepStart({ x: -320, y: 20 }, { ...beside, h: 160 }, unit('a', 300, 20)).h).toBe(160)
   })
 })

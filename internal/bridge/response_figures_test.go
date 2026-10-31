@@ -38,3 +38,39 @@ func TestResponseOf_should_show_no_size_for_a_message_exchange(t *testing.T) {
 		t.Fatalf("size %q, want none", got.Size)
 	}
 }
+
+func TestResponseOf_should_show_the_rows_of_a_dataset_record_as_a_table(t *testing.T) {
+	t.Parallel()
+	rec := &engine.Record{
+		Kind: engine.KindDataset, Outcome: engine.OutcomeOK, Timings: engine.Timings{Total: 5 * time.Millisecond},
+		Body: engine.Body{JSON: map[string]any{
+			"columns":   []any{"id", "name", "note"},
+			"rows":      []any{map[string]any{"id": 1, "name": "Ada", "note": nil}, map[string]any{"id": 2, "name": "Grace", "note": "vip"}},
+			"row_count": 2, "truncated": true,
+		}},
+	}
+
+	got := responseOf(exchangeWith(rec), vm.ViewJSON)
+
+	table := got.Table
+	if table == nil || len(table.Columns) != 3 || table.Columns[1] != "name" || len(table.Rows) != 2 || !table.Truncated || table.RowCount != 2 {
+		t.Fatalf("table %+v", table)
+	}
+	if table.Rows[0][1] != "Ada" || table.Rows[0][2] != nil || table.Rows[1][0] != 2 {
+		t.Fatalf("rows %v", table.Rows)
+	}
+	if got.Code != "ok" || got.Size != "" {
+		t.Fatalf("code %q size %q", got.Code, got.Size)
+	}
+}
+
+func TestResponseOf_should_show_no_table_for_a_response_that_is_not_a_dataset(t *testing.T) {
+	t.Parallel()
+	rec := &engine.Record{Status: 200}
+
+	got := responseOf(exchangeWith(rec), vm.ViewJSON)
+
+	if got.Table != nil {
+		t.Fatalf("table %+v", got.Table)
+	}
+}

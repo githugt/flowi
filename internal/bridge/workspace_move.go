@@ -60,48 +60,45 @@ func withMove(entries []MenuEntry, ws *vm.Workspace, ids []string) []MenuEntry {
 
 // MoveTargets lists where requests can go: every collection, its request
 // folders under it, in tree order.
-func (s *WorkspaceService) MoveTargets() []MoveTargetView {
-	out := []MoveTargetView{}
-	s.app.actor.Do(func() {
-		ws := s.app.workspace
-		for _, id := range ws.Children("") {
-			n := ws.Node(id)
-			if n.Kind != vm.NodeCollection {
-				continue
-			}
-			out = append(out, MoveTargetView{Row: id, Label: ws.Display(id), Draft: n.Draft})
-			out = append(out, requestFolders(ws, id, ws.Display(id), 1)...)
-		}
-	})
-	return out
-}
+func (s *WorkspaceService) MoveTargets() []MoveTargetView { return s.PlaceTargets("requests") }
 
-// requestFolders are the request folders below row, depth first.
-func requestFolders(ws *vm.Workspace, row, label string, depth int) []MoveTargetView {
+// treeFolders are the folders of tree ("requests" or "flows") below row, depth first.
+func treeFolders(ws *vm.Workspace, row, label string, depth int, tree string) []MoveTargetView {
 	var out []MoveTargetView
 	for _, id := range ws.Children(row) {
 		n := ws.Node(id)
 		switch {
-		case n.Kind == vm.NodeRequestsGroup:
-			out = append(out, requestFolders(ws, id, label, depth)...)
-		case n.Kind == vm.NodeFolder && n.Tree == "requests":
+		case isGroupOf(n, tree):
+			out = append(out, treeFolders(ws, id, label, depth, tree)...)
+		case n.Kind == vm.NodeFolder && n.Tree == tree:
 			name := label + " / " + path.Base(n.Path)
 			out = append(out, MoveTargetView{Row: id, Label: name, Depth: depth})
-			out = append(out, requestFolders(ws, id, name, depth+1)...)
+			out = append(out, treeFolders(ws, id, name, depth+1, tree)...)
 		}
 	}
 	return out
+}
+
+// isGroupOf says whether n is the "Requests" or "Flows" group of tree.
+func isGroupOf(n vm.TreeNode, tree string) bool {
+	return (n.Kind == vm.NodeRequestsGroup || n.Kind == vm.NodeFlowsGroup) && n.Tree == tree
 }
 
 // moveDestination is the collection and folder a row stands for: a
 // collection or its requests group is the top of its requests, a request
 // folder is itself. ok is false for any other row.
 func moveDestination(ws *vm.Workspace, row string) (collection model.ID, folder string, ok bool) {
+	return placeDestination(ws, row, "requests")
+}
+
+// placeDestination is moveDestination for tree: a collection or the group of
+// tree is its top, a folder of tree is itself.
+func placeDestination(ws *vm.Workspace, row, tree string) (collection model.ID, folder string, ok bool) {
 	n := ws.Node(row)
 	switch {
-	case n.Kind == vm.NodeCollection, n.Kind == vm.NodeRequestsGroup:
+	case n.Kind == vm.NodeCollection, isGroupOf(n, tree):
 		return n.Collection, "", true
-	case n.Kind == vm.NodeFolder && n.Tree == "requests":
+	case n.Kind == vm.NodeFolder && n.Tree == tree:
 		return n.Collection, n.Path, true
 	}
 	return "", "", false

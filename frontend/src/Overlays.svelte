@@ -5,6 +5,7 @@
   let innerHeight = $state(0)
   import BlueprintDialog from './BlueprintDialog.svelte'
   import MoveDialog from './MoveDialog.svelte'
+  import PlaceDialog from './PlaceDialog.svelte'
   import SignInDialog from './SignInDialog.svelte'
   import Dropdown from './Dropdown.svelte'
   import { protocolVerb } from './lib/verbs'
@@ -68,7 +69,7 @@
         {/if}
         {#if ui.dialog.protocols}
           <label>
-            <span>Protocol</span>
+            <span>{ui.dialog.protocolsLabel ?? 'Protocol'}</span>
             <Dropdown pill options={ui.dialog.protocols.map((p) => ({ value: p.id, label: p.label, tone: protocolVerb(p.id) }))} value={protocol} onpick={(p) => (protocol = p)} />
           </label>
         {/if}
@@ -90,6 +91,7 @@
 
 <BlueprintDialog />
 <MoveDialog />
+<PlaceDialog />
 <SignInDialog />
 
 <div class="toasts" aria-live="polite">
@@ -101,6 +103,8 @@
     position: fixed;
     z-index: 50;
     min-width: 190px;
+    width: max-content;
+    max-width: calc(100vw - 16px);
     max-height: calc(100vh - 24px);
     overflow: auto;
     display: flex;
@@ -111,7 +115,7 @@
     border-radius: var(--r-lg);
     box-shadow: 0 8px 24px rgb(0 0 0 / 0.35);
   }
-  .menu button { background: none; border: 0; color: var(--text); font: inherit; text-align: left; padding: 5px 10px; border-radius: var(--r-sm); }
+  .menu button { background: none; border: 0; color: var(--text); font: inherit; text-align: left; padding: 5px 10px; border-radius: var(--r-sm); white-space: nowrap; }
   .menu button:hover:not(:disabled) { background: color-mix(in srgb, var(--accent) 20%, transparent); }
   .menu button:disabled { opacity: 0.4; }
   hr { width: 100%; border: 0; border-top: 1px solid var(--line); margin: 4px 0; }

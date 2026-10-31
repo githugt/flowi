@@ -7,6 +7,7 @@
   import EmptyState from './EmptyState.svelte'
   import { tick } from 'svelte'
   import { rowsToText, textToRows } from './lib/bulk'
+  import { bindingValues, bulkSuggestions, completeBulk, type BulkSuggestion } from './lib/binding'
 
   let {
     rows,
@@ -16,6 +17,7 @@
     describe = false,
     empty,
     marks = {},
+    suggestKeys = [],
   }: {
     rows: KV[] | null
     onchange: (rows: KV[]) => void
@@ -26,7 +28,10 @@
     empty?: { icon: string; title: string; hint: string; add: string }
     /** Rows a spec overlay sets, by key: the tooltip naming the overlay. */
     marks?: Record<string, string>
+    /** Names to suggest while typing a key, and (for names with a fixed set of values) the values: in the form's key box and in bulk edit. */
+    suggestKeys?: string[]
   } = $props()
+  const uid = $props.id()
 
   let local = $state<KV[]>([])
   let within = $state(false)
@@ -68,6 +73,24 @@
   function bulkInput(text: string) {
     bulkText = text
     onchange(textToRows(text, bulkBase))
+    showSuggestions()
+  }
+
+  // Suggestions under the bulk box: what fits at the caret. A pick goes in without the box losing its focus.
+  let suggestion = $state<BulkSuggestion | null>(null)
+  function showSuggestions() {
+    const ta = box?.querySelector<HTMLTextAreaElement>('textarea')
+    suggestion = ta && suggestKeys.length ? bulkSuggestions(ta.value, ta.selectionStart, suggestKeys) : null
+  }
+  async function pickSuggestion(item: string) {
+    const ta = box?.querySelector<HTMLTextAreaElement>('textarea')
+    if (!ta || !suggestion) return
+    const done = completeBulk(ta.value, ta.selectionStart, suggestion.kind, item)
+    bulkInput(done.text)
+    await tick()
+    ta.focus()
+    ta.setSelectionRange(done.caret, done.caret)
+    showSuggestions()
   }
 </script>
 
@@ -86,7 +109,16 @@
       spellcheck="false"
       aria-label="Rows, one per line"
       oninput={(e) => bulkInput(e.currentTarget.value)}
+      onkeyup={showSuggestions}
+      onclick={showSuggestions}
     ></textarea>
+    {#if suggestion}
+      <div class="suggest" role="listbox" aria-label={suggestion.kind === 'key' ? 'Names' : 'Values'}>
+        {#each suggestion.items as item}
+          <button type="button" role="option" aria-selected="false" onpointerdown={(e) => e.preventDefault()} onclick={() => pickSuggestion(item)}>{item}</button>
+        {/each}
+      </div>
+    {/if}
     <div class="tools">
       <span class="hint">One per line: {keyLabel}: {valueLabel}{describe ? ' · descriptions stay with their name' : ''}</span>
       <button class="add" onclick={() => (bulk = false)}>Key-value edit</button>
@@ -94,8 +126,9 @@
   {:else}
   {#each local as row, i}
     <div class="row">
-      <input class="k" placeholder={keyLabel} bind:value={row.Key} oninput={commit} spellcheck="false" />
-      <span class="cell"><input class="v" placeholder={valueLabel} bind:value={row.Value} oninput={commit} spellcheck="false" /><HiddenChars value={row.Value} onclean={(t) => { row.Value = t; commit() }} /></span>
+      <input class="k" placeholder={keyLabel} bind:value={row.Key} oninput={commit} spellcheck="false" list={suggestKeys.length ? `${uid}-k` : undefined} />
+      <span class="cell"><input class="v" placeholder={valueLabel} bind:value={row.Value} oninput={commit} spellcheck="false" list={suggestKeys.length && bindingValues(row.Key).length ? `${uid}-v${i}` : undefined} />
+        {#if suggestKeys.length && bindingValues(row.Key).length}<datalist id={`${uid}-v${i}`}>{#each bindingValues(row.Key) as v}<option value={v}></option>{/each}</datalist>{/if}<HiddenChars value={row.Value} onclean={(t) => { row.Value = t; commit() }} /></span>
       {#if describe}
         <input class="d" placeholder="description" bind:value={row.Description} oninput={commit} />
       {/if}
@@ -103,6 +136,7 @@
       <button class="x" aria-label="Remove row" onclick={() => { local.splice(i, 1); commit() }}>×</button>
     </div>
   {/each}
+  {#if suggestKeys.length}<datalist id={`${uid}-k`}>{#each suggestKeys as n}<option value={n}></option>{/each}</datalist>{/if}
   <!-- A ghost row where the next one goes: one click and the cursor is in its key box. -->
   <button class="ghost" onclick={addRow}>+ {empty?.add ?? 'Add row'}</button>
   <div class="tools end"><button class="add" onclick={startBulk}>Bulk edit</button></div>
@@ -143,6 +177,9 @@
     padding: 6px 8px; font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; -webkit-user-select: text; user-select: text;
   }
   .bulk:focus { border-color: var(--accent); }
+  .suggest { display: flex; flex-wrap: wrap; gap: 4px; }
+  .suggest button { border: 1px solid var(--line); border-radius: var(--r-pill); padding: 1px 10px; color: var(--text); font: var(--fs-xs) var(--mono); }
+  .suggest button:hover { border-color: var(--accent); color: var(--accent); }
   .x:hover { color: var(--fail); }
   .mark {
     align-self: center; flex: none; padding: 1px 6px; border-radius: var(--r-sm); font-size: var(--fs-xs);
