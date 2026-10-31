@@ -1,0 +1,7 @@
+id: 01J9ZE3M4N5P6Q7R8S9T0VWXYZ
+name: staging
+vars:
+  base_url: https://staging.acme.dev
+  port: "8443"
+  password:
+    secret: true

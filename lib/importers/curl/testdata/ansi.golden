@@ -1,0 +1,13 @@
+item "curl/post-v1-notes" imported at 1:1
+--- request curl/post-v1-notes
+name: POST /v1/notes
+versions:
+  "1":
+    method: POST
+    url: https://api.example.com/v1/notes
+    headers:
+      content-type: text/plain
+    body:
+      text: |-
+        line one
+        line 'two'

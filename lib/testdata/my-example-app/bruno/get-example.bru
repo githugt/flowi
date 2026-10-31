@@ -1,0 +1,24 @@
+meta {
+  name: Get example
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/examples/1
+  body: none
+  auth: basic
+}
+
+auth:basic {
+  username: ada
+  password: {{password}}
+}
+
+vars:post-response {
+  exampleName: res.body.name
+}
+
+assert {
+  res.status: eq 200
+}

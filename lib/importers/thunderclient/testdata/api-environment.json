@@ -1,0 +1,5 @@
+{"_id": "e1", "name": "Staging", "default": false, "data": [
+  {"name": "base_url", "value": "https://staging.example.com"},
+  {"name": "token", "value": "tok-12345"},
+  {"name": "", "value": "ignored"}
+]}

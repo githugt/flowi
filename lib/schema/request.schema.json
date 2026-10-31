@@ -1,0 +1,172 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/githugt/flowi-lib/schema/request.schema.json",
+  "title": "Flowi request (*.req.yaml)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "versions"
+  ],
+  "properties": {
+    "id": {
+      "$ref": "common.schema.json#/$defs/ulid"
+    },
+    "name": {
+      "type": "string"
+    },
+    "description": {
+      "type": "string"
+    },
+    "operation": {
+      "type": "string",
+      "description": "The OpenAPI operationId the request was imported from; Arazzo steps refer to requests by it."
+    },
+    "default": {
+      "type": "string"
+    },
+    "versions": {
+      "type": "object",
+      "minProperties": 1,
+      "propertyNames": {
+        "pattern": "^(0|[1-9][0-9]*)(\\.(0|[1-9][0-9]*))*$"
+      },
+      "additionalProperties": {
+        "$ref": "#/$defs/version"
+      }
+    },
+    "edit": {
+      "$ref": "#/$defs/version",
+      "description": "The one dirty edit: an autosaved working copy, never read by runs, serve or the CLI."
+    },
+    "edit_base": {
+      "type": "string",
+      "description": "Label of the version the edit started from."
+    },
+    "hooks": {
+      "$ref": "common.schema.json#/$defs/hooks"
+    },
+    "tags": {
+      "type": "array",
+      "description": "Labels for `flowi run --tag`. A folder's tags apply to everything under it.",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    }
+  },
+  "$defs": {
+    "version": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "method": {
+          "type": "string"
+        },
+        "url": {
+          "type": "string"
+        },
+        "query": {
+          "$ref": "common.schema.json#/$defs/stringMap"
+        },
+        "headers": {
+          "$ref": "common.schema.json#/$defs/stringMap"
+        },
+        "body": {
+          "type": "object",
+          "additionalProperties": false,
+          "maxProperties": 1,
+          "properties": {
+            "json": {
+              "type": "string"
+            },
+            "text": {
+              "type": "string"
+            },
+            "file": {
+              "type": "string"
+            },
+            "form": {
+              "$ref": "common.schema.json#/$defs/stringMap"
+            },
+            "multipart": {
+              "type": [
+                "object",
+                "array"
+              ],
+              "description": "Parts by name; a list of one-entry mappings when a name repeats."
+            }
+          }
+        },
+        "extract": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "from": {
+                "enum": [
+                  "body",
+                  "header",
+                  "cookie",
+                  "status"
+                ]
+              },
+              "path": {
+                "type": "string"
+              },
+              "header": {
+                "type": "string"
+              },
+              "cookie": {
+                "type": "string"
+              },
+              "regex": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "variables": {
+          "$ref": "common.schema.json#/$defs/stringMap"
+        },
+        "name": {
+          "type": "string",
+          "description": "A short title for this version, shown beside its label."
+        },
+        "docs": {
+          "type": "string",
+          "description": "Documentation of this version, in Markdown."
+        },
+        "notes": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "Descriptions of query parameters, headers and variables, by name.",
+          "properties": {
+            "query": {
+              "$ref": "common.schema.json#/$defs/stringMap"
+            },
+            "headers": {
+              "$ref": "common.schema.json#/$defs/stringMap"
+            },
+            "variables": {
+              "$ref": "common.schema.json#/$defs/stringMap"
+            }
+          }
+        },
+        "assert": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "settings": {
+          "$ref": "common.schema.json#/$defs/settings"
+        },
+        "hooks": {
+          "$ref": "common.schema.json#/$defs/hooks"
+        }
+      }
+    }
+  }
+}

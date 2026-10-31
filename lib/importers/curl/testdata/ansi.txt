@@ -1,0 +1,1 @@
+curl https://api.example.com/v1/notes -H $'content-type: text/plain' --data-binary $'line one\nline \'two\''

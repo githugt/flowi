@@ -1,0 +1,11 @@
+id: 01J9ZH3M4N5P6Q7R8S9T0VWXYZ
+name: Standard onboarding
+params:
+  api:
+    type: request-ref
+    description: The request to call
+nodes:
+  - id: call
+    type: request
+    request:
+      param: api

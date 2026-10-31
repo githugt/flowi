@@ -1,0 +1,37 @@
+meta {
+  name: Get user
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/v1/users/:id?include=roles
+  body: none
+  auth: inherit
+}
+
+params:query {
+  include: roles
+  ~debug: 1
+}
+
+params:path {
+  id: 42
+}
+
+assert {
+  res.status: eq 200
+  res.body.name: isDefined
+  res.body.roles: isArray
+}
+
+vars:post-response {
+  userName: res.body.name
+  etag: res.headers.etag
+  seen: res.body.items[0].id
+  computed: res.body.a + 1
+}
+
+tests {
+  test("ok", () => expect(res.status).to.equal(200));
+}

@@ -1,0 +1,39 @@
+swagger: "2.0"
+info: {title: Examples, version: "1.0"}
+host: localhost:8080
+basePath: /
+schemes: [http]
+consumes: [application/json]
+produces: [application/json]
+securityDefinitions:
+  basic: {type: basic}
+  key: {type: apiKey, in: header, name: X-API-Key}
+paths:
+  /examples:
+    post:
+      operationId: createExample
+      parameters:
+        - {name: body, in: body, required: true, schema: {$ref: "#/definitions/Example"}}
+      responses:
+        "201": {description: created, schema: {$ref: "#/definitions/Example"}}
+  /examples/{id}:
+    parameters:
+      - {name: id, in: path, required: true, type: string}
+    get:
+      operationId: getExample
+      parameters:
+        - {name: verbose, in: query, type: boolean}
+      responses:
+        "200": {description: ok, schema: {$ref: "#/definitions/Example"}}
+        "404": {description: missing}
+    put:
+      parameters:
+        - {name: name, in: formData, type: string, required: true}
+      responses:
+        "200": {description: ok}
+definitions:
+  Example:
+    type: object
+    properties:
+      id: {type: string}
+      name: {type: string}

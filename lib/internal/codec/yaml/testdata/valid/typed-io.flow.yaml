@@ -1,0 +1,28 @@
+id: 01J9ZB3M4N5P6Q7R8S9T0VWXYZ
+name: Typed inputs and outputs
+inputs:
+  zeta:
+    type: string
+    default: z
+  alpha:
+    type: number
+outputs:
+  user: "{{vars.user}}"
+  count:
+    type: number
+    value: "{{vars.count}}"
+nodes:
+  - id: pick
+    type: set
+    color: teal
+    values:
+      - name: token
+        from: response
+        in: body
+        path: $.data.token
+      - name: nickname
+        from: generate
+        value: "{{$first-name}}"
+        seed: 7
+      - name: total
+        value: "{{vars.a + 1}}"

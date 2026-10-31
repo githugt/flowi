@@ -1,0 +1,6 @@
+id: 01J9ZC3M4N5P6Q7R8S9T0VWXYZ
+name: Verify
+versions:
+  "1":
+    method: POST
+    url: /verify

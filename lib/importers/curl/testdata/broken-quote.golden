@@ -1,0 +1,12 @@
+item "command at line 1" skipped at 1:1
+  error FLW-IMPORT-004 1:51 curl syntax error: the quote ' is never closed
+    | curl 'https://api.example.com/v1/a -H 'accept: */*'
+    |                                                   ^
+  error FLW-IMPORT-005 1:1 command at line 1 was skipped: the command cannot be read
+item "curl/get-v1-b" imported at 2:1
+--- request curl/get-v1-b
+name: GET /v1/b
+versions:
+  "1":
+    method: GET
+    url: https://api.example.com/v1/b

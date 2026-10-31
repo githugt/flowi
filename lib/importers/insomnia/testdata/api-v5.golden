@@ -1,0 +1,44 @@
+item "Notes/List" imported at 0:0
+item "Notes/Create" imported at 0:0
+item "Ping" imported at 0:0
+item "base environment" imported at 0:0
+  warning FLW-IMPORT-006 0:0 variable key looked like a credential and was replaced by a secret declaration
+item "environment Staging" imported at 0:0
+  warning FLW-IMPORT-006 0:0 variable key looked like a credential and was replaced by a secret declaration
+--- request Notes/List
+name: List
+versions:
+  "1":
+    method: GET
+    url: "{{env.host}}/notes"
+    headers:
+      Accept: application/json
+      X-Key: "{{secret.key}}"
+--- request Notes/Create
+name: Create
+versions:
+  "1":
+    method: POST
+    url: "{{env.host}}/notes"
+    headers:
+      Content-Type: text/plain
+    body:
+      text: hello
+--- request Ping
+name: Ping
+versions:
+  "1":
+    method: GET
+    url: "{{env.host}}/ping"
+--- environment notes
+name: notes
+vars:
+  host: http://localhost:3000
+  key:
+    secret: true
+--- environment staging
+name: staging
+vars:
+  host: https://staging.example.com
+  key:
+    secret: true

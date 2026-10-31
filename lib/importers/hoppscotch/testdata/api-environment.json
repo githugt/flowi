@@ -1,0 +1,7 @@
+[
+  {"v": 1, "id": "e1", "name": "Staging", "variables": [
+    {"key": "base_url", "value": "https://staging.example.com", "secret": false},
+    {"key": "token", "value": "tok-12345", "secret": true},
+    {"key": "key", "value": "k-98765", "secret": false}
+  ]}
+]

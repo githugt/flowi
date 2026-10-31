@@ -1,0 +1,5 @@
+$ curl -sSL "https://api.example.com/health"
+curl -XPUT https://api.example.com/v1/users/42 -u admin:hunter2 \
+     -d name=Ada -d 'city=New York' --frobnicate
+curl --json '{"a":1}' https://api.example.com/v1/things -G --data-urlencode 'q=a b'
+curl -F 'file=@avatar.png' -F caption=hi https://api.example.com/v1/upload

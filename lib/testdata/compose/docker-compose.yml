@@ -1,0 +1,119 @@
+# Brokers for the integration tests of the async transports (just test-integration).
+# Runtime-neutral: fully qualified image names and nothing Docker-only, so
+# `podman compose` and `docker compose` both read it. Ports are on localhost.
+services:
+  mosquitto:
+    image: docker.io/library/eclipse-mosquitto:2
+    command: ["mosquitto", "-c", "/mosquitto-no-auth.conf"]
+    ports: ["1883:1883"]
+
+  nats:
+    image: docker.io/library/nats:2
+    command: ["-js"]
+    ports: ["4222:4222"]
+
+  kafka:
+    image: docker.io/apache/kafka:3.9.0
+    hostname: kafka
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_LISTENERS: PLAINTEXT_HOST://:9092,CONTROLLER://:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT_HOST://localhost:9092
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT_HOST
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_NUM_PARTITIONS: 1
+    ports: ["9092:9092"]
+
+  rabbitmq:
+    image: docker.io/library/rabbitmq:3
+    environment:
+      # guest may only connect from the container itself; this user can connect through the port mapping.
+      RABBITMQ_DEFAULT_USER: flowi
+      RABBITMQ_DEFAULT_PASS: flowi
+    ports: ["5672:5672"]
+
+  # AMQP 1.0 (the amqp10 transport); RabbitMQ above speaks 0-9-1. Queues are created on first use.
+  artemis:
+    image: docker.io/apache/activemq-artemis:latest-alpine
+    environment:
+      ARTEMIS_USER: flowi
+      ARTEMIS_PASSWORD: flowi
+      ANONYMOUS_LOGIN: "false"
+    ports: ["5673:5672"]
+
+  redis:
+    image: docker.io/library/redis:7
+    ports: ["6379:6379"]
+
+  # SQS and SNS in one emulator; credentials are ignored (any key works).
+  localstack:
+    image: docker.io/localstack/localstack:3.8
+    environment:
+      SERVICES: sqs,sns
+    ports: ["4566:4566"]
+
+  pubsub:
+    image: gcr.io/google.com/cloudsdktool/google-cloud-cli:emulators
+    command: ["gcloud", "beta", "emulators", "pubsub", "start", "--host-port=0.0.0.0:8085", "--project=flowi-it"]
+    ports: ["8085:8085"]
+
+  # Azure Service Bus emulator. It needs SQL Server and listens on 5672 like
+  # RabbitMQ, so it is behind a profile and is started on its own:
+  #   podman compose --profile servicebus up -d servicebus
+  # then FLOWI_TEST_SERVICEBUS="Endpoint=sb://localhost;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=SAS_KEY_VALUE;UseDevelopmentEmulator=true;"
+  # (stop rabbitmq first). Not run by `just test-integration`.
+  servicebus-sql:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    profiles: ["servicebus"]
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_SA_PASSWORD: "Flowi-Test-1234"
+
+  servicebus:
+    image: mcr.microsoft.com/azure-messaging/servicebus-emulator:latest
+    profiles: ["servicebus"]
+    depends_on: [servicebus-sql]
+    environment:
+      ACCEPT_EULA: "Y"
+      SQL_SERVER: servicebus-sql
+      MSSQL_SA_PASSWORD: "Flowi-Test-1234"
+    volumes:
+      - ./servicebus-config.json:/ServiceBus_Emulator/ConfigFiles/Config.json:ro
+    ports: ["5672:5672"]
+
+  # WebDAV on 8890, no login, held in the container: PROPFIND, PROPPATCH, MKCOL, COPY, MOVE, LOCK and UNLOCK, for
+  # trying the custom methods by hand (docs/testing-guide-core.md, section on WebDAV). Not run when this was written: the
+  # same handler (golang.org/x/net/webdav) is checked in-process by internal/httpx/webdav_test.go.
+  webdav:
+    image: docker.io/rclone/rclone:1.75.2
+    command: ["serve", "webdav", "/data", "--addr", ":8890"]
+    ports: ["8890:8890"]
+
+  # CalDAV on 5232 for MKCALENDAR and REPORT. Not run when this was written, and the login the image expects was not
+  # checked: read its README before the first request.
+  radicale:
+    image: docker.io/tomsquest/docker-radicale:3.9.0.0
+    ports: ["5232:5232"]
+
+  # The stores of the dataset requests (dataset/integration_test.go). One user and database each, flowi / flowi.
+  postgres:
+    image: docker.io/library/postgres:17
+    environment: {POSTGRES_USER: flowi, POSTGRES_PASSWORD: flowi, POSTGRES_DB: flowi}
+    ports: ["5433:5432"]
+
+  mysql:
+    image: docker.io/library/mysql:8.4
+    environment: {MYSQL_USER: flowi, MYSQL_PASSWORD: flowi, MYSQL_ROOT_PASSWORD: root, MYSQL_DATABASE: flowi}
+    ports: ["3307:3306"]
+
+  mariadb:
+    image: docker.io/library/mariadb:11.4
+    environment: {MARIADB_USER: flowi, MARIADB_PASSWORD: flowi, MARIADB_ROOT_PASSWORD: root, MARIADB_DATABASE: flowi}
+    ports: ["3308:3306"]

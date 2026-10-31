@@ -1,0 +1,12 @@
+item "curl/get-v1-us-ers" imported at 1:1
+  warning FLW-LINT-003 1:35 invisible character U+200B in the URL
+    | curl https://api.example.com/v1/us⟨U+200B⟩ers -H "X-Note: café"
+    |                                   ^
+--- request curl/get-v1-us-ers
+name: GET /v1/us​ers
+versions:
+  "1":
+    method: GET
+    url: https://api.example.com/v1/us​ers
+    headers:
+      X-Note: café

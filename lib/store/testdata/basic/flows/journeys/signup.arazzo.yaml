@@ -1,0 +1,32 @@
+arazzo: 1.1.0
+info:
+  title: Signup
+  version: 1.0.0
+sourceDescriptions:
+  - name: flowi
+    url: ../../descriptions/requests.openapi.yaml
+    type: openapi
+workflows:
+  - workflowId: journeys-signup
+    summary: Signup
+    steps:
+      - stepId: login
+        operationId: $sourceDescriptions.flowi.auth_login
+      - stepId: form
+        operationId: $sourceDescriptions.flowi.onboarding_form_page_1
+    x-flowi-digest: sha256:bcf192ed24c9712644ad412ccc93286884f71cd28d4ba51e569851b99351272f
+    x-flowi-flow:
+      id: 01J9ZB3M4N5P6Q7R8S9T0VWXYZ
+      name: Signup
+      nodes:
+        - id: login
+          type: request
+          request:
+            id: 01J9ZA3M4N5P6Q7R8S9T0VWXYZ
+            path: auth/login
+        - id: form
+          type: request
+          request:
+            id: 01J9ZF3M4N5P6Q7R8S9T0VWXYZ
+            path: onboarding/form-page-1
+x-flowi-version: 1

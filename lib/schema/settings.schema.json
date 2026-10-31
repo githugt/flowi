@@ -1,0 +1,566 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/githugt/flowi-lib/schema/settings.schema.json",
+  "title": "Flowi settings",
+  "description": "User settings file (settings.yaml) and every settings: block. Which keys a layer may set is enforced by Flowi.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "timeout": {
+      "type": "string",
+      "pattern": "^([0-9]+(\\.[0-9]+)?(ns|us|\u00b5s|ms|s|m|h))+$",
+      "default": "30s"
+    },
+    "schemas": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "infer": {
+          "type": "boolean",
+          "default": true,
+          "description": "Learn a JSON Schema from the request and response bodies of each send, and check later sends against it (a request mismatch warns, a response mismatch is an error; neither stops the send)."
+        }
+      }
+    },
+    "responses": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "save": {
+          "type": "string",
+          "enum": [
+            "none",
+            "last",
+            "per-status"
+          ],
+          "default": "last"
+        },
+        "pin": {
+          "type": "string",
+          "enum": [
+            "off",
+            "first",
+            "last"
+          ],
+          "default": "off"
+        }
+      }
+    },
+    "requests": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "seed_blueprint": {
+          "type": "string",
+          "default": "default"
+        }
+      }
+    },
+    "empty": {
+      "type": "string",
+      "enum": [
+        "keep",
+        "omit",
+        "error"
+      ],
+      "default": "omit"
+    },
+    "http": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "version": {
+          "type": "string",
+          "enum": [
+            "auto",
+            "1.1",
+            "2",
+            "h2c",
+            "3"
+          ],
+          "default": "auto"
+        },
+        "follow_redirects": {
+          "type": "boolean",
+          "default": true
+        },
+        "default_headers": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [
+            "Accept: */*",
+            "Cache-Control: no-cache"
+          ]
+        },
+        "user_agent": {
+          "type": "string",
+          "default": ""
+        },
+        "max_redirects": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100,
+          "default": 10
+        },
+        "redirect_credentials": {
+          "type": "string",
+          "enum": [
+            "strip",
+            "same_site",
+            "keep"
+          ],
+          "default": "strip"
+        },
+        "redirect_keep_headers": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": []
+        },
+        "cookies": {
+          "type": "string",
+          "enum": [
+            "isolated",
+            "shared",
+            "off"
+          ],
+          "default": "isolated"
+        },
+        "request_compression": {
+          "type": "string",
+          "enum": [
+            "none",
+            "gzip"
+          ],
+          "default": "none"
+        }
+      }
+    },
+    "retry": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "max": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 10,
+          "default": 0
+        },
+        "backoff": {
+          "type": "string",
+          "enum": [
+            "exponential",
+            "constant"
+          ],
+          "default": "exponential"
+        },
+        "jitter": {
+          "type": "boolean",
+          "default": true
+        },
+        "on": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "5xx",
+              "429",
+              "timeout",
+              "connection"
+            ]
+          },
+          "default": [
+            "5xx",
+            "timeout",
+            "connection"
+          ]
+        }
+      }
+    },
+    "hooks": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "nested": {
+          "type": "boolean",
+          "default": false
+        },
+        "max_depth": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 16,
+          "default": 3
+        }
+      }
+    },
+    "downloads": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "stream_threshold_bytes": {
+          "type": "integer",
+          "minimum": 1024,
+          "default": 10485760
+        }
+      }
+    },
+    "run": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "grace": {
+          "type": "string",
+          "pattern": "^([0-9]+(\\.[0-9]+)?(ns|us|\u00b5s|ms|s|m|h))+$",
+          "default": "60s"
+        },
+        "max_concurrency": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1024,
+          "default": 8
+        }
+      }
+    },
+    "serve": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "replay_addr": {
+          "type": "string",
+          "default": "127.0.0.1:8525"
+        },
+        "trigger_addr": {
+          "type": "string",
+          "default": "127.0.0.1:8526"
+        },
+        "latency": {
+          "type": "string",
+          "pattern": "^([0-9]+(\\.[0-9]+)?(ns|us|\u00b5s|ms|s|m|h))+$",
+          "default": "0s"
+        },
+        "max_runs": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 256,
+          "default": 4
+        },
+        "shutdown_timeout": {
+          "type": "string",
+          "pattern": "^([0-9]+(\\.[0-9]+)?(ns|us|\u00b5s|ms|s|m|h))+$",
+          "default": "30s"
+        },
+        "traffic_log": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100000,
+          "default": 1000
+        },
+        "valkey_addr": {
+          "type": "string",
+          "default": ""
+        },
+        "valkey_tls": {
+          "type": "boolean",
+          "default": false
+        }
+      }
+    },
+    "otel": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "endpoint": {
+          "type": "string",
+          "default": ""
+        },
+        "headers": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": []
+        },
+        "propagate": {
+          "type": "boolean",
+          "default": false
+        }
+      }
+    },
+    "defaults": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "environment": {
+          "type": "string",
+          "default": ""
+        }
+      }
+    },
+    "proxy": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "http": {
+          "type": "string",
+          "default": ""
+        }
+      }
+    },
+    "tls": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "ca_files": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": []
+        }
+      }
+    },
+    "appearance": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "theme": {
+          "type": "string",
+          "enum": [
+            "system",
+            "classic",
+            "light",
+            "dark",
+            "high-contrast",
+            "solarized-light",
+            "solarized-dark",
+            "nord",
+            "anuppuccin-dark",
+            "anuppuccin-light",
+            "flowi-dark",
+            "flowi-light",
+            "custom"
+          ],
+          "default": "system"
+        },
+        "accent": {
+          "type": "string",
+          "default": ""
+        },
+        "font": {
+          "type": "string",
+          "default": ""
+        },
+        "font_size": {
+          "type": "integer",
+          "minimum": 8,
+          "maximum": 48,
+          "default": 13
+        },
+        "palette_file": {
+          "type": "string",
+          "default": ""
+        },
+        "url": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "scheme": {
+              "type": "string",
+              "default": ""
+            },
+            "separator": {
+              "type": "string",
+              "default": ""
+            },
+            "subdomain": {
+              "type": "string",
+              "default": ""
+            },
+            "host": {
+              "type": "string",
+              "default": ""
+            },
+            "port": {
+              "type": "string",
+              "default": ""
+            },
+            "path": {
+              "type": "string",
+              "default": ""
+            },
+            "variable": {
+              "type": "string",
+              "default": ""
+            },
+            "unknown_variable": {
+              "type": "string",
+              "default": ""
+            },
+            "query_mark": {
+              "type": "string",
+              "default": ""
+            },
+            "equals": {
+              "type": "string",
+              "default": ""
+            },
+            "fragment": {
+              "type": "string",
+              "default": ""
+            },
+            "pairs": {
+              "type": "string",
+              "enum": [
+                "rainbow",
+                "single",
+                "off"
+              ],
+              "default": "rainbow"
+            },
+            "pair_color": {
+              "type": "string",
+              "default": ""
+            },
+            "pair_colors": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "default": []
+            }
+          }
+        }
+      }
+    },
+    "language": {
+      "type": "string",
+      "enum": [
+        "en"
+      ],
+      "default": "en"
+    },
+    "viewer": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "large_body_bytes": {
+          "type": "integer",
+          "minimum": 1024,
+          "default": 2097152
+        }
+      }
+    },
+    "ui": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "default_section": {
+          "type": "string",
+          "enum": [
+            "auto",
+            "params",
+            "headers",
+            "body",
+            "auth",
+            "variables",
+            "settings",
+            "extract",
+            "assert",
+            "hooks",
+            "docs"
+          ],
+          "default": "auto"
+        },
+        "suggestions_max": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 20,
+          "default": 3
+        },
+        "restore_tabs": {
+          "type": "boolean",
+          "default": true
+        },
+        "drafts_trash_after": {
+          "type": "string",
+          "pattern": "^([0-9]+(\\.[0-9]+)?(ns|us|\u00b5s|ms|s|m|h))+$",
+          "default": "168h"
+        },
+        "keep_history": {
+          "type": "boolean",
+          "default": false
+        },
+        "snippet_exclude_secrets": {
+          "type": "boolean",
+          "default": true
+        }
+      }
+    },
+    "logging": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "level": {
+          "type": "string",
+          "enum": [
+            "debug",
+            "info",
+            "warn",
+            "error"
+          ],
+          "default": "info"
+        },
+        "format": {
+          "type": "string",
+          "enum": [
+            "text",
+            "json"
+          ],
+          "default": "text"
+        },
+        "file": {
+          "type": "string",
+          "default": ""
+        }
+      }
+    },
+    "telemetry": {
+      "type": "string",
+      "enum": [
+        "off",
+        "minimal",
+        "full"
+      ],
+      "default": "off"
+    },
+    "telemetry_endpoint": {
+      "type": "string",
+      "default": ""
+    },
+    "announcements": {
+      "type": "boolean",
+      "default": true
+    },
+    "announcements_url": {
+      "type": "string",
+      "default": ""
+    },
+    "announcements_keys": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": []
+    },
+    "announcements_dismissed": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": []
+    }
+  }
+}

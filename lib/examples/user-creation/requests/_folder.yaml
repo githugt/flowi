@@ -1,0 +1,9 @@
+settings:
+  timeout: 10s
+hooks:
+  pre:
+    - inline:
+        - id: trace
+          type: set
+          target: request.headers.X-Trace
+          value: "{{$uuid-v4}}"

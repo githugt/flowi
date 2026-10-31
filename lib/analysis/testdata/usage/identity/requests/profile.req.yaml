@@ -1,0 +1,6 @@
+id: 01JB0000000000000000000011
+name: Profile
+versions:
+  "1":
+    method: GET
+    url: "{{env.base}}/v1/profile"

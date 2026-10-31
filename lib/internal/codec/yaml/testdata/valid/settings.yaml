@@ -1,0 +1,7 @@
+timeout: 20s
+http:
+  max_redirects: 3
+appearance:
+  theme: dark
+logging:
+  level: debug

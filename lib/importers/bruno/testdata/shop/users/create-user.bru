@@ -1,0 +1,22 @@
+meta {
+  name: Create user
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/v1/users
+  body: multipartForm
+  auth: apikey
+}
+
+auth:apikey {
+  key: X-Api-Key
+  value: ak_live_999
+  placement: header
+}
+
+body:multipart-form {
+  name: {{$randomFullName}}
+  avatar: @file(/Users/ada/me.png)
+}

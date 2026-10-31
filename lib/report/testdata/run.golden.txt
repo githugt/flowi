@@ -1,0 +1,22 @@
+⊘ User creation journey  aborted  1m1.5s
+  run 01JRUN0000000000000000000A · seed 42 · env local
+  ✓ login  120ms
+    ✓ hook pre collection hooks/sign  5ms
+      ✓ sign  1ms
+  ↷ flaky  1ms  (failed, continued)
+      FLW-RUN-001 assertion failed: vars.ready
+  ✓ users  300ms
+    [0]
+      ✓ create  100ms
+    [1]
+      ✓ create  90ms
+  ⊘ both  1m0s
+    b1
+      ⊘ verify  1m0s
+    b2
+      ✓ note  0s
+Warnings:
+  FLW-RUN-015 node "flaky" failed; continuing (on_error: continue)
+Notes:
+  both/b2/note: hello
+Aborted: grace_period_exceeded after 1m0s; in flight: both/b1/verify

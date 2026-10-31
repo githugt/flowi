@@ -1,0 +1,17 @@
+arazzo: 1.1.0
+info:
+  title: check-login
+  version: 1.0.0
+sourceDescriptions:
+  - name: flowi
+    url: ../descriptions/requests.openapi.yaml
+    type: openapi
+workflows:
+  - workflowId: check-login
+    x-flowi-flow:
+      id: 01JB0000000000000000000020
+      name: Check login
+      nodes:
+        - id: has-token
+          type: assert
+          check: response.body.token != empty

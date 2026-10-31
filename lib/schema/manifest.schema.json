@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/githugt/flowi-lib/schema/manifest.schema.json",
+  "title": "Flowi collection manifest (flowi.yaml)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "format",
+    "id"
+  ],
+  "properties": {
+    "format": {
+      "type": "integer",
+      "const": 1
+    },
+    "id": {
+      "$ref": "common.schema.json#/$defs/ulid"
+    },
+    "name": {
+      "type": "string"
+    },
+    "description": {
+      "type": "string"
+    },
+    "depends_on": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id"
+        ],
+        "properties": {
+          "id": {
+            "$ref": "common.schema.json#/$defs/ulid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "repo": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "settings": {
+      "$ref": "common.schema.json#/$defs/settings"
+    },
+    "hooks": {
+      "$ref": "common.schema.json#/$defs/hooks"
+    },
+    "variables": {
+      "type": "object",
+      "description": "The collection's own values, read as {{collection_var.name}}; an environment variable of the same name overrides one.",
+      "additionalProperties": {
+        "type": "string"
+      }
+    }
+  }
+}

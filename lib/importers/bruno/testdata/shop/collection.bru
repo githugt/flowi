@@ -1,0 +1,15 @@
+headers {
+  x-client: bruno
+}
+
+auth {
+  mode: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+script:pre-request {
+  bru.setVar("t", Date.now());
+}

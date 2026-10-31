@@ -1,0 +1,146 @@
+{
+  "id": "R1",
+  "kind": "flow",
+  "flow_id": "F1",
+  "flow_path": "journey",
+  "flow_name": "Journey",
+  "collection": "users",
+  "env": "local",
+  "status": "passed",
+  "seed": 7,
+  "started": "2026-10-07T09:00:00Z",
+  "nodes": [
+    {
+      "path": "login",
+      "id": "login",
+      "type": "request",
+      "status": "passed",
+      "started": "2026-10-07T09:00:00Z",
+      "outputs": {
+        "status": 200
+      },
+      "attempts": [
+        {
+          "n": 1,
+          "method": "POST",
+          "url": "http://api/login",
+          "status": 503,
+          "duration_ms": 10
+        },
+        {
+          "n": 2,
+          "method": "POST",
+          "url": "http://api/login",
+          "status": 200,
+          "duration_ms": 20
+        }
+      ],
+      "hooks": [
+        {
+          "phase": "pre",
+          "level": "collection",
+          "step": "hooks/sign",
+          "index": 0,
+          "status": "passed",
+          "nodes": [
+            {
+              "path": "login/pre:collection:0/sign",
+              "id": "sign",
+              "type": "set",
+              "status": "passed",
+              "started": "2026-10-07T09:00:00Z",
+              "duration_ms": 1
+            }
+          ],
+          "duration_ms": 2
+        }
+      ],
+      "duration_ms": 40
+    },
+    {
+      "path": "each",
+      "id": "each",
+      "type": "batch",
+      "status": "passed",
+      "started": "2026-10-07T09:00:00Z",
+      "lanes": [
+        {
+          "label": "[0]",
+          "nodes": [
+            {
+              "path": "each[0]/n",
+              "id": "n",
+              "type": "note",
+              "status": "passed",
+              "started": "2026-10-07T09:00:00Z",
+              "outputs": {
+                "text": "first"
+              },
+              "duration_ms": 0
+            }
+          ]
+        },
+        {
+          "label": "[1]",
+          "nodes": [
+            {
+              "path": "each[1]/n",
+              "id": "n",
+              "type": "note",
+              "status": "passed",
+              "started": "2026-10-07T09:00:00Z",
+              "outputs": {
+                "text": "second"
+              },
+              "duration_ms": 0
+            }
+          ]
+        }
+      ],
+      "duration_ms": 5
+    },
+    {
+      "path": "a",
+      "id": "a",
+      "type": "assert",
+      "status": "failed",
+      "handled": true,
+      "started": "2026-10-07T09:00:00Z",
+      "diagnostics": [
+        {
+          "code": "FLW-RUN-001",
+          "severity": "error",
+          "message": "assertion failed: x"
+        }
+      ],
+      "duration_ms": 0
+    }
+  ],
+  "warnings": [
+    {
+      "code": "FLW-RUN-015",
+      "severity": "warning",
+      "message": "node \"a\" failed; continuing (on_error: continue)"
+    }
+  ],
+  "notes": [
+    {
+      "path": "each[0]/n",
+      "text": "first"
+    },
+    {
+      "path": "each[1]/n",
+      "text": "second"
+    }
+  ],
+  "versions": [
+    {
+      "path": "login",
+      "request_id": "Q1",
+      "request_path": "auth/login",
+      "version": "2",
+      "source": "preferred"
+    }
+  ],
+  "duration_ms": 1000
+}

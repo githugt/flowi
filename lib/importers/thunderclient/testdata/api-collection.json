@@ -1,0 +1,36 @@
+{
+  "clientName": "Thunder Client",
+  "collectionName": "Shop API",
+  "collectionId": "c1",
+  "version": "1.2",
+  "folders": [
+    {"_id": "f1", "name": "Orders", "containerId": "", "sortNum": 10000},
+    {"_id": "f2", "name": "Admin", "containerId": "f1", "sortNum": 20000}
+  ],
+  "requests": [
+    {"_id": "r1", "colId": "c1", "containerId": "f1", "name": "List orders", "url": "{{base_url}}/orders?status=open", "method": "GET", "sortNum": 10000,
+      "headers": [{"name": "Accept", "value": "application/json"}, {"name": "X-Api-Key", "value": "literal-key"}, {"name": "X-Off", "value": "1", "isDisabled": true}],
+      "params": [{"name": "page", "value": "1", "isPath": false}, {"name": "status", "value": "open", "isPath": false}, {"name": "id", "value": "7", "isPath": true}],
+      "auth": {"type": "bearer", "bearer": "{{token}}"},
+      "tests": [
+        {"type": "res-code", "custom": "", "action": "equal", "value": "200"},
+        {"type": "res-header", "custom": "Content-Type", "action": "equal", "value": "application/json"},
+        {"type": "json-query", "custom": "json.items.id", "action": ">", "value": "0"},
+        {"type": "res-body", "custom": "", "action": "contains", "value": "ok"}
+      ]},
+    {"_id": "r2", "colId": "c1", "containerId": "f2", "name": "Create order", "url": "{{base_url}}/orders", "method": "POST", "sortNum": 20000,
+      "headers": [],
+      "auth": {"type": "basic", "basic": {"username": "ada", "password": "pw"}},
+      "body": {"type": "json", "raw": "{\"sku\": \"abc\", \"password\": \"hunter2\"}", "form": []}},
+    {"_id": "r3", "colId": "c1", "containerId": "f1", "name": "Form", "url": "{{base_url}}/forms", "method": "POST", "sortNum": 30000,
+      "body": {"type": "formencoded", "form": [{"name": "a", "value": "1"}, {"name": "secret", "value": "s3"}]}},
+    {"_id": "r4", "colId": "c1", "containerId": "", "name": "Upload", "url": "{{base_url}}/up", "method": "POST", "sortNum": 40000,
+      "body": {"type": "formdata", "form": [{"name": "note", "value": "hi"}], "files": [{"name": "doc", "value": "/home/me/doc.pdf"}]}},
+    {"_id": "r5", "colId": "c1", "containerId": "", "name": "Query", "url": "{{base_url}}/graphql", "method": "POST", "sortNum": 50000,
+      "body": {"type": "graphql", "graphql": {"query": "{ me { id } }", "variables": "{\"a\": 1}"}}},
+    {"_id": "r6", "colId": "c1", "containerId": "", "name": "Token", "url": "{{base_url}}/token", "method": "POST", "sortNum": 60000,
+      "auth": {"type": "oauth2", "oauth2": {"grantType": "client_credentials", "tokenUrl": "{{base_url}}/oauth/token", "clientId": "abc", "clientSecret": "shh", "scope": "read"}}},
+    {"_id": "r7", "colId": "c1", "containerId": "", "name": "Hawk", "url": "{{base_url}}/h", "method": "GET", "sortNum": 70000, "auth": {"type": "hawk"}},
+    {"_id": "r8", "colId": "c1", "containerId": "", "name": "Empty", "url": "", "method": "GET", "sortNum": 80000}
+  ]
+}

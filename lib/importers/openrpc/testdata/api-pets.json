@@ -1,0 +1,39 @@
+{
+  "openrpc": "1.2.6",
+  "info": {"title": "Pet service", "version": "1.0.0"},
+  "servers": [{"name": "prod", "url": "https://rpc.example.com/v1"}],
+  "methods": [
+    {
+      "name": "pets.list",
+      "summary": "List the pets",
+      "description": "Returns a page of pets.",
+      "paramStructure": "by-name",
+      "params": [
+        {"name": "limit", "required": false, "schema": {"type": "integer", "default": 20}},
+        {"name": "tag", "schema": {"type": "string", "examples": ["dog"]}}
+      ],
+      "result": {"name": "pets", "schema": {"type": "array"}},
+      "examples": [
+        {"name": "two dogs", "params": [{"name": "limit", "value": 2}, {"name": "tag", "value": "dog"}],
+         "result": {"name": "pets", "value": [{"id": 1, "name": "Rex"}, {"id": 2, "name": "Fido"}]}}
+      ]
+    },
+    {
+      "name": "pets.get",
+      "summary": "Get one pet",
+      "params": [{"name": "id", "required": true, "schema": {"type": "integer"}}],
+      "result": {"name": "pet", "schema": {"type": "object"}}
+    },
+    {
+      "name": "pets.add",
+      "params": [
+        {"name": "pet", "required": true, "schema": {"type": "object"}},
+        {"name": "dryRun", "schema": {"type": "boolean"}}
+      ],
+      "result": {"name": "ok", "schema": {"type": "boolean"}}
+    },
+    {"name": "rpc.ping", "params": [], "result": {"name": "pong", "schema": {"type": "string"}}},
+    {"name": "pets.get", "params": [], "summary": "a second method of the same name"},
+    {"summary": "no name"}
+  ]
+}

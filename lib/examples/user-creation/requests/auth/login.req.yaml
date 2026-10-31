@@ -1,0 +1,48 @@
+id: 01JA0000000000000000000010
+name: Login
+description: Exchange email and password for an access token.
+default: "1"
+versions:
+  "1":
+    method: POST
+    url: "{{env.base_url}}/v1/login"
+    headers:
+      Content-Type: application/json
+    body:
+      json: |
+        { "email": "{{email}}", "password": "{{secret.password}}" }
+    extract:
+      token:
+        from: body
+        path: $.data.token
+      subject:
+        from: body
+        path: $.data.sub
+    hooks:
+      post:
+        - inline:
+            - id: logged-in
+              type: assert
+              check: status == 200
+              on_fail: error
+  "2":
+    method: POST
+    url: "{{env.base_url}}/v2/login"
+    headers:
+      Content-Type: application/json
+    body:
+      json: |
+        { "email": "{{email}}", "password": "{{secret.password}}", "remember": true }
+    extract:
+      token:
+        from: body
+        path: $.token
+      subject:
+        from: body
+        path: $.user.id
+    hooks:
+      post:
+        - inline:
+            - id: has-token
+              type: assert
+              check: response.body.token != empty

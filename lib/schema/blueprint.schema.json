@@ -1,0 +1,97 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/githugt/flowi-lib/schema/blueprint.schema.json",
+  "title": "Flowi blueprint (*.blueprint.yaml)",
+  "description": "A flow template with declared parameters. Nodes are checked only for id and type here; the flow made from the blueprint is checked in full against flow.schema.json. A request or subflow reference may be {param: name}.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id"
+  ],
+  "properties": {
+    "id": {
+      "$ref": "common.schema.json#/$defs/ulid"
+    },
+    "name": {
+      "type": "string"
+    },
+    "description": {
+      "type": "string"
+    },
+    "phase": {
+      "enum": [
+        "pre",
+        "post"
+      ],
+      "description": "Which hooks of a request the nodes can be, when the blueprint is used as the hooks a new request starts with. Empty means post."
+    },
+    "params": {
+      "type": "object",
+      "propertyNames": {
+        "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+        "maxLength": 64
+      },
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "type"
+        ],
+        "properties": {
+          "type": {
+            "enum": [
+              "string",
+              "int",
+              "bool",
+              "request-ref",
+              "flow-ref"
+            ]
+          },
+          "description": {
+            "type": "string"
+          },
+          "default": {
+            "type": [
+              "string",
+              "number",
+              "boolean"
+            ]
+          }
+        }
+      }
+    },
+    "prefer_version": {
+      "$ref": "flow.schema.json#/properties/prefer_version"
+    },
+    "inputs": {
+      "$ref": "flow.schema.json#/properties/inputs"
+    },
+    "outputs": {
+      "$ref": "flow.schema.json#/properties/outputs"
+    },
+    "execution": {
+      "$ref": "flow.schema.json#/properties/execution"
+    },
+    "run": {
+      "$ref": "flow.schema.json#/properties/run"
+    },
+    "nodes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "type"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}

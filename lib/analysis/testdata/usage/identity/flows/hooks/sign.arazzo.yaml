@@ -1,0 +1,18 @@
+arazzo: 1.1.0
+info:
+  title: sign
+  version: 1.0.0
+sourceDescriptions:
+  - name: flowi
+    url: ../descriptions/requests.openapi.yaml
+    type: openapi
+workflows:
+  - workflowId: sign
+    x-flowi-flow:
+      id: 01JB0000000000000000000021
+      name: Sign
+      nodes:
+        - id: sig
+          type: set
+          target: vars.signature
+          value: x

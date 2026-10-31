@@ -1,0 +1,6 @@
+{
+  "version": "2",
+  "status": 200,
+  "headers": [{"name": "X-Request-Id", "value": "r2"}, {"name": "Set-Cookie", "value": "sid=1; Path=/"}],
+  "body": {"token": "t", "user": {"id": "u"}}
+}

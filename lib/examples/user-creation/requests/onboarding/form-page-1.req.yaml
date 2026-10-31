@@ -1,0 +1,12 @@
+id: 01JA0000000000000000000012
+name: Form page 1
+description: Personal details.
+versions:
+  "1":
+    method: PUT
+    url: "{{env.base_url}}/v1/onboarding/{{subject}}/personal"
+    headers:
+      Authorization: Bearer {{token}}
+    body:
+      json: |
+        { "firstName": "{{first_name}}", "lastName": "{{last_name}}" }

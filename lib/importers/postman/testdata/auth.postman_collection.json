@@ -1,0 +1,19 @@
+{
+  "info": {"name": "Auth", "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"},
+  "item": [
+    {"name": "Digest", "request": {"method": "GET", "url": "https://example.com/d",
+      "auth": {"type": "digest", "digest": [{"key": "username", "value": "ada"}, {"key": "password", "value": "pw-literal"}]}}},
+    {"name": "Token", "request": {"method": "POST", "url": "https://example.com/t",
+      "auth": {"type": "oauth2", "oauth2": [{"key": "grant_type", "value": "client_credentials"}, {"key": "accessTokenUrl", "value": "{{base}}/oauth/token"},
+        {"key": "clientId", "value": "abc"}, {"key": "clientSecret", "value": "shh-literal"}, {"key": "scope", "value": "read"}, {"key": "client_authentication", "value": "body"}]}}},
+    {"name": "Browser", "request": {"method": "GET", "url": "https://example.com/b",
+      "auth": {"type": "oauth2", "oauth2": [{"key": "grant_type", "value": "authorization_code_with_pkce"}, {"key": "authUrl", "value": "{{base}}/oauth/authorize"},
+        {"key": "accessTokenUrl", "value": "{{base}}/oauth/token"}, {"key": "clientId", "value": "abc"}, {"key": "redirect_uri", "value": "https://oauth.pstmn.io/v1/callback"}, {"key": "scope", "value": "read"}]}}},
+    {"name": "Aws", "request": {"method": "GET", "url": "https://example.com/a",
+      "auth": {"type": "awsv4", "awsv4": [{"key": "accessKey", "value": "AKIAEXAMPLE"}, {"key": "secretKey", "value": "{{aws_secret}}"}, {"key": "region", "value": "eu-west-1"}, {"key": "service", "value": "execute-api"}]}}},
+    {"name": "Hawk", "request": {"method": "GET", "url": "https://example.com/h",
+      "auth": {"type": "hawk", "hawk": [{"key": "authId", "value": "id1"}, {"key": "authKey", "value": "key-literal"}, {"key": "algorithm", "value": "sha256"}]}}},
+    {"name": "Oauth1", "request": {"method": "GET", "url": "https://example.com/o",
+      "auth": {"type": "oauth1", "oauth1": [{"key": "consumerKey", "value": "ck"}, {"key": "consumerSecret", "value": "cs-literal"}, {"key": "signatureMethod", "value": "HMAC-SHA1"}]}}}
+  ]
+}

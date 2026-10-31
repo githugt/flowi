@@ -1,0 +1,144 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/githugt/flowi-lib/schema/flow.schema.json",
+  "title": "Flowi flow (*.flow.yaml)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id"
+  ],
+  "properties": {
+    "id": {
+      "$ref": "common.schema.json#/$defs/ulid"
+    },
+    "name": {
+      "type": "string"
+    },
+    "description": {
+      "type": "string"
+    },
+    "prefer_version": {
+      "type": "string"
+    },
+    "inputs": {
+      "type": "object",
+      "additionalProperties": {
+        "type": [
+          "object",
+          "null"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "default": {
+            "type": "string"
+          },
+          "type": {
+            "enum": [
+              "string",
+              "number",
+              "boolean",
+              "object",
+              "array"
+            ],
+            "description": "What the input holds; shown on the Start card."
+          }
+        }
+      }
+    },
+    "outputs": {
+      "type": "object",
+      "description": "Values the flow returns: name \u2192 template rendered when the flow ends, or {type, value}.",
+      "additionalProperties": {
+        "oneOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "object",
+            "required": [
+              "value"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "type": {
+                "enum": [
+                  "string",
+                  "number",
+                  "boolean",
+                  "object",
+                  "array"
+                ]
+              },
+              "value": {
+                "type": "string"
+              }
+            }
+          }
+        ]
+      }
+    },
+    "execution": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "max_concurrency": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "rate_limit": {
+          "oneOf": [
+            {
+              "type": "string",
+              "pattern": "^[1-9][0-9]*/[smh]$"
+            },
+            {
+              "type": "object",
+              "description": "Per-host limits; the key \"*\" applies to every host.",
+              "additionalProperties": {
+                "type": "string",
+                "pattern": "^[1-9][0-9]*/[smh]$"
+              }
+            }
+          ]
+        },
+        "on_branch_error": {
+          "enum": [
+            "fail_fast",
+            "finish_running",
+            "continue_all"
+          ]
+        }
+      }
+    },
+    "run": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "until": {
+          "type": "string"
+        },
+        "max_iterations": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "max_duration": {
+          "type": "string"
+        },
+        "interval": {
+          "type": "string"
+        }
+      }
+    },
+    "nodes": {
+      "$ref": "common.schema.json#/$defs/nodes"
+    },
+    "tags": {
+      "type": "array",
+      "description": "Labels for `flowi run --tag`. A folder's tags apply to everything under it.",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    }
+  }
+}
