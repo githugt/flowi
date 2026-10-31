@@ -24,13 +24,13 @@ jobs:
       run:
         working-directory: app
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0 # the release notes read the history; the version comes from the tag, through VERSION
-      - uses: actions/setup-go@v6
+      - uses: actions/setup-go@v7
         with:
           go-version-file: app/go.mod
-      - uses: actions/setup-node@v5
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
 
@@ -84,7 +84,7 @@ jobs:
           mv bin/flowi-app.rpm "bin/flowi-app_${VERSION}_linux_amd64.rpm"
           mv bin/flowi-app.pkg.tar.zst "bin/flowi-app_${VERSION}_linux_amd64.pkg.tar.zst"
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: flowi-${{ matrix.os }}
           retention-days: 7
