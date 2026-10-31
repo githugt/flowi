@@ -4,7 +4,7 @@ go 1.27
 
 require (
 	github.com/githugt/flowi-lib v0.3.0-alpha.1
-	github.com/wailsapp/wails/v3 v3.0.0-beta.30
+	github.com/wailsapp/wails/v3 v3.1.0-nightly.20261027
 )
 
 require (
