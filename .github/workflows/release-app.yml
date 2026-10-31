@@ -27,7 +27,7 @@ jobs:
       - uses: actions/checkout@v5
         with:
           fetch-depth: 0 # the release notes read the history; the version comes from the tag, through VERSION
-      - uses: actions/setup-go@v6
+      - uses: actions/setup-go@v7
         with:
           go-version-file: app/go.mod
       - uses: actions/setup-node@v5

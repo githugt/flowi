@@ -18,7 +18,7 @@ jobs:
       - uses: actions/checkout@v5
         with:
           fetch-depth: 0 # git-cliff and goreleaser read the history and the tags
-      - uses: actions/setup-go@v6
+      - uses: actions/setup-go@v7
         with:
           go-version-file: cli/go.mod
       - name: release notes
