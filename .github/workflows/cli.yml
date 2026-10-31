@@ -52,7 +52,7 @@ jobs:
       - uses: actions/setup-go@v6
         with:
           go-version-file: cli/go.mod
-      - uses: golangci/golangci-lint-action@v8
+      - uses: golangci/golangci-lint-action@v9
         with:
           version: v2.14
           working-directory: cli
