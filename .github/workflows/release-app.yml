@@ -24,7 +24,7 @@ jobs:
       run:
         working-directory: app
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0 # the release notes read the history; the version comes from the tag, through VERSION
       - uses: actions/setup-go@v6
