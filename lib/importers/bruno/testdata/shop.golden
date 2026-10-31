@@ -1,0 +1,100 @@
+item "collection" imported at 1:1
+  warning FLW-IMPORT-001 1:1 collection script:pre-request has no Flowi equivalent and was left out: scripts are JavaScript; use hooks and extract or assert nodes instead
+item "auth/login" imported at 1:1
+item "broken/bad-block" skipped at 1:1
+  error FLW-IMPORT-004 9:1 Bruno syntax error: expected name: value in block get
+    | headers {
+    | ^
+  error FLW-IMPORT-005 1:1 broken/bad-block was skipped: the file cannot be read
+item "graph" imported at 1:1
+  warning FLW-IMPORT-006 1:1 basic auth password looked like a credential and was replaced by {{secret.password}}
+item "users/create-user" imported at 1:1
+  warning FLW-IMPORT-006 1:1 API key X-Api-Key looked like a credential and was replaced by {{secret.x_api_key}}
+  warning FLW-IMPORT-001 1:1 file part avatar has no Flowi equivalent and was kept with its path: the path is on the machine that exported the collection
+item "users/get-user" imported at 1:1
+  warning FLW-IMPORT-001 25:3 assert res.body.roles: isArray has no Flowi equivalent and was left out: only comparisons and isDefined/isUndefined/isNull map to Flowi checks
+  warning FLW-IMPORT-001 32:3 post-response var computed has no Flowi equivalent and was left out: only res.body paths, res.headers.x and res.status map to extracts
+  warning FLW-IMPORT-001 1:1 request tests has no Flowi equivalent and was left out: scripts are JavaScript; use hooks and extract or assert nodes instead
+item "environment local" imported at 1:1
+  warning FLW-IMPORT-006 1:1 variable password looked like a credential and was replaced by a secret declaration
+  warning FLW-IMPORT-006 1:1 variable token looked like a credential and was replaced by a secret declaration
+--- request auth/login
+name: Login
+versions:
+  "1":
+    method: POST
+    url: "{{env.baseUrl}}/v1/login"
+    headers:
+      x-client: bruno
+      content-type: application/json
+    body:
+      json: |-
+        {
+          "email": "{{env.email}}",
+          "password": "{{secret.password}}"
+        }
+    extract:
+      token:
+        from: body
+        path: $.token
+--- request graph
+name: Me
+versions:
+  "1":
+    method: POST
+    url: "{{env.baseUrl}}/graphql"
+    headers:
+      x-client: bruno
+      Authorization: Basic {{toBase64("admin" + ":" + secret.password)}}
+      Content-Type: application/json
+    body:
+      json: "{\"query\":\"query { me { id } }\",\"variables\":{\"a\":1}}"
+--- request users/create-user
+name: Create user
+versions:
+  "1":
+    method: POST
+    url: "{{env.baseUrl}}/v1/users"
+    headers:
+      x-client: bruno
+      accept: application/json
+      X-Api-Key: "{{secret.x_api_key}}"
+    body:
+      multipart:
+        name: "{{$full-name}}"
+        avatar:
+          file: /Users/ada/me.png
+--- request users/get-user
+name: Get user
+versions:
+  "1":
+    method: GET
+    url: "{{env.baseUrl}}/v1/users/42"
+    query:
+      include: roles
+    headers:
+      x-client: bruno
+      accept: application/json
+      Authorization: Bearer {{token}}
+    extract:
+      userName:
+        from: body
+        path: $.name
+      etag:
+        from: header
+        header: etag
+      seen:
+        from: body
+        path: $.items[0].id
+    assert:
+      - status == 200
+      - response.body.name != nil
+--- environment local
+name: local
+vars:
+  baseUrl: http://localhost:8080
+  email: qa@example.com
+  password:
+    secret: true
+  token:
+    secret: true

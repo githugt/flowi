@@ -1,0 +1,90 @@
+item "Orders/List-orders" imported at 0:0
+  warning FLW-IMPORT-006 0:0 header X-Api-Key looked like a credential and was replaced by {{secret.x_api_key}}
+  warning FLW-IMPORT-001 0:0 test res-body contains has no Flowi equivalent and was left out: only comparisons of the status, a header, the time or a JSON value map to Flowi checks
+item "Orders/Admin/Create-order" imported at 0:0
+  warning FLW-IMPORT-006 0:0 basic auth password looked like a credential and was replaced by {{secret.password}}
+  warning FLW-IMPORT-006 0:0 the request body (1 values) looked like a credential and was replaced by (redacted)
+item "Orders/Form" imported at 0:0
+  warning FLW-IMPORT-006 0:0 form field secret looked like a credential and was replaced by {{secret.secret}}
+item "Upload" imported at 0:0
+  warning FLW-IMPORT-001 0:0 file part doc has no Flowi equivalent and was left out: the file is on the machine that exported the collection
+item "Query" imported at 0:0
+item "Token" imported at 0:0
+  warning FLW-IMPORT-006 0:0 oauth2 auth client_secret looked like a credential and was replaced by {{secret.client_secret}}
+item "Hawk" imported at 0:0
+  warning FLW-IMPORT-001 0:0 auth type hawk has no Flowi equivalent and was left out: set the credentials up with headers or a pre-hook
+item "Empty" skipped at 0:0
+  error FLW-IMPORT-005 0:0 Empty was skipped: the request has no URL
+--- request Orders/List-orders
+name: List orders
+versions:
+  "1":
+    method: GET
+    url: "{{env.base_url}}/orders"
+    query:
+      status: open
+      page: "1"
+    headers:
+      Accept: application/json
+      X-Api-Key: "{{secret.x_api_key}}"
+      Authorization: Bearer {{secret.token}}
+    assert:
+      - status == 200
+      - response.headers["content-type"] == "application/json"
+      - response.body.items.id > 0
+--- request Orders/Admin/Create-order
+name: Create order
+versions:
+  "1":
+    method: POST
+    url: "{{env.base_url}}/orders"
+    headers:
+      Authorization: Basic {{toBase64("ada" + ":" + secret.password)}}
+    body:
+      json: "{\"password\":\"(redacted)\",\"sku\":\"abc\"}"
+--- request Orders/Form
+name: Form
+versions:
+  "1":
+    method: POST
+    url: "{{env.base_url}}/forms"
+    body:
+      form:
+        a: "1"
+        secret: "{{secret.secret}}"
+--- request Upload
+name: Upload
+versions:
+  "1":
+    method: POST
+    url: "{{env.base_url}}/up"
+    body:
+      multipart:
+        note: hi
+--- request Query
+name: Query
+versions:
+  "1":
+    method: POST
+    url: "{{env.base_url}}/graphql"
+    body:
+      json: "{\"query\":\"{ me { id } }\",\"variables\":{\"a\": 1}}"
+--- request Token
+name: Token
+versions:
+  "1":
+    method: POST
+    url: "{{env.base_url}}/token"
+    auth:
+      type: oauth2
+      grant: client_credentials
+      token_url: "{{env.base_url}}/oauth/token"
+      client_id: abc
+      client_secret: "{{secret.client_secret}}"
+      scope: read
+--- request Hawk
+name: Hawk
+versions:
+  "1":
+    method: GET
+    url: "{{env.base_url}}/h"

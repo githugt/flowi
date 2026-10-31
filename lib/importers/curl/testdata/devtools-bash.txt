@@ -1,0 +1,8 @@
+curl 'https://api.example.com/v1/users?page=2&sort=name' \
+  -H 'accept: application/json' \
+  -H 'authorization: Bearer eyJhbGciOiJIUzI1NiJ9.e30.abc' \
+  -H 'content-type: application/json' \
+  -b 'session=s3cr3t; theme=dark' \
+  -H 'x-trace-id: 7f1c' \
+  --data-raw '{"name":"Ada","tags":["a","b"]}' \
+  --compressed

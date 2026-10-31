@@ -1,0 +1,7 @@
+curl -X POST 'http://localhost:8080/examples' -H 'Content-Type: application/json' -d '{"name":"first"}'
+curl 'http://localhost:8080/examples/1' -H 'Accept: application/json'
+curl -X PUT 'http://localhost:8080/examples/1' -H 'Content-Type: application/json' -d '{"name":"renamed"}'
+curl -u ada:hunter2 'http://localhost:8080/secure/examples/1'
+curl 'http://localhost:8080/secure/examples/1' -H 'X-API-Key: key-literal-123'
+curl ^"http://localhost:8080/examples/2^" ^
+  -H ^"Accept: application/json^"

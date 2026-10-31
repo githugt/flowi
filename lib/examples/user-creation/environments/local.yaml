@@ -1,0 +1,6 @@
+id: 01JA0000000000000000000002
+vars:
+  base_url: http://localhost:8080
+  password:
+    secret: true
+  verify_wait: 10ms

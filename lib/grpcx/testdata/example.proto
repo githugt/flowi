@@ -1,0 +1,26 @@
+syntax = "proto3";
+
+package myexampleapp;
+
+import "common/types.proto";
+import "google/protobuf/timestamp.proto";
+
+service ExampleService {
+  rpc GetExample(GetExampleRequest) returns (GetExampleResponse);
+  rpc ListExamples(ListExamplesRequest) returns (stream GetExampleResponse);
+  rpc Upload(stream GetExampleRequest) returns (GetExampleResponse);
+}
+
+message GetExampleRequest {
+  string id = 1;
+}
+
+message GetExampleResponse {
+  string id = 1;
+  common.Page page = 2;
+  google.protobuf.Timestamp created = 3;
+}
+
+message ListExamplesRequest {
+  int32 limit = 1;
+}

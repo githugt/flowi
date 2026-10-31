@@ -1,0 +1,54 @@
+# Flowi core library. Run `just` to list recipes.
+
+set shell := ["bash", "-euo", "pipefail", "-c"]
+
+# List recipes.
+default:
+    @just --list
+
+# Run every test with the race detector, then check the no-cgo build.
+test-all:
+    go test -race ./...
+    CGO_ENABLED=0 go build ./...
+
+# Run tests quickly (no race detector). Pass packages or flags, e.g. `just test ./store -run Watch`.
+test *args="./...":
+    go test {{args}}
+
+# Run a fuzz target for a while, e.g. `just fuzz FuzzDecode ./internal/codec/yaml 30s`.
+fuzz target pkg time="20s":
+    go test -run '^$' -fuzz '^{{target}}$' -fuzztime {{time}} {{pkg}}
+
+# Needs a running container engine; for podman on macOS: `podman machine init` and `podman machine start`.
+# Uses `podman compose` when podman is installed, else `docker compose`.
+# Run the MQTT, NATS, Kafka, AMQP, Redis, SQS/SNS (LocalStack), Pub/Sub and PostgreSQL/MySQL/MariaDB integration tests
+# against throwaway containers.
+test-integration:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if command -v podman >/dev/null; then compose="podman compose"; else compose="docker compose"; fi
+    file=testdata/compose/docker-compose.yml
+    $compose -f "$file" up -d
+    trap '$compose -f "$file" down -v' EXIT
+    go test -tags integration -count=1 -v ./transport/ ./dataset/
+
+# Serve the demo API the example collection talks to (default 127.0.0.1:8080, password "demo").
+demo-server *args:
+    go run ./examples/demoserver/cmd/flowi-demo-server {{args}}
+
+# Format code, tidy go.mod and verify downloaded modules.
+clean:
+    go fmt ./...
+    go mod tidy
+    go mod verify
+
+# Lint with golangci-lint (v2).
+lint:
+    golangci-lint run ./...
+
+# Everything CI checks: clean, lint, test-all.
+check: clean lint test-all
+
+# Regenerate CHANGELOG.md from Conventional Commits (needs git-cliff).
+changelog:
+    git cliff --output CHANGELOG.md

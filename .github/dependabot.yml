@@ -2,11 +2,19 @@
 version: 2
 updates:
   - package-ecosystem: gomod
-    directory: /
+    directory: /lib
+    schedule:
+      interval: weekly
+  - package-ecosystem: gomod
+    directory: /cli
+    schedule:
+      interval: weekly
+  - package-ecosystem: gomod
+    directory: /app
     schedule:
       interval: weekly
   - package-ecosystem: npm
-    directory: /frontend
+    directory: /app/frontend
     schedule:
       interval: weekly
   - package-ecosystem: github-actions

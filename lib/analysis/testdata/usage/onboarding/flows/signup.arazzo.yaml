@@ -1,0 +1,45 @@
+arazzo: 1.1.0
+info:
+  title: signup
+  version: 1.0.0
+sourceDescriptions:
+  - name: flowi
+    url: ../descriptions/requests.openapi.yaml
+    type: openapi
+workflows:
+  - workflowId: signup
+    x-flowi-flow:
+      id: 01JC0000000000000000000020
+      name: Signup
+      prefer_version: "2"
+      inputs:
+        email: {}
+      nodes:
+        - id: par
+          type: parallel
+          branches:
+            - id: a
+              nodes:
+                - id: login
+                  type: request
+                  request:
+                    collection: identity
+                    id: 01JB0000000000000000000010
+                    path: auth/login
+                  with:
+                    email: "{{inputs.email}}"
+                    tenant: acme
+            - id: b
+              nodes:
+                - id: hello
+                  type: log
+                  value: hi
+        - id: after
+          type: set
+          target: vars.t
+          value: "{{nodes.login.token}}"
+        - id: hdr
+          type: log
+          value: "{{nodes.login.headers[\"X-Request-Id\"]}} {{nodes.login.session}} {{nodes.login.body.nickname ?? 'anon'}}"
+      outputs:
+        user: "{{nodes.login.body.user.id}}"

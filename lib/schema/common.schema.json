@@ -1,0 +1,746 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/githugt/flowi/lib/schema/common.schema.json",
+  "title": "Flowi shared definitions",
+  "$defs": {
+    "ulid": {
+      "type": "string",
+      "pattern": "^[0-7][0-9A-HJKMNP-TV-Z]{25}$",
+      "description": "A ULID in canonical upper-case form."
+    },
+    "ref": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id"
+      ],
+      "properties": {
+        "collection": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string",
+          "pattern": "^[0-7][0-9A-HJKMNP-TV-Z]{25}$",
+          "description": "A ULID in canonical upper-case form."
+        },
+        "path": {
+          "type": "string"
+        }
+      }
+    },
+    "node": {
+      "type": "object",
+      "required": [
+        "id",
+        "type"
+      ],
+      "additionalProperties": true,
+      "description": "A flow node. Keys not listed here are node-specific options.",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "type": {
+          "enum": [
+            "request",
+            "fetch",
+            "webhook",
+            "subflow",
+            "set",
+            "assert",
+            "fuzz",
+            "condition",
+            "delay",
+            "batch",
+            "run_till",
+            "parallel",
+            "log",
+            "note",
+            "digest",
+            "save",
+            "stop"
+          ]
+        },
+        "name": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "needs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "when": {
+          "type": "string"
+        },
+        "concurrent": {
+          "type": "boolean"
+        },
+        "on_error": {
+          "type": "string",
+          "pattern": "^(fail|continue|goto:.+)$"
+        },
+        "timeout": {
+          "type": "string"
+        },
+        "attach": {
+          "type": "string",
+          "description": "The id of a request or subflow node right next to this one that the canvas draws it with; a view only."
+        },
+        "color": {
+          "enum": [
+            "blue",
+            "green",
+            "amber",
+            "pink",
+            "purple",
+            "teal"
+          ],
+          "description": "The colour the canvas draws this step in; the step's category colour when left out. A view only."
+        },
+        "attach_at": {
+          "enum": [
+            "above",
+            "below"
+          ],
+          "description": "With attach: draw this node in a stack above or below that request, not beside it."
+        },
+        "request": {
+          "$ref": "#/$defs/ref"
+        },
+        "version": {
+          "type": "string"
+        },
+        "overlay": {
+          "type": "string",
+          "description": "A flowi overlay of the request's collection laid over the version; several are joined with +, the later one winning."
+        },
+        "open": {
+          "type": "string",
+          "description": "Opens an async connection (WebSocket, MQTT 5, core NATS) of this name and keeps it for later steps."
+        },
+        "over": {
+          "type": "string",
+          "description": "Runs this step's send and receive over the connection an earlier step opened."
+        },
+        "close": {
+          "type": "boolean",
+          "description": "Closes the connection named by over once this step has run."
+        },
+        "hooks": {
+          "oneOf": [
+            {
+              "enum": [
+                "all",
+                "none"
+              ]
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "mode": {
+                  "enum": [
+                    "all",
+                    "none"
+                  ]
+                },
+                "skip": {
+                  "type": "array",
+                  "items": {
+                    "enum": [
+                      "pre",
+                      "post"
+                    ]
+                  }
+                }
+              }
+            }
+          ]
+        },
+        "with": {
+          "type": "object",
+          "additionalProperties": {
+            "type": [
+              "string",
+              "number",
+              "boolean"
+            ]
+          }
+        },
+        "headers": {
+          "type": "object",
+          "additionalProperties": {
+            "type": [
+              "string",
+              "number",
+              "boolean"
+            ]
+          }
+        },
+        "flow": {
+          "$ref": "#/$defs/ref"
+        },
+        "body": {
+          "$ref": "#/$defs/nodes"
+        },
+        "branches": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "nodes": {
+                "$ref": "#/$defs/nodes"
+              }
+            }
+          }
+        },
+        "then": {
+          "$ref": "#/$defs/nodes"
+        },
+        "else": {
+          "$ref": "#/$defs/nodes"
+        },
+        "cases": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "when": {
+                "type": "string"
+              },
+              "nodes": {
+                "$ref": "#/$defs/nodes"
+              }
+            }
+          }
+        },
+        "target": {
+          "type": "string",
+          "description": "set: vars.<name>, request.<field> or cookies.<name>"
+        },
+        "value": {
+          "description": "set / log: the value or message (a template when text)"
+        },
+        "check": {
+          "type": "string",
+          "description": "assert: a boolean expression"
+        },
+        "on_fail": {
+          "enum": [
+            "error",
+            "warn"
+          ],
+          "description": "assert: error fails the node; warn reports and continues"
+        },
+        "message": {
+          "type": "string",
+          "description": "assert: shown when the check fails; stop: why the run stops"
+        },
+        "status": {
+          "enum": [
+            "passed",
+            "failed"
+          ],
+          "description": "stop: how the run ends; passed (the default) is a normal end that skips the rest"
+        },
+        "values": {
+          "type": "array",
+          "description": "set: values written in order; a later one may read an earlier one",
+          "items": {
+            "type": "object",
+            "required": [
+              "name"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "from": {
+                "enum": [
+                  "expr",
+                  "literal",
+                  "response",
+                  "generate"
+                ],
+                "description": "where the value comes from; expr when left out"
+              },
+              "value": {
+                "description": "expr, literal or generate: the value or template"
+              },
+              "in": {
+                "enum": [
+                  "body",
+                  "header",
+                  "cookie",
+                  "status"
+                ],
+                "description": "response: which part of the response"
+              },
+              "path": {
+                "type": "string",
+                "description": "response body: RFC 9535 JSONPath"
+              },
+              "header": {
+                "type": "string"
+              },
+              "cookie": {
+                "type": "string"
+              },
+              "regex": {
+                "type": "string"
+              },
+              "seed": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "generate: seed for this value only"
+              }
+            }
+          }
+        },
+        "count": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 200,
+          "description": "fuzz: how many bad bodies to send (default 20)"
+        },
+        "expect": {
+          "enum": [
+            "no_server_error",
+            "rejected"
+          ],
+          "description": "fuzz: no_server_error fails on a 5xx or no answer; rejected also fails when a bad body is accepted"
+        },
+        "schema": {
+          "type": "string",
+          "description": "assert: the id of a request step whose response must match the response schema kept for its request"
+        },
+        "problem": {
+          "type": "string",
+          "description": "assert: the id of a request step whose response must be a problem details document (RFC 9457)"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "set"
+              }
+            },
+            "required": [
+              "type"
+            ]
+          },
+          "then": {
+            "anyOf": [
+              {
+                "required": [
+                  "target",
+                  "value"
+                ]
+              },
+              {
+                "required": [
+                  "values"
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "assert"
+              }
+            },
+            "required": [
+              "type"
+            ]
+          },
+          "then": {
+            "properties": {
+              "on_fail": {
+                "enum": [
+                  "error",
+                  "warn"
+                ]
+              }
+            },
+            "anyOf": [
+              {
+                "required": [
+                  "check"
+                ]
+              },
+              {
+                "required": [
+                  "schema"
+                ]
+              },
+              {
+                "required": [
+                  "problem"
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "stop"
+              }
+            },
+            "required": [
+              "type"
+            ]
+          },
+          "then": {
+            "properties": {
+              "status": {
+                "enum": [
+                  "passed",
+                  "failed"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "log"
+              }
+            },
+            "required": [
+              "type"
+            ]
+          },
+          "then": {
+            "required": [
+              "value"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "note"
+              }
+            },
+            "required": [
+              "type"
+            ]
+          },
+          "then": {
+            "required": [
+              "text"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "delay"
+              }
+            },
+            "required": [
+              "type"
+            ]
+          },
+          "then": {
+            "required": [
+              "duration"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "run_till"
+              }
+            },
+            "required": [
+              "type"
+            ]
+          },
+          "then": {
+            "required": [
+              "until",
+              "body"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "batch"
+              }
+            },
+            "required": [
+              "type"
+            ]
+          },
+          "then": {
+            "required": [
+              "body"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "parallel"
+              }
+            },
+            "required": [
+              "type"
+            ]
+          },
+          "then": {
+            "required": [
+              "branches"
+            ],
+            "properties": {
+              "wait": {
+                "enum": [
+                  "all",
+                  "any",
+                  "first-success"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "fetch"
+              }
+            },
+            "required": [
+              "type"
+            ]
+          },
+          "then": {
+            "required": [
+              "url"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "webhook"
+              }
+            },
+            "required": [
+              "type"
+            ]
+          },
+          "then": {
+            "required": [
+              "url"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "save"
+              }
+            },
+            "required": [
+              "type"
+            ]
+          },
+          "then": {
+            "required": [
+              "key",
+              "value"
+            ],
+            "properties": {
+              "mode": {
+                "enum": [
+                  "overwrite",
+                  "latest-by-status",
+                  "append"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "digest"
+              }
+            },
+            "required": [
+              "type"
+            ]
+          },
+          "then": {
+            "properties": {
+              "sink": {
+                "enum": [
+                  "stdout",
+                  "file",
+                  "webhook"
+                ]
+              },
+              "format": {
+                "enum": [
+                  "markdown",
+                  "text",
+                  "json"
+                ]
+              },
+              "style": {
+                "enum": [
+                  "text",
+                  "slack",
+                  "discord",
+                  "teams",
+                  "email"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "request"
+              }
+            },
+            "required": [
+              "type"
+            ]
+          },
+          "then": {
+            "required": [
+              "request"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "subflow"
+              }
+            },
+            "required": [
+              "type"
+            ]
+          },
+          "then": {
+            "required": [
+              "flow"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "fuzz"
+              }
+            },
+            "required": [
+              "type"
+            ]
+          },
+          "then": {
+            "required": [
+              "request"
+            ],
+            "properties": {
+              "expect": {
+                "enum": [
+                  "no_server_error",
+                  "rejected"
+                ]
+              }
+            }
+          }
+        }
+      ]
+    },
+    "nodes": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/node"
+      }
+    },
+    "hookStep": {
+      "type": "object",
+      "additionalProperties": false,
+      "minProperties": 1,
+      "maxProperties": 1,
+      "properties": {
+        "flow": {
+          "$ref": "#/$defs/ref"
+        },
+        "inline": {
+          "$ref": "#/$defs/nodes"
+        }
+      }
+    },
+    "hooks": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "pre": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/hookStep"
+          }
+        },
+        "post": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/hookStep"
+          }
+        }
+      }
+    },
+    "stringMap": {
+      "type": "object",
+      "additionalProperties": {
+        "type": [
+          "string",
+          "number",
+          "boolean"
+        ]
+      }
+    },
+    "settings": {
+      "$ref": "settings.schema.json"
+    }
+  }
+}

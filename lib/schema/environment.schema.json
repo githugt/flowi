@@ -1,0 +1,69 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/githugt/flowi/lib/schema/environment.schema.json",
+  "title": "Flowi environment",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id"
+  ],
+  "properties": {
+    "id": {
+      "$ref": "common.schema.json#/$defs/ulid"
+    },
+    "name": {
+      "type": "string"
+    },
+    "description": {
+      "type": "string"
+    },
+    "colour": {
+      "enum": [
+        "red",
+        "orange",
+        "yellow",
+        "lime",
+        "green",
+        "aqua",
+        "blue",
+        "purple",
+        "gray"
+      ]
+    },
+    "extends": {
+      "type": "string",
+      "description": "The environment this one builds on. Its plain variables apply unless this one sets the same name; secrets are not inherited."
+    },
+    "vars": {
+      "type": "object",
+      "additionalProperties": {
+        "anyOf": [
+          {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "secret"
+            ],
+            "properties": {
+              "secret": {
+                "const": true
+              }
+            }
+          },
+          {
+            "type": "array"
+          }
+        ]
+      },
+      "description": "A scalar keeps its type: 5 is a number, true a boolean, \"5\" text. An object or a list is an object value; {secret: true} marks a secret whose value is in the vault."
+    }
+  }
+}

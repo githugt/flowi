@@ -1,0 +1,43 @@
+asyncapi: 3.0.0
+info: {title: Streetlights, version: 1.0.0}
+servers:
+  prod:
+    host: "{broker}:1883"
+    protocol: mqtt
+    variables: {broker: {default: broker.example.com}}
+  secure:
+    host: mqtt.example.com
+    protocol: mqtts
+channels:
+  lightMeasured:
+    address: "smartylighting/streetlights/1/0/event/{streetlightId}/lighting/measured"
+    servers:
+      - $ref: "#/servers/prod"
+    messages:
+      lightMeasured:
+        $ref: "#/components/messages/lightMeasured"
+    parameters:
+      streetlightId: {}
+  turnOn:
+    address: "smartylighting/streetlights/1/0/action/{streetlightId}/turn/on"
+    messages:
+      turnOn:
+        payload:
+          type: object
+          properties:
+            command: {type: string}
+            level: {type: integer}
+operations:
+  receiveLightMeasurement:
+    action: receive
+    title: Receive light measurements
+    channel: {$ref: "#/channels/lightMeasured"}
+  turnOn:
+    action: send
+    channel: {$ref: "#/channels/turnOn"}
+components:
+  messages:
+    lightMeasured:
+      payload: {type: object}
+      examples:
+        - payload: {lumens: 800}

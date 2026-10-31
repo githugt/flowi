@@ -1,0 +1,14 @@
+format: 1
+id: 01JA0000000000000000000001
+name: User creation
+description: Reference collection — a user signs up, verifies, and completes onboarding.
+settings:
+  timeout: 30s
+hooks:
+  post:
+    - inline:
+        - id: fast-enough
+          type: assert
+          check: response.time < 5s
+          on_fail: warn
+          message: slower than 5s

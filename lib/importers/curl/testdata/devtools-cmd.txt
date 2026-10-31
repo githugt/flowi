@@ -1,0 +1,4 @@
+curl ^"https://api.example.com/v1/orders^" ^
+  -H ^"accept: application/json^" ^
+  -H ^"x-api-key: abc123^" ^
+  --data-raw ^"^{^\^"id^\^":1^}^"

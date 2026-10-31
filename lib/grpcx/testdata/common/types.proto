@@ -1,0 +1,3 @@
+syntax = "proto3";
+package common;
+message Page { int32 size = 1; }

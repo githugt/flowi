@@ -1,0 +1,6 @@
+format: 1
+id: 01JC0000000000000000000001
+name: onboarding
+depends_on:
+  - id: 01JB0000000000000000000001
+    name: identity

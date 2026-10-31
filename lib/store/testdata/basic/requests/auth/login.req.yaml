@@ -1,0 +1,6 @@
+id: 01J9ZA3M4N5P6Q7R8S9T0VWXYZ
+name: Login
+versions:
+  "1":
+    method: POST
+    url: "{{env.base_url}}/login"

@@ -1,0 +1,45 @@
+[
+  {
+    "v": 11,
+    "name": "Shop API",
+    "auth": {"authType": "bearer", "authActive": true, "token": "<<token>>"},
+    "headers": [{"key": "X-Team", "value": "blue", "active": true}, {"key": "X-Off", "value": "1", "active": false}],
+    "variables": [],
+    "requests": [
+      {"v": "13", "name": "Ping", "method": "GET", "endpoint": "<<base_url>>/ping?verbose=1",
+        "params": [{"key": "page", "value": "2", "active": true}, {"key": "debug", "value": "1", "active": false}],
+        "headers": [{"key": "Accept", "value": "application/json", "active": true}, {"key": "X-Api-Key", "value": "literal-key", "active": true}],
+        "auth": {"authType": "inherit", "authActive": true},
+        "body": {"contentType": null, "body": null}, "preRequestScript": "", "testScript": "pw.expect(1).toBe(1)"}
+    ],
+    "folders": [
+      {
+        "v": 11, "name": "Orders",
+        "auth": {"authType": "inherit", "authActive": true},
+        "headers": [],
+        "requests": [
+          {"v": "13", "name": "Create order", "method": "POST", "endpoint": "<<base_url>>/orders",
+            "params": [], "headers": [],
+            "auth": {"authType": "basic", "authActive": true, "username": "ada", "password": "pw"},
+            "body": {"contentType": "application/json", "body": "{\"sku\": \"abc\", \"password\": \"hunter2\"}"},
+            "preRequestScript": "", "testScript": ""},
+          {"v": "13", "name": "Form", "method": "POST", "endpoint": "<<base_url>>/forms", "params": [], "headers": [],
+            "auth": {"authType": "none", "authActive": true},
+            "body": {"contentType": "application/x-www-form-urlencoded", "body": "a: 1\nsecret: s3\n# off: 0"}},
+          {"v": "13", "name": "Upload", "method": "POST", "endpoint": "<<base_url>>/up", "params": [], "headers": [],
+            "auth": {"authType": "api-key", "authActive": true, "key": "X-Key", "value": "<<key>>", "addTo": "HEADERS"},
+            "body": {"contentType": "multipart/form-data", "body": [
+              {"key": "note", "value": "hi", "active": true, "isFile": false},
+              {"key": "doc", "value": [], "active": true, "isFile": true}]}},
+          {"v": "13", "name": "Token", "method": "POST", "endpoint": "<<base_url>>/token", "params": [], "headers": [],
+            "auth": {"authType": "oauth-2", "authActive": true, "grantTypeInfo": {"grantType": "CLIENT_CREDENTIALS", "authEndpoint": "<<base_url>>/oauth/token", "clientID": "abc", "clientSecret": "shh", "scopes": "read"}},
+            "body": {"contentType": "text/xml", "body": "<a/>"}},
+          {"v": "13", "name": "Implicit", "method": "GET", "endpoint": "<<base_url>>/i", "params": [], "headers": [],
+            "auth": {"authType": "oauth-2", "authActive": true, "grantTypeInfo": {"grantType": "AUTHORIZATION_CODE"}}},
+          {"v": "13", "name": "Empty", "method": "GET", "endpoint": "", "params": [], "headers": []}
+        ],
+        "folders": []
+      }
+    ]
+  }
+]

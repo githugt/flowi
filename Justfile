@@ -1,49 +1,51 @@
-# Flowi web-view GUI (Wails 3 + Svelte). Run `just` to list recipes.
+# flowi: run the apps and checks across lib, cli and app. Run `just` to list recipes.
+#
+# Each folder has its own Justfile with more recipes; these delegate to them.
 
 set shell := ["bash", "-euo", "pipefail", "-c"]
 set positional-arguments
 
-# Go's cgo passes -lobjc twice on macOS, and Xcode 15+'s linker warns about it
-# (golang/go#67799). The warning is harmless; this silences it.
-ldflags := if os() == "macos" { "-ldflags=-extldflags=-Wl,-no_warn_duplicate_libraries" } else { "" }
+repos := "lib cli app"
 
-# Build the frontend, then start the app.
-run *args: frontend
-    go run {{ldflags}} . "$@"
+# List recipes.
+default:
+    @just --list
 
-# Build the app into ./bin/flowi-app (the front end first: the binary embeds it).
-build: frontend
-    go build {{ldflags}} -o bin/flowi-app .
+# Start the GUI (Wails + Svelte).
+run *args:
+    just --justfile app/Justfile run "$@"
 
-# Install the frontend dependencies when missing, and build it (the app embeds frontend/dist).
-frontend:
-    cd frontend && { [ -d node_modules ] || npm ci; } && npm run build
+# Run a CLI command in the cli sandbox (never touches your real settings), e.g. `just run-cli ls requests`.
+run-cli *args:
+    just --justfile cli/Justfile cli "$@"
 
-# Regenerate the TypeScript bindings after changing a service's Go methods.
-bindings:
-    wails3 generate bindings -clean=true
+# Serve the demo API the example collection talks to (127.0.0.1:8080, password "demo").
+demo-server *args:
+    just --justfile lib/Justfile demo-server "$@"
 
-# Type-check the Svelte code.
-check-frontend:
-    cd frontend && npm run check
+# Reset the CLI sandbox to just the example collection.
+sandbox:
+    just --justfile cli/Justfile sandbox
 
-# Format code, tidy go.mod and verify downloaded modules.
+# Walk through the main CLI commands on a fresh sandbox.
+demo:
+    just --justfile cli/Justfile demo
+
+# Run both example flows against the demo API (live progress tree), writing JUnit and Markdown reports.
+demo-run:
+    just --justfile cli/Justfile demo-run
+
+# Run every module's full test suite.
+test-all:
+    for r in {{repos}}; do echo "== $r"; just --justfile $r/Justfile test-all; done
+
+# Format, tidy and verify modules in every module.
 clean:
-    go fmt ./...
-    go mod tidy
-    go mod verify
+    for r in {{repos}}; do echo "== $r"; just --justfile $r/Justfile clean; done
 
-# Lint with golangci-lint (v2).
+# Lint every module.
 lint:
-    golangci-lint run ./...
+    for r in {{repos}}; do echo "== $r"; just --justfile $r/Justfile lint; done
 
-# Run every test with the race detector, and type-check the frontend.
-test-all: frontend check-frontend test-frontend
-    go test -race ./...
-
-# Run the frontend's unit tests.
-test-frontend:
-    cd frontend && npm test
-
-# Everything CI checks: clean, lint, test-all.
+# clean, lint and test-all across every module.
 check: clean lint test-all

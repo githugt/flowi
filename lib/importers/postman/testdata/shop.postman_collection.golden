@@ -1,0 +1,123 @@
+item "collection Shop API" imported at 1:1
+  warning FLW-IMPORT-001 1:1 collection pre-request script has no Flowi equivalent and was left out: scripts are JavaScript; use hooks and extract or assert nodes instead
+  warning FLW-IMPORT-006 1:1 variable api_secret looked like a credential and was replaced by a secret declaration
+item "Auth/Login" imported at 18:9
+  warning FLW-IMPORT-006 18:9 saved response OK (1 values) looked like a credential and was replaced by (redacted)
+  warning FLW-IMPORT-001 18:9 request test script has no Flowi equivalent and was left out: scripts are JavaScript; use hooks and extract or assert nodes instead
+item "Users/Get-user" imported at 43:9
+item "Users/Get-user-orders" imported at 56:9
+item "Users/Create-user" imported at 60:9
+  warning FLW-IMPORT-006 60:9 header X-Api-Key looked like a credential and was replaced by {{secret.x_api_key}}
+  warning FLW-IMPORT-001 60:9 file part avatar has no Flowi equivalent and was kept with its path: the path is on the machine that exported the collection
+  warning FLW-IMPORT-001 60:9 dynamic variable $randomBankAccountIban has no Flowi equivalent and was replaced by an env reference: Flowi has no generator for it
+item "Users/Search-users" imported at 74:9
+  warning FLW-IMPORT-006 74:9 basic auth password looked like a credential and was replaced by {{secret.password}}
+item "Users/Broken" skipped at 83:9
+  error FLW-IMPORT-005 83:9 Users/Broken was skipped: the request has no URL
+item "Graph" imported at 89:5
+item "Partner" imported at 98:5
+  warning FLW-IMPORT-001 98:5 auth type oauth2 has no Flowi equivalent and was left out: a token fetched in Postman or a grant Flowi does not have (implicit) has no Flowi equivalent; use client credentials, password or authorization code, or send the token as a Bearer header
+item "Empty thing" skipped at 106:5
+  error FLW-IMPORT-005 106:5 Empty thing was skipped: it is neither a request nor a folder
+--- request Auth/Login
+name: Login
+versions:
+  "1":
+    method: POST
+    url: "{{env.base_url}}/v1/login"
+    headers:
+      Content-Type: application/json
+    body:
+      json: |-
+        {
+          "email": "{{env.email}}",
+          "password": "{{secret.password}}",
+          "nonce": "{{$uuid-v4}}"
+        }
+--- request Users/Get-user
+name: Get user
+versions:
+  "1":
+    method: GET
+    url: "{{env.base_url}}/v1/users/42"
+    query:
+      include: roles
+    headers:
+      Accept: application/json
+      Authorization: Bearer {{secret.token}}
+--- request Users/Get-user-orders
+name: Get user orders
+versions:
+  "1":
+    method: GET
+    url: "{{env.base_url}}/v1/users/{{user_id}}/orders"
+    headers:
+      Authorization: Bearer {{secret.token}}
+--- request Users/Create-user
+name: Create user
+versions:
+  "1":
+    method: POST
+    url: "{{env.base_url}}/v1/users"
+    headers:
+      X-Api-Key: "{{secret.x_api_key}}"
+      Authorization: Bearer {{secret.token}}
+    body:
+      multipart:
+        name: "{{$full-name}}"
+        email: "{{$email}}"
+        iban: "{{env.randomBankAccountIban}}"
+        avatar:
+          file: /Users/ada/avatar.png
+--- request Users/Search-users
+name: Search users
+versions:
+  "1":
+    method: POST
+    url: "{{env.base_url}}/v1/users/search"
+    headers:
+      Authorization: Basic {{toBase64("admin" + ":" + secret.password)}}
+    body:
+      form:
+        q: ada
+--- request Graph
+name: Graph
+versions:
+  "1":
+    method: POST
+    url: "{{env.base_url}}/graphql"
+    query:
+      api_key: "{{secret.api_secret}}"
+    headers:
+      Content-Type: application/json
+    body:
+      json: "{\"query\":\"query { me { id } }\",\"variables\":{\"a\":1}}"
+--- request Partner
+name: Partner
+versions:
+  "1":
+    method: GET
+    url: https://partner.example.com/v2/stock
+    query:
+      sku: "{{env.sku}}"
+--- environment shop-api
+name: shop-api
+vars:
+  base_url: https://api.example.com
+  api_secret:
+    secret: true
+--- example Auth/Login OK
+{
+  "version": "1",
+  "status": 200,
+  "headers": [
+    {
+      "name": "Content-Type",
+      "value": "application/json"
+    }
+  ],
+  "body": {
+    "expires_in": 3600,
+    "token": "(redacted)"
+  }
+}

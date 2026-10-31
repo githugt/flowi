@@ -1,0 +1,36 @@
+flowchart LR
+  %% Flowi flow onboarding-check; labels follow Flowi's Mermaid conventions
+  %% containers are drawn as subgraphs; importing them back gives placeholders
+  session["subflow: shared/login"]
+  who["set who"]
+  profile["set profile"]
+  subgraph checks ["batch checks"]
+    config["fetch config"]
+    double["set: twice={{index * 2}}"]
+    config --> double
+  end
+  subgraph both ["parallel both"]
+    notify["webhook notify"]
+    client["req: config"]
+  end
+  subgraph poll ["run_till poll"]
+    status["fetch status"]
+  end
+  subgraph decide ["condition decide"]
+    ready["note: Onboarding of {{vars.subject}} ({{vars.nickname}}) is ready after {{nodes.poll.iterations}} polls."]
+    stuck["log: Onboarding is still pending."]
+  end
+  passed["set: checked={{nodes.checks.passed}}"]
+  all-checked["assert: vars.checked == 3"]
+  keep["save keep"]
+  summary["digest summary"]
+  session --> who
+  who --> profile
+  profile --> checks
+  checks --> both
+  both --> poll
+  poll --> decide
+  decide --> passed
+  passed --> all-checked
+  all-checked --> keep
+  keep --> summary

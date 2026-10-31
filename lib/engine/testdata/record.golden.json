@@ -1,0 +1,80 @@
+{
+  "id": "01JA00000000000000000000R1",
+  "run_id": "01JA00000000000000000000N1",
+  "collection_id": "01JA0000000000000000000001",
+  "request_id": "01JA0000000000000000000010",
+  "request_path": "auth/login",
+  "version": "2",
+  "version_source": "preferred",
+  "at": "2026-10-06T12:00:00Z",
+  "request": {
+    "method": "POST",
+    "url": "https://api.example/v2/login?token=plain",
+    "headers": [
+      {
+        "name": "X-Key",
+        "value": "plain"
+      }
+    ],
+    "body": {
+      "text": "{\"password\":\"plain\"}",
+      "sha256": "aa",
+      "size": 10
+    }
+  },
+  "status": 302,
+  "proto": "HTTP/2.0",
+  "headers": [
+    {
+      "name": "Content-Type",
+      "value": "application/json"
+    }
+  ],
+  "body": {
+    "text": "{\"echo\":\"plain\"}",
+    "json": {
+      "echo": "plain",
+      "list": [
+        "plain"
+      ]
+    },
+    "sha256": "bb",
+    "size": 20,
+    "raw_size": 18,
+    "content_type": "application/json"
+  },
+  "redirects": [
+    {
+      "status": 302,
+      "url": "https://api.example/a",
+      "location": "/b?s=plain",
+      "headers": [
+        {
+          "name": "Location",
+          "value": "/b?s=plain"
+        }
+      ]
+    }
+  ],
+  "timings": {
+    "dns": 1000000,
+    "connect": 2000000,
+    "tls": 3000000,
+    "ttfb": 4000000,
+    "total": 5000000
+  },
+  "attempts": [
+    {
+      "error": "dial tcp: plain",
+      "duration": 1000000,
+      "wait": 200000000
+    },
+    {
+      "status": 302,
+      "duration": 5000000
+    }
+  ],
+  "outputs": {
+    "token": "plain"
+  }
+}

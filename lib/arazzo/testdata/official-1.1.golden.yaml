@@ -1,0 +1,29 @@
+arazzo: 1.0.1
+info:
+  title: purchasePet
+  version: 1.0.0
+sourceDescriptions:
+  - name: petstore
+    url: ./petstore.openapi.yaml
+    type: openapi
+workflows:
+  - workflowId: purchasePet
+    inputs:
+      type: object
+      properties:
+        correlationId:
+          type: string
+        petId:
+          type: string
+    steps:
+      - stepId: fetchPet
+        operationId: $sourceDescriptions.petstore.getPet
+        parameters:
+          - name: petId
+            in: path
+            value: $inputs.petId
+        successCriteria:
+          - condition: $statusCode == 200
+    x-flowi-skipped:
+      - placeOrder
+      - confirmOrder

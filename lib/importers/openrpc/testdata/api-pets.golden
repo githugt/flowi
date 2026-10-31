@@ -1,0 +1,129 @@
+item "environment" imported at 0:0
+item "pets.list" imported at 0:0
+item "pets.get" imported at 0:0
+item "pets.add" imported at 0:0
+item "rpc.ping" imported at 0:0
+item "pets.get-2" imported at 0:0
+item "method" skipped at 0:0
+  error FLW-IMPORT-005 0:0 method was skipped: the method has no name
+--- request pets.list
+name: pets.list
+versions:
+  "1":
+    method: POST
+    url: "{{env.base_url}}"
+    headers:
+      Content-Type: application/json
+    body:
+      json: |-
+        {
+          "jsonrpc": "2.0",
+          "method": "pets.list",
+          "params": {
+            "limit": 2,
+            "tag": "dog"
+          },
+          "id": 1
+        }
+    docs: |-
+      List the pets
+      
+      Returns a page of pets.
+--- request pets.get
+name: pets.get
+versions:
+  "1":
+    method: POST
+    url: "{{env.base_url}}"
+    headers:
+      Content-Type: application/json
+    body:
+      json: |-
+        {
+          "jsonrpc": "2.0",
+          "method": "pets.get",
+          "params": [
+            0
+          ],
+          "id": 1
+        }
+    docs: Get one pet
+--- request pets.add
+name: pets.add
+versions:
+  "1":
+    method: POST
+    url: "{{env.base_url}}"
+    headers:
+      Content-Type: application/json
+    body:
+      json: |-
+        {
+          "jsonrpc": "2.0",
+          "method": "pets.add",
+          "params": [
+            {},
+            false
+          ],
+          "id": 1
+        }
+--- request rpc.ping
+name: rpc.ping
+versions:
+  "1":
+    method: POST
+    url: "{{env.base_url}}"
+    headers:
+      Content-Type: application/json
+    body:
+      json: |-
+        {
+          "jsonrpc": "2.0",
+          "method": "rpc.ping",
+          "id": 1
+        }
+--- request pets.get-2
+name: pets.get
+versions:
+  "1":
+    method: POST
+    url: "{{env.base_url}}"
+    headers:
+      Content-Type: application/json
+    body:
+      json: |-
+        {
+          "jsonrpc": "2.0",
+          "method": "pets.get",
+          "id": 1
+        }
+    docs: a second method of the same name
+--- environment openrpc
+name: openrpc
+vars:
+  base_url: https://rpc.example.com/v1
+--- example pets.list two-dogs
+{
+  "version": "1",
+  "status": 200,
+  "headers": [
+    {
+      "name": "Content-Type",
+      "value": "application/json"
+    }
+  ],
+  "body": {
+    "id": 1,
+    "jsonrpc": "2.0",
+    "result": [
+      {
+        "id": 1,
+        "name": "Rex"
+      },
+      {
+        "id": 2,
+        "name": "Fido"
+      }
+    ]
+  }
+}

@@ -1,0 +1,24 @@
+meta {
+  name: Me
+  type: graphql
+  seq: 9
+}
+
+post {
+  url: {{baseUrl}}/graphql
+  body: graphql
+  auth: basic
+}
+
+auth:basic {
+  username: admin
+  password: hunter2
+}
+
+body:graphql {
+  query { me { id } }
+}
+
+body:graphql:vars {
+  {"a": 1}
+}

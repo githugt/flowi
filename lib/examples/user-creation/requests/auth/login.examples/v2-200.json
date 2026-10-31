@@ -1,0 +1,16 @@
+{
+  "version": "2",
+  "status": 200,
+  "headers": [
+    {
+      "name": "Content-Type",
+      "value": "application/json"
+    }
+  ],
+  "body": {
+    "token": "usr_demo.signature",
+    "user": {
+      "id": "usr_demo"
+    }
+  }
+}

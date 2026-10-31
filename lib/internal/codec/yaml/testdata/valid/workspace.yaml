@@ -1,0 +1,10 @@
+id: 01JA003M4N5P6Q7R8S9T0VWXYZ
+name: Default
+collections:
+  - id: 01J9Z8K3M4N5P6Q7R8S9T0VWXY
+    path: ~/code/acme/onboarding-api
+  - id: 01JB12K3M4N5P6Q7R8S9T0VWXY
+    path: /work/identity api
+settings:
+  defaults:
+    environment: staging

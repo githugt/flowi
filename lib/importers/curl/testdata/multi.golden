@@ -1,0 +1,49 @@
+item "curl/get-health" imported at 1:3
+item "curl/put-v1-users-42" imported at 2:1
+  warning FLW-IMPORT-001 2:1 flag --frobnicate has no Flowi equivalent and was ignored: it is not a curl flag Flowi knows
+  warning FLW-IMPORT-006 2:1 header Authorization looked like a credential and was replaced by {{secret.authorization}}
+item "curl/get-v1-things" imported at 4:1
+item "curl/post-v1-upload" imported at 5:1
+  warning FLW-IMPORT-001 5:1 file part file has no Flowi equivalent and was kept with its path: the path is relative to where curl ran
+--- request curl/get-health
+name: GET /health
+versions:
+  "1":
+    method: GET
+    url: https://api.example.com/health
+--- request curl/put-v1-users-42
+name: PUT /v1/users/42
+versions:
+  "1":
+    method: PUT
+    url: https://api.example.com/v1/users/42
+    headers:
+      Authorization: "{{secret.authorization}}"
+    body:
+      form:
+        name: Ada
+        city: New York
+--- request curl/get-v1-things
+name: GET /v1/things
+versions:
+  "1":
+    method: GET
+    url: https://api.example.com/v1/things
+    query:
+      q: a b
+    headers:
+      Content-Type: application/json
+      Accept: application/json
+    body:
+      json: "{\"a\":1}"
+--- request curl/post-v1-upload
+name: POST /v1/upload
+versions:
+  "1":
+    method: POST
+    url: https://api.example.com/v1/upload
+    body:
+      multipart:
+        file:
+          file: avatar.png
+        caption: hi

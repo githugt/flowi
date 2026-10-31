@@ -1,0 +1,109 @@
+arazzo: 1.1.0
+info:
+  title: User creation journey
+  version: 1.0.0
+sourceDescriptions:
+  - name: flowi
+    url: ../descriptions/requests.openapi.yaml
+    type: openapi
+workflows:
+  - workflowId: user-creation
+    summary: User creation journey
+    description: Login, verify, then fill both onboarding pages.
+    inputs:
+      type: object
+      properties:
+        email:
+          type: string
+          default: "{{$email}}"
+    steps:
+      - stepId: login
+        operationId: $sourceDescriptions.flowi.auth_login
+        requestBody:
+          contentType: application/json
+          payload:
+            email: $inputs.email
+      - stepId: wait-for-code
+        operationId: $sourceDescriptions.flowi.flowiCustomStep
+        x-flowi-node: wait-for-code
+      - stepId: verify
+        operationId: $sourceDescriptions.flowi.auth_verify
+        requestBody:
+          contentType: application/json
+          payload:
+            code: "123456"
+      - stepId: profile
+        operationId: $sourceDescriptions.flowi.flowiCustomStep
+        x-flowi-node: profile
+      - stepId: page-1
+        operationId: $sourceDescriptions.flowi.onboarding_form_page_1
+      - stepId: page-2
+        operationId: $sourceDescriptions.flowi.onboarding_form_page_2
+    x-flowi-digest: sha256:a93800710aeb2eb7318020957842b1ed828734a640d3a8a8cd59a1a3fd67f3ec
+    x-flowi-flow:
+      id: 01JA0000000000000000000020
+      name: User creation journey
+      description: Login, verify, then fill both onboarding pages.
+      prefer_version: "2"
+      inputs:
+        email:
+          default: "{{$email}}"
+      nodes:
+        - id: login
+          type: request
+          request:
+            id: 01JA0000000000000000000010
+            path: auth/login
+          with:
+            email: "{{inputs.email}}"
+        - id: session
+          type: set
+          values:
+            - name: token
+              value: "{{nodes.login.token}}"
+            - name: subject
+              value: "{{nodes.login.subject}}"
+        - id: wait-for-code
+          type: delay
+          duration: "{{env.verify_wait}}"
+        - id: verify
+          type: request
+          request:
+            id: 01JA0000000000000000000011
+            path: auth/verify
+          with:
+            token: "{{vars.token}}"
+            subject: "{{vars.subject}}"
+            code: "123456"
+        - id: profile
+          type: set
+          values:
+            - name: first_name
+              from: generate
+              value: "{{$first-name}}"
+            - name: last_name
+              from: generate
+              value: "{{$last-name}}"
+            - name: city
+              from: generate
+              value: "{{$city-name}}"
+        - id: page-1
+          type: request
+          request:
+            id: 01JA0000000000000000000012
+            path: onboarding/form-page-1
+          with:
+            token: "{{vars.token}}"
+            subject: "{{vars.subject}}"
+            first_name: "{{vars.first_name}}"
+            last_name: "{{vars.last_name}}"
+        - id: page-2
+          type: request
+          request:
+            id: 01JA0000000000000000000013
+            path: onboarding/form-page-2
+          with:
+            token: "{{vars.token}}"
+            subject: "{{vars.subject}}"
+            city: "{{vars.city}}"
+x-flowi-version: 1

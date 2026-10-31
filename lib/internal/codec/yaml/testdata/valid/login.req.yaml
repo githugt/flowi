@@ -1,0 +1,44 @@
+id: 01J9ZA3M4N5P6Q7R8S9T0VWXYZ
+name: Login
+description: Authenticate a user
+default: "1"
+versions:
+  "1":
+    method: POST
+    url: "{{env.base_url}}/v1/login"
+    headers:
+      Content-Type: application/json
+    body:
+      json: |
+        { "email": "{{email}}", "password": "{{secret.password}}" }
+    extract:
+      token:
+        from: body
+        path: $.data.token
+      subject:
+        from: body
+        path: $.data.sub
+    assert:
+      - status == 200
+    settings:
+      timeout: 10s
+  "1.1":
+    method: POST
+    url: "{{env.base_url}}/v1.1/login"
+  "2":
+    method: POST
+    url: "{{env.base_url}}/v2/login"
+    query:
+      mode: full
+    hooks:
+      post:
+        - inline:
+            - id: check
+              type: assert
+              check: response.body.token != empty
+              on_fail: error
+hooks:
+  pre:
+    - flow:
+        id: 01J9ZD3M4N5P6Q7R8S9T0VWXYZ
+        path: hooks/sign-request

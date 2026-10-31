@@ -1,0 +1,34 @@
+arazzo: 1.1.0
+info:
+  title: local
+  version: 1.0.0
+sourceDescriptions:
+  - name: flowi
+    url: ../descriptions/requests.openapi.yaml
+    type: openapi
+workflows:
+  - workflowId: local
+    x-flowi-flow:
+      id: 01JB0000000000000000000022
+      name: Local login
+      nodes:
+        - id: gen
+          type: set
+          values:
+            - name: email
+              from: generate
+              value: "{{$email}}"
+        - id: login
+          type: request
+          request:
+            id: 01JB0000000000000000000010
+            path: auth/login
+          version: "1"
+        - id: use
+          type: log
+          value: "{{nodes.login.token}} {{nodes.login.body.data.sub}} {{nodes.login.status}}"
+        - id: me
+          type: request
+          request:
+            id: 01JB0000000000000000000011
+            path: profile

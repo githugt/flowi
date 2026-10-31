@@ -1,0 +1,84 @@
+item "collection Auth" imported at 1:1
+item "Digest" imported at 4:5
+  warning FLW-IMPORT-006 4:5 digest auth password looked like a credential and was replaced by {{secret.password}}
+item "Token" imported at 6:5
+  warning FLW-IMPORT-006 6:5 oauth2 auth client_secret looked like a credential and was replaced by {{secret.client_secret}}
+item "Browser" imported at 9:5
+  warning FLW-IMPORT-001 9:5 OAuth 2.0 redirect address https://oauth.pstmn.io/v1/callback has no Flowi equivalent and was not used: Flowi redirects to http://127.0.0.1:<port>/callback; register that address with the provider and set redirect_port to its port
+item "Aws" imported at 12:5
+item "Hawk" imported at 14:5
+  warning FLW-IMPORT-006 14:5 hawk auth key looked like a credential and was replaced by {{secret.key}}
+item "Oauth1" imported at 16:5
+  warning FLW-IMPORT-006 16:5 oauth1 auth consumer_secret looked like a credential and was replaced by {{secret.consumer_secret}}
+--- request Digest
+name: Digest
+versions:
+  "1":
+    method: GET
+    url: https://example.com/d
+    auth:
+      type: digest
+      username: ada
+      password: "{{secret.password}}"
+--- request Token
+name: Token
+versions:
+  "1":
+    method: POST
+    url: https://example.com/t
+    auth:
+      type: oauth2
+      grant: client_credentials
+      token_url: "{{env.base}}/oauth/token"
+      client_id: abc
+      client_secret: "{{secret.client_secret}}"
+      scope: read
+      client_auth: body
+--- request Browser
+name: Browser
+versions:
+  "1":
+    method: GET
+    url: https://example.com/b
+    auth:
+      type: oauth2
+      grant: authorization_code
+      authorization_url: "{{env.base}}/oauth/authorize"
+      token_url: "{{env.base}}/oauth/token"
+      client_id: abc
+      scope: read
+      pkce: "on"
+--- request Aws
+name: Aws
+versions:
+  "1":
+    method: GET
+    url: https://example.com/a
+    auth:
+      type: aws_sigv4
+      access_key_id: AKIAEXAMPLE
+      secret_access_key: "{{secret.aws_secret}}"
+      region: eu-west-1
+      service: execute-api
+--- request Hawk
+name: Hawk
+versions:
+  "1":
+    method: GET
+    url: https://example.com/h
+    auth:
+      type: hawk
+      id: id1
+      key: "{{secret.key}}"
+      algorithm: sha256
+--- request Oauth1
+name: Oauth1
+versions:
+  "1":
+    method: GET
+    url: https://example.com/o
+    auth:
+      type: oauth1
+      consumer_key: ck
+      consumer_secret: "{{secret.consumer_secret}}"
+      signature_method: HMAC-SHA1

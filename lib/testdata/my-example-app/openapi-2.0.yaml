@@ -1,0 +1,57 @@
+swagger: "2.0"
+info: {title: my-example-app, version: 1.0.0}
+host: localhost:8080
+basePath: /
+schemes: [http]
+consumes: [application/json]
+produces: [application/json]
+securityDefinitions:
+  basic: {type: basic}
+  apiKey: {type: apiKey, in: header, name: X-API-Key}
+definitions:
+  Example:
+    type: object
+    required: [id, name]
+    properties:
+      id: {type: string}
+      name: {type: string}
+  NewExample:
+    type: object
+    required: [name]
+    properties:
+      name: {type: string}
+paths:
+  /examples:
+    post:
+      operationId: createExample
+      parameters:
+        - {name: body, in: body, required: true, schema: {$ref: '#/definitions/NewExample'}}
+      responses:
+        "201": {description: created, schema: {$ref: '#/definitions/Example'}}
+  /examples/{id}:
+    parameters:
+      - {name: id, in: path, required: true, type: string}
+    get:
+      operationId: getExample
+      responses:
+        "200": {description: ok, schema: {$ref: '#/definitions/Example'}}
+    put:
+      operationId: replaceExample
+      parameters:
+        - {name: body, in: body, required: true, schema: {$ref: '#/definitions/NewExample'}}
+      responses:
+        "200": {description: ok, schema: {$ref: '#/definitions/Example'}}
+    patch:
+      operationId: updateExample
+      parameters:
+        - {name: body, in: body, schema: {$ref: '#/definitions/NewExample'}}
+      responses:
+        "200": {description: ok, schema: {$ref: '#/definitions/Example'}}
+  /secure/examples/{id}:
+    get:
+      operationId: getSecureExample
+      security: [{basic: []}]
+      parameters:
+        - {name: id, in: path, required: true, type: string}
+      responses:
+        "200": {description: ok, schema: {$ref: '#/definitions/Example'}}

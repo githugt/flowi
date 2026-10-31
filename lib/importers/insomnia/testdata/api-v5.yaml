@@ -1,0 +1,34 @@
+type: collection.insomnia.rest/5.0
+name: Notes
+collection:
+  - name: Notes
+    children:
+      - name: List
+        method: GET
+        url: "{{ _.host }}/notes"
+        headers:
+          - name: Accept
+            value: application/json
+        authentication:
+          type: apikey
+          key: X-Key
+          value: "{{ _.key }}"
+          addTo: header
+      - name: Create
+        method: POST
+        url: "{{ _.host }}/notes"
+        body:
+          mimeType: text/plain
+          text: hello
+  - name: Ping
+    method: GET
+    url: "{{ _.host }}/ping"
+environments:
+  name: Base Environment
+  data:
+    host: http://localhost:3000
+    key: abc
+  subEnvironments:
+    - name: Staging
+      data:
+        host: https://staging.example.com

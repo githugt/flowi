@@ -1,0 +1,14 @@
+asyncapi: 2.6.0
+info: {title: Chat, version: 1.0.0}
+servers:
+  main: {url: "wss://chat.example.com/socket", protocol: wss}
+channels:
+  messages:
+    publish:
+      operationId: sendMessage
+      message:
+        payload: {type: object, properties: {text: {type: string}}}
+    subscribe:
+      operationId: onMessage
+      message:
+        payload: {type: object}

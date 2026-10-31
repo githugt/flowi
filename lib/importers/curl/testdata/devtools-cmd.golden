@@ -1,0 +1,13 @@
+item "curl/post-v1-orders" imported at 1:1
+  warning FLW-IMPORT-006 3:6 header x-api-key looked like a credential and was replaced by {{secret.x_api_key}}
+--- request curl/post-v1-orders
+name: POST /v1/orders
+versions:
+  "1":
+    method: POST
+    url: https://api.example.com/v1/orders
+    headers:
+      accept: application/json
+      x-api-key: "{{secret.x_api_key}}"
+    body:
+      json: "{\"id\":1}"

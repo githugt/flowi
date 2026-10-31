@@ -1,0 +1,17 @@
+{
+  "info": {"name": "my-example-app", "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"},
+  "variable": [{"key": "baseUrl", "value": "http://localhost:8080"}],
+  "item": [
+    {"name": "REST", "item": [
+      {"name": "Create", "event": [{"listen": "prerequest", "script": {"exec": ["pm.variables.set('x', 1)"]}}],
+        "request": {"method": "POST", "header": [{"key": "Content-Type", "value": "application/json"}],
+          "body": {"mode": "raw", "raw": "{\"name\":\"first\"}", "options": {"raw": {"language": "json"}}},
+          "url": "{{baseUrl}}/examples"},
+        "response": [{"name": "Created", "code": 201, "status": "Created", "header": [{"key": "Content-Type", "value": "application/json"}], "body": "{\"id\":\"1\",\"name\":\"first\"}"}]},
+      {"name": "Get", "request": {"method": "GET", "url": "{{baseUrl}}/examples/1"}}
+    ]},
+    {"name": "Secure", "item": [
+      {"name": "Get secure", "request": {"method": "GET", "auth": {"type": "basic", "basic": [{"key": "username", "value": "ada"}, {"key": "password", "value": "hunter2"}]}, "url": "{{baseUrl}}/secure/examples/1"}}
+    ]}
+  ]
+}

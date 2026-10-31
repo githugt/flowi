@@ -1,0 +1,30 @@
+id: 01J9ZB3M4N5P6Q7R8S9T0VWXYZ
+name: Standard onboarding
+description: Log in, then create a user.
+params:
+  api:
+    type: request-ref
+    description: The login request
+    default: auth/login
+  email:
+    type: string
+    default: demo@example.com
+  retries:
+    type: int
+  notify:
+    type: bool
+    default: "true"
+  verify:
+    type: flow-ref
+inputs:
+  note:
+    default: hello
+nodes:
+  - id: login
+    type: request
+    request:
+      param: api
+  - id: verify
+    type: subflow
+    flow:
+      param: verify

@@ -1,0 +1,33 @@
+# An OpenAPI document split over files: references to files beside it are
+# followed, and the files are kept beside the kept copy for the update.
+exec flowi import openapi api/openapi.yaml --init ./shop
+stdout '^Created collection shop'
+exists shop/requests/addPet.req.yaml
+grep 'nickname' shop/requests/addPet.req.yaml
+exists shop/descriptions/openapi.files/schemas/pet.yaml
+! stderr 'external reference'
+
+# From standard input there is no folder: the reference is reported and left out.
+stdin api/openapi.yaml
+exec flowi import openapi - --init ./piped
+stderr 'external reference'
+stderr 'FLW-IMPORT-001'
+
+-- api/openapi.yaml --
+openapi: 3.0.3
+info: {title: shop, version: 1.0.0}
+paths:
+  /pets:
+    post:
+      operationId: addPet
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: ./schemas/pet.yaml
+      responses:
+        "200": {description: ok}
+-- api/schemas/pet.yaml --
+type: object
+properties:
+  nickname: {type: string}
