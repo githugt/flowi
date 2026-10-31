@@ -35,7 +35,7 @@ jobs:
       - name: install the Linux build dependencies
         if: runner.os == 'Linux'
         uses: ./.github/actions/linux-deps
-      - uses: actions/setup-node@v5
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
       - name: build the frontend (the app embeds it)
@@ -53,7 +53,7 @@ jobs:
           go-version-file: app/go.mod
       - name: install the Linux build dependencies
         uses: ./.github/actions/linux-deps
-      - uses: actions/setup-node@v5
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
       - name: build the frontend (the app embeds it)
@@ -77,7 +77,7 @@ jobs:
           go-version-file: app/go.mod
       - name: install the Linux build dependencies
         uses: ./.github/actions/linux-deps
-      - uses: actions/setup-node@v5
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
       - name: build the frontend (the app embeds it)
@@ -94,7 +94,7 @@ jobs:
         working-directory: app/frontend
     steps:
       - uses: actions/checkout@v5
-      - uses: actions/setup-node@v5
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
       - run: npm ci
@@ -110,7 +110,7 @@ jobs:
         working-directory: app/frontend
     steps:
       - uses: actions/checkout@v5
-      - uses: actions/setup-node@v5
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
       - run: npm ci
