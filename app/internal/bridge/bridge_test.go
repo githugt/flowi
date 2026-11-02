@@ -562,6 +562,20 @@ func TestSettingsService_State_should_list_groups_and_the_appearance(t *testing.
 	}
 }
 
+func TestSettingsService_State_Given_no_choice_When_read_Then_send_button_is_orange_and_a_choice_is_kept(t *testing.T) {
+	app, _ := fixture(t)
+	svc := app.Settings()
+
+	before := svc.State().Appearance.SendButton
+	svc.Set("appearance.send_button", "emerald")
+	after := svc.State().Appearance.SendButton
+
+	// Before: the Send button had one fixed colour; the window could not be told another.
+	if before != "orange" || after != "emerald" {
+		t.Fatalf("send button before %q, after %q; want orange then emerald", before, after)
+	}
+}
+
 func TestSecretsService_State_should_list_secrets_without_values(t *testing.T) {
 	c := vmtest.SampleCollection()
 	b := &vmtest.Backend{Cols: []model.Collection{c}, SecretList: []flowi.SecretInfo{{Environment: "staging", Name: "password"}}}
