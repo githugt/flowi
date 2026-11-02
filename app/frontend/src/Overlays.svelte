@@ -1,5 +1,7 @@
 <script lang="ts">
   let menuH = $state(0)
+  // A menu with a ticked choice keeps room for the tick on every row, so the labels line up.
+  const hasChecks = $derived(!!ui.menu?.items.some((i) => i.checked !== undefined))
   let menuW = $state(0)
   let innerWidth = $state(0)
   let innerHeight = $state(0)
@@ -43,7 +45,7 @@
     style:left={`${Math.max(8, Math.min(ui.menu.x, innerWidth - menuW - 8))}px`} style:top={`${Math.max(8, Math.min(ui.menu.y, innerHeight - menuH - 8))}px`} onpointerdown={(e) => e.stopPropagation()}>
     {#each ui.menu.items as item}
       {#if item.separator}<hr />{:else}
-        <button role="menuitem" disabled={item.disabled} onclick={() => { ui.closeMenu(); item.run() }}>{item.label}</button>
+        <button role={item.checked === undefined ? 'menuitem' : 'menuitemradio'} class:checkable={hasChecks} aria-checked={item.checked} disabled={item.disabled} onclick={() => { ui.closeMenu(); item.run() }}>{#if hasChecks}<span class="tick" aria-hidden="true">{item.checked ? '✓' : ''}</span>{/if}{item.label}</button>
       {/if}
     {/each}
   </div>
@@ -118,6 +120,8 @@
   .menu button { background: none; border: 0; color: var(--text); font: inherit; text-align: left; padding: 5px 10px; border-radius: var(--r-sm); white-space: nowrap; }
   .menu button:hover:not(:disabled) { background: color-mix(in srgb, var(--accent) 20%, transparent); }
   .menu button:disabled { opacity: 0.4; }
+  .menu button.checkable { display: flex; gap: 6px; }
+  .tick { flex: none; width: 1em; color: var(--accent); }
   hr { width: 100%; border: 0; border-top: 1px solid var(--line); margin: 4px 0; }
   .scrim { position: fixed; inset: 0; background: rgb(0 0 0 / 0.4); display: grid; place-items: center; z-index: 60; }
   .dialog { width: 380px; display: flex; flex-direction: column; gap: 10px; padding: 16px; background: var(--panel); border: 1px solid var(--line); border-radius: var(--r-lg); }

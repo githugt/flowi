@@ -10,7 +10,7 @@
   import { collapsedOnOpen, loadPins, savePins, type TabKind } from './lib/sidebar'
   import Verb from './Verb.svelte'
   import Icon from './Icon.svelte'
-  import { ui } from './lib/ui.svelte'
+  import { ui, type MenuItem } from './lib/ui.svelte'
   import { newMenu, promptNewEnvironment } from './lib/menus'
   import EnvOffers from './EnvOffers.svelte'
 
@@ -104,7 +104,13 @@
   const tab = $derived(app.tabs.find((t) => t.node === app.active))
   // The picker takes the colour of the environment it shows, so a production one cannot be mistaken for a test one.
   const selectedSwatch = $derived(envSwatch(app.tree?.envColours?.[app.tree?.selected ?? '']))
-  const NEW_ENV = ':new' // the picker's "New environment…" entry; ':' is not allowed in an environment name
+  // The environment chip's menu: "No environment", each environment (the current one ticked), then a way to make one.
+  function environmentMenu(): MenuItem[] {
+    const selected = app.tree?.selected ?? ''
+    const choices = ['', ...(app.tree?.environments ?? [])]
+    const items: MenuItem[] = choices.map((name) => ({ label: name || 'No environment', checked: name === selected, run: () => app.selectEnvironment(name) }))
+    return [...items, { label: '', separator: true, run: () => {} }, { label: 'New environment…', run: promptNewEnvironment }]
+  }
 
   // Tabs are reordered by dragging with the pointer (the browser's own drag and drop
   // is not reliable in the window's web view). A press only becomes a drag after a few pixels.
@@ -212,19 +218,12 @@
         <button class="plus" title="New…" aria-label="New" onpointerdown={(e) => e.stopPropagation()} onclick={(e) => { const r = e.currentTarget.getBoundingClientRect(); ui.openMenu(r.left, r.bottom + 4, newMenu()) }}><Icon name="plus" /></button>
         {#if app.tree}
           <!-- Always shown, even with no environments yet: it is where a new user learns they need one. -->
-          <select class="envsel" class:none={!app.tree.selected} class:tinted={!!selectedSwatch} style:--env={selectedSwatch} title="Environment: where {'{{env.…}}'} values come from" aria-label="Environment" value={app.tree.selected}
-            onchange={(e) => {
-              const v = e.currentTarget.value
-              if (v === NEW_ENV) {
-                e.currentTarget.value = app.tree?.selected ?? ''
-                promptNewEnvironment()
-              } else app.selectEnvironment(v)
-            }}>
-            <option value="">No environment</option>
-            {#each app.tree.environments as name}<option value={name}>{name}</option>{/each}
-            <option disabled>──────────</option>
-            <option value={NEW_ENV}>New environment…</option>
-          </select>
+          <button class="envsel" class:none={!app.tree.selected} class:tinted={!!selectedSwatch} style:--env={selectedSwatch} title="Environment: where {'{{env.…}}'} values come from" aria-label="Environment: {app.tree.selected || 'none'}" aria-haspopup="menu"
+            onpointerdown={(e) => e.stopPropagation()} onclick={(e) => { const r = e.currentTarget.getBoundingClientRect(); ui.openMenu(r.left, r.bottom + 4, environmentMenu()) }}>
+            <span class="envdot" aria-hidden="true"></span>
+            <span class="envname">{app.tree.selected || 'No environment'}</span>
+            <svg class="envchev" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6" /></svg>
+          </button>
         {/if}
       </div>
     </nav>
@@ -339,7 +338,11 @@
   .plus:hover { color: var(--text); border-color: var(--accent); }
   .envsel.tinted { background: color-mix(in srgb, var(--env) 30%, var(--bg)); border-color: var(--env); }
   .envsel.none { color: var(--warn); border-color: color-mix(in srgb, var(--warn) 60%, var(--line)); }
-  .envsel { background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); font: inherit; padding: 3px 6px; max-width: 160px; }
+  .envsel { display: flex; align-items: center; gap: 6px; background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: var(--r-pill); font: inherit; padding: 3px 8px 3px 10px; max-width: 180px; }
+  .envdot { flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--env, var(--muted)); }
+  .envsel.none .envdot { background: var(--warn); }
+  .envname { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .envchev { flex: none; color: var(--muted); }
   .body { flex: 1; min-height: 0; position: relative; }
   .empty { color: var(--muted); text-align: center; margin-top: 20vh; }
   .err { position: absolute; left: 16px; bottom: 16px; color: var(--fail); }

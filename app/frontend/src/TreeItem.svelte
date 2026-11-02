@@ -10,6 +10,8 @@
   import { moveRequests, movingWith } from './lib/move'
 
   let { node, depth, parent, tint = '' }: { node: TreeNode; depth: number; parent?: TreeNode; tint?: string } = $props()
+  // Each level indents by this much; the guide line under a group sits at the middle of its chevron.
+  const INDENT = 12
   let open = $state(true)
   const branch = $derived(!['request', 'environment', 'flow', 'missing'].includes(node.kind))
   const active = $derived(app.active === node.id)
@@ -113,20 +115,22 @@
 </script>
 
 <div role="treeitem" aria-selected={active} aria-expanded={branch ? open : undefined}>
-  <button class="row" class:active class:marked class:group={branch} class:dragging={drag?.active}
+  <button class="row" class:active class:marked class:group={branch} class:heading={branch && depth === 0} class:dragging={drag?.active}
     class:dropBefore={app.treeDrop?.id === node.id && !app.treeDrop.into && !app.treeDrop.after}
     class:dropAfter={app.treeDrop?.id === node.id && !app.treeDrop.into && app.treeDrop.after}
     class:dropInto={app.treeDrop?.id === node.id && app.treeDrop.into}
-    data-tree-row={node.id} style:--tint={tint || undefined} data-markable={markable ? '' : undefined} data-drop={container ? '' : undefined} style:padding-left={`${8 + depth * 14}px`}
+    data-tree-row={node.id} style:--tint={tint || undefined} data-markable={markable ? '' : undefined} data-drop={container ? '' : undefined} style:padding-left={`${8 + depth * INDENT}px`}
     onclick={click} oncontextmenu={contextmenu} onpointerdown={down} onpointermove={move} onpointerup={up} onpointercancel={up}>
     <span class="twist" class:open aria-hidden="true">{#if branch}<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6" /></svg>{/if}</span>
     {#if node.kind === 'request' && node.method}<span class="method"><Verb verb={node.method} short /></span>{:else if node.kind === 'flow'}<span class="method"><Verb verb="FLOW" /></span>{/if}
     <span class="label">{node.label}</span>
   </button>
   {#if branch && open}
-    {#each node.children ?? [] as child (child.id)}
-      <TreeItem node={child} depth={depth + 1} parent={node} />
-    {/each}
+    <div class="kids" role="group" style:--guide={`${8 + depth * INDENT + 6}px`}>
+      {#each node.children ?? [] as child (child.id)}
+        <TreeItem node={child} depth={depth + 1} parent={node} />
+      {/each}
+    </div>
   {/if}
 </div>
 
@@ -144,7 +148,9 @@
     border-radius: var(--r-md);
     color: var(--text);
     font: inherit;
-    padding-block: 3px;
+    font-size: var(--fs-md);
+    height: 26px;
+    padding-block: 0;
     cursor: default;
   }
   .row.dragging { opacity: 0.5; }
@@ -153,10 +159,19 @@
   .row.dropInto { box-shadow: inset 0 0 0 2px var(--accent); background: color-mix(in srgb, var(--accent) 16%, transparent); }
   .row:hover { background: var(--tint-hover); }
   .row.marked { background: color-mix(in srgb, var(--accent) 32%, transparent); }
-  .row.active { background: var(--tint-sel); box-shadow: inset 2px 0 0 var(--accent); }
-  .group { color: var(--muted); font-weight: 600; font-size: var(--fs-xs); text-transform: uppercase; letter-spacing: 0.05em; }
-  .twist { flex: none; width: 12px; height: 12px; color: var(--muted); display: grid; place-items: center; transition: transform 0.12s; }
+  .row.active { background: var(--tint-sel); }
+  /* The 2px bar marks keyboard focus only; the open row is shown by its fill. */
+  .row:focus-visible { outline: none; box-shadow: inset 2px 0 0 var(--accent); }
+  /* Sub-groups (Requests, Flows …) read as quiet sentence-case headings; only a collection's root keeps capitals. */
+  .group { color: var(--muted); font-weight: 600; font-size: var(--fs-sm); }
+  .heading { font-size: var(--fs-xs); text-transform: uppercase; letter-spacing: 0.05em; }
+  .twist { flex: none; width: 12px; height: 12px; color: var(--muted); display: grid; place-items: center; transition: transform var(--t-fast) var(--ease-out); }
   .twist.open { transform: rotate(90deg); }
   .label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .method { flex: none; min-width: 44px; display: inline-flex; }
+  /* Wide enough for the longest short verb (KAFKA, PATCH) so the names after the pills line up. */
+  .method { flex: none; min-width: 56px; display: inline-flex; }
+  /* A guide line down a group's children, shown while the pointer is over the tree. */
+  .kids { position: relative; }
+  .kids::before { content: ''; position: absolute; top: 0; bottom: 0; left: var(--guide); width: 1px; background: var(--line); opacity: 0; pointer-events: none; transition: opacity var(--t-base) var(--ease-out); }
+  :global(.tree:hover) .kids::before { opacity: 0.4; }
 </style>
