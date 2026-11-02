@@ -56,4 +56,4 @@ never surprise them.
   schema checks only node `id` and `type`.
 - With Valkey down every instance fires every schedule tick.
 - HTTP/3 refuses a configured proxy and does not fall back to TCP.
-- The GUI has no release pipeline yet (cgo packaging); `.goreleaser.yaml` covers the CLI.
+- The GUI has no release pipeline yet (cgo packaging); `cli/scripts/dist.sh` builds the CLI archives.
