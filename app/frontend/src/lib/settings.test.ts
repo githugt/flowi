@@ -6,6 +6,7 @@ describe('sectionOf', () => {
     ['appearance.theme', 'Appearance'],
     ['appearance.url.host', 'Appearance'],
     ['appearance.palette_file', 'Advanced'],
+    ['appearance.send_button', 'Appearance'],
     ['telemetry', 'Privacy'],
     ['telemetry_endpoint', 'Privacy'],
     ['announcements_url', 'Privacy'],
@@ -25,6 +26,10 @@ describe('labelOf', () => {
     expect(labelOf('http.follow_redirects')).toBe('Follow redirects')
     expect(labelOf('serve.replay_addr')).toBe('Replay address')
     expect(labelOf('tls.ca_files')).toBe('CA files')
+  })
+
+  it('names the Send button colour in words, not by its key', () => {
+    expect(labelOf('appearance.send_button')).toBe('Send button colour')
   })
 
   it('prefers a written label', () => {

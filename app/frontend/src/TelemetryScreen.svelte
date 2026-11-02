@@ -40,7 +40,7 @@
 {/if}
 
 <style>
-  .page { position: absolute; inset: 0; overflow: auto; padding: 20px 28px 40px; max-width: 760px; }
+  .page { position: absolute; inset: 0; overflow: auto; padding: 28px 32px 56px; max-width: 760px; }
   h2 { margin: 0 0 8px; }
   .expl { white-space: pre-wrap; line-height: 1.5; }
   .levels { display: flex; gap: 10px; margin: 12px 0; }
@@ -49,7 +49,7 @@
   .err { color: var(--fail); }
   h4 { margin: 18px 0 6px; }
   .tabs { display: flex; gap: 4px; margin-bottom: 6px; }
-  .tabs button { background: transparent; color: var(--muted); border: 1px solid var(--line); border-radius: var(--r-md); padding: 2px 12px; font: inherit; }
+  .tabs button { background: transparent; color: var(--muted); border: 0; border-radius: var(--r-md); padding: 0 12px; min-height: var(--ctl-h); font: inherit; font-weight: 500; }
   .tabs .on { color: var(--text); border-color: var(--accent); }
   pre { background: var(--bg); border: 1px solid var(--line); border-radius: var(--r-lg); padding: 10px; font: var(--fs-sm) var(--mono); overflow: auto; -webkit-user-select: text; user-select: text; }
 </style>

@@ -62,8 +62,8 @@
 
 <style>
   .scrim { position: fixed; inset: 0; z-index: 29; }
-  .popup { position: fixed; z-index: 30; width: 360px; max-height: 430px; box-sizing: border-box; display: flex; flex-direction: column; gap: 8px; padding: 10px; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; box-shadow: var(--shadow); }
-  input { background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); padding: 7px 10px; font: inherit; }
+  .popup { position: fixed; z-index: 30; width: 360px; max-height: 430px; box-sizing: border-box; display: flex; flex-direction: column; gap: 8px; padding: 10px; background: var(--raised); border: 1px solid var(--line); border-radius: 14px; box-shadow: var(--shadow); }
+  input { background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); padding: 7px 10px; font: inherit; }
   input:focus { border-color: var(--accent); outline: none; }
   .list { overflow: auto; display: flex; flex-direction: column; gap: 2px; }
   h4 { margin: 8px 4px 2px; color: var(--muted); font-size: var(--fs-xs); text-transform: uppercase; letter-spacing: 0.06em; }

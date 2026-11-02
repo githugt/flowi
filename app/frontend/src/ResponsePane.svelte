@@ -329,11 +329,11 @@
   .tabs .status-pill { margin-left: 8px; }
   .tone.run { color: var(--accent); }
   .tabs .active { color: var(--text); border-bottom-color: var(--accent); }
-  select { background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); font: inherit; font-size: var(--fs-xs); }
+  select { background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); font: inherit; font-size: var(--fs-xs); }
   .body { flex: 1; min-height: 0; overflow: auto; }
   .col { display: flex; flex-direction: column; }
   .col .edit { align-self: flex-start; }
-  .mono { font: 12.5px/1.6 ui-monospace, Menlo, monospace; -webkit-user-select: text; user-select: text; }
+  .mono { font: var(--fs-sm)/1.6 ui-monospace, Menlo, monospace; -webkit-user-select: text; user-select: text; }
   .ms { border-left: 2px solid var(--line); padding: 2px 10px; margin: 6px 0; }
   .mshead { display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; }
   .mshref { font: 600 var(--fs-sm) var(--mono); }
@@ -344,7 +344,7 @@
   .mstat.bad { color: var(--fail); }
   .rowsum { margin: 0 0 6px; }
   .grid { overflow: auto; border: 1px solid var(--line); border-radius: var(--r-md); }
-  .grid table { border-collapse: collapse; width: 100%; font: 12.5px/1.5 ui-monospace, Menlo, monospace; -webkit-user-select: text; user-select: text; }
+  .grid table { border-collapse: collapse; width: 100%; font: var(--fs-sm)/1.5 ui-monospace, Menlo, monospace; -webkit-user-select: text; user-select: text; }
   .grid th, .grid td { padding: 3px 10px; border-bottom: 1px solid var(--line); text-align: left; white-space: nowrap; max-width: 28em; overflow: hidden; text-overflow: ellipsis; }
   .grid th { position: sticky; top: 0; background: var(--bg); color: var(--muted); font-weight: 600; font-size: var(--fs-xs); z-index: 1; }
   .grid td.number { text-align: right; color: var(--syn-number); }
@@ -352,7 +352,7 @@
   .grid td.null { color: var(--muted); font-style: italic; }
   .grid .idx { color: var(--muted); text-align: right; width: 1%; }
   .treebar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-  .treebar input { flex: 1; min-width: 120px; background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); padding: 3px 8px; font: inherit; }
+  .treebar input { flex: 1; min-width: 120px; background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); padding: 3px 8px; font: inherit; }
   .path { color: var(--muted); font: var(--fs-xs) var(--mono); }
   .phase { display: grid; grid-template-columns: 80px 1fr 70px; gap: 8px; align-items: center; margin: 6px 0; font-size: var(--fs-sm); }
   .track { background: var(--bg); border-radius: var(--r-sm); height: 10px; }
@@ -395,7 +395,7 @@
   .err.off { color: var(--muted); }
   .switch { flex-basis: auto; margin-top: 4px; }
   .hist { margin: 0; padding: 4px 8px; font-size: var(--fs-sm); background: color-mix(in srgb, var(--accent) 14%, transparent); border-radius: var(--r-md); }
-  .mini { background: transparent; color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); padding: 1px 8px; font: inherit; font-size: var(--fs-xs); }
+  .mini { background: var(--raised); color: var(--text); border: 0; box-shadow: inset 0 0 0 1px var(--line); border-radius: var(--r-md); padding: 0 10px; min-height: var(--ctl-h-sm); font: inherit; font-weight: 500; font-size: var(--fs-xs); }
   h5 { margin: 8px 0 2px; color: var(--muted); font-size: var(--fs-xs); text-transform: uppercase; letter-spacing: 0.05em; }
   .diag { color: var(--fail); font-size: var(--fs-sm); margin: 2px 0; }
 </style>

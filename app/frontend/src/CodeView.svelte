@@ -173,10 +173,11 @@
     padding: 3px 12px;
     font: inherit;
   }
-  button:hover:not(:disabled) { border-color: var(--accent); }
+  button:hover:not(:disabled) { background: var(--raised-3); }
   button:disabled { opacity: 0.4; }
   .tabs .active { border-color: var(--accent); }
-  .primary:not(:disabled) { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
+  .primary:not(:disabled) { background: var(--primary-fill); color: var(--on-primary); font-weight: 600; box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.18); }
+  .primary:not(:disabled):hover { filter: brightness(1.1); }
   .problems { margin: 0; padding: 6px 12px; list-style: none; background: color-mix(in srgb, var(--fail) 12%, transparent); flex: none; max-height: 140px; overflow: auto; }
   .problems button { background: none; border: 0; color: var(--fail); padding: 1px 0; text-align: left; font: var(--fs-sm) var(--mono); }
   .notes { margin: 0; padding: 6px 12px; list-style: none; background: color-mix(in srgb, var(--warn) 14%, transparent); flex: none; max-height: 120px; overflow: auto; }

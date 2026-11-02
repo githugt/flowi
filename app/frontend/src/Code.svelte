@@ -13,7 +13,7 @@
 <style>
   .code {
     margin: 0; padding: 8px; background: var(--bg); border: 1px solid var(--line); border-radius: var(--r-md);
-    font: 12px/1.45 var(--mono); white-space: pre-wrap; word-break: break-word; overflow: auto;
+    font: var(--fs-sm)/1.45 var(--mono); white-space: pre-wrap; word-break: break-word; overflow: auto;
     -webkit-user-select: text; user-select: text;
   }
 </style>

@@ -139,7 +139,7 @@
 </div>
 
 <style>
-  .page { position: absolute; inset: 0; overflow: auto; padding: 16px 24px 48px; max-width: 860px; }
+  .page { position: absolute; inset: 0; overflow: auto; padding: 28px 32px 56px; max-width: 860px; }
   h3 { margin: 22px 0 4px; }
   h4 { margin: 14px 0 4px; color: var(--muted); }
   .note, .muted { color: var(--muted); font-size: var(--fs-sm); margin: 0 0 6px; }
@@ -150,10 +150,12 @@
   .line { display: flex; align-items: center; gap: 14px; margin: 8px 0; }
   .inline { font-size: var(--fs-sm); color: var(--muted); display: flex; align-items: center; gap: 6px; }
   .num { width: 56px; }
-  select, input { background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); padding: 4px 8px; font: inherit; }
-  button { background: transparent; color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); padding: 3px 14px; font: inherit; cursor: pointer; }
+  select, input { background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); padding: 4px 8px; font: inherit; }
+  button { background: var(--raised); color: var(--text); border: 0; box-shadow: inset 0 0 0 1px var(--line); border-radius: var(--r-md); padding: 0 14px; min-height: var(--ctl-h); font: inherit; font-weight: 500; cursor: pointer; }
+  button:hover:not(:disabled) { background: var(--raised-3); }
   button:disabled { opacity: 0.4; }
-  .primary:not(:disabled) { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
+  .primary:not(:disabled) { background: var(--primary-fill); color: var(--on-primary); font-weight: 600; box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.18); }
+  .primary:not(:disabled):hover { filter: brightness(1.1); }
   .totals { border: 1px solid var(--line); border-radius: var(--r-lg); padding: 8px 12px; display: flex; flex-direction: column; gap: 2px; margin: 8px 0; font-size: var(--fs-sm); }
   .totals.bad { border-color: var(--fail); }
   .badnote, .badline { color: var(--fail); }

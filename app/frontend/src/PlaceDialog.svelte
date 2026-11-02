@@ -142,17 +142,17 @@
   .muted { color: var(--muted); font-size: var(--fs-sm); margin: 0; }
   .at code { font: var(--fs-xs) var(--mono); }
   .f { display: flex; flex-direction: column; gap: 3px; color: var(--muted); font-size: var(--fs-xs); }
-  input { background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); padding: 5px 8px; font: inherit; -webkit-user-select: text; user-select: text; }
+  input { background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); padding: 5px 8px; font: inherit; -webkit-user-select: text; user-select: text; }
   input:focus { border-color: var(--accent); }
   .where { display: flex; align-items: center; justify-content: space-between; gap: 8px; color: var(--muted); font-size: var(--fs-xs); }
   .make { display: flex; gap: 6px; }
-  .make button, .making button, .actions button { background: transparent; color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); padding: 3px 10px; font: inherit; white-space: nowrap; }
+  .make button, .making button, .actions button { background: var(--raised); color: var(--text); border: 0; box-shadow: inset 0 0 0 1px var(--line); border-radius: var(--r-md); padding: 0 10px; min-height: var(--ctl-h); font: inherit; font-weight: 500; white-space: nowrap; }
   .make button { color: var(--accent); font-size: var(--fs-sm); }
   .making { display: flex; gap: 6px; }
   .making input { flex: 1; min-width: 0; }
   .list { flex: 1; min-height: 120px; max-height: 280px; overflow: auto; border: 1px solid var(--line); border-radius: var(--r-md); padding: 4px; background: var(--bg); }
   .list button { width: 100%; display: flex; align-items: center; gap: 6px; text-align: left; background: none; border: 0; border-radius: var(--r-sm); color: var(--text); font: inherit; padding-block: 4px; padding-right: 10px; }
-  .list button:hover { background: color-mix(in srgb, var(--accent) 10%, transparent); }
+  .list button:hover { background: var(--tint-hover); }
   .list button.on { background: color-mix(in srgb, var(--accent) 24%, transparent); }
   .list button.top { font-weight: 600; }
   .tag { margin-left: auto; color: var(--muted); font-size: var(--fs-xs); font-weight: 400; }

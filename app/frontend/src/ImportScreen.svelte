@@ -135,19 +135,21 @@
 {/if}
 
 <style>
-  .page { position: absolute; inset: 0; overflow: auto; padding: 16px 24px 48px; max-width: 860px; display: flex; flex-direction: column; gap: 10px; }
+  .page { position: absolute; inset: 0; overflow: auto; padding: 28px 32px 56px; max-width: 860px; display: flex; flex-direction: column; gap: 10px; }
   .note { color: var(--muted); margin: 0; }
   .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
   .f { display: flex; flex-direction: column; gap: 3px; color: var(--muted); font-size: var(--fs-xs); }
-  .choose { display: flex; justify-content: space-between; align-items: center; gap: 8px; text-align: left; background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); padding: 5px 8px; font: inherit; }
+  .choose { display: flex; justify-content: space-between; align-items: center; gap: 8px; text-align: left; background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); padding: 5px 8px; font: inherit; }
   .choose:hover { border-color: var(--accent); }
   .chev { color: var(--muted); }
-  select, input, textarea { background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); padding: 5px 8px; font: inherit; -webkit-user-select: text; user-select: text; }
+  select, input, textarea { background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); padding: 5px 8px; font: inherit; -webkit-user-select: text; user-select: text; }
   textarea { min-height: 90px; font: var(--fs-sm) var(--mono); resize: vertical; }
   .actions { display: flex; gap: 8px; }
-  button { background: transparent; color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); padding: 4px 16px; font: inherit; }
+  button { background: var(--raised); color: var(--text); border: 0; box-shadow: inset 0 0 0 1px var(--line); border-radius: var(--r-md); padding: 0 16px; min-height: var(--ctl-h); font: inherit; font-weight: 500; }
+  button:hover:not(:disabled) { background: var(--raised-3); }
   button:disabled { opacity: 0.4; }
-  .primary:not(:disabled) { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
+  .primary:not(:disabled) { background: var(--primary-fill); color: var(--on-primary); font-weight: 600; box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.18); }
+  .primary:not(:disabled):hover { filter: brightness(1.1); }
   .link { border: 0; color: var(--text); padding: 0; font-weight: 600; }
   h3 { margin: 12px 0 0; }
   h4 { margin: 8px 0 2px; font-size: var(--fs-sm); }

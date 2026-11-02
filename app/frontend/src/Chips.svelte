@@ -51,7 +51,7 @@
   .error, .needs { color: var(--fail) !important; border-color: var(--fail) !important; }
   .warning, .disk { color: var(--warn) !important; border-color: var(--warn) !important; }
   .unsaved { color: var(--accent) !important; }
-  .pop { position: absolute; top: 100%; left: 0; margin-top: 6px; width: 320px; padding: 10px 12px; background: var(--panel); border: 1px solid var(--line); border-radius: var(--r-lg); box-shadow: 0 8px 24px rgb(0 0 0 / 0.35); z-index: 25; font-size: var(--fs-sm); }
+  .pop { position: absolute; top: 100%; left: 0; margin-top: 6px; width: 320px; padding: 10px 12px; background: var(--raised); border: 1px solid var(--line); border-radius: var(--r-lg); box-shadow: var(--shadow); z-index: 25; font-size: var(--fs-sm); }
   .pop p { margin: 0 0 6px; line-height: 1.45; }
-  .act { background: var(--accent); color: var(--on-accent); border: 0; border-radius: var(--r-md); padding: 3px 12px; font: inherit; }
+  .act { background: var(--primary-fill); color: var(--on-primary); border: 0; border-radius: var(--r-md); padding: 3px 12px; font: inherit; }
 </style>

@@ -65,7 +65,7 @@
     max-height: 240px;
     overflow: auto;
     padding: 8px 12px;
-    background: var(--panel);
+    background: var(--raised);
     border: 1px solid var(--line);
     border-radius: var(--r-lg);
     box-shadow: var(--shadow);

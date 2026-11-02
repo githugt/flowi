@@ -105,7 +105,9 @@
   .muted { color: var(--muted); font-size: var(--fs-sm); }
   .err { color: var(--fail); }
   .actions { display: flex; justify-content: flex-end; gap: 8px; }
-  button { background: transparent; color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); padding: 3px 12px; font: inherit; }
+  button { background: var(--raised); color: var(--text); border: 0; box-shadow: inset 0 0 0 1px var(--line); border-radius: var(--r-md); padding: 0 12px; min-height: var(--ctl-h); font: inherit; font-weight: 500; }
+  button:hover:not(:disabled) { background: var(--raised-3); }
   button:disabled { opacity: 0.4; }
-  .primary { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
+  .primary { background: var(--primary-fill); color: var(--on-primary); font-weight: 600; box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.18); }
+  .primary:hover { filter: brightness(1.1); }
 </style>

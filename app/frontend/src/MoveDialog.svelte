@@ -75,16 +75,17 @@
   .dialog { width: 420px; max-height: 80vh; display: flex; flex-direction: column; gap: 10px; padding: 16px; background: var(--panel); border: 1px solid var(--line); border-radius: var(--r-lg); outline: none; }
   h3 { margin: 0; }
   .muted { color: var(--muted); font-size: var(--fs-sm); margin: 0; }
-  input { background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); padding: 5px 8px; font: inherit; -webkit-user-select: text; user-select: text; }
+  input { background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); padding: 5px 8px; font: inherit; -webkit-user-select: text; user-select: text; }
   .list { flex: 1; min-height: 120px; max-height: 340px; overflow: auto; border: 1px solid var(--line); border-radius: var(--r-md); padding: 4px; background: var(--bg); }
   .list button { width: 100%; display: flex; align-items: center; gap: 6px; text-align: left; background: none; border: 0; border-radius: var(--r-sm); color: var(--text); font: inherit; padding-block: 4px; padding-right: 10px; }
-  .list button:hover { background: color-mix(in srgb, var(--accent) 10%, transparent); }
+  .list button:hover { background: var(--tint-hover); }
   .list button.on { background: color-mix(in srgb, var(--accent) 24%, transparent); }
   .list button.top { font-weight: 600; }
   .tag { margin-left: auto; color: var(--muted); font-size: var(--fs-xs); font-weight: 400; }
   .empty { padding: 8px; }
   .actions { display: flex; justify-content: flex-end; gap: 8px; }
-  .actions button { background: transparent; color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); padding: 3px 12px; font: inherit; }
-  .actions .primary { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
+  .actions button { background: var(--raised); color: var(--text); border: 0; box-shadow: inset 0 0 0 1px var(--line); border-radius: var(--r-md); padding: 0 12px; min-height: var(--ctl-h); font: inherit; font-weight: 500; }
+  .actions .primary { background: var(--primary-fill); color: var(--on-primary); font-weight: 600; box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.18); }
+  .primary:hover { filter: brightness(1.1); }
   .actions button:disabled { opacity: 0.4; }
 </style>

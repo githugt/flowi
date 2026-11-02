@@ -180,7 +180,7 @@
   .toggle:hover { color: var(--text); }
   .pop {
     position: absolute; top: calc(100% + 4px); left: 0; z-index: 30; width: max(100%, 380px);
-    display: flex; flex-direction: column; background: var(--panel); border: 1px solid var(--line);
+    display: flex; flex-direction: column; background: var(--raised); border: 1px solid var(--line);
     border-radius: var(--r-lg); box-shadow: var(--shadow);
   }
   .rows { max-height: 380px; overflow: auto; padding: 4px; }
@@ -200,7 +200,7 @@
   .grow { flex: 1; }
   .muted { color: var(--muted); }
   .icon { display: grid; place-items: center; background: none; border: 0; color: var(--muted); padding: 3px; border-radius: var(--r-sm); }
-  .icon:hover { color: var(--text); background: color-mix(in srgb, var(--accent) 12%, transparent); }
+  .icon:hover { color: var(--text); background: var(--tint-hover); }
   .link { background: none; border: 0; color: var(--accent); padding: 3px 4px; font: inherit; }
   .link:disabled { opacity: 0.4; }
 </style>

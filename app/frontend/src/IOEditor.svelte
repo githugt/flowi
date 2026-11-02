@@ -67,17 +67,17 @@
 
 <style>
   .scrim { position: fixed; inset: 0; z-index: 29; }
-  .io { position: fixed; z-index: 30; width: 320px; box-sizing: border-box; display: flex; flex-direction: column; gap: 8px; padding: 12px; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; box-shadow: var(--shadow); }
+  .io { position: fixed; z-index: 30; width: 320px; box-sizing: border-box; display: flex; flex-direction: column; gap: 8px; padding: 12px; background: var(--raised); border: 1px solid var(--line); border-radius: 14px; box-shadow: var(--shadow); }
   .top { display: flex; align-items: center; justify-content: space-between; }
   h4 { margin: 0; font-size: var(--fs-md); }
   .close { background: none; border: 0; color: var(--muted); font: inherit; font-size: var(--fs-lg); line-height: 1; }
   .field { display: flex; flex-direction: column; gap: 3px; }
   .label { color: var(--muted); font-size: var(--fs-xs); }
-  input, select { background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); padding: 5px 6px; font: inherit; }
+  input, select { background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); padding: 5px 6px; font: inherit; }
   input:focus, select:focus { border-color: var(--accent); outline: none; }
   .err { color: var(--fail); font-size: var(--fs-sm); margin: 0; }
   .actions { display: flex; justify-content: space-between; gap: 8px; }
-  .actions button { background: transparent; color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); padding: 3px 12px; font: inherit; }
+  .actions button { background: var(--raised); color: var(--text); border: 0; box-shadow: inset 0 0 0 1px var(--line); border-radius: var(--r-md); padding: 0 12px; min-height: var(--ctl-h); font: inherit; font-weight: 500; }
   .actions .remove:hover { color: var(--fail); border-color: var(--fail); }
-  .actions .primary { background: var(--act-send); color: var(--on-act); border-color: var(--act-send); font-weight: 600; }
+  .actions .primary { background: var(--primary-fill); color: var(--on-primary); border: 0; font-weight: 600; box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.18); }
 </style>

@@ -68,6 +68,6 @@
     -webkit-user-select: text;
     user-select: text;
   }
-  .mono { font: 12.5px/1.45 ui-monospace, Menlo, monospace; }
+  .mono { font: var(--fs-sm)/1.45 ui-monospace, Menlo, monospace; }
   textarea:focus { border-color: var(--accent); }
 </style>

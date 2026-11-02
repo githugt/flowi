@@ -66,13 +66,13 @@
   .line { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
   .vars { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: center; }
   .var { display: flex; align-items: center; gap: 4px; font-size: var(--fs-sm); }
-  .var input { width: 150px; background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); padding: 2px 6px; font: var(--fs-sm) var(--mono); }
+  .var input { width: 150px; background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); padding: 2px 6px; font: var(--fs-sm) var(--mono); }
   .var.new input { width: 130px; }
   .hint { color: var(--muted); font-size: var(--fs-xs); }
-  button { background: transparent; color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); padding: 2px 12px; font: inherit; }
+  button { background: var(--raised); color: var(--text); border: 0; box-shadow: inset 0 0 0 1px var(--line); border-radius: var(--r-md); padding: 0 12px; min-height: var(--ctl-h-sm); font: inherit; font-weight: 500; }
   button:disabled { opacity: 0.4; }
-  button:hover:not(:disabled) { border-color: var(--accent); }
-  .primary { background: var(--act-send); color: var(--on-act); border-color: var(--act-send); font-weight: 600; }
+  button:hover:not(:disabled) { background: var(--raised-3); }
+  .primary { background: var(--send-fill); color: var(--on-send); border: 0; font-weight: 600; box-shadow: var(--send-edge), 0 4px 14px var(--send-glow); }
   .strip { flex: none; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; padding: 4px 12px; border-bottom: 1px solid var(--line); font-size: var(--fs-sm); color: var(--muted); }
   .chip { border-radius: var(--r-pill); padding: 0 10px; font-size: var(--fs-xs); color: var(--fail); border-color: var(--fail); }
 </style>

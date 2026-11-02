@@ -100,5 +100,5 @@
   .field { display: flex; flex-direction: column; gap: 3px; }
   .label { color: var(--muted); font-size: var(--fs-xs); }
   .check { display: flex; align-items: center; gap: 6px; }
-  select { background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); padding: 5px 6px; font: inherit; }
+  select { background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); padding: 5px 6px; font: inherit; }
 </style>

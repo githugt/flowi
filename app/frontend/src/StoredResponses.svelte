@@ -97,11 +97,12 @@
   h4 { margin: 14px 0 4px; font-size: var(--fs-sm); }
   .row { display: flex; align-items: center; gap: 8px; padding: 4px 0; border-bottom: 1px solid color-mix(in srgb, var(--line) 50%, transparent); font-size: var(--fs-sm); }
   .name { font: var(--fs-sm) var(--mono); min-width: 70px; }
-  .status { font: 600 11px ui-monospace, Menlo, monospace; color: var(--muted); }
+  .status { font: 600 var(--fs-xs) ui-monospace, Menlo, monospace; color: var(--muted); }
   .status.ok { color: var(--ok); }
   .status.bad { color: var(--fail); }
   .at { white-space: nowrap; }
   .spacer { flex: 1; }
-  button { background: transparent; color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); padding: 1px 9px; font: inherit; font-size: var(--fs-xs); cursor: pointer; }
+  button { background: var(--raised); color: var(--text); border: 0; box-shadow: inset 0 0 0 1px var(--line); border-radius: var(--r-md); padding: 0 10px; min-height: var(--ctl-h-sm); font: inherit; font-weight: 500; font-size: var(--fs-xs); cursor: pointer; }
+  button:hover:not(:disabled) { background: var(--raised-3); }
   .del:hover { color: var(--fail); border-color: var(--fail); }
 </style>

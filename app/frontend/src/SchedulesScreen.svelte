@@ -49,7 +49,7 @@
       <button disabled={view.runner.state === 'stopping'} onclick={() => SchedulesService.StopRunner()}>{view.runner.state === 'stopping' ? 'Stopping…' : '■ Stop schedules'}</button>
       <span class="ok">● running while this window is open</span>
     {:else}
-      <button class="primary" disabled={view.runner.state === 'starting' || !view.schedules.length} title={view.schedules.length ? 'Fire the schedules while this window is open' : 'Add a schedule first'} onclick={() => SchedulesService.StartRunner()}>{view.runner.state === 'starting' ? 'Starting…' : '▶ Start schedules'}</button>
+      <button class="primary go" disabled={view.runner.state === 'starting' || !view.schedules.length} title={view.schedules.length ? 'Fire the schedules while this window is open' : 'Add a schedule first'} onclick={() => SchedulesService.StartRunner()}>{view.runner.state === 'starting' ? 'Starting…' : '▶ Start schedules'}</button>
       <span class="muted">stopped: nothing fires</span>
     {/if}
   </div>
@@ -109,12 +109,12 @@
 </div>
 
 <style>
-  .page { position: absolute; inset: 0; overflow: auto; padding: 16px 24px 48px; max-width: 820px; }
+  .page { position: absolute; inset: 0; overflow: auto; padding: 28px 32px 56px; max-width: 820px; }
   .note, .muted { color: var(--muted); font-size: var(--fs-sm); margin: 0 0 6px; }
   .err { color: var(--fail); }
-  h3 { margin: 22px 0 8px; font-size: var(--fs-md); border-bottom: 1px solid var(--line); padding-bottom: 4px; display: flex; justify-content: space-between; align-items: center; }
+  h3 { margin: 22px 0 8px; font-size: var(--fs-lg); font-weight: 600; display: flex; justify-content: space-between; align-items: center; }
   h4 { margin: 0; }
-  .card { border: 1px solid var(--line); border-radius: var(--r-lg); padding: 8px 12px; margin: 6px 0; }
+  .card { border: 1px solid var(--line); border-radius: var(--r-xl); background: var(--panel); padding: 8px 12px; margin: 6px 0; }
   .card.off { opacity: 0.6; }
   .top { display: flex; align-items: center; gap: 10px; }
   .spacer { flex: 1; }
@@ -123,15 +123,19 @@
   .edit { border: 1px solid var(--accent); border-radius: var(--r-lg); padding: 12px; margin: 10px 0; display: flex; flex-direction: column; gap: 8px; }
   label { display: flex; flex-direction: column; gap: 3px; color: var(--muted); font-size: var(--fs-xs); }
   .check { flex-direction: row; align-items: center; gap: 6px; font-size: var(--fs-sm); color: var(--text); }
-  input:not([type]), select, textarea { background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); padding: 5px 8px; font: inherit; -webkit-user-select: text; user-select: text; }
+  input:not([type]), select, textarea { background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); padding: 5px 8px; font: inherit; -webkit-user-select: text; user-select: text; }
   textarea { min-height: 70px; font: var(--fs-sm) var(--mono); }
   .actions { display: flex; gap: 8px; justify-content: flex-end; }
-  button { background: transparent; color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); padding: 3px 12px; font: inherit; }
+  button { background: var(--raised); color: var(--text); border: 0; box-shadow: inset 0 0 0 1px var(--line); border-radius: var(--r-md); padding: 0 12px; min-height: var(--ctl-h); font: inherit; font-weight: 500; }
+  button:hover:not(:disabled) { background: var(--raised-3); }
   .add { border: 0; color: var(--accent); }
   .runner { display: flex; align-items: center; gap: 10px; margin: 8px 0; }
-  .runner.on button:not(.primary) { border-color: var(--fail); color: var(--fail); }
+  .runner.on button:not(.primary) { background: var(--fail-t); color: var(--fail); }
   .ok { color: var(--ok); }
   .cli { margin: 8px 0; font-size: var(--fs-sm); }
   .cli summary { cursor: default; color: var(--accent); }
-  .primary { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
+  .primary { background: var(--primary-fill); color: var(--on-primary); font-weight: 600; box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.18); }
+  .primary:hover { filter: brightness(1.1); }
+  /* Starting the schedules is a "go" like Run, so it wears the Send colour. */
+  .primary.go { background: var(--send-fill); color: var(--on-send); box-shadow: var(--send-edge); }
 </style>

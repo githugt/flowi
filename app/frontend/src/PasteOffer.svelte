@@ -186,7 +186,7 @@
   .f { display: flex; flex-direction: column; gap: 3px; color: var(--muted); font-size: var(--fs-xs); }
   .choose { display: flex; justify-content: space-between; align-items: center; gap: 8px; text-align: left; width: 100%; box-sizing: border-box; }
   .chev { color: var(--muted); }
-  select { background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); padding: 5px 8px; font: inherit; }
+  select { background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); padding: 5px 8px; font: inherit; }
   .item { border-left: 2px solid var(--line); padding: 2px 10px; font-size: var(--fs-sm); }
   .item.skipped { border-color: var(--fail); }
   .tag { margin-left: 8px; color: var(--fail); font-size: var(--fs-xs); }
@@ -196,10 +196,11 @@
   .err { color: var(--fail); font-size: var(--fs-sm); }
   .actions { display: flex; align-items: center; gap: 8px; }
   .grow { flex: 1; }
-  button { background: transparent; color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); padding: 5px 12px; font: inherit; white-space: nowrap; }
-  button:hover:not(:disabled) { border-color: var(--accent); }
+  button { background: var(--raised); color: var(--text); border: 0; box-shadow: inset 0 0 0 1px var(--line); border-radius: var(--r-md); padding: 0 12px; min-height: var(--ctl-h); font: inherit; font-weight: 500; white-space: nowrap; }
+  button:hover:not(:disabled) { background: var(--raised-3); }
   button:disabled { opacity: 0.4; }
-  .primary { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
+  .primary { background: var(--primary-fill); color: var(--on-primary); font-weight: 600; box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.18); }
+  .primary:hover { filter: brightness(1.1); }
   .link { border: 0; padding: 5px 0; color: var(--muted); }
   .link:hover:not(:disabled) { color: var(--text); }
 </style>

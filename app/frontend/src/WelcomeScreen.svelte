@@ -8,6 +8,7 @@
   import { promptNewEnvironment } from './lib/menus'
   import type { TreeNode } from './lib/types'
   import Markdown from './Markdown.svelte'
+  import Icon from './Icon.svelte'
 
   interface WelcomeView {
     version: string
@@ -38,10 +39,14 @@
 </script>
 
 <div class="page">
-  <h1>Welcome to Flowi</h1>
-  <p class="muted">Version {view?.version ?? ''}</p>
+ <div class="col">
+  <div class="hero">
+    <div class="logo" aria-hidden="true"><Icon name="blueprint" size={26} /></div>
+    <h1>Welcome to Flowi</h1>
+    <p class="muted">Version {view?.version ?? ''} · your requests and flows stay on this machine</p>
+  </div>
 
-  <h3>Get started</h3>
+  <h3><span>Get started</span><span class="progress">{steps.filter((x) => x.done).length} of {steps.length}</span></h3>
   <ol class="steps">
     {#each steps as s, i}
       <li class:done={s.done}>
@@ -69,8 +74,8 @@
   </ol>
 
   <div class="cards">
-    <button onclick={() => app.openScreen('screen:import', 'Import')}><strong>Import an API</strong><span>OpenAPI, AsyncAPI, Postman, Bruno, Insomnia, Hoppscotch, HAR, curl…</span></button>
-    <button onclick={() => app.openScreen('screen:telemetry', 'Telemetry')}><strong>Usage reporting</strong><span>Off unless you choose otherwise.</span></button>
+    <button onclick={() => app.openScreen('screen:import', 'Import')}><span class="sq import"><Icon name="import" size={17} /></span><strong>Import an API</strong><span>OpenAPI, AsyncAPI, Postman, Bruno, Insomnia, Hoppscotch, HAR, curl…</span></button>
+    <button onclick={() => app.openScreen('screen:telemetry', 'Telemetry')}><span class="sq usage"><Icon name="chart" size={17} /></span><strong>Usage reporting</strong><span>Off unless you choose otherwise.</span></button>
   </div>
 
   {#if view?.whatsNew}
@@ -79,27 +84,36 @@
       <Markdown text={view.whatsNew} />
     </details>
   {/if}
+ </div>
 </div>
 
 <style>
-  .page { position: absolute; inset: 0; overflow: auto; padding: var(--sp-6) 32px 48px; max-width: 760px; }
-  h1 { margin: 0 0 4px; font-size: var(--fs-xl); }
-  .muted { color: var(--muted); margin: 0 0 var(--sp-4); }
-  h3 { margin: var(--sp-4) 0 var(--sp-2); font-size: var(--fs-md); }
+  .page { position: absolute; inset: 0; overflow: auto; padding: 48px 32px 48px; background: radial-gradient(ellipse 700px 420px at 50% 0%, var(--tint-accent), transparent 70%); }
+  .col { max-width: 660px; margin: 0 auto; }
+  .hero { display: flex; flex-direction: column; align-items: center; text-align: center; margin-bottom: var(--sp-6); }
+  /* The mark: the accent running into the data colour, the two this app is drawn in. */
+  .logo { width: 52px; height: 52px; border-radius: 15px; display: grid; place-items: center; color: var(--on-accent); background: linear-gradient(135deg, var(--accent), var(--data)); box-shadow: 0 8px 24px color-mix(in srgb, var(--accent) 30%, transparent); }
+  h1 { margin: 16px 0 4px; font-size: var(--fs-xl); font-weight: 650; letter-spacing: -0.01em; }
+  .muted { color: var(--muted); margin: 0; font-size: var(--fs-md); }
+  h3 { margin: var(--sp-4) 0 var(--sp-2); font-size: var(--fs-xs); font-weight: 600; letter-spacing: 0.07em; text-transform: uppercase; color: var(--muted); display: flex; justify-content: space-between; }
+  .progress { font-weight: 500; letter-spacing: 0; text-transform: none; }
   .steps { list-style: none; margin: 0 0 var(--sp-6); padding: 0; display: flex; flex-direction: column; gap: var(--sp-2); }
-  .steps li { display: flex; align-items: center; gap: var(--sp-3); padding: 10px 14px; background: var(--panel); border: 1px solid var(--line); border-radius: var(--r-lg); }
+  .steps li { display: flex; align-items: center; gap: var(--sp-3); padding: 10px 14px; background: var(--panel); border: 1px solid var(--line); border-radius: var(--r-xl); }
   .mark { flex: none; width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; font-size: var(--fs-xs); font-weight: 600; border: 1px solid var(--line); color: var(--muted); }
   .done .mark { background: var(--ok); border-color: var(--ok); color: var(--on-accent); }
   .done strong { color: var(--muted); }
   .body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
   .detail { color: var(--muted); font-size: var(--fs-sm); }
-  li button, li select { flex: none; background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); padding: 4px 12px; font: inherit; }
-  li button:hover:not(:disabled) { border-color: var(--accent); }
+  li button, li select { flex: none; background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); padding: 4px 12px; font: inherit; }
+  li button:hover:not(:disabled) { background: var(--raised-3); }
   li button:disabled { opacity: 0.4; }
-  li .primary { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
+  li .primary { background: var(--primary-fill); color: var(--on-primary); border-color: transparent; font-weight: 600; box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.18); }
   .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: var(--sp-3); }
-  .cards button { text-align: left; background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: var(--r-lg); padding: var(--sp-3) 14px; font: inherit; display: flex; flex-direction: column; gap: 4px; }
-  .cards button:hover { border-color: var(--accent); }
+  .cards button { text-align: left; background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: var(--r-xl); padding: 14px; font: inherit; display: flex; flex-direction: column; gap: 4px; }
+  .sq { width: 32px; height: 32px; border-radius: 9px; display: grid; place-items: center; margin-bottom: 6px; }
+  .cards .sq.import { background: var(--tint-accent); color: var(--accent); }
+  .cards .sq.usage { background: var(--data-t); color: var(--data); }
+  .cards button:hover { background: var(--raised-3); }
   .cards span { color: var(--muted); font-size: var(--fs-sm); }
   .news { margin-top: var(--sp-6); }
   .news summary { cursor: pointer; color: var(--muted); }

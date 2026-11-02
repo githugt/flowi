@@ -182,7 +182,7 @@
   .f { display: flex; flex-direction: column; gap: 3px; color: var(--muted); font-size: var(--fs-xs); }
   .muted { color: var(--muted); font-size: var(--fs-sm); margin: 0; }
   .err { color: var(--fail); font-size: var(--fs-sm); margin: 0; }
-  select, button { background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); padding: 4px 10px; font: inherit; }
+  select, button { background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); padding: 4px 10px; font: inherit; }
   button { background: transparent; }
   button:disabled { opacity: 0.4; }
   code { font-family: var(--mono); }

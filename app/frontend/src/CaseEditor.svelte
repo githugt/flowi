@@ -34,10 +34,10 @@
 
 <style>
   .scrim { position: fixed; inset: 0; z-index: 29; }
-  .case { position: fixed; z-index: 30; width: 360px; box-sizing: border-box; display: flex; flex-direction: column; gap: 6px; padding: 12px; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; box-shadow: var(--shadow); }
+  .case { position: fixed; z-index: 30; width: 360px; box-sizing: border-box; display: flex; flex-direction: column; gap: 6px; padding: 12px; background: var(--raised); border: 1px solid var(--line); border-radius: 14px; box-shadow: var(--shadow); }
   label { display: flex; flex-direction: column; gap: 3px; }
   .label { color: var(--muted); font-size: var(--fs-xs); }
-  input { background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); padding: 5px 6px; font: inherit; font-family: var(--mono, monospace); }
+  input { background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); padding: 5px 6px; font: inherit; font-family: var(--mono, monospace); }
   input:focus { border-color: var(--accent); outline: none; }
   .hint { color: var(--muted); font-size: var(--fs-sm); }
 </style>

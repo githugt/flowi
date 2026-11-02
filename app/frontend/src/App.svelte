@@ -291,8 +291,7 @@
     flex: none;
     display: flex;
     align-items: flex-end;
-    background: var(--panel);
-    border-bottom: 1px solid var(--line);
+    background: var(--chrome);
     --wails-draggable: drag;
   }
   .strip { flex: 1; min-width: 0; display: flex; align-items: flex-end; gap: 2px; padding: 0 8px; overflow-x: auto; scrollbar-width: none; align-self: stretch; }
@@ -307,14 +306,14 @@
     align-items: center;
     max-width: 240px;
     border: 1px solid transparent;
-    border-bottom: 2px solid transparent;
-    border-radius: 8px 8px 0 0;
+    border-bottom: 0;
+    border-radius: var(--r-lg) var(--r-lg) 0 0;
     --wails-draggable: no-drag;
   }
   .tab.dragging { opacity: 0.35; cursor: grabbing; }
   .ghost {
     position: fixed; z-index: 80; pointer-events: none; display: flex; align-items: center; gap: 6px; padding: 6px 12px;
-    background: var(--panel); color: var(--text); border: 1px solid var(--accent); border-radius: var(--r-md); box-shadow: var(--shadow); white-space: nowrap;
+    background: var(--raised); color: var(--text); border: 1px solid var(--accent); border-radius: var(--r-md); box-shadow: var(--shadow); white-space: nowrap;
   }
   .dropmark { position: fixed; z-index: 79; width: 2px; margin-left: -1px; background: var(--accent); border-radius: 1px; pointer-events: none; }
   .dropmark span {
@@ -323,7 +322,7 @@
     font-size: var(--fs-xs); color: var(--on-accent); background: var(--accent); border-radius: var(--r-sm);
   }
   .tab:hover { background: var(--tint-hover); }
-  .tab.active { background: var(--bg); border-color: var(--line); border-bottom-color: var(--accent); }
+  .tab.active { background: var(--bg); border-color: var(--line); margin-bottom: -1px; position: relative; z-index: 2; }
   .tab button { background: none; border: 0; color: var(--text); font: inherit; }
   .tab .name { display: flex; align-items: center; gap: 6px; padding: 8px 6px 8px 8px; min-width: 0; }
   .tab:not(.active) .name { color: var(--muted); }
@@ -343,7 +342,7 @@
   .envsel.none .envdot { background: var(--warn); }
   .envname { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .envchev { flex: none; color: var(--muted); }
-  .body { flex: 1; min-height: 0; position: relative; }
+  .body { flex: 1; min-height: 0; position: relative; background: var(--bg); border-top: 1px solid var(--line); border-left: 1px solid var(--line); }
   .empty { color: var(--muted); text-align: center; margin-top: 20vh; }
   .err { position: absolute; left: 16px; bottom: 16px; color: var(--fail); }
 </style>

@@ -720,9 +720,11 @@
   // reaching furthest right) and the left + before the first. There was only the right one, so a step
   // could not be added in front of another.
   const picked = $derived(units.find((u) => selectedUnits.has(u.id) && !u.headW))
+  // Nothing starts after a Stop, so no step is added after it or on its outcome.
+  const endsRun = (u: Unit) => u.types.length > 0 && u.types.every((t) => t === 'stop')
   const addAfter = $derived.by(() => {
-    if (picked) return picked
-    const cards = units.filter((u) => !u.headW)
+    if (picked) return endsRun(picked) ? null : picked
+    const cards = units.filter((u) => !u.headW && !endsRun(u))
     return cards.reduce<Unit | null>((best, u) => (!best || at(u).x + u.w > at(best).x + best.w ? u : best), null)
   })
   // Where a + goes: on the arrow joining the card to its neighbour, half-way along it, so it reads as
@@ -796,7 +798,7 @@
 
     {#each dataArcs as a}
       <path class="data" class:hot={a.hot} d={a.d} marker-end="url(#dataarrow)" />
-      {#if a.hot || dataArcs.length <= 6}<text class="datalabel" class:hot={a.hot} x={a.lx} y={a.ly} text-anchor="middle">{a.label}</text>{/if}
+      {#if a.hot}<text class="datalabel" class:hot={a.hot} x={a.lx} y={a.ly} text-anchor="middle">{a.label}</text>{/if}
     {/each}
 
     {#if editable && onaddcase}
@@ -854,7 +856,7 @@
             toolbar={!!ontoolbar && editable && selection.length === 1 && selectedUnits.has(u.id) && !moving && !link}
             ontool={(tool, e) => ontoolbar?.(tool, u.nodes[u.core ?? 0], e)} oncolour={(c) => oncolour?.(u.nodes[u.core ?? 0], c)}
             oncase={oncase ? (i, e) => oncase(u.nodes[u.core ?? 0], i, e) : undefined}
-            onrow={(key) => rowClicked(u, key)} onport={(e, port) => onport(e, u, port)} pickedPorts={pickedPorts.unit === u.id ? pickedPorts.ports : []} onaddon={onaddon && editable ? (port, e) => onaddon(coreOf(u), outcomeOfPort(port), e.clientX, e.clientY) : undefined} ondataport={ondata ? (e) => ondataport(e, u) : undefined} />
+            onrow={(key) => rowClicked(u, key)} onport={(e, port) => onport(e, u, port)} pickedPorts={pickedPorts.unit === u.id ? pickedPorts.ports : []} onaddon={onaddon && editable && !endsRun(u) ? (port, e) => onaddon(coreOf(u), outcomeOfPort(port), e.clientX, e.clientY) : undefined} ondataport={ondata ? (e) => ondataport(e, u) : undefined} />
         {:else if u.headW}
           <rect width={u.headW} height="40" y="12" rx="10" />
         {:else if u.above || u.nodes.some((_, i) => stacked(u, i))}
@@ -1066,16 +1068,17 @@
   .addcase rect { fill: var(--panel); stroke: var(--accent); stroke-dasharray: 3 3; }
   .addcase text { fill: var(--accent); font-size: 11px; pointer-events: none; }
   .addcase:hover rect { fill: color-mix(in srgb, var(--accent) 18%, var(--panel)); }
-  /* Faint, thin dots were not seen as an arrow at all after a value was connected. */
-  .data { fill: none; stroke: var(--data); stroke-width: 2; stroke-dasharray: 6 4; opacity: 0.9; pointer-events: none; }
-  .data.hot { opacity: 1; stroke-width: 2.6; }
-  .datalabel { fill: var(--data); font-size: 11px; opacity: 0.9; pointer-events: none; }
+  /* Quiet until a step is selected: every value arc at full strength was a tangle, and the ones of the selected
+     step are the ones being asked about. A quiet arc is still drawn solid and visible, so it is found, not lost. */
+  .data { fill: none; stroke: var(--data); stroke-width: 1.4; opacity: 0.3; pointer-events: none; transition: opacity var(--t-base) var(--ease-out), stroke-width var(--t-base) var(--ease-out); }
+  .data.hot { opacity: 1; stroke-width: 2; stroke-dasharray: 6 4; }
+  .datalabel { fill: var(--data); font-size: 11px; opacity: 0; pointer-events: none; transition: opacity var(--t-base) var(--ease-out); }
   .datalabel.hot { opacity: 1; font-weight: 600; }
   .edgelabel { fill: var(--muted); font-size: 10px; font-style: italic; pointer-events: none; }
   .branchlabel { fill: var(--accent); font-size: 11px; font-weight: 600; pointer-events: none; }
   .edge.branch { stroke-dasharray: none; }
   .lane { fill: none; stroke: var(--line); stroke-dasharray: 6 5; }
-  .edge { fill: none; stroke: var(--muted); stroke-width: 1.6; }
+  .edge { fill: none; stroke: color-mix(in srgb, var(--muted) 80%, var(--bg)); stroke-width: 1.5; stroke-linecap: round; }
   .edge.fail, .flow.fail { stroke: var(--fail); }
   .edgehit { fill: none; stroke: transparent; stroke-width: 16; pointer-events: stroke; cursor: pointer; }
   .edgepick { fill: none; stroke: var(--accent); stroke-width: 3; opacity: 0; pointer-events: none; }
@@ -1166,7 +1169,7 @@
     max-height: 60%;
     overflow: auto;
     padding: 12px;
-    background: var(--panel);
+    background: var(--raised);
     border: 1px solid var(--accent);
     border-radius: 14px;
     box-shadow: var(--shadow);
@@ -1181,6 +1184,7 @@
     background: var(--panel);
     border: 1px solid var(--line);
     border-radius: var(--r-lg);
+    box-shadow: var(--shadow);
     cursor: pointer;
   }
   .minimap rect { fill: var(--muted); opacity: 0.55; rx: 6; }
@@ -1191,14 +1195,16 @@
     bottom: 16px;
     display: flex;
     align-items: center;
-    gap: 8px;
-    padding: 6px 10px;
-    background: var(--panel);
+    gap: 2px;
+    padding: 3px;
+    background: var(--raised);
     border: 1px solid var(--line);
-    border-radius: var(--r-lg);
+    border-radius: var(--r-pill);
+    box-shadow: var(--shadow);
   }
-  .bar button.on { color: var(--accent); }
-  .bar span { min-width: 40px; text-align: center; color: var(--muted); }
+  .bar button.on { color: var(--accent); background: var(--tint-accent); }
+  .bar span { min-width: 44px; text-align: center; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .bar button { min-height: 26px; padding: 0 10px; border: 0; border-radius: var(--r-pill); color: var(--text); background: none; font: inherit; }
   button {
     background: transparent;
     color: var(--text);
@@ -1207,5 +1213,5 @@
     padding: 3px 10px;
     font: inherit;
   }
-  button:hover:not(:disabled) { border-color: var(--accent); }
+  button:hover:not(:disabled) { background: var(--raised-3); }
 </style>

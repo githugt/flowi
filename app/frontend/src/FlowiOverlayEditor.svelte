@@ -156,10 +156,10 @@
   .list .add { color: var(--accent); }
   .none { padding: 6px 8px; }
   .edit { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
-  textarea { flex: 1; min-height: 180px; resize: none; background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); padding: 8px; font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; }
+  textarea { flex: 1; min-height: 180px; resize: none; background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); padding: 8px; font: var(--fs-sm)/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; }
   .field { display: flex; align-items: center; gap: 8px; }
   .field span { color: var(--muted); font-size: var(--fs-sm); width: 44px; }
-  .field input { flex: 1; background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); padding: 4px 8px; font: inherit; }
+  .field input { flex: 1; background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); padding: 4px 8px; font: inherit; }
   .export { border-top: 1px solid var(--line); padding-top: 8px; display: flex; flex-direction: column; gap: 6px; }
   .export textarea { min-height: 90px; flex: none; }
   .export ul { margin: 4px 0 0; padding-left: 18px; font-size: var(--fs-xs); color: var(--muted); }
@@ -169,8 +169,10 @@
   .err { color: var(--fail); font-size: var(--fs-sm); }
   .actions { display: flex; gap: 8px; align-items: center; }
   .grow { flex: 1; }
-  button { background: transparent; color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); padding: 3px 12px; font: inherit; }
+  button { background: var(--raised); color: var(--text); border: 0; box-shadow: inset 0 0 0 1px var(--line); border-radius: var(--r-md); padding: 0 12px; min-height: var(--ctl-h); font: inherit; font-weight: 500; }
+  button:hover:not(:disabled) { background: var(--raised-3); }
   button:disabled { opacity: 0.4; }
-  .primary { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
+  .primary { background: var(--primary-fill); color: var(--on-primary); font-weight: 600; box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.18); }
+  .primary:hover { filter: brightness(1.1); }
   .danger { color: var(--fail); }
 </style>

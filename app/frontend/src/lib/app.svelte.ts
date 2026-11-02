@@ -169,6 +169,8 @@ class AppState {
     this.applyTheme(a)
     if (/^#[0-9a-fA-F]{6}$/.test(a.accent)) root.style.setProperty('--accent', a.accent)
     else if (!(a.theme === 'custom' && a.custom?.vars['--accent'])) root.style.removeProperty('--accent')
+    if (a.sendButton && a.sendButton !== 'orange') root.dataset.send = a.sendButton
+    else delete root.dataset.send
     if (a.font) root.style.setProperty('--font', a.font)
     else root.style.removeProperty('--font')
     root.style.setProperty('--font-size', `${a.fontSize || 13}px`)

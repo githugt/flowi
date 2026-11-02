@@ -50,6 +50,8 @@
   .code { font: 600 28px/1.2 var(--mono); letter-spacing: 0.12em; text-align: center; padding: 8px 0; -webkit-user-select: text; user-select: text; }
   .url { word-break: break-all; font-size: var(--fs-sm); color: var(--muted); }
   .actions { display: flex; justify-content: flex-end; gap: 8px; }
-  button { background: transparent; color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); padding: 4px 14px; font: inherit; }
-  .primary { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
+  button { background: var(--raised); color: var(--text); border: 0; box-shadow: inset 0 0 0 1px var(--line); border-radius: var(--r-md); padding: 0 14px; min-height: var(--ctl-h); font: inherit; font-weight: 500; }
+  button:hover:not(:disabled) { background: var(--raised-3); }
+  .primary { background: var(--primary-fill); color: var(--on-primary); font-weight: 600; box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.18); }
+  .primary:hover { filter: brightness(1.1); }
 </style>

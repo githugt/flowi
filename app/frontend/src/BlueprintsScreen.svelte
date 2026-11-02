@@ -37,13 +37,14 @@
 </div>
 
 <style>
-  .page { position: absolute; inset: 0; overflow: auto; padding: 16px 24px; max-width: 820px; }
+  .page { position: absolute; inset: 0; overflow: auto; padding: 28px 32px 56px; max-width: 820px; }
   .note, .muted { color: var(--muted); font-size: var(--fs-sm); margin: 0 0 4px; }
-  .card { border: 1px solid var(--line); border-radius: var(--r-lg); padding: 8px 12px; margin: 8px 0; }
+  .card { border: 1px solid var(--line); border-radius: var(--r-xl); background: var(--panel); padding: 8px 12px; margin: 8px 0; }
   .top { display: flex; align-items: center; gap: 10px; }
   .spacer { flex: 1; }
   .tag { font-size: var(--fs-xs); border: 1px solid var(--line); border-radius: var(--r-pill); padding: 0 8px; color: var(--muted); }
   .builtin { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 45%, transparent); }
   code { font: var(--fs-xs) var(--mono); }
-  button { background: transparent; color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); padding: 3px 12px; font: inherit; }
+  button { background: var(--raised); color: var(--text); border: 0; box-shadow: inset 0 0 0 1px var(--line); border-radius: var(--r-md); padding: 0 12px; min-height: var(--ctl-h); font: inherit; font-weight: 500; }
+  button:hover:not(:disabled) { background: var(--raised-3); }
 </style>

@@ -30,6 +30,7 @@
   .note { display: flex; align-items: center; gap: 8px; padding: 6px 12px; background: color-mix(in srgb, var(--accent) 14%, var(--panel)); border-bottom: 1px solid var(--line); font-size: var(--fs-sm); }
   .note.warning { background: color-mix(in srgb, var(--warn) 18%, var(--panel)); }
   .text { flex: 1; }
-  button { background: transparent; color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); padding: 2px 10px; font: inherit; font-size: var(--fs-sm); }
+  button { background: var(--raised); color: var(--text); border: 0; box-shadow: inset 0 0 0 1px var(--line); border-radius: var(--r-md); padding: 0 10px; min-height: var(--ctl-h-sm); font: inherit; font-weight: 500; font-size: var(--fs-sm); }
+  button:hover:not(:disabled) { background: var(--raised-3); }
   .quiet { color: var(--muted); border: 0; }
 </style>

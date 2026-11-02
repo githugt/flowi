@@ -42,6 +42,7 @@ const WORDS: Record<string, string> = {
 const LABELS: Record<string, string> = {
   empty: 'Empty values in headers and query',
   'appearance.font_size': 'Font size',
+  'appearance.send_button': 'Send button colour',
   'ui.default_section': 'Request section opened first',
   'ui.suggestions_max': 'Suggestions shown while typing',
   'ui.snippet_exclude_secrets': 'Leave secrets out of code snippets',

@@ -144,9 +144,9 @@
 
 <style>
   .outcomes { display: flex; flex-direction: column; gap: 6px; }
-  .muted { color: var(--muted); font-size: 13px; margin: 0 0 4px; line-height: 1.45; }
-  .small { font-size: 12px; margin-top: 6px; }
-  .hint { color: var(--muted); font-size: 12px; }
+  .muted { color: var(--muted); font-size: var(--fs-md); margin: 0 0 4px; line-height: 1.45; }
+  .small { font-size: var(--fs-sm); margin-top: 6px; }
+  .hint { color: var(--muted); font-size: var(--fs-sm); }
   .card { border: 1px solid var(--line); border-left: 4px solid var(--tone); border-radius: 8px; background: var(--panel); padding: 6px 8px 8px; display: flex; flex-direction: column; gap: 6px; }
   .head { display: flex; align-items: center; gap: 8px; }
   .grow { flex: 1; }
@@ -156,23 +156,23 @@
   .mv:hover:not(:disabled) { color: var(--text); background: var(--tint-hover); }
   .mv:disabled { opacity: 0.25; cursor: default; }
   .on { display: flex; align-items: center; }
-  input.name, input.rule, input.desc { min-width: 0; width: 100%; box-sizing: border-box; background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: 6px; padding: 5px 8px; font-size: 13px; }
+  input.name, input.rule, input.desc { min-width: 0; width: 100%; box-sizing: border-box; background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: 6px; padding: 5px 8px; font-size: var(--fs-md); }
   input.name { width: auto; flex: 0 1 180px; }
   input.name, input.rule { font-family: var(--mono, ui-monospace, monospace); }
-  input.desc { font-size: 12.5px; }
+  input.desc { font-size: var(--fs-sm); }
   input.bad { border-color: var(--fail); }
   .built { font-weight: 600; padding: 3px 8px; border-radius: 6px; background: color-mix(in srgb, var(--tone) 16%, transparent); }
-  .said { color: var(--muted); font-size: 12.5px; margin: 0; }
+  .said { color: var(--muted); font-size: var(--fs-sm); margin: 0; }
   .swatches { display: flex; gap: 7px; flex-wrap: wrap; align-items: center; }
   .swatch { all: unset; box-sizing: border-box; width: 18px; height: 18px; border-radius: 50%; cursor: pointer; border: 2px solid transparent; }
   .swatch:hover { transform: scale(1.12); }
   .swatch.chosen { border-color: var(--text); }
-  .x { all: unset; cursor: pointer; padding: 0 6px; color: var(--muted); font-size: 16px; }
+  .x { all: unset; cursor: pointer; padding: 0 6px; color: var(--muted); font-size: var(--fs-lg); }
   .x:hover:not(:disabled) { color: var(--fail); }
   .x:disabled { opacity: 0.3; cursor: default; }
-  .problem { margin: 0; color: var(--fail); font-size: 12px; }
+  .problem { margin: 0; color: var(--fail); font-size: var(--fs-sm); }
   .actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 2px; }
-  .actions button { display: inline-flex; gap: 5px; align-items: center; background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: 8px; padding: 5px 10px; cursor: pointer; font-size: 13px; }
+  .actions button { display: inline-flex; gap: 5px; align-items: center; background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: 8px; padding: 5px 10px; cursor: pointer; font-size: var(--fs-md); }
   .actions button:hover { background: var(--tint-hover); }
   .actions .quiet { color: var(--muted); border-style: dashed; }
 </style>

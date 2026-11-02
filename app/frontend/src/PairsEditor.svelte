@@ -51,16 +51,19 @@
   input {
     flex: 1;
     min-width: 0;
-    background: var(--bg);
+    background: var(--panel);
     color: var(--text);
-    border: 1px solid var(--line);
+    border: 1px solid transparent;
     border-radius: var(--r-md);
-    padding: 4px 6px;
-    font: 12px ui-monospace, SFMono-Regular, Menlo, monospace;
+    padding: 5px 8px;
+    min-height: var(--ctl-h);
+    box-sizing: border-box;
+    font: var(--fs-sm) ui-monospace, SFMono-Regular, Menlo, monospace;
     -webkit-user-select: text;
     user-select: text;
   }
   input:focus { border-color: var(--accent); }
+  input:hover:not(:focus) { border-color: var(--line); }
   .k { flex: 0 0 38%; }
   .cell { position: relative; flex: 1; display: flex; min-width: 0; }
   button { background: none; border: 0; color: var(--muted); font: inherit; }

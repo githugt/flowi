@@ -99,10 +99,12 @@
   code { font-size: var(--fs-xs); }
   .muted { color: var(--muted); font-size: var(--fs-sm); }
   .err { color: var(--fail); }
-  .yaml { margin: 0; max-height: 240px; overflow: auto; padding: 8px; background: var(--bg); border: 1px solid var(--line); border-radius: var(--r-md); font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; -webkit-user-select: text; user-select: text; }
+  .yaml { margin: 0; max-height: 240px; overflow: auto; padding: 8px; background: var(--bg); border: 1px solid var(--line); border-radius: var(--r-md); font: var(--fs-sm)/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; -webkit-user-select: text; user-select: text; }
   .link { border: 0; padding: 0; color: var(--accent); text-align: left; }
   .actions { display: flex; justify-content: flex-end; gap: 8px; }
-  button { background: transparent; color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); padding: 3px 12px; font: inherit; }
+  button { background: var(--raised); color: var(--text); border: 0; box-shadow: inset 0 0 0 1px var(--line); border-radius: var(--r-md); padding: 0 12px; min-height: var(--ctl-h); font: inherit; font-weight: 500; }
+  button:hover:not(:disabled) { background: var(--raised-3); }
   button:disabled { opacity: 0.4; }
-  .primary { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
+  .primary { background: var(--primary-fill); color: var(--on-primary); font-weight: 600; box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.18); }
+  .primary:hover { filter: brightness(1.1); }
 </style>

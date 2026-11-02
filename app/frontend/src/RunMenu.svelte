@@ -2,6 +2,7 @@
   import { errorText } from './lib/errors'
   import { FlowService } from '../bindings/github.com/githugt/flowi/app/internal/bridge'
   import type { FlowView } from './lib/types'
+  import Icon from './Icon.svelte'
   import { ui } from './lib/ui.svelte'
 
   let { view }: { view: FlowView } = $props()
@@ -68,8 +69,8 @@
   {#if view.run.running}
     <button class="primary" onclick={() => FlowService.Cancel(node)}>Cancel</button>
   {:else}
-    <button class="primary" onclick={() => launch('all', false)}>▶ Run</button>
-    <button class="more" aria-label="More ways to run" onpointerdown={(e) => e.stopPropagation()} onclick={() => (open = !open)}>▾</button>
+    <button class="primary main" onclick={() => launch('all', false)}>Run</button>
+    <button class="more" aria-label="More ways to run" onpointerdown={(e) => e.stopPropagation()} onclick={() => (open = !open)}><Icon name="chevd" size={14} /></button>
   {/if}
   {#if open}
     <div class="menu" role="menu" tabindex="-1" onpointerdown={(e) => e.stopPropagation()}>
@@ -102,7 +103,7 @@
 {/if}
 
 <style>
-  .run { position: relative; display: flex; gap: 2px; }
+  .run { position: relative; display: flex; gap: 0; }
   button {
     background: transparent;
     color: var(--text);
@@ -111,12 +112,17 @@
     padding: 3px 12px;
     font: inherit;
   }
-  button:hover:not(:disabled) { border-color: var(--accent); }
+  button:hover:not(:disabled) { background: var(--raised-3); }
   button:disabled { opacity: 0.4; }
   /* the same strong blue as a request's Send, not the paler accent */
-  .primary { background: var(--act-send); color: var(--on-act); border-color: var(--act-send); font-weight: 600; }
-  .primary:hover:not(:disabled) { border-color: var(--act-send); background: color-mix(in srgb, var(--act-send) 88%, white); }
-  .more { padding: 3px 8px; }
+  .primary { background: var(--send-fill); color: var(--on-send); border: 0; font-weight: 600; box-shadow: var(--send-edge), 0 2px 6px var(--send-glow); }
+  .primary:hover:not(:disabled) { filter: brightness(1.1); }
+  /* One joined pair, the same size and glow as a request's Send. */
+  .run button { min-height: var(--ctl-h); padding: 0 12px; border: 0; }
+  .run .primary { border-radius: var(--r-md) 0 0 var(--r-md); }
+  .run .primary:only-child { border-radius: var(--r-md); }
+  .run .more { display: inline-flex; align-items: center; justify-content: center; padding: 0 8px; border-radius: 0 var(--r-md) var(--r-md) 0; background: var(--send-fill); color: var(--on-send); box-shadow: var(--send-edge), 0 2px 6px var(--send-glow); border-left: 1px solid rgb(0 0 0 / 0.22); }
+  .run .more:hover:not(:disabled) { background: var(--send-fill); filter: brightness(1.1); }
   .menu {
     position: absolute;
     top: 100%;
@@ -126,14 +132,14 @@
     display: flex;
     flex-direction: column;
     padding: 4px;
-    background: var(--panel);
+    background: var(--raised);
     border: 1px solid var(--line);
     border-radius: var(--r-lg);
     box-shadow: var(--shadow);
     z-index: 20;
   }
   .menu button { border: 0; text-align: left; }
-  .menu button:hover:not(:disabled) { background: color-mix(in srgb, var(--accent) 18%, transparent); }
+  .menu button:hover:not(:disabled) { background: var(--tint-hover); }
   hr { width: 100%; border: 0; border-top: 1px solid var(--line); margin: 4px 0; }
   .err { color: var(--fail); font-size: var(--fs-sm); }
   .scrim { position: fixed; inset: 0; background: rgb(0 0 0 / 0.4); display: grid; place-items: center; z-index: 30; }

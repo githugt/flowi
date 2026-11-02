@@ -636,6 +636,8 @@ export interface SettingsView {
   appearance: {
     theme: string
     accent: string
+    /** orange, violet, emerald, cyan or outline: the colour of the Send button. */
+    sendButton: string
     font: string
     fontSize: number
     /** The palette of the custom theme, when its file reads; customProblem says why it does not. */

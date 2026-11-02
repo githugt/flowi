@@ -21,5 +21,5 @@
   .muted { color: var(--muted); font-size: var(--fs-sm); }
   ul { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 4px; font-size: var(--fs-sm); }
   .actions { display: flex; justify-content: flex-end; }
-  button { background: var(--accent); color: var(--on-accent); border: 1px solid var(--accent); border-radius: var(--r-md); padding: 3px 16px; font: inherit; }
+  button { background: var(--primary-fill); color: var(--on-primary); border: 0; border-radius: var(--r-md); padding: 0 16px; min-height: var(--ctl-h); font: inherit; font-weight: 600; box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.18); }
 </style>

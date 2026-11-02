@@ -53,6 +53,6 @@
   .text { flex: 1; min-width: 0; }
   code { font-family: var(--mono); }
   code.fn { color: var(--fail); }
-  button { background: transparent; color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); padding: 2px 10px; font: inherit; white-space: nowrap; }
-  button:hover { border-color: var(--accent); }
+  button { background: var(--raised); color: var(--text); border: 0; box-shadow: inset 0 0 0 1px var(--line); border-radius: var(--r-md); padding: 0 10px; min-height: var(--ctl-h-sm); font: inherit; font-weight: 500; white-space: nowrap; }
+  button:hover { background: var(--raised-3); }
 </style>

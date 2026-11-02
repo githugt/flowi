@@ -23,6 +23,6 @@
 
 <style>
   .bar { margin: 0; padding: 6px 12px; font-size: var(--fs-sm); background: color-mix(in srgb, var(--warn) 15%, transparent); display: flex; gap: 8px; align-items: center; }
-  button { background: transparent; color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); padding: 2px 10px; font: inherit; }
-  button:hover { border-color: var(--accent); }
+  button { background: var(--raised); color: var(--text); border: 0; box-shadow: inset 0 0 0 1px var(--line); border-radius: var(--r-md); padding: 0 10px; min-height: var(--ctl-h-sm); font: inherit; font-weight: 500; }
+  button:hover { background: var(--raised-3); }
 </style>

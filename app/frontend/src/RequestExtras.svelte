@@ -91,25 +91,6 @@
     {/each}
   {/if}
 {:else if which === 'settings'}
-  {#if rows.length}
-    <p class="muted">Settings this version sets for itself; everything else comes from the layers above (collection, workspace, you).</p>
-  {:else}
-    <EmptyState icon="settings" title="No settings of its own" hint="Everything comes from the collection, the workspace and your own settings. Add one below to change it for this version only." compact />
-  {/if}
-  {#each rows as r, i}
-    {@const spec = settings?.available.find((a) => a.key === r.key)}
-    <div class="srow">
-      <code>{r.key}</code>
-      {#if spec?.choices?.length}
-        <select bind:value={r.raw} onchange={pushRows}>{#each spec.choices as c}<option value={c}>{c}</option>{/each}</select>
-      {:else}
-        <input bind:value={r.raw} oninput={pushRows} spellcheck="false" />
-      {/if}
-      <button class="x" aria-label="Remove setting" onclick={() => { rows.splice(i, 1); pushRows() }}>×</button>
-    </div>
-    {#if spec}<p class="muted">{spec.description}</p>{/if}
-  {/each}
-  {#each problems as p}<p class="err">{p}</p>{/each}
   <div class="bar">
     <select bind:value={add}>
       <option value="">Add a setting…</option>
@@ -117,6 +98,27 @@
     </select>
     <button disabled={!add} onclick={async () => { await RequestService.AddSetting(node, add); add = ''; await loadSettings() }}>Add</button>
   </div>
+  {#if rows.length}
+    <p class="muted">Settings this version sets for itself; everything else comes from the layers above (collection, workspace, you).</p>
+  {:else}
+    <EmptyState icon="settings" title="No settings of its own" hint="Everything comes from the collection, the workspace and your own settings. Add one above to change it for this version only." compact />
+  {/if}
+  {#each rows as r, i}
+    {@const spec = settings?.available.find((a) => a.key === r.key)}
+    <div class="scard">
+      <div class="shead">
+        <code>{r.key}</code>
+        <button class="x" aria-label="Remove setting" title="Remove this setting" onclick={() => { rows.splice(i, 1); pushRows() }}>×</button>
+      </div>
+      {#if spec}<p class="muted">{spec.description}</p>{/if}
+      {#if spec?.choices?.length}
+        <select bind:value={r.raw} onchange={pushRows} aria-label={r.key}>{#each spec.choices as c}<option value={c}>{c}</option>{/each}</select>
+      {:else}
+        <input bind:value={r.raw} oninput={pushRows} spellcheck="false" aria-label={r.key} />
+      {/if}
+    </div>
+  {/each}
+  {#each problems as p}<p class="err">{p}</p>{/each}
 {:else if which === 'schema'}
   {#if schemas && !schemas.length}
     <EmptyState icon="schema" title="No schema yet" hint="A send learns one from the request and response bodies while the setting schemas.infer is on, and checks later sends against it." compact />
@@ -151,19 +153,23 @@
   .bar { display: flex; align-items: center; gap: 10px; }
   .spacer { flex: 1; }
   .check { display: flex; align-items: center; gap: 4px; font-size: var(--fs-sm); }
-  select, button { background: transparent; color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); padding: 3px 10px; font: inherit; }
-  select { background: var(--bg); }
+  select, button { background: var(--raised); color: var(--text); border: 0; box-shadow: inset 0 0 0 1px var(--line); border-radius: var(--r-md); padding: 0 10px; min-height: var(--ctl-h); font: inherit; font-weight: 500; }
+  select { appearance: none; -webkit-appearance: none; padding-right: 28px; background: var(--panel) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='rgb(140 146 158)' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E") no-repeat right 8px center / 14px; }
   button:disabled { opacity: 0.4; }
   .muted { color: var(--muted); font-size: var(--fs-sm); margin: 0; }
   .err { color: var(--fail); margin: 0; }
   h5 { margin: 8px 0 2px; color: var(--muted); font-size: var(--fs-xs); text-transform: uppercase; letter-spacing: 0.05em; }
   .row { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; width: 100%; text-align: left; background: none; border: 0; padding: 3px 0; }
-  .row:enabled:hover { background: color-mix(in srgb, var(--accent) 10%, transparent); }
+  .row:enabled:hover { background: var(--tint-hover); }
   .cookie { border: 1px solid var(--line); border-radius: var(--r-lg); padding: 6px 10px; margin: 6px 0; display: flex; flex-direction: column; gap: 2px; }
   code { font: var(--fs-sm) var(--mono); word-break: break-all; -webkit-user-select: text; user-select: text; }
   .x { border: 0; float: right; color: var(--muted); padding: 0 4px; }
-  .srow { display: flex; gap: 6px; align-items: center; margin-top: 6px; }
-  .srow code { flex: 0 0 38%; font-size: var(--fs-sm); }
-  .srow input, .srow select { flex: 1; min-width: 0; background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); padding: 4px 8px; font: inherit; }
+  .scard { margin-top: 10px; padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; background: var(--panel); border: 1px solid var(--line); border-radius: var(--r-lg); }
+  .shead { display: flex; align-items: center; gap: 8px; }
+  .shead code { flex: 1; font-size: var(--fs-md); font-weight: 600; }
+  .shead .x { float: none; box-shadow: none; background: none; min-height: var(--ctl-h-sm); padding: 0 8px; }
+  .shead .x:hover { background: var(--tint-hover); color: var(--text); }
+  .scard input, .scard select { width: 100%; box-sizing: border-box; min-height: var(--ctl-h); background-color: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); padding: 0 10px; font: inherit; }
+  .scard select { padding-right: 28px; }
   .schema { margin: 8px 0; }
 </style>

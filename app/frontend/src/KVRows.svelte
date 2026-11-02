@@ -157,7 +157,7 @@
     padding: 5px 8px;
     min-height: 30px;
     box-sizing: border-box;
-    font: 12px ui-monospace, SFMono-Regular, Menlo, monospace;
+    font: var(--fs-sm) ui-monospace, SFMono-Regular, Menlo, monospace;
     -webkit-user-select: text;
     user-select: text;
   }
@@ -174,7 +174,7 @@
   .hint { color: var(--muted); font-size: var(--fs-xs); }
   .bulk {
     resize: vertical; background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md);
-    padding: 6px 8px; font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; -webkit-user-select: text; user-select: text;
+    padding: 6px 8px; font: var(--fs-sm)/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; -webkit-user-select: text; user-select: text;
   }
   .bulk:focus { border-color: var(--accent); }
   .suggest { display: flex; flex-wrap: wrap; gap: 4px; }

@@ -111,7 +111,7 @@
   .passed .tick { color: var(--ok); }
   .failed .tick, .error .tick { color: var(--fail); }
   .c { flex: 1; min-width: 0; }
-  .c :global(input) { outline: 0; font: 12px ui-monospace, SFMono-Regular, Menlo, monospace; }
+  .c :global(input) { outline: 0; font: var(--fs-sm) ui-monospace, SFMono-Regular, Menlo, monospace; }
   .card:focus-within { border-color: var(--accent); }
   button { background: none; border: 0; color: var(--muted); font: inherit; }
   .add { color: var(--accent); padding: 2px 0; }
@@ -120,7 +120,7 @@
   .hint { color: var(--muted); font-size: var(--fs-xs); }
   textarea {
     resize: vertical; background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md);
-    padding: 6px 8px; font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; -webkit-user-select: text; user-select: text;
+    padding: 6px 8px; font: var(--fs-sm)/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; -webkit-user-select: text; user-select: text;
   }
   textarea:focus { border-color: var(--accent); }
 </style>

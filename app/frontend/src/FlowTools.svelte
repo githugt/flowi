@@ -229,11 +229,11 @@
 
 <style>
   .tools { position: relative; }
-  button { background: transparent; color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); padding: 3px 12px; font: inherit; }
-  button:hover:not(:disabled) { border-color: var(--accent); }
+  button { background: var(--raised); color: var(--text); border: 0; box-shadow: inset 0 0 0 1px var(--line); border-radius: var(--r-md); padding: 0 12px; min-height: var(--ctl-h); font: inherit; font-weight: 500; }
+  button:hover:not(:disabled) { background: var(--raised-3); }
   button:disabled { opacity: 0.4; }
-  .primary { background: var(--act-send); color: var(--on-act); border-color: var(--act-send); font-weight: 600; }
-  .menu { position: absolute; top: 100%; right: 0; z-index: 30; min-width: 250px; display: flex; flex-direction: column; padding: 4px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; box-shadow: var(--shadow); }
+  .primary { background: var(--send-fill); color: var(--on-send); border: 0; font-weight: 600; box-shadow: var(--send-edge), 0 4px 14px var(--send-glow); }
+  .menu { position: absolute; top: 100%; right: 0; z-index: 30; min-width: 250px; display: flex; flex-direction: column; padding: 4px; background: var(--raised); border: 1px solid var(--line); border-radius: 10px; box-shadow: var(--shadow); }
   .menu button { border: 0; text-align: left; padding: 6px 10px; }
   hr { border: 0; border-top: 1px solid var(--line); width: 100%; margin: 4px 0; }
   .scrim { position: fixed; inset: 0; z-index: 40; background: rgba(0, 0, 0, 0.45); display: flex; align-items: center; justify-content: center; }
@@ -243,7 +243,7 @@
   .group { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 14px; font-size: var(--fs-sm); }
   .group > strong { min-width: 90px; }
   .opt { display: flex; align-items: center; gap: 4px; font-size: var(--fs-sm); }
-  select, input:not([type]) { background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); padding: 3px 8px; font: inherit; }
+  select, input:not([type]) { background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); padding: 3px 8px; font: inherit; }
   .actions { display: flex; align-items: center; justify-content: flex-end; gap: 8px; margin-top: 4px; }
   .actions .muted { margin-right: auto; }
   .result { margin: 4px 0 0; font-weight: 600; }

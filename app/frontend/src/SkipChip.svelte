@@ -38,9 +38,9 @@
   .wrap { position: relative; }
   .chip { border-radius: var(--r-pill); padding: 1px 10px; font: inherit; font-size: var(--fs-xs); background: transparent; border: 1px solid var(--muted); color: var(--muted); white-space: nowrap; }
   .chip.bad { border-color: var(--fail); color: var(--fail); }
-  .pop { position: absolute; z-index: 20; top: 28px; left: 0; width: 340px; box-sizing: border-box; display: flex; flex-direction: column; gap: 8px; padding: 10px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; box-shadow: var(--shadow); }
+  .pop { position: absolute; z-index: 20; top: 28px; left: 0; width: 340px; box-sizing: border-box; display: flex; flex-direction: column; gap: 8px; padding: 10px; background: var(--raised); border: 1px solid var(--line); border-radius: 12px; box-shadow: var(--shadow); }
   .row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-  .row button { background: transparent; color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); padding: 2px 10px; font: inherit; font-size: var(--fs-sm); }
+  .row button { background: var(--raised); color: var(--text); border: 0; box-shadow: inset 0 0 0 1px var(--line); border-radius: var(--r-md); padding: 0 10px; min-height: var(--ctl-h-sm); font: inherit; font-weight: 500; font-size: var(--fs-sm); }
   .hold { display: flex; align-items: center; gap: 6px; color: var(--text); font-size: var(--fs-sm); }
   .problem { margin: 0; color: var(--fail); font-size: var(--fs-sm); }
   .problem.warn { color: var(--warn); }

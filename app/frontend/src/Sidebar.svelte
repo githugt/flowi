@@ -7,13 +7,15 @@
   import Icon from './Icon.svelte'
   import { screens } from './lib/screens'
   import type { TreeNode } from './lib/types'
+  import { rootsForGroup, type RailGroup } from './lib/railgroups'
 
   // peek: shown floating from the rail, with a Pin open button; otherwise it has the fold button.
-  let { width, peek = false, onpin, onfold }: { width: number; peek?: boolean; onpin?: () => void; onfold?: () => void } = $props()
+  // group: when shown from a rail icon, the part of the tree that icon stands for.
+  let { width, peek = false, group = '', onpin, onfold }: { width: number; peek?: boolean; group?: RailGroup | ''; onpin?: () => void; onfold?: () => void } = $props()
 
   // Drafts go last, after the collections and environments: they come and go,
   // and showing them first pushed everything else down the moment one was made.
-  const roots = $derived([...(app.tree?.roots ?? [])].sort((a, b) => Number(!!a.draft) - Number(!!b.draft)))
+  const roots = $derived([...rootsForGroup(app.tree?.roots ?? [], group)].sort((a, b) => Number(!!a.draft) - Number(!!b.draft)))
 
   // Arrow keys walk the visible rows; right and left open and close a group.
   function treeKeys(e: KeyboardEvent) {
@@ -72,7 +74,7 @@
 <aside style:width={`${width}px`}>
   <div class="head" class:peeking={peek}>
     <button class="ws" aria-haspopup="menu" aria-expanded={wsOpen} title="Workspace" onpointerdown={(e) => e.stopPropagation()} onclick={() => (wsOpen = !wsOpen)}>
-      <span class="wsname">{app.tree?.name ?? ''}</span><span class="caret" aria-hidden="true">▾</span>
+      <span class="avatar" aria-hidden="true">{(app.tree?.name ?? '?').slice(0, 1).toUpperCase()}</span><span class="wsname">{app.tree?.name ?? ''}</span><span class="caret" aria-hidden="true">▾</span>
     </button>
     {#if wsOpen}
       <div class="wsmenu" role="menu" tabindex="-1" onpointerdown={(e) => e.stopPropagation()}>
@@ -126,8 +128,7 @@
     flex: none;
     display: flex;
     flex-direction: column;
-    background: var(--panel);
-    border-right: 1px solid var(--line);
+    background: var(--chrome);
     min-height: 0;
   }
   .head { position: relative; height: 44px; display: flex; align-items: center; gap: 8px; padding: 0 12px 0 84px; --wails-draggable: drag; }
@@ -137,12 +138,13 @@
     background: none; border: 0; border-radius: var(--r-md); color: var(--text); font: inherit; font-weight: 600;
   }
   .ws:hover, .ws[aria-expanded='true'] { background: var(--tint-hover); }
+  .avatar { flex: none; width: 22px; height: 22px; border-radius: 7px; display: grid; place-items: center; background: linear-gradient(135deg, var(--accent), var(--data)); color: var(--on-accent); font-size: var(--fs-xs); font-weight: 700; }
   .wsname { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .caret { color: var(--muted); font-size: var(--fs-xs); }
   .wsmenu {
     --wails-draggable: no-drag; position: absolute; top: calc(100% - 4px); left: 78px; z-index: 40; min-width: 200px;
     display: flex; flex-direction: column; padding: 4px;
-    background: var(--panel); border: 1px solid var(--line); border-radius: var(--r-lg); box-shadow: var(--shadow);
+    background: var(--raised); border: 1px solid var(--line); border-radius: var(--r-lg); box-shadow: var(--shadow);
   }
   .wsmenu button { background: none; border: 0; border-radius: var(--r-sm); color: var(--text); font: inherit; text-align: left; padding: 5px 10px; }
   .wsmenu button:hover:not(:disabled) { background: var(--tint-sel); }
@@ -155,7 +157,7 @@
   .rail .morebtn { font-size: var(--fs-md, 15px); line-height: 1; min-width: 28px; }
   .moremenu {
     position: absolute; top: calc(100% - 4px); right: 8px; z-index: 40; min-width: 170px; display: flex; flex-direction: column; padding: 4px;
-    background: var(--panel); border: 1px solid var(--line); border-radius: var(--r-lg); box-shadow: var(--shadow);
+    background: var(--raised); border: 1px solid var(--line); border-radius: var(--r-lg); box-shadow: var(--shadow);
   }
   .rail .moremenu button { display: flex; justify-content: flex-start; align-items: center; gap: 8px; color: var(--text); font: inherit; text-align: left; padding: 5px 10px; border-radius: var(--r-sm); }
   .rail .moremenu button:hover { background: var(--tint-sel); }
@@ -170,5 +172,5 @@
   }
   .selbar .grow { flex: 1; }
   .selbar button { background: none; border: 1px solid var(--line); border-radius: var(--r-md); color: var(--text); font: inherit; padding: 2px 10px; }
-  .selbar button:hover { border-color: var(--accent); }
+  .selbar button:hover { background: var(--raised-3); }
 </style>

@@ -94,10 +94,10 @@
 </div>
 
 <style>
-  .page { position: absolute; inset: 0; overflow: auto; padding: 16px 24px; max-width: 820px; }
+  .page { position: absolute; inset: 0; overflow: auto; padding: 28px 32px 56px; max-width: 820px; }
   .note { color: var(--muted); margin-top: 0; }
   .err { color: var(--fail); }
-  h3 { margin: 20px 0 6px; font-size: var(--fs-md); border-bottom: 1px solid var(--line); padding-bottom: 4px; }
+  h3 { margin: 20px 0 6px; font-size: var(--fs-lg); font-weight: 600; }
   .row { display: grid; grid-template-columns: 160px 90px 1fr auto auto auto; gap: 8px; align-items: center; margin: 6px 0; }
   code { font: var(--fs-sm) var(--mono); }
   .state { font-size: var(--fs-xs); color: var(--muted); }
@@ -106,8 +106,9 @@
   .state.overridden { color: var(--accent); }
   .cell { position: relative; display: flex; flex: 1; min-width: 0; }
   .cell input { flex: 1; }
-  input { background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); padding: 5px 8px; font: inherit; min-width: 0; -webkit-user-select: text; user-select: text; }
-  button { background: transparent; color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); padding: 3px 12px; font: inherit; }
+  input { background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); padding: 5px 8px; font: inherit; min-width: 0; -webkit-user-select: text; user-select: text; }
+  button { background: var(--raised); color: var(--text); border: 0; box-shadow: inset 0 0 0 1px var(--line); border-radius: var(--r-md); padding: 0 12px; min-height: var(--ctl-h); font: inherit; font-weight: 500; }
+  button:hover:not(:disabled) { background: var(--raised-3); }
   button:disabled { opacity: 0.4; }
   .revealed { border-color: var(--accent); font-family: var(--mono, ui-monospace, monospace); }
 </style>

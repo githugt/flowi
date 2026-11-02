@@ -74,8 +74,9 @@
   h4 { margin: 0; padding: 6px 12px; font-size: var(--fs-sm); }
   .muted { color: var(--muted); font-weight: 400; }
   .canvas { flex: 1; min-height: 0; position: relative; }
-  button, select { background: transparent; color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); padding: 3px 12px; font: inherit; }
+  button, select { background: var(--raised); color: var(--text); border: 0; box-shadow: inset 0 0 0 1px var(--line); border-radius: var(--r-md); padding: 0 12px; min-height: var(--ctl-h); font: inherit; font-weight: 500; }
   select { background: var(--bg); }
-  .primary:not(:disabled) { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
+  .primary:not(:disabled) { background: var(--primary-fill); color: var(--on-primary); font-weight: 600; box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.18); }
+  .primary:not(:disabled):hover { filter: brightness(1.1); }
   button:disabled { opacity: 0.4; }
 </style>

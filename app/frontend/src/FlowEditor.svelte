@@ -434,10 +434,10 @@
     padding: 3px 12px;
     font: inherit;
   }
-  button:hover:not(:disabled) { border-color: var(--accent); }
+  button:hover:not(:disabled) { background: var(--raised-3); }
   button:disabled { opacity: 0.4; }
   .more { padding: 3px 9px; }
   /* the same strong blue as a request's Send, not the paler accent */
-  .primary:not(:disabled) { background: var(--act-send); color: var(--on-act); border-color: var(--act-send); font-weight: 600; }
-  .primary:hover:not(:disabled) { border-color: var(--act-send); background: color-mix(in srgb, var(--act-send) 88%, white); }
+  .primary:not(:disabled) { background: var(--primary-fill); color: var(--on-primary); border: 0; font-weight: 600; box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.18); }
+  .primary:hover:not(:disabled) { filter: brightness(1.1); }
 </style>

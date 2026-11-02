@@ -214,10 +214,11 @@
   .p-subdomain { color: var(--info); }
   .p-host { color: var(--ok); }
   .p-port { color: var(--warn); }
-  .p-variable { color: var(--literal); }
+  /* A template value reads as a chip: its text on a tint of its own colour. */
+  .p-variable { color: var(--literal); background: color-mix(in srgb, var(--literal) 16%, transparent); border-radius: var(--r-sm); }
   .p-unknown-variable { color: var(--fail); text-decoration: underline wavy; }
   .p-fragment { color: var(--muted); }
-  .menu { position: absolute; top: 100%; left: 0; right: 0; z-index: 30; margin: 2px 0 0; padding: 4px; list-style: none; background: var(--panel); border: 1px solid var(--line); border-radius: var(--r-lg); box-shadow: 0 8px 24px rgb(0 0 0 / 0.35); max-height: 220px; overflow: auto; }
+  .menu { position: absolute; top: 100%; left: 0; right: 0; z-index: 30; margin: 2px 0 0; padding: 4px; list-style: none; background: var(--raised); border: 1px solid var(--line); border-radius: var(--r-lg); box-shadow: var(--shadow); max-height: 220px; overflow: auto; }
   .menu li.on button { background: color-mix(in srgb, var(--accent) 22%, transparent); }
   .menu button { display: flex; gap: 10px; width: 100%; text-align: left; background: none; border: 0; color: var(--text); font: inherit; padding: 3px 8px; border-radius: var(--r-sm); }
   .menu code { font-family: var(--mono); font-size: var(--fs-sm); }
