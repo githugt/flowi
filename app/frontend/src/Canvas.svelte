@@ -1137,12 +1137,13 @@
   .unit.failed rect, .unit.error rect, .unit.aborted rect { stroke: var(--fail); stroke-width: 2.4; filter: drop-shadow(0 0 5px var(--fail)); }
   .unit.pulse rect { animation: pulse 0.7s ease-in-out 3; }
   @keyframes pulse { 50% { filter: drop-shadow(0 0 14px var(--fail)); stroke-width: 4; } }
-  .unit.running rect { stroke: var(--accent); animation: pulse 1.1s ease-in-out infinite; }
-  @keyframes pulse { 50% { stroke-opacity: 0.35; } }
+  .unit.running rect { stroke: var(--accent); animation: pulse-soft 1.1s ease-in-out infinite; }
+  /* Was a second "pulse", which replaced the glow above for the found-step pulse too. */
+  @keyframes pulse-soft { 50% { stroke-opacity: 0.35; } }
   .dot { fill: var(--muted); }
   .dot.passed { fill: var(--ok); }
   .dot.failed, .dot.error, .dot.aborted { fill: var(--fail); }
-  .dot.running { fill: var(--accent); animation: pulse 1.1s ease-in-out infinite; }
+  .dot.running { fill: var(--accent); animation: pulse-soft 1.1s ease-in-out infinite; }
   .result { fill: var(--muted); font-size: 10px; }
   .result.failed, .result.error { fill: var(--fail); }
   .port { fill: var(--bg); stroke: var(--muted); stroke-width: 1.6; opacity: 0; cursor: crosshair; transition: opacity 0.15s; }
