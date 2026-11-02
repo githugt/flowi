@@ -26,6 +26,11 @@ default:
 build:
     CGO_ENABLED=0 go build -o {{bin}} ./cmd/flowi
 
+# Build the release archives into ./dist for a version without the v, e.g. `just dist 0.4.1-alpha.1`.
+# CI does not run this recipe: the release workflow calls scripts/dist.sh itself, which is all this does.
+dist version:
+    scripts/dist.sh {{version}}
+
 # Run flowi inside the sandbox, e.g. `just cli ls requests` or `just cli config list`.
 cli *args: build
     @mkdir -p {{sandbox}}
