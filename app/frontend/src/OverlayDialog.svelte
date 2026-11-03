@@ -1,4 +1,5 @@
 <script lang="ts">
+  import Button from './Button.svelte'
   // Save to spec overlay: what saving this version to its spec's overlay would change, each change
   // chosen or not, with what stays in Flowi and why. Saving replaces what the overlay said about
   // this operation, so a change already in it is chosen too: leaving it out takes it out.
@@ -80,8 +81,8 @@
       {/if}
     {/if}
     <div class="actions">
-      <button type="button" onclick={onclose}>Cancel</button>
-      <button class="primary" type="submit" disabled={!preview}>Save</button>
+      <Button type="button" onclick={onclose}>Cancel</Button>
+      <Button variant="primary" type="submit" disabled={!preview}>Save</Button>
     </div>
   </form>
 </div>
@@ -100,11 +101,6 @@
   .muted { color: var(--muted); font-size: var(--fs-sm); }
   .err { color: var(--fail); }
   .yaml { margin: 0; max-height: 240px; overflow: auto; padding: 8px; background: var(--bg); border: 1px solid var(--line); border-radius: var(--r-md); font: var(--fs-sm)/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; -webkit-user-select: text; user-select: text; }
-  .link { border: 0; padding: 0; color: var(--accent); text-align: left; }
+  .link { background: none; border: 0; padding: 0; font: inherit; color: var(--accent); text-align: left; }
   .actions { display: flex; justify-content: flex-end; gap: 8px; }
-  button { background: var(--raised); color: var(--text); border: 0; box-shadow: inset 0 0 0 1px var(--line); border-radius: var(--r-md); padding: 0 12px; min-height: var(--ctl-h); font: inherit; font-weight: 500; }
-  button:hover:not(:disabled) { background: var(--raised-3); }
-  button:disabled { opacity: 0.4; }
-  .primary { background: var(--primary-fill); color: var(--on-primary); font-weight: 600; box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.18); }
-  .primary:hover { filter: brightness(1.1); }
 </style>

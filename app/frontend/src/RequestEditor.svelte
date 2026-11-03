@@ -1,4 +1,5 @@
 <script lang="ts">
+  import Toggle from './Toggle.svelte'
   import { errorText } from './lib/errors'
   import { app } from './lib/app.svelte'
   import { ui } from './lib/ui.svelte'
@@ -327,6 +328,14 @@
     app.pasteOffer = { node, kind, text, http: view.kind === 'http', field: e.target instanceof HTMLElement ? e.target : null }
   }
 
+  // The palette's Send command: only the editor that is showing sends.
+  let seenSend = app.sendRequests
+  $effect(() => {
+    if (app.sendRequests === seenSend) return
+    seenSend = app.sendRequests
+    if (app.active === node) RequestService.Send(node, hooks)
+  })
+
   function onkeydown(e: KeyboardEvent) {
     if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 's') {
       e.preventDefault()
@@ -524,7 +533,7 @@
               {/if}
             {/if}
             {#if view.bodyKind === 'form'}
-              <label class="radio"><input type="checkbox" checked={view.multipart} onchange={(e) => RequestService.SetMultipart(node, e.currentTarget.checked)} />Multipart</label>
+              <Toggle checked={view.multipart} onchange={(on) => RequestService.SetMultipart(node, on)}>Multipart</Toggle>
             {/if}
           </div>
         {:else if section === 'Auth'}
@@ -652,7 +661,7 @@
   .xmlnote.bad { color: var(--warn); }
   .req { position: absolute; inset: 0; display: flex; flex-direction: column; }
   header { display: flex; gap: 8px; padding: 12px 16px; border-bottom: 1px solid var(--line); align-items: center; }
-  .addr { flex: 1; min-width: 0; display: flex; align-items: center; height: 38px; box-sizing: border-box; background: var(--panel); border: 1px solid var(--line); border-radius: var(--r-lg); transition: border-color var(--t-fast) var(--ease-out), box-shadow var(--t-fast) var(--ease-out); }
+  .addr { flex: 1; min-width: 0; display: flex; align-items: center; height: var(--addr-h); box-sizing: border-box; background: var(--panel); border: 1px solid var(--line); border-radius: var(--r-lg); transition: border-color var(--t-fast) var(--ease-out), box-shadow var(--t-fast) var(--ease-out); }
   .addr:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px var(--tint-accent); }
   /* The fields inside draw no edge of their own: the bar does. */
   .addr :global(input), .addr :global(.field), .addr :global(.box) { background: none; border: 0; box-shadow: none; min-height: 0; }
@@ -670,12 +679,12 @@
     font: inherit;
   }
   /* The toolbar's controls share one height, so the method, the address and the buttons sit on one line. */
-  select, button { padding: 0 12px; min-height: 38px; box-sizing: border-box; font-weight: 500; }
-  header :global(input) { min-height: 32px; box-sizing: border-box; }
+  select, button { padding: 0 12px; min-height: var(--addr-h); box-sizing: border-box; font-weight: 500; }
+  header :global(input) { min-height: var(--addr-h-sm); box-sizing: border-box; }
   button:hover:not(:disabled) { background: var(--raised-3); }
   button:disabled { opacity: 0.4; }
   .send { position: relative; display: flex; gap: 2px; }
-  .more { padding: 0 8px; min-height: 38px; }
+  .more { padding: 0 8px; min-height: var(--addr-h); }
   .menu {
     position: absolute; top: 100%; right: 0; margin-top: 4px; min-width: 150px; display: flex; flex-direction: column; padding: 4px;
     background: var(--raised); border: 1px solid var(--line); border-radius: var(--r-lg); box-shadow: var(--shadow); z-index: 20;
@@ -733,7 +742,7 @@
   .send .main kbd { font: 500 var(--fs-xs) var(--font, system-ui); padding: 0 5px; border-radius: var(--r-sm); background: rgb(255 255 255 / 0.22); color: inherit; text-shadow: none; }
   /* Inside the address bar the buttons are shorter than the bar, so it frames them. */
   .addr .send { margin-right: 4px; }
-  .addr .send button { min-height: 28px; }
+  .addr .send button { min-height: var(--ctl-h); }
   .send .more { border-radius: 0 var(--r-md) var(--r-md) 0; display: inline-flex; align-items: center; justify-content: center; }
   .send .act.more { border-left: 1px solid rgb(0 0 0 / 0.22); }
   .send:not(.savegrp) { gap: 0; }
@@ -744,7 +753,6 @@
   .menu kbd { margin-left: auto; padding-left: 16px; color: var(--muted); font: inherit; font-size: var(--fs-xs); }
   .menu button { display: flex; align-items: center; white-space: nowrap; }
   .section { flex: 1; overflow: auto; padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; }
-  .radio { display: flex; gap: 4px; align-items: center; }
   .muted { color: var(--muted); font-size: var(--fs-sm); margin: 0; }
   .row { display: flex; gap: 4px; }
   .row input {

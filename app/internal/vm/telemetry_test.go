@@ -48,6 +48,18 @@ func TestTelemetry_Preview_should_show_the_sample_of_the_chosen_level(t *testing
 	}
 }
 
+// Off sends no report at all, so showing a report header for it suggested something is still sent.
+func TestTelemetry_Preview_Given_off_Then_shows_nothing(t *testing.T) {
+	_, w := newUIQueue()
+	tel := vm.NewTelemetry(&vmtest.Backend{}, w, guiClient())
+
+	off := tel.Preview("off")
+
+	if off != "" {
+		t.Fatalf("off preview:\n%s", off)
+	}
+}
+
 func TestTelemetry_Choose_should_store_the_level_in_the_user_settings(t *testing.T) {
 	q, w := newUIQueue()
 	b := &vmtest.Backend{}

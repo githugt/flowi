@@ -56,8 +56,11 @@
   import Overlays from './Overlays.svelte'
   import PasteOffer from './PasteOffer.svelte'
   import HooksEditor from './HooksEditor.svelte'
+  import HomeScreen from './HomeScreen.svelte'
+  import Logo from './Logo.svelte'
   import WelcomeScreen from './WelcomeScreen.svelte'
   import TelemetryScreen from './TelemetryScreen.svelte'
+  import TracingScreen from './TracingScreen.svelte'
   import Announcements from './Announcements.svelte'
   import EnvEditor from './EnvEditor.svelte'
   import Footer from './Footer.svelte'
@@ -185,6 +188,10 @@
   <section class:folded={collapsed}>
     <Announcements />
     <nav class="tabs">
+      <!-- With the sidebar folded, Home is the top of the rail instead. -->
+      {#if !collapsed}
+        <button class="home" class:on={app.active === 'screen:home'} title="Home" aria-label="Home" aria-current={app.active === 'screen:home' ? 'page' : undefined} onpointerdown={(e) => e.stopPropagation()} onclick={() => app.openScreen('screen:home', 'Home')}><Logo size={22} /></button>
+      {/if}
       <div class="strip" class:fade-left={overflow.left} class:fade-right={overflow.right} bind:this={strip} onscroll={measureOverflow} onwheel={stripWheel}>
         {#each app.tabs as t (t.node)}
           {@const verb = t.kind === 'flow' ? 'FLOW' : app.requests[t.node]?.verb || app.find(t.node)?.method || ''}
@@ -246,10 +253,14 @@
         {#key tab.node}
           <EnvEditor view={app.envs[tab.node]} />
         {/key}
+      {:else if tab && tab.node === 'screen:home'}
+        <HomeScreen />
       {:else if tab && tab.node === 'screen:welcome'}
         <WelcomeScreen />
       {:else if tab && tab.node === 'screen:telemetry'}
         <TelemetryScreen />
+      {:else if tab && tab.node === 'screen:tracing'}
+        <TracingScreen />
       {:else if tab && tab.node === 'screen:settings'}
         <SettingsScreen />
       {:else if tab && tab.node === 'screen:secrets'}
@@ -294,6 +305,10 @@
     background: var(--chrome);
     --wails-draggable: drag;
   }
+  /* The way back to Home, ahead of the tabs and outside their scrolling strip, so it is always there. */
+  .home { flex: none; align-self: center; --wails-draggable: no-drag; margin: 0 0 0 8px; padding: 4px; display: grid; place-items: center; background: none; border: 0; border-radius: var(--r-md); opacity: 0.85; }
+  .home:hover { background: var(--tint-hover); opacity: 1; }
+  .home.on { background: var(--tint-sel); opacity: 1; }
   .strip { flex: 1; min-width: 0; display: flex; align-items: flex-end; gap: 2px; padding: 0 8px; overflow-x: auto; scrollbar-width: none; align-self: stretch; }
   .strip::-webkit-scrollbar { display: none; }
   /* A soft edge where more tabs are scrolled out of sight. A mask reads only alpha, so black is opaque, not a colour. */

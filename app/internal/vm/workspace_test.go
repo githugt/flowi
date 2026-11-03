@@ -148,6 +148,20 @@ func TestWorkspaceVM_should_list_the_scratch_space_first_as_Drafts_and_other_app
 	}
 }
 
+func TestWorkspaceVM_should_mark_only_the_scratch_space_as_scratch(t *testing.T) {
+	b := draftsBackend()
+	w := vmtest.SyncWorker()
+	ws := vm.NewWorkspace(b, w)
+
+	ws.Load()
+	w.Wait()
+
+	roots := ws.Children("")
+	if !ws.Node(roots[0]).Scratch || ws.Node(roots[2]).Scratch || !ws.Node(roots[2]).Draft {
+		t.Fatalf("scratch %v, an unsaved collection's scratch %v and draft %v", ws.Node(roots[0]).Scratch, ws.Node(roots[2]).Scratch, ws.Node(roots[2]).Draft)
+	}
+}
+
 func TestWorkspaceVM_request_nodes_should_carry_their_method(t *testing.T) {
 	b := draftsBackend()
 	w := vmtest.SyncWorker()

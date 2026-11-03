@@ -1,4 +1,5 @@
 <script lang="ts">
+  import Button from './Button.svelte'
   // The editor behind a Start or End row: the input's or output's name, type and default or value, and Remove. It
   // opens where the row was clicked and each field commits when it is left, so Undo takes back one field at a time.
   import { FlowService } from '../bindings/github.com/githugt/flowi/app/internal/bridge'
@@ -62,7 +63,7 @@
     <input bind:value onchange={commit} placeholder={isInput ? '' : '{{vars.token}}'} spellcheck="false" />
   </label>
   {#if error}<p class="err">{error}</p>{/if}
-  <div class="actions"><button class="remove" onclick={remove}>Remove</button><button class="primary" onclick={onclose}>Done</button></div>
+  <div class="actions"><Button variant="danger" onclick={remove}>Remove</Button><Button variant="primary" onclick={onclose}>Done</Button></div>
 </div>
 
 <style>
@@ -77,7 +78,4 @@
   input:focus, select:focus { border-color: var(--accent); outline: none; }
   .err { color: var(--fail); font-size: var(--fs-sm); margin: 0; }
   .actions { display: flex; justify-content: space-between; gap: 8px; }
-  .actions button { background: var(--raised); color: var(--text); border: 0; box-shadow: inset 0 0 0 1px var(--line); border-radius: var(--r-md); padding: 0 12px; min-height: var(--ctl-h); font: inherit; font-weight: 500; }
-  .actions .remove:hover { color: var(--fail); border-color: var(--fail); }
-  .actions .primary { background: var(--primary-fill); color: var(--on-primary); border: 0; font-weight: 600; box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.18); }
 </style>

@@ -17,3 +17,12 @@ describe('tookTone', () => {
     expect(tookTone(text)).toBe(tone)
   })
 })
+
+describe('tookTone without a space', () => {
+  it('reads Go durations as the replayer writes them ("142ms", "2.4s")', () => {
+    // Before: only "142 ms" was read, so the replayer's times were never tinted.
+    expect(tookTone('142ms')).toBe('')
+    expect(tookTone('900ms')).toBe('slow')
+    expect(tookTone('2.4s')).toBe('verySlow')
+  })
+})

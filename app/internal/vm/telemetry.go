@@ -61,8 +61,13 @@ func levelSetting(b Backend) string {
 }
 
 // Preview is the report that level would send, with example values, as
-// indented JSON.
+// indented JSON. Off sends no report at all (Collector.Payload refuses to
+// build one, and Payload.Validate rejects it), so it says so instead of
+// showing an empty report that reads as "something is still sent".
 func (t *Telemetry) Preview(level string) string {
+	if telemetry.ParseLevel(level) == telemetry.LevelOff {
+		return ""
+	}
 	data, err := json.MarshalIndent(telemetry.Sample(telemetry.ParseLevel(level), t.client), "", "  ")
 	if err != nil {
 		return err.Error() // a sample of plain strings cannot fail to encode

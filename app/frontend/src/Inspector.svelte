@@ -1,4 +1,5 @@
 <script lang="ts">
+  import Toggle from './Toggle.svelte'
   import { confirmDeleteSteps } from './lib/flowDelete'
   import { errorText } from './lib/errors'
   import { FlowService } from '../bindings/github.com/githugt/flowi/app/internal/bridge'
@@ -127,7 +128,7 @@
         <TextField label="Open connection" value={step.call.open ?? ''} oninput={(v) => text('open', v)} placeholder="name (WebSocket, MQTT 5, NATS)" />
         <TextField label="Run over connection" value={step.call.over ?? ''} oninput={(v) => text('over', v)} placeholder="a name opened by an earlier step" />
         {#if step.call.over}
-          <label class="check"><input type="checkbox" checked={step.call.close ?? false} onchange={(e) => FlowService.SetClose(node, e.currentTarget.checked)} /> Close it after this step</label>
+          <Toggle checked={step.call.close ?? false} onchange={(on) => FlowService.SetClose(node, on)}>Close it after this step</Toggle>
         {/if}
       {/if}
       <span class="label">With</span>
@@ -265,10 +266,7 @@
       <TextField label="Description" value={step.description} oninput={(v) => text('description', v)} />
       <TemplateField label="Run when (expression)" help="flow.when" placeholder="vars.count > 3" value={step.when} oninput={(v) => text('when', v)} suggest={complete} vocabulary={vocabulary('flow.when')} />
       <TextField label="Timeout (e.g. 5s)" value={step.timeout} oninput={(v) => text('timeout', v)} />
-      <label class="check">
-        <input type="checkbox" checked={step.concurrent} onchange={(e) => FlowService.SetConcurrent(node, e.currentTarget.checked)} />
-        <span>Concurrent (may run alongside earlier nodes)</span>
-      </label>
+      <Toggle checked={step.concurrent} onchange={(on) => FlowService.SetConcurrent(node, on)}>Concurrent (may run alongside earlier nodes)</Toggle>
       <label class="field">
         <span class="label">If this step fails</span>
         <select value={step.failMode} onchange={(e) => FlowService.SetFailRoute(node, e.currentTarget.value, step.failTarget)}>
@@ -331,7 +329,6 @@
   .label { color: var(--muted); font-size: var(--fs-sm); }
   .field.inline { flex-direction: row; align-items: center; }
   .field.inline .grow { flex: 1; }
-  .check { display: flex; align-items: center; gap: 6px; }
   .mode { align-self: flex-start; background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); padding: 3px 6px; font: inherit; font-size: var(--fs-sm); }
   .type { color: var(--muted); font-size: var(--fs-xs); border: 1px solid var(--line); border-radius: var(--r-pill); padding: 0 6px; }
   select {

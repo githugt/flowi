@@ -61,6 +61,7 @@ type App struct {
 	hooks      *HooksService
 	session    *SessionService
 	welcome    *WelcomeService
+	tracing    *TracingService
 	passphrase *PassphraseService
 }
 
@@ -74,6 +75,7 @@ type appOptions struct {
 	specs        SpecOverlays
 	variables    CollectionVariables
 	changelog    string
+	tracer       vm.Tracer
 }
 
 // WithLogger sets the logger for what the app cannot report in the window
@@ -85,6 +87,11 @@ func WithLogger(l *slog.Logger) Option {
 // WithChangelog gives the text of CHANGELOG.md, which the welcome screen shows the latest entry of.
 func WithChangelog(text string) Option {
 	return func(o *appOptions) { o.changelog = text }
+}
+
+// WithTracer gives the exporter the Tracing page controls. Without one, tracing is never on.
+func WithTracer(t vm.Tracer) Option {
+	return func(o *appOptions) { o.tracer = t }
 }
 
 // WithOpenProblems passes on what flowi.OpenWorkspace reported. The Problems
@@ -111,13 +118,13 @@ func NewApp(b vm.Backend, actor *Actor, emit Emit, opts ...Option) *App {
 	a.send.OnPrompt(a.promptPerson)
 	a.scheduler = vm.NewTimerScheduler(actor.Post)
 	a.treeReady = newFirstLoad()
-	a.buildServices(o.logger)
+	a.buildServices(o.logger, o.tracer)
 	return a
 }
 
 // buildServices creates every service once. Several subscribe to view-model
 // changes, so building one twice would publish its events twice.
-func (a *App) buildServices(logger *slog.Logger) {
+func (a *App) buildServices(logger *slog.Logger, tracer vm.Tracer) {
 	a.tree = &WorkspaceService{app: a}
 	a.flows = &FlowService{app: a, docs: map[string]*openFlow{}}
 	a.requests = newRequestService(a)
@@ -137,6 +144,7 @@ func (a *App) buildServices(logger *slog.Logger) {
 	a.session = newSessionService(a, logger)
 	a.welcome = newWelcomeService(a)
 	a.passphrase = newPassphraseService(a)
+	a.tracing = newTracingService(a, tracer) // after settings: it follows their changes
 }
 
 // Start loads the workspace and watches its files until ctx ends. Every
@@ -152,6 +160,7 @@ func (a *App) Start(ctx context.Context) {
 		a.workspace.Load()
 		a.workspace.Watch(ctx)
 		a.problems.Refresh()
+		a.tracing.vm.Reload() // traces flow from the first send, without the Tracing page being opened
 	})
 }
 
@@ -208,6 +217,9 @@ func (a *App) Session() *SessionService { return a.session }
 
 // Welcome is the service for the welcome screen and usage reporting.
 func (a *App) Welcome() *WelcomeService { return a.welcome }
+
+// Tracing is the service for the Tracing page.
+func (a *App) Tracing() *TracingService { return a.tracing }
 
 // Passphrase is the service for the vault's passphrase question.
 func (a *App) Passphrase() *PassphraseService { return a.passphrase }

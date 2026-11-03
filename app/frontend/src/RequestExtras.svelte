@@ -1,4 +1,5 @@
 <script lang="ts">
+  import Toggle from './Toggle.svelte'
   import EmptyState from './EmptyState.svelte'
   import Code from './Code.svelte'
   // The request's side tabs: the code snippet, who uses it, and the cookie jar.
@@ -70,7 +71,7 @@
     <select value={view.snippet.format} onchange={(e) => RequestService.SetSnippetFormat(node, e.currentTarget.value)} aria-label="Format">
       {#each view.snippet.formats as f}<option value={f}>{f}</option>{/each}
     </select>
-    <label class="check"><input type="checkbox" checked={view.snippet.exclude} onchange={(e) => RequestService.SetSnippetExclude(node, e.currentTarget.checked)} /> Leave secrets out</label>
+    <Toggle checked={view.snippet.exclude} onchange={(on) => RequestService.SetSnippetExclude(node, on)}>Leave secrets out</Toggle>
     <span class="spacer"></span>
     <button disabled={!view.snippet.text} onclick={() => copy(view.snippet.text)}>Copy</button>
   </div>
@@ -152,7 +153,6 @@
 <style>
   .bar { display: flex; align-items: center; gap: 10px; }
   .spacer { flex: 1; }
-  .check { display: flex; align-items: center; gap: 4px; font-size: var(--fs-sm); }
   select, button { background: var(--raised); color: var(--text); border: 0; box-shadow: inset 0 0 0 1px var(--line); border-radius: var(--r-md); padding: 0 10px; min-height: var(--ctl-h); font: inherit; font-weight: 500; }
   select { appearance: none; -webkit-appearance: none; padding-right: 28px; background: var(--panel) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='rgb(140 146 158)' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E") no-repeat right 8px center / 14px; }
   button:disabled { opacity: 0.4; }

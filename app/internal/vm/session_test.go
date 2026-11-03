@@ -75,7 +75,7 @@ func TestSession_should_write_privately(t *testing.T) {
 func TestHistory_Export_and_Restore_should_round_trip_the_exchanges(t *testing.T) {
 	h := vm.NewHistory()
 	rec := &engine.Record{RequestPath: "auth/login", Status: 200}
-	h.Add(flowi.RequestTarget{Collection: "C1", Request: "R1"}, "1", engine.SendResult{Status: engine.StatusPassed, Record: rec})
+	h.Add(flowi.RequestTarget{Collection: "C1", Request: "R1"}, "1", engine.SendResult{Status: engine.StatusPassed, Record: rec}, nil)
 	s := vm.NewSessionStore(t.TempDir())
 	if err := s.SaveHistory(h.Export()); err != nil {
 		t.Fatal(err)
@@ -92,7 +92,7 @@ func TestHistory_Export_and_Restore_should_round_trip_the_exchanges(t *testing.T
 	if len(items) != 1 || items[0].Title != h.Items()[0].Title || items[0].Result.Record.Status != 200 || items[0].Target.Request != "R1" {
 		t.Fatalf("items %+v", items)
 	}
-	next := again.Add(flowi.RequestTarget{}, "1", engine.SendResult{})
+	next := again.Add(flowi.RequestTarget{}, "1", engine.SendResult{}, nil)
 	if next.ID == items[0].ID {
 		t.Fatal("a new exchange must not reuse a restored id")
 	}
@@ -188,7 +188,7 @@ func TestHistory_should_keep_at_most_a_fixed_number_of_exchanges_when_exporting_
 // session was still being read, and Open picked the wrong one.
 func TestHistory_Restore_Given_a_send_finished_first_Then_ids_stay_unique(t *testing.T) {
 	h := vm.NewHistory()
-	live := h.Add(flowi.RequestTarget{}, "1", engine.SendResult{})
+	live := h.Add(flowi.RequestTarget{}, "1", engine.SendResult{}, nil)
 
 	h.Restore([]vm.StoredExchange{{ID: 2, Title: "newer"}, {ID: 1, Title: "older"}})
 
@@ -208,11 +208,24 @@ func TestHistory_OnAdd_should_fire_for_a_new_exchange_but_not_for_opening_one(t 
 	h := vm.NewHistory()
 	added := 0
 	h.OnAdd(func() { added++ })
-	ex := h.Add(flowi.RequestTarget{}, "1", engine.SendResult{})
+	ex := h.Add(flowi.RequestTarget{}, "1", engine.SendResult{}, nil)
 
 	h.Open(ex.ID)
 
 	if added != 1 {
 		t.Fatalf("added %d", added)
+	}
+}
+
+func TestSession_WelcomeShown_should_be_false_until_marked_and_then_stay_true(t *testing.T) {
+	dir := t.TempDir()
+	first := vm.NewSessionStore(dir)
+
+	before, beforeErr := first.WelcomeShown()
+	markErr := first.MarkWelcomeShown()
+	after, afterErr := vm.NewSessionStore(dir).WelcomeShown() // a new store: the next run of the app
+
+	if beforeErr != nil || markErr != nil || afterErr != nil || before || !after {
+		t.Fatalf("before %v (%v), mark %v, after %v (%v)", before, beforeErr, markErr, after, afterErr)
 	}
 }

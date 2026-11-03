@@ -1,4 +1,5 @@
 <script lang="ts">
+  import TextInput from './TextInput.svelte'
   import { onMount } from 'svelte'
   import { live } from './lib/live'
   import { ManagerService } from '../bindings/github.com/githugt/flowi/app/internal/bridge'
@@ -135,7 +136,7 @@
   </div>
 
   <h3>New collection</h3>
-  <label class="f"><span>Name</span><input bind:value={newName} spellcheck="false" /></label>
+  <label class="f"><span>Name</span><TextInput bind:value={newName} label="Name" /></label>
   <div class="line">
     <PathField bind:value={newLocation} label="Folder (empty: Flowi’s own folder)" />
     <button disabled={!newName} onclick={() => { ManagerService.NewCollection(newName, newLocation); newName = ''; newLocation = '' }}>Create</button>
@@ -163,7 +164,6 @@
   .line.spec { align-items: center; font-size: var(--fs-sm); }
   .line.spec code { font-size: var(--fs-xs); }
   .f { display: flex; flex-direction: column; gap: 3px; color: var(--muted); font-size: var(--fs-xs); margin-bottom: 8px; }
-  input { background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); padding: 5px 8px; font: inherit; -webkit-user-select: text; user-select: text; }
   button { background: var(--raised); color: var(--text); border: 0; box-shadow: inset 0 0 0 1px var(--line); border-radius: var(--r-md); padding: 0 12px; min-height: var(--ctl-h); font: inherit; font-weight: 500; }
   button:hover:not(:disabled) { background: var(--raised-3); }
   button:disabled { opacity: 0.4; }

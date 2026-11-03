@@ -4,6 +4,7 @@ package bridge
 
 import (
 	"encoding/json"
+	"fmt"
 	"time"
 
 	"github.com/githugt/flowi/lib/engine"
@@ -24,6 +25,8 @@ type MessageView struct {
 	At        string `json:"at"`
 	Body      string `json:"body"`
 	Key       string `json:"key,omitempty"`
+	Kind      string `json:"kind,omitempty"` // json, text or binary; empty for a message with no body
+	Type      string `json:"type,omitempty"` // the protocol's name for the message: an SSE event name, a WebSocket frame kind
 }
 
 // PipelineRowView is a line of the pipeline: the hooks and the request, in
@@ -56,9 +59,26 @@ func messagesOf(in []engine.RecordMessage) []MessageView {
 		if body == "" && m.Body.JSON != nil {
 			body = jsonText(m.Body.JSON)
 		}
-		out = append(out, MessageView{Direction: m.Direction, At: m.At.Local().Format(time.TimeOnly), Body: body, Key: m.Key})
+		kind := messageKind(m.Body)
+		if kind == "binary" {
+			body = fmt.Sprintf("(binary, %d bytes)", m.Body.Size) // the bytes are not text; say what is there
+		}
+		out = append(out, MessageView{Direction: m.Direction, At: m.At.Local().Format(time.TimeOnly), Body: body, Key: m.Key, Kind: kind, Type: m.Type})
 	}
 	return out
+}
+
+// messageKind names what a message body is, for the type pill on its row.
+func messageKind(b engine.Body) string {
+	switch {
+	case b.Base64 != "":
+		return "binary"
+	case b.JSON != nil:
+		return "json"
+	case b.Text != "":
+		return "text"
+	}
+	return ""
 }
 
 func pipelineOf(r *vm.Request, trace *vm.Trace) []PipelineRowView {

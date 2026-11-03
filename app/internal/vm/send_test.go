@@ -280,8 +280,8 @@ func TestHistory_and_RunLog_Clear_should_empty_them_and_tell_the_listeners(t *te
 func TestHistory_Remove_should_forget_one_exchange_and_leave_the_others(t *testing.T) {
 	h := vm.NewHistory()
 	target := flowi.RequestTarget{Collection: "C1", Request: "R1"}
-	first := h.Add(target, "1", engine.SendResult{})
-	second := h.Add(target, "1", engine.SendResult{})
+	first := h.Add(target, "1", engine.SendResult{}, nil)
+	second := h.Add(target, "1", engine.SendResult{}, nil)
 	changes := 0
 	h.OnChange(func() { changes++ })
 
@@ -290,5 +290,15 @@ func TestHistory_Remove_should_forget_one_exchange_and_leave_the_others(t *testi
 
 	if items := h.Items(); len(items) != 1 || items[0].ID != second.ID || changes != 1 {
 		t.Fatalf("items %+v, changes %d", items, changes)
+	}
+}
+
+func TestHistory_Add_should_keep_the_checks_the_result_judged(t *testing.T) {
+	h := vm.NewHistory()
+
+	ex := h.Add(flowi.RequestTarget{}, "1", engine.SendResult{Status: engine.StatusPassed}, []string{"status == 200"})
+
+	if len(ex.Checks) != 1 || ex.Checks[0] != "status == 200" {
+		t.Fatalf("checks %v", ex.Checks)
 	}
 }

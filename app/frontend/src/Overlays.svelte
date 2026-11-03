@@ -1,10 +1,24 @@
 <script lang="ts">
   let menuH = $state(0)
-  // A menu with a ticked choice keeps room for the tick on every row, so the labels line up.
-  const hasChecks = $derived(!!ui.menu?.items.some((i) => i.checked !== undefined))
+  // The shared Menu takes a separator as a rule above the next item.
+  const menuItems = $derived.by((): MenuItem[] => {
+    const out: MenuItem[] = []
+    let rule = false
+    for (const i of ui.menu?.items ?? []) {
+      if (i.separator) rule = true
+      else {
+        out.push({ label: i.label, onselect: i.run, disabled: i.disabled, checked: i.checked, separated: rule && out.length > 0 })
+        rule = false
+      }
+    }
+    return out
+  })
   let menuW = $state(0)
   let innerWidth = $state(0)
   let innerHeight = $state(0)
+  import Menu, { type MenuItem } from './Menu.svelte'
+  import Toasts from './Toasts.svelte'
+  import CommandPalette from './CommandPalette.svelte'
   import BlueprintDialog from './BlueprintDialog.svelte'
   import MoveDialog from './MoveDialog.svelte'
   import PlaceDialog from './PlaceDialog.svelte'
@@ -41,13 +55,9 @@
 
 {#if ui.menu}
   <!-- kept inside the window: moved up when it would run off the bottom, left when off the right -->
-  <div class="menu" role="menu" tabindex="-1" bind:clientHeight={menuH} bind:clientWidth={menuW}
-    style:left={`${Math.max(8, Math.min(ui.menu.x, innerWidth - menuW - 8))}px`} style:top={`${Math.max(8, Math.min(ui.menu.y, innerHeight - menuH - 8))}px`} onpointerdown={(e) => e.stopPropagation()}>
-    {#each ui.menu.items as item}
-      {#if item.separator}<hr />{:else}
-        <button role={item.checked === undefined ? 'menuitem' : 'menuitemradio'} class:checkable={hasChecks} aria-checked={item.checked} disabled={item.disabled} onclick={() => { ui.closeMenu(); item.run() }}>{#if hasChecks}<span class="tick" aria-hidden="true">{item.checked ? '✓' : ''}</span>{/if}{item.label}</button>
-      {/if}
-    {/each}
+  <div class="menupos" bind:clientHeight={menuH} bind:clientWidth={menuW}
+    style:left={`${Math.max(8, Math.min(ui.menu.x, innerWidth - menuW - 8))}px`} style:top={`${Math.max(8, Math.min(ui.menu.y, innerHeight - menuH - 8))}px`}>
+    <Menu style="position: static; min-width: 190px" items={menuItems} onclose={() => ui.closeMenu()} />
   </div>
 {/if}
 
@@ -96,33 +106,12 @@
 <PlaceDialog />
 <SignInDialog />
 
-<div class="toasts" aria-live="polite">
-  {#each ui.toasts as t (t.id)}<div class="toast {t.level}">{t.text}</div>{/each}
-</div>
+<CommandPalette />
+<Toasts />
 
 <style>
-  .menu {
-    position: fixed;
-    z-index: 50;
-    min-width: 190px;
-    width: max-content;
-    max-width: calc(100vw - 16px);
-    max-height: calc(100vh - 24px);
-    overflow: auto;
-    display: flex;
-    flex-direction: column;
-    padding: 4px;
-    background: var(--raised);
-    border: 1px solid var(--line);
-    border-radius: var(--r-lg);
-    box-shadow: var(--shadow);
-  }
-  .menu button { background: none; border: 0; color: var(--text); font: inherit; text-align: left; padding: 5px 10px; border-radius: var(--r-sm); white-space: nowrap; }
-  .menu button:hover:not(:disabled) { background: var(--tint-hover); }
-  .menu button:disabled { opacity: 0.4; }
-  .menu button.checkable { display: flex; gap: 6px; }
-  .tick { flex: none; width: 1em; color: var(--accent); }
-  hr { width: 100%; border: 0; border-top: 1px solid var(--line); margin: 4px 0; }
+  /* Positioned by the code above so the menu stays inside the window; Menu draws it. */
+  .menupos { position: fixed; z-index: 50; }
   .scrim { position: fixed; inset: 0; background: rgb(0 0 0 / 0.5); backdrop-filter: blur(2px); display: grid; place-items: center; z-index: 60; animation: fade var(--t-base) var(--ease-out); }
   .dialog { width: 400px; display: flex; flex-direction: column; gap: 12px; padding: 20px; background: var(--raised); border: 1px solid var(--line); border-radius: var(--r-xl); box-shadow: var(--shadow); animation: rise var(--t-slow) var(--ease-out); }
   .dialog h3 { margin: 0; font-size: var(--fs-lg); font-weight: 600; }
@@ -139,8 +128,4 @@
   .actions { display: flex; justify-content: flex-end; gap: 8px; }
   .actions button { background: var(--raised-3); color: var(--text); border: 0; border-radius: var(--r-md); padding: 0 14px; min-height: var(--ctl-h); font: inherit; font-weight: 500; }
   .primary { background: var(--accent) !important; color: var(--on-accent) !important; border-color: var(--accent) !important; }
-  .toasts { position: fixed; right: 16px; bottom: 16px; display: flex; flex-direction: column; gap: 8px; z-index: 70; }
-  .toast { max-width: 380px; padding: 9px 14px 9px 12px; border-radius: var(--r-lg); background: var(--raised); border: 1px solid var(--line); border-left: 3px solid var(--accent); box-shadow: var(--shadow); animation: rise var(--t-slow) var(--ease-out); }
-  .toast.error { border-left-color: var(--fail); }
-  @media (prefers-reduced-motion: reduce) { .toast { animation: none; } }
 </style>

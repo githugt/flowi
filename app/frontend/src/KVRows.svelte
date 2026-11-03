@@ -155,7 +155,7 @@
     border: 1px solid var(--line);
     border-radius: var(--r-md);
     padding: 5px 8px;
-    min-height: 30px;
+    min-height: var(--row-h-lg);
     box-sizing: border-box;
     font: var(--fs-sm) ui-monospace, SFMono-Regular, Menlo, monospace;
     -webkit-user-select: text;
@@ -167,7 +167,7 @@
   .k { flex: 0 0 30%; }
   button { background: none; border: 0; color: var(--muted); font: inherit; }
   .add { color: var(--accent); padding: 2px 0; }
-  .ghost { min-height: 30px; padding: 4px 10px; border: 1px dashed var(--line); border-radius: var(--r-md); text-align: left; color: var(--muted); }
+  .ghost { min-height: var(--row-h-lg); padding: 4px 10px; border: 1px dashed var(--line); border-radius: var(--r-md); text-align: left; color: var(--muted); }
   .ghost:hover, .ghost:focus-visible { border-color: var(--accent); color: var(--accent); background: var(--tint-hover); }
   .tools { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
   .tools.end { justify-content: flex-end; }

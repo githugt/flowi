@@ -8,6 +8,8 @@ import { screens } from './screens'
 import type { PastedKind } from './paste'
 import { EnvironmentService, FlowService, HooksService, PanelsService, PassphraseService, RequestService, SessionService, SettingsService, SystemService, TrashService, WorkspaceService } from '../../bindings/github.com/githugt/flowi/app/internal/bridge'
 import type { HooksView, SettingsView, Panels, EnvView, FlowView, HistoryRow, RequestView, RunView, Tree, TreeNode } from './types'
+import { themeMode } from './theme'
+import type { PaletteContext } from './commands'
 
 export interface Tab {
   node: string
@@ -33,6 +35,12 @@ class AppState {
   treeDrop = $state<{ id: string; after: boolean; into?: boolean } | null>(null)
   /** Where a Shift-click range of marked rows starts: the row last clicked. */
   markAnchor = $state('')
+  /** Counts the requests to jump to a row (Cmd/Ctrl+K): the open sidebar, or the panel floating from the rail, focuses its Jump to field. */
+  jumpRequests = $state(0)
+  /** Bumped by the palette's Send command; the open request's editor sends when it changes. */
+  sendRequests = $state(0)
+  /** The command palette (Cmd/Ctrl+Shift+P) is open. */
+  paletteOpen = $state(false)
   /** Each flow tab's canvas pan and zoom, so switching tabs does not reset it. Not reactive: only the canvas reads it, on mount. */
   canvasViews: Record<string, { x: number; y: number; k: number }> = {}
   /** True once the last session's tabs are back: before that, the tab list is not worth keeping. */
@@ -135,6 +143,9 @@ class AppState {
   onMenu(action: string) {
     const screen = screens.find((s) => s.menu === action)
     if (screen) return this.openScreen(screen.id, screen.title)
+    if (action === 'jump') return void this.jumpRequests++
+    if (action === 'send') return void this.sendRequests++
+    if (action === 'palette') return void (this.paletteOpen = !this.paletteOpen)
     if (action === 'new-request') return void WorkspaceService.NewScratchRequest()
     if (action === 'new-flow') return void WorkspaceService.NewScratchFlow()
     const i = this.tabs.findIndex((t) => t.node === this.active)
@@ -153,7 +164,11 @@ class AppState {
     } finally {
       this.restored = true
     }
-    if (!this.tabs.length) this.openScreen('screen:welcome', 'Welcome')
+    if (!this.tabs.length) {
+      // The welcome page is for the first launch only; after that the window opens on Home.
+      const first = (await SessionService.ShowWelcome()) as boolean
+      this.openScreen(first ? 'screen:welcome' : 'screen:home', first ? 'Welcome' : 'Home')
+    }
   }
 
   /** The rows of the tabs worth restoring: documents, not screens or editors made from them. */
@@ -171,6 +186,8 @@ class AppState {
     else if (!(a.theme === 'custom' && a.custom?.vars['--accent'])) root.style.removeProperty('--accent')
     if (a.sendButton && a.sendButton !== 'orange') root.dataset.send = a.sendButton
     else delete root.dataset.send
+    if (a.density === 'compact') root.dataset.density = 'compact'
+    else delete root.dataset.density
     if (a.font) root.style.setProperty('--font', a.font)
     else root.style.removeProperty('--font')
     root.style.setProperty('--font-size', `${a.fontSize || 13}px`)
@@ -193,14 +210,20 @@ class AppState {
       this.customVars = Object.keys(a.custom.vars)
       for (const [name, value] of Object.entries(a.custom.vars)) root.style.setProperty(name, value)
       root.dataset.theme = a.custom.base
+      root.dataset.mode = themeMode(a.custom.base)
       this.rainbow = a.custom.rainbow
       return
     }
     for (const name of this.customVars) root.style.removeProperty(name)
     this.customVars = []
     this.rainbow = []
-    if (a.theme && a.theme !== 'system') root.dataset.theme = a.theme
-    else delete root.dataset.theme
+    if (a.theme && a.theme !== 'system') {
+      root.dataset.theme = a.theme
+      root.dataset.mode = themeMode(a.theme)
+    } else {
+      delete root.dataset.theme
+      delete root.dataset.mode
+    }
   }
 
   /** Opens a screen that is not a tree node (settings, import, ...) as a tab. */
@@ -352,6 +375,20 @@ class AppState {
 
   selectEnvironment(name: string) {
     return WorkspaceService.SelectEnvironment(name)
+  }
+
+  /** What the palette needs to know to offer environments, themes and Send. */
+  paletteContext(): PaletteContext {
+    const themeField = this.settings?.groups.flatMap((g) => g.fields).find((f) => f.name === 'appearance.theme')
+    return {
+      environments: this.tree?.environments ?? [],
+      selected: this.tree?.selected ?? '',
+      themes: themeField?.enum ?? [],
+      theme: String(themeField?.value ?? ''),
+      canSend: !!this.requests[this.active],
+      selectEnvironment: (n) => void this.selectEnvironment(n),
+      setTheme: (n) => void SettingsService.Set('appearance.theme', n),
+    }
   }
 }
 

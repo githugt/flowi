@@ -1,6 +1,7 @@
 <script lang="ts">
-  // The first screen: what to do next, worked out from the workspace, with the
-  // changelog folded away below for those who want it.
+  import Button from './Button.svelte'
+  // The first launch's screen: what to do next, worked out from the workspace, with the
+  // changelog folded away below. Later launches open the home page; this stays reachable from it and the Help menu.
   import { onMount } from 'svelte'
   import { WelcomeService } from '../bindings/github.com/githugt/flowi/app/internal/bridge'
   import { app } from './lib/app.svelte'
@@ -9,6 +10,7 @@
   import type { TreeNode } from './lib/types'
   import Markdown from './Markdown.svelte'
   import Icon from './Icon.svelte'
+  import Logo from './Logo.svelte'
 
   interface WelcomeView {
     version: string
@@ -17,7 +19,7 @@
   let view = $state<WelcomeView | null>(null)
   onMount(() => live<WelcomeView>('welcome', () => WelcomeService.State(), (v) => (view = v)))
 
-  const collections = $derived((app.tree?.roots ?? []).filter((n) => n.kind === 'collection' && !n.draft))
+  const collections = $derived((app.tree?.roots ?? []).filter((n) => n.kind === 'collection' && !n.scratch))
   const environments = $derived(app.tree?.environments ?? [])
   const selected = $derived(app.tree?.selected ?? '')
 
@@ -41,7 +43,7 @@
 <div class="page">
  <div class="col">
   <div class="hero">
-    <div class="logo" aria-hidden="true"><Icon name="blueprint" size={26} /></div>
+    <div class="logo"><Logo size={56} /></div>
     <h1>Welcome to Flowi</h1>
     <p class="muted">Version {view?.version ?? ''} · your requests and flows stay on this machine</p>
   </div>
@@ -56,7 +58,7 @@
           <span class="detail">{s.detail}</span>
         </div>
         {#if i === 0}
-          <button class:primary={!s.done} onclick={() => app.openScreen('screen:manager', 'Collections')}>{s.done ? 'Collections' : 'Open…'}</button>
+          <Button variant={s.done ? 'secondary' : 'primary'} onclick={() => app.openScreen('screen:manager', 'Collections')}>{s.done ? 'Collections' : 'Open…'}</Button>
         {:else if i === 1 && !s.done}
           {#if environments.length}
             <select aria-label="Environment" value="" onchange={(e) => app.selectEnvironment(e.currentTarget.value)}>
@@ -64,10 +66,10 @@
               {#each environments as name}<option value={name}>{name}</option>{/each}
             </select>
           {:else}
-            <button class="primary" disabled={!collections.length} onclick={promptNewEnvironment}>New environment…</button>
+            <Button variant="primary" disabled={!collections.length} onclick={promptNewEnvironment}>New environment…</Button>
           {/if}
         {:else if i === 2 && firstRequest}
-          <button class:primary={steps[0].done && steps[1].done} onclick={() => app.open(firstRequest!)}>Open {firstRequest.label}</button>
+          <Button variant={steps[0].done && steps[1].done ? 'primary' : 'secondary'} onclick={() => app.open(firstRequest!)}>Open {firstRequest.label}</Button>
         {/if}
       </li>
     {/each}
@@ -77,6 +79,8 @@
     <button onclick={() => app.openScreen('screen:import', 'Import')}><span class="sq import"><Icon name="import" size={17} /></span><strong>Import an API</strong><span>OpenAPI, AsyncAPI, Postman, Bruno, Insomnia, Hoppscotch, HAR, curl…</span></button>
     <button onclick={() => app.openScreen('screen:telemetry', 'Telemetry')}><span class="sq usage"><Icon name="chart" size={17} /></span><strong>Usage reporting</strong><span>Off unless you choose otherwise.</span></button>
   </div>
+
+  <div class="home"><Button variant="primary" onclick={() => app.openScreen('screen:home', 'Home')}>Go to Home</Button></div>
 
   {#if view?.whatsNew}
     <details class="news">
@@ -91,8 +95,7 @@
   .page { position: absolute; inset: 0; overflow: auto; padding: 48px 32px 48px; background: radial-gradient(ellipse 700px 420px at 50% 0%, var(--tint-accent), transparent 70%); }
   .col { max-width: 660px; margin: 0 auto; }
   .hero { display: flex; flex-direction: column; align-items: center; text-align: center; margin-bottom: var(--sp-6); }
-  /* The mark: the accent running into the data colour, the two this app is drawn in. */
-  .logo { width: 52px; height: 52px; border-radius: 15px; display: grid; place-items: center; color: var(--on-accent); background: linear-gradient(135deg, var(--accent), var(--data)); box-shadow: 0 8px 24px color-mix(in srgb, var(--accent) 30%, transparent); }
+  .logo { display: grid; filter: drop-shadow(0 8px 20px color-mix(in srgb, var(--brand-tile) 30%, transparent)); }
   h1 { margin: 16px 0 4px; font-size: var(--fs-xl); font-weight: 650; letter-spacing: -0.01em; }
   .muted { color: var(--muted); margin: 0; font-size: var(--fs-md); }
   h3 { margin: var(--sp-4) 0 var(--sp-2); font-size: var(--fs-xs); font-weight: 600; letter-spacing: 0.07em; text-transform: uppercase; color: var(--muted); display: flex; justify-content: space-between; }
@@ -104,10 +107,7 @@
   .done strong { color: var(--muted); }
   .body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
   .detail { color: var(--muted); font-size: var(--fs-sm); }
-  li button, li select { flex: none; background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); padding: 4px 12px; font: inherit; }
-  li button:hover:not(:disabled) { background: var(--raised-3); }
-  li button:disabled { opacity: 0.4; }
-  li .primary { background: var(--primary-fill); color: var(--on-primary); border-color: transparent; font-weight: 600; box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.18); }
+  li select { flex: none; background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); padding: 4px 12px; font: inherit; }
   .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: var(--sp-3); }
   .cards button { text-align: left; background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: var(--r-xl); padding: 14px; font: inherit; display: flex; flex-direction: column; gap: 4px; }
   .sq { width: 32px; height: 32px; border-radius: 9px; display: grid; place-items: center; margin-bottom: 6px; }
@@ -115,6 +115,7 @@
   .cards .sq.usage { background: var(--data-t); color: var(--data); }
   .cards button:hover { background: var(--raised-3); }
   .cards span { color: var(--muted); font-size: var(--fs-sm); }
+  .home { display: flex; justify-content: center; margin-top: var(--sp-6); }
   .news { margin-top: var(--sp-6); }
   .news summary { cursor: pointer; color: var(--muted); }
 </style>

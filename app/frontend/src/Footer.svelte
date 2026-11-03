@@ -126,7 +126,7 @@
 
 <style>
   footer { flex: none; background: var(--chrome); display: flex; flex-direction: column; }
-  .tabs { display: flex; align-items: flex-end; gap: 2px; padding: 0 8px; height: 28px; }
+  .tabs { display: flex; align-items: flex-end; gap: 2px; padding: 0 8px; height: var(--ctl-h); }
   .tabs button { background: none; border: 0; border-bottom: 2px solid transparent; color: var(--muted); font: inherit; font-size: var(--fs-sm); padding: 4px 10px 2px; border-radius: 0; }
   .tabs button.on { color: var(--text); border-bottom-color: var(--accent); }
   .tabs button:hover { color: var(--text); }

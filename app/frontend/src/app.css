@@ -1,4 +1,10 @@
 :root {
+  /* The flowi mark's colours (Logo.svelte, from build/appicon.svg). The brand does not change with the theme, so no theme sets these. */
+  --brand-tile: #e11d48;
+  --brand-wave-1: #c8153f;
+  --brand-wave-2: #9f1239;
+  --brand-ink: #ffffff;
+  --brand-dot: #ffe600;
   --bg: #131519;
   --panel: #1a1d22;
   --chrome: #0c0d10;
@@ -36,8 +42,12 @@
   --fs-xs: 11px; --fs-sm: 12px; --fs-md: 13px; --fs-lg: 15px; --fs-xl: 20px;
   /* The section tab bars of the request and response panes, which sit side by side and line up. */
   --tabbar-h: 38px;
+  /* The bar over an editor (name, actions), the address bar and the field in it. */
+  --head-h: 40px; --addr-h: 38px; --addr-h-sm: 32px;
   /* One height for buttons, fields and selects, and a smaller one for dense rows. */
   --ctl-h: 28px; --ctl-h-sm: 24px;
+  /* Tree rows, and the taller rows of lists and tables. appearance.density 'compact' shrinks all of these. */
+  --row-h: 26px; --row-h-lg: 30px;
   --r-sm: 4px; --r-md: 6px; --r-lg: 10px; --r-xl: 14px; --r-pill: 999px;
   --sp-1: 4px; --sp-2: 8px; --sp-3: 12px; --sp-4: 16px; --sp-6: 24px;
   --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
@@ -61,7 +71,7 @@
   --t-fast: 120ms; --t-base: 180ms; --t-slow: 260ms;
 }
 @media (prefers-color-scheme: light) { :root:not([data-theme]) { --shadow: 0 1px 2px rgb(0 0 0 / 0.08), 0 10px 28px rgb(0 0 0 / 0.12); } }
-:root[data-theme='light'], :root[data-theme='flowi-light'], :root[data-theme='solarized-light'], :root[data-theme='anuppuccin-light'] { --shadow: 0 1px 2px rgb(0 0 0 / 0.08), 0 10px 28px rgb(0 0 0 / 0.12); }
+:root[data-mode='light'] { --shadow: 0 1px 2px rgb(0 0 0 / 0.08), 0 10px 28px rgb(0 0 0 / 0.12); }
 /* The themes that name only --bg and --panel get a frame derived from --bg: darker than the pane, and in the light
    themes only a touch, not nearly black. */
 :root[data-theme='solarized-dark'], :root[data-theme='nord'], :root[data-theme='anuppuccin-dark'] { --chrome: color-mix(in srgb, var(--bg) 62%, black); }
@@ -108,10 +118,12 @@
   --act-send: #2f6fe0; --act-receive: #0e7d6b; --act-both: #7a4fd6; --on-act: #fff;
   /* The Send button's colour, chosen in Settings (appearance.send_button) and put on the root as data-send.
      Warm orange is the default: it is unlike any status colour, so Send is the one strong colour on the screen. */
-  --send-a: #d4541a; --send-b: #c0365a; --on-send: #fff;
 }
-/* The fill is built where the stops are chosen, so a swatch in Settings (any element with data-send) shows its own. */
+/* The fill is built where the stops are chosen, so a swatch in Settings (any element with data-send) shows its own.
+   The stops and the ink are reset here too, or a swatch would inherit the root's choice: every swatch showed the
+   picked colour, and the outline's blue ink. */
 :root, [data-send] {
+  --send-a: #d4541a; --send-b: #c0365a; --on-send: #fff;
   --send-fill: linear-gradient(135deg, var(--send-a), var(--send-b));
   --send-glow: color-mix(in srgb, var(--send-b) 30%, transparent);
   --send-edge: inset 0 1px 0 rgb(255 255 255 / 0.25);
@@ -124,7 +136,7 @@
 /* An outline: the accent on its own tint, with a soft glow. */
 [data-send='outline'] { --send-fill: var(--tint-accent); --on-send: var(--accent); --send-glow: color-mix(in srgb, var(--accent) 35%, transparent); --send-edge: inset 0 0 0 1px var(--accent); }
 @media (prefers-color-scheme: light) { :root:not([data-theme]) { --ok: #1f8a5a; --warn: #a16207; --dirty: #c2620a; --info: #0e7490; --literal: #8b3fa0; --pending: #8a6d00; --data: #6d28d9; } }
-:root[data-theme='light'], :root[data-theme='flowi-light'], :root[data-theme='solarized-light'], :root[data-theme='anuppuccin-light'] {
+:root[data-mode='light'] {
   --ok: #1f8a5a; --warn: #a16207; --dirty: #c2620a; --info: #0e7490; --literal: #8b3fa0; --pending: #8a6d00; --data: #6d28d9;
 }
 :root[data-theme='high-contrast'], :root[data-theme='high-contrast'][data-send] { --on-accent: #000; --act-send: var(--accent); --act-receive: var(--accent); --act-both: var(--accent); --on-act: #000; --send-fill: var(--accent); --on-send: #000; --send-glow: transparent; --send-edge: inset 0 0 0 1px var(--text); }
@@ -133,7 +145,7 @@
    text with tok-* classes. Templates use --literal, as they do in the address field. */
 :root { --syn-key: #79b8ff; --syn-string: #9ece6a; --syn-number: #ff9e64; --syn-atom: #56b6c2; --syn-punct: var(--muted); }
 @media (prefers-color-scheme: light) { :root:not([data-theme]) { --syn-key: #0b5cad; --syn-string: #2f7d32; --syn-number: #b45309; --syn-atom: #0e7490; } }
-:root[data-theme='light'], :root[data-theme='flowi-light'], :root[data-theme='solarized-light'], :root[data-theme='anuppuccin-light'] {
+:root[data-mode='light'] {
   --syn-key: #0b5cad; --syn-string: #2f7d32; --syn-number: #b45309; --syn-atom: #0e7490;
 }
 .tok-propertyName { color: var(--syn-key); }
@@ -164,6 +176,9 @@ body {
   -webkit-user-select: none;
   user-select: none;
 }
+
+/* appearance.density: compact trades room for how much fits on screen; type sizes stay as they are. */
+:root[data-density='compact'] { --ctl-h: 24px; --ctl-h-sm: 20px; --row-h: 22px; --row-h-lg: 26px; --tabbar-h: 34px; --head-h: 34px; --addr-h: 32px; --addr-h-sm: 28px; }
 
 /* Themes: appearance.theme sets data-theme on the root; "system" sets none and follows the OS. */
 :root[data-theme='dark'], :root[data-theme='classic'], :root[data-theme='flowi-dark'] {
@@ -203,9 +218,9 @@ body {
 /* Colours of the verbs (HTTP methods and message protocols); the light set reads on a light background. */
 :root { --v-GET: #35c58a; --v-POST: #f4b84a; --v-PUT: #60a5fa; --v-PATCH: #b59af7; --v-DELETE: #f06470; --v-QUERY: #e0b0ff; --v-WS: #2dd4bf; --v-SSE: #38bdf8; --v-MQTT: #ff8a5b; --v-KAFKA: #e879f9; --v-AMQP: #a3e635; --v-NATS: #818cf8; --v-GRPC: #5eead4; --v-SQL: #f2c14e; --v-REDIS: #ff6b6b; --v-SQS: #fb923c; --v-SNS: #fb7185; --v-BUS: #4aa8ff; --v-PUBSUB: #22d3ee; --v-OTHER: #a7b3c6; }
 @media (prefers-color-scheme: light) { :root:not([data-theme]) { --v-GET: #147d57; --v-POST: #8a5700; --v-PUT: #245ddb; --v-PATCH: #7042b8; --v-DELETE: #c43142; --v-QUERY: #8e3fb8; --v-WS: #0f766e; --v-SSE: #0369a1; --v-MQTT: #b4441a; --v-KAFKA: #a21caf; --v-AMQP: #4d7c0f; --v-NATS: #4338ca; --v-GRPC: #0f766e; --v-SQL: #9a6b00; --v-REDIS: #b91c1c; --v-SQS: #b45309; --v-SNS: #be123c; --v-BUS: #0b5cad; --v-PUBSUB: #0e7490; --v-OTHER: #536178; } }
-:root[data-theme='light'], :root[data-theme='flowi-light'], :root[data-theme='solarized-light'], :root[data-theme='anuppuccin-light'] { --v-GET: #147d57; --v-POST: #8a5700; --v-PUT: #245ddb; --v-PATCH: #7042b8; --v-DELETE: #c43142; --v-QUERY: #8e3fb8; --v-WS: #0f766e; --v-SSE: #0369a1; --v-MQTT: #b4441a; --v-KAFKA: #a21caf; --v-AMQP: #4d7c0f; --v-NATS: #4338ca; --v-GRPC: #0f766e; --v-SQL: #9a6b00; --v-REDIS: #b91c1c; --v-SQS: #b45309; --v-SNS: #be123c; --v-BUS: #0b5cad; --v-PUBSUB: #0e7490; --v-OTHER: #536178; }
+:root[data-mode='light'] { --v-GET: #147d57; --v-POST: #8a5700; --v-PUT: #245ddb; --v-PATCH: #7042b8; --v-DELETE: #c43142; --v-QUERY: #8e3fb8; --v-WS: #0f766e; --v-SSE: #0369a1; --v-MQTT: #b4441a; --v-KAFKA: #a21caf; --v-AMQP: #4d7c0f; --v-NATS: #4338ca; --v-GRPC: #0f766e; --v-SQL: #9a6b00; --v-REDIS: #b91c1c; --v-SQS: #b45309; --v-SNS: #be123c; --v-BUS: #0b5cad; --v-PUBSUB: #0e7490; --v-OTHER: #536178; }
 
 /* Flows have a pill too. */
 :root { --v-FLOW: #e0b0ff; }
 @media (prefers-color-scheme: light) { :root:not([data-theme]) { --v-FLOW: #7e22ce; } }
-:root[data-theme='light'], :root[data-theme='flowi-light'], :root[data-theme='solarized-light'], :root[data-theme='anuppuccin-light'] { --v-FLOW: #7e22ce; }
+:root[data-mode='light'] { --v-FLOW: #7e22ce; }

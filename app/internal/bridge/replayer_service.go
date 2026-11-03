@@ -3,9 +3,11 @@
 package bridge
 
 import (
+	"slices"
 	"time"
 
 	"github.com/githugt/flowi/app/internal/vm"
+	"github.com/githugt/flowi/lib/serve/replay"
 )
 
 // ReplayerForm is what the user chooses before starting.
@@ -36,6 +38,11 @@ type TrafficRow struct {
 	Request  string `json:"request"`
 	Duration string `json:"duration"`
 	Remote   string `json:"remote"`
+	// Which saved answer was given, and the delay added on purpose ("" when there was none).
+	Version string `json:"version"`
+	Example string `json:"example"`
+	Source  string `json:"source"`
+	Delay   string `json:"delay"`
 }
 
 // ReplayerView is the replayer mode.
@@ -109,13 +116,21 @@ func (s *ReplayerService) view() ReplayerView {
 	}
 	entries := s.vm.Entries()
 	for i := len(entries) - 1; i >= 0 && len(v.Traffic) < maxTrafficShown; i-- {
-		e := entries[i]
-		v.Traffic = append(v.Traffic, TrafficRow{
-			Seq: e.Seq, At: e.At.Local().Format(time.TimeOnly), Method: e.Method, Path: e.Path, Status: e.Status, Match: e.Match,
-			Request: e.Request, Duration: e.Duration.Round(time.Millisecond).String(), Remote: e.Remote,
-		})
+		v.Traffic = append(v.Traffic, trafficRowOf(entries[i]))
 	}
 	return v
+}
+
+func trafficRowOf(e replay.Entry) TrafficRow {
+	row := TrafficRow{
+		Seq: e.Seq, At: e.At.Local().Format(time.TimeOnly), Method: e.Method, Path: e.Path, Status: e.Status, Match: e.Match,
+		Request: e.Request, Duration: e.Duration.Round(time.Millisecond).String(), Remote: e.Remote,
+		Version: e.Version, Example: e.Example, Source: e.Source,
+	}
+	if e.Latency > 0 {
+		row.Delay = e.Latency.Round(time.Millisecond).String()
+	}
+	return row
 }
 
 // targets are the collections recorded requests can go to; the Scratch draft comes first.
@@ -128,4 +143,61 @@ func (s *ReplayerService) targets() []Choice {
 		out = append(out, Choice{ID: string(c.Manifest.ID), Label: c.Manifest.Name, Path: c.Manifest.Name})
 	}
 	return out
+}
+
+// CallHeader is one header line of a captured call.
+type CallHeader struct {
+	Name  string `json:"name"`
+	Value string `json:"value"`
+}
+
+// CallPart is one side of a captured call.
+type CallPart struct {
+	Headers   []CallHeader `json:"headers"`
+	Body      string       `json:"body"`
+	Truncated bool         `json:"truncated"`
+}
+
+// CallView is what a call carried and what it was answered with. Credential values are masked.
+type CallView struct {
+	Seq      int      `json:"seq"`
+	Captured bool     `json:"captured"` // false for a call made before capture was on, or one the log has dropped
+	Sent     CallPart `json:"sent"`
+	Got      CallPart `json:"got"`
+}
+
+// Call returns the headers and bodies of one call by its number.
+func (s *ReplayerService) Call(seq int) CallView {
+	var v CallView
+	s.app.actor.Do(func() {
+		e, _ := s.vm.Entry(seq)
+		v = callViewOf(e)
+	})
+	return v
+}
+
+func callViewOf(e replay.Entry) CallView {
+	v := CallView{Seq: e.Seq}
+	if e.Exchange == nil {
+		return v
+	}
+	v.Captured = true
+	v.Sent, v.Got = callPartOf(e.Exchange.Sent), callPartOf(e.Exchange.Got)
+	return v
+}
+
+// callPartOf lists the headers by name, a line for each value.
+func callPartOf(m replay.Message) CallPart {
+	names := make([]string, 0, len(m.Header))
+	for name := range m.Header {
+		names = append(names, name)
+	}
+	slices.Sort(names)
+	part := CallPart{Headers: []CallHeader{}, Body: m.Body, Truncated: m.Truncated}
+	for _, name := range names {
+		for _, value := range m.Header[name] {
+			part.Headers = append(part.Headers, CallHeader{Name: name, Value: value})
+		}
+	}
+	return part
 }

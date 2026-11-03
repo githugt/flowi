@@ -1,4 +1,5 @@
 <script lang="ts">
+  import Button from './Button.svelte'
   // Update from spec: import a kept spec again with its overlays, from the kept copy or a newer
   // document. Requests it replaces keep your edits, checks, extractions and hooks; the preview says
   // what changes before anything is written.
@@ -82,11 +83,11 @@
       {/if}
     {/if}
     <div class="actions">
-      <button type="button" onclick={onclose}>Cancel</button>
+      <Button type="button" onclick={onclose}>Cancel</Button>
       {#if preview && !nothing}
-        <button class="primary" disabled={busy} onclick={apply}>Update</button>
+        <Button variant="primary" disabled={busy} onclick={apply}>Update</Button>
       {:else}
-        <button class="primary" disabled={busy || (from === 'newer' && !source.trim())} onclick={look}>Preview</button>
+        <Button variant="primary" disabled={busy || (from === 'newer' && !source.trim())} onclick={look}>Preview</Button>
       {/if}
     </div>
   </div>
@@ -105,9 +106,4 @@
   .muted { color: var(--muted); font-size: var(--fs-sm); }
   .err { color: var(--fail); }
   .actions { display: flex; justify-content: flex-end; gap: 8px; }
-  button { background: var(--raised); color: var(--text); border: 0; box-shadow: inset 0 0 0 1px var(--line); border-radius: var(--r-md); padding: 0 12px; min-height: var(--ctl-h); font: inherit; font-weight: 500; }
-  button:hover:not(:disabled) { background: var(--raised-3); }
-  button:disabled { opacity: 0.4; }
-  .primary { background: var(--primary-fill); color: var(--on-primary); font-weight: 600; box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.18); }
-  .primary:hover { filter: brightness(1.1); }
 </style>

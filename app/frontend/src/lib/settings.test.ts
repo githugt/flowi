@@ -30,6 +30,7 @@ describe('labelOf', () => {
 
   it('names the Send button colour in words, not by its key', () => {
     expect(labelOf('appearance.send_button')).toBe('Send button colour')
+    expect(labelOf('appearance.density')).toBe('Spacing')
   })
 
   it('prefers a written label', () => {

@@ -3,9 +3,11 @@
   // Settings). Pointing at a group opens the whole tree as a floating panel over the canvas (nothing moves); it
   // closes when the pointer leaves, unless pinned open, and stays while a button is held (a request being dragged out
   // of it). "Pin open" puts the sidebar back for this kind of tab.
+  import { tick } from 'svelte'
   import { app } from './lib/app.svelte'
   import { screens } from './lib/screens'
   import Icon from './Icon.svelte'
+  import Logo from './Logo.svelte'
   import Sidebar from './Sidebar.svelte'
   import type { RailGroup } from './lib/railgroups'
 
@@ -26,9 +28,11 @@
     peek = true
     if (group) shown = group
   }
+  // The Jump to field has the focus: the panel stays when the pointer leaves, and goes with a click elsewhere or Escape.
+  const typing = () => !!wrap?.contains(document.activeElement) && document.activeElement instanceof HTMLInputElement
   function leave(e: PointerEvent) {
     // A held button means a drag from the tree is under way: the tree stays until it is dropped.
-    if (e.buttons) return
+    if (e.buttons || typing()) return
     clearTimeout(closing)
     closing = setTimeout(() => (peek = false), 250)
   }
@@ -39,18 +43,47 @@
     if (!peek || wrap?.contains(e.target as Node)) return
     closing = setTimeout(() => (peek = false), 600)
   }
-  // A click on a row opens it and puts the panel away; the workspace button and its menu in the head are not rows.
+  // A click on a row opens it and puts the panel away; the workspace button and its menu in the head, and the Jump to
+  // field, are not rows.
   function opened(e: MouseEvent) {
-    if ((e.target as HTMLElement).closest('.head')) return
+    if ((e.target as HTMLElement).closest('.head, .jump')) return
     peek = false
   }
+  function pressedOutside(e: PointerEvent) {
+    if (peek && !wrap?.contains(e.target as Node)) peek = false
+  }
+  function escaped(e: KeyboardEvent) {
+    // The Jump to field takes the first Escape to clear itself (and says so by cancelling the event).
+    if (peek && e.key === 'Escape' && !e.defaultPrevented) peek = false
+  }
+
+  // Cmd/Ctrl+K while the sidebar is folded shows the panel with its Jump to field focused, without pinning it.
+  let seenJump = app.jumpRequests
+  $effect(() => {
+    if (app.jumpRequests === seenJump) return
+    seenJump = app.jumpRequests
+    enter(shown || 'collections')
+    tick().then(() => {
+      const field = wrap?.querySelector<HTMLInputElement>('.jump input')
+      field?.focus()
+      field?.select()
+    })
+  })
+  // Whatever opened a tab (Enter in the field, a row) puts the panel away.
+  let lastActive = app.active
+  $effect(() => {
+    if (app.active === lastActive) return
+    lastActive = app.active
+    peek = false
+  })
 </script>
 
-<svelte:window onpointerup={dropped} />
+<svelte:window onpointerup={dropped} onpointerdown={pressedOutside} onkeydown={escaped} />
 
 <div class="wrap" bind:this={wrap} onpointerenter={() => enter()} onpointerleave={leave} role="presentation">
   <nav class="rail" aria-label="Sidebar">
     <div class="spacer"></div>
+    <button class="homebtn" class:on={app.active === 'screen:home'} title="Home" aria-label="Home" aria-current={app.active === 'screen:home' ? 'page' : undefined} onclick={() => app.openScreen('screen:home', 'Home')}><Logo size={22} /></button>
     <button class="expand" title="Show the sidebar" aria-label="Show the sidebar" onclick={onexpand}><Icon name="list" /></button>
     {#each groups as g}
       <button title={`${g.title}: show the tree`} aria-label={g.title} aria-haspopup="tree" aria-expanded={peek} onpointerenter={() => enter(g.id)} onclick={() => enter(g.id)} onfocus={() => enter(g.id)}><Icon name={g.icon} /></button>
@@ -76,6 +109,8 @@
   .rail button:hover { color: var(--text); background: var(--tint-hover); }
   .rail button.on { color: var(--accent); background: var(--tint-sel); }
   .expand { margin-bottom: 6px; }
+  .rail .homebtn { margin-bottom: 8px; padding: 5px; }
+  .rail .homebtn.on { background: var(--tint-sel); }
   /* Floating, over the canvas: the layout does not move. */
   .peek { position: absolute; z-index: 50; top: 0; bottom: 0; left: 40px; box-shadow: var(--shadow); display: flex; }
 </style>

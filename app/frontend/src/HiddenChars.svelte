@@ -1,4 +1,5 @@
 <script lang="ts">
+  import Button from './Button.svelte'
   // A button that shows up inside a field only when its text has characters
   // that cannot be seen (a zero-width space, a non-breaking space, a space at
   // the end). It lists them and can remove them.
@@ -25,7 +26,7 @@
         <p>Hidden characters in this text:</p>
         <ul>{#each found as h}<li><code>{h.code}</code> {h.name}, at {h.index}</li>{/each}</ul>
         <code class="shown">{revealHidden(value)}</code>
-        <button type="button" class="fix" onclick={(e) => { e.preventDefault(); open = false; onclean(stripHidden(value)) }}>Remove them</button>
+        <Button type="button" variant="primary" small onclick={(e) => { e.preventDefault(); open = false; onclean(stripHidden(value)) }}>Remove them</Button>
       </div>
     {/if}
   </span>
@@ -39,5 +40,4 @@
   ul { margin: 0 0 6px; padding-left: 16px; max-height: 120px; overflow: auto; }
   code { font: var(--fs-xs) var(--mono); }
   .shown { display: block; background: var(--bg); border-radius: var(--r-sm); padding: 3px 6px; margin-bottom: 8px; word-break: break-all; -webkit-user-select: text; user-select: text; }
-  .fix { background: var(--primary-fill); color: var(--on-primary); border: 0; border-radius: var(--r-md); padding: 3px 12px; font: inherit; cursor: pointer; }
 </style>

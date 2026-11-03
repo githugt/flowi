@@ -84,8 +84,8 @@ func TestHistory_Add_should_name_an_untitled_request_by_what_was_sent(t *testing
 	h := vm.NewHistory()
 	rec := &engine.Record{RequestPath: "untitled-6", Status: 403, Request: engine.SentRequest{Method: "POST", URL: "https://pokeapi.co/api/v2/pokemon/ditto"}}
 
-	ex := h.Add(flowi.RequestTarget{}, "1", engine.SendResult{Status: engine.StatusFailed, Record: rec})
-	named := h.Add(flowi.RequestTarget{}, "1", engine.SendResult{Status: engine.StatusPassed, Record: &engine.Record{RequestPath: "auth/login", Status: 200}})
+	ex := h.Add(flowi.RequestTarget{}, "1", engine.SendResult{Status: engine.StatusFailed, Record: rec}, nil)
+	named := h.Add(flowi.RequestTarget{}, "1", engine.SendResult{Status: engine.StatusPassed, Record: &engine.Record{RequestPath: "auth/login", Status: 200}}, nil)
 
 	if ex.Title != "POST pokeapi.co/api/v2/pokemon/ditto v1 · 403 · failed" || named.Title != "auth/login v1 · 200 · passed" {
 		t.Fatalf("titles %q / %q", ex.Title, named.Title)

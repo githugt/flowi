@@ -33,5 +33,15 @@ export function SaveTabs(rows) {
     return $Call.ByID(3215320538, rows);
 }
 
+/**
+ * ShowWelcome says whether the welcome page is what the window should open with: true on the first launch only.
+ * It marks the welcome as shown, so every later launch opens the home page. When the marker cannot be kept the
+ * answer is still true this once; the welcome page then comes back next launch, which is better than never.
+ * @returns {$CancellablePromise<boolean>}
+ */
+export function ShowWelcome() {
+    return $Call.ByID(1644521298);
+}
+
 // Private type creation functions
 const $$createType0 = $Create.Array($Create.Any);

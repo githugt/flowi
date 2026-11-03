@@ -1,4 +1,5 @@
 <script lang="ts">
+  import Button from './Button.svelte'
   import { tick } from 'svelte'
   import { confirmDeleteSteps } from './lib/flowDelete'
   import { FlowService } from '../bindings/github.com/githugt/flowi/app/internal/bridge'
@@ -308,14 +309,14 @@
       <FlowTools {view} />
     {/if}
     {#if editing}
-      <button title="Add a step (/)" onclick={openPopupAtButton}>+ Add step</button>
-      <button disabled={!view.canUndo} onclick={() => FlowService.Undo(node)}>Undo</button>
-      <button disabled={!view.canRedo} onclick={() => FlowService.Redo(node)}>Redo</button>
+      <Button title="Add a step (/)" onclick={openPopupAtButton}>+ Add step</Button>
+      <Button disabled={!view.canUndo} onclick={() => FlowService.Undo(node)}>Undo</Button>
+      <Button disabled={!view.canRedo} onclick={() => FlowService.Redo(node)}>Redo</Button>
     {/if}
     {#if !embedded}
       <button class="edit" class:on={editMode} aria-pressed={editMode} title={editMode ? 'Stop editing: more room for the graph' : 'Edit the flow: add, move and link steps'} onclick={toggleEdit}>{editMode ? 'Done' : 'Edit'}</button>
     {/if}
-    {#if !embedded}<button class="primary" disabled={!view.dirty} onclick={() => FlowService.Save(node)}>Save</button>{/if}
+    {#if !embedded}<Button variant="primary" disabled={!view.dirty} onclick={() => FlowService.Save(node)}>Save</Button>{/if}
     {#if !embedded}<button class="more" aria-label="More" title="More" onpointerdown={(e) => e.stopPropagation()} onclick={moreMenu}>⋯</button>{/if}
   </header>
   <DebugBar {view} />
@@ -323,7 +324,7 @@
   {#if !embedded && view.run.error && !view.run.running && dismissedError !== view.run.error}
     <div class="runerr" role="alert">
       <span class="msg"><strong>Run failed.</strong> <Problem text={view.run.error ?? ""} /></span>
-      {#if failedSteps.length}<button onclick={showFailure}>Show step</button>{/if}
+      {#if failedSteps.length}<Button small onclick={showFailure}>Show step</Button>{/if}
       <button class="x" aria-label="Dismiss" onclick={() => (dismissedError = view.run.error ?? "")}>×</button>
     </div>
   {/if}
@@ -400,7 +401,7 @@
   .failed { border-radius: var(--r-pill); padding: 1px 10px; font: inherit; font-size: var(--fs-xs); background: transparent; border: 1px solid var(--fail); color: var(--fail); white-space: nowrap; }
   .editor { position: absolute; inset: 0; display: flex; flex-direction: column; }
   header {
-    height: 40px;
+    height: var(--head-h);
     flex: none;
     display: flex;
     align-items: center;
@@ -438,6 +439,4 @@
   button:disabled { opacity: 0.4; }
   .more { padding: 3px 9px; }
   /* the same strong blue as a request's Send, not the paler accent */
-  .primary:not(:disabled) { background: var(--primary-fill); color: var(--on-primary); border: 0; font-weight: 600; box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.18); }
-  .primary:hover:not(:disabled) { filter: brightness(1.1); }
 </style>

@@ -13,3 +13,13 @@ export function untilText(iso: string, now: number): string {
   if (!hours) return `in ${minutes} min`
   return minutes ? `in ${hours} h ${minutes} min` : `in ${hours} h`
 }
+
+const two = (n: number): string => String(n).padStart(2, '0')
+
+/** The clock time on this machine, as "HH:MM", at each given number of hours after `now`. */
+export function axisClock(now: number, hoursAhead: number[]): string[] {
+  return hoursAhead.map((h) => {
+    const d = new Date(now + h * HOUR)
+    return `${two(d.getHours())}:${two(d.getMinutes())}`
+  })
+}

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import TextInput from './TextInput.svelte'
   import HiddenChars from './HiddenChars.svelte'
   import { onMount, onDestroy } from 'svelte'
   import { errorText } from './lib/errors'
@@ -76,9 +77,9 @@
         <span class="cell">
           {#if shown?.id === key(s)}
             <!-- The stored value takes the box's place while it is shown; read only, so it cannot be mistaken for a new value. -->
-            <input class="revealed" type="text" readonly value={shown.value} aria-label="Stored value of {s.name}" spellcheck="false" />
+            <TextInput readonly mono value={shown.value} label="Stored value of {s.name}" />
           {:else}
-            <input type="password" placeholder={s.state === 'stored' ? 'type to replace' : 'value'} bind:value={values[key(s)]} disabled={s.state === 'overridden'} /><HiddenChars value={values[key(s)] ?? ''} onclean={(t) => (values[key(s)] = t)} />
+            <TextInput type="password" label="Value of {s.name}" placeholder={s.state === 'stored' ? 'type to replace' : 'value'} bind:value={values[key(s)]} disabled={s.state === 'overridden'} /><HiddenChars value={values[key(s)] ?? ''} onclean={(t) => (values[key(s)] = t)} />
           {/if}
         </span>
         <button type="submit" disabled={!values[key(s)] || shown?.id === key(s)}>Store</button>
@@ -105,10 +106,7 @@
   .state.missing { color: var(--warn); }
   .state.overridden { color: var(--accent); }
   .cell { position: relative; display: flex; flex: 1; min-width: 0; }
-  .cell input { flex: 1; }
-  input { background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); padding: 5px 8px; font: inherit; min-width: 0; -webkit-user-select: text; user-select: text; }
   button { background: var(--raised); color: var(--text); border: 0; box-shadow: inset 0 0 0 1px var(--line); border-radius: var(--r-md); padding: 0 12px; min-height: var(--ctl-h); font: inherit; font-weight: 500; }
   button:hover:not(:disabled) { background: var(--raised-3); }
   button:disabled { opacity: 0.4; }
-  .revealed { border-color: var(--accent); font-family: var(--mono, ui-monospace, monospace); }
 </style>

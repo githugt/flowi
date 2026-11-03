@@ -105,13 +105,13 @@ func groupOf(name string) string {
 func valueText(v any) string {
 	switch x := v.(type) {
 	case []string:
-		return strings.Join(x, ", ")
+		return settings.FormatList(x)
 	case []any:
 		parts := make([]string, len(x))
 		for i, p := range x {
 			parts[i] = fmt.Sprint(p)
 		}
-		return strings.Join(parts, ", ")
+		return settings.FormatList(parts)
 	case nil:
 		return ""
 	}

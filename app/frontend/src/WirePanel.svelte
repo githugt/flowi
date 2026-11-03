@@ -1,4 +1,5 @@
 <script lang="ts">
+  import Button from './Button.svelte'
   // A value wire was dropped from one step onto another: say which part of what the first makes to take, and where
   // in the second to put it. The result is a template written into that field, as one change that Undo takes back.
   import { FlowService } from '../bindings/github.com/githugt/flowi/app/internal/bridge'
@@ -53,7 +54,7 @@
       <label class="field"><span class="label">Name</span><input bind:value={name} placeholder="token" spellcheck="false" /></label>
     {/if}
     {#if error}<p class="err">{error}</p>{/if}
-    <div class="actions"><button onclick={onclose}>Cancel</button><button class="primary" onclick={connect}>Connect</button></div>
+    <div class="actions"><Button onclick={onclose}>Cancel</Button><Button variant="primary" onclick={connect}>Connect</Button></div>
   {/if}
 </div>
 
@@ -69,6 +70,4 @@
   .hint { color: var(--muted); font-size: var(--fs-sm); margin: 0; }
   .err { color: var(--fail); font-size: var(--fs-sm); margin: 0; }
   .actions { display: flex; justify-content: flex-end; gap: 8px; }
-  .actions button { background: var(--raised); color: var(--text); border: 0; box-shadow: inset 0 0 0 1px var(--line); border-radius: var(--r-md); padding: 0 12px; min-height: var(--ctl-h); font: inherit; font-weight: 500; }
-  .actions .primary { background: var(--primary-fill); color: var(--on-primary); border: 0; font-weight: 600; box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.18); }
 </style>

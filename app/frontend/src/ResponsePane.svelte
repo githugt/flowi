@@ -1,8 +1,11 @@
 <script lang="ts">
+  import { tick } from 'svelte'
   import { errorText } from './lib/errors'
   import { RequestService } from '../bindings/github.com/githugt/flowi/app/internal/bridge'
   import type { RequestView } from './lib/types'
   import Parts from './Parts.svelte'
+  import Icon from './Icon.svelte'
+  import { flowEnd, groupPipeline } from './lib/pipelinegroups'
   import Problem from './Problem.svelte'
   import EmptyState from './EmptyState.svelte'
   import JsonNode from './JsonNode.svelte'
@@ -43,6 +46,39 @@
   const hookPassed = $derived(hookSteps.filter((p) => p.state === 'passed').length)
   const hookFailed = $derived(hookSteps.filter((p) => p.state === 'failed').length)
   const hookWaiting = $derived(hookSteps.filter((p) => !['passed', 'failed', 'running'].includes(p.state)).length)
+  // One line runs behind every tick, from the first to the last, so the steps read as one run across the cards.
+  // It is measured, not computed from the CSS, because a step's height depends on how its text wraps.
+  let cardsEl = $state<HTMLElement>()
+  let flow = $state({ top: 0, height: 0, x: 0, ran: false })
+  function measureFlow() {
+    const ticks = cardsEl ? [...cardsEl.querySelectorAll<HTMLElement>('.tick')] : []
+    if (!cardsEl || ticks.length < 2) return void (flow = { top: 0, height: 0, x: 0, ran: false })
+    // After a send the line carries on only as far as the run did: to the step that failed, or the last that ran.
+    // Steps after that never ran, so there is nothing to join them to. Before any send it shows the whole way.
+    const states = ticks.map((t) => t.getAttribute('aria-label') ?? '')
+    const { end, ran } = flowEnd(states)
+    const box = cardsEl.getBoundingClientRect()
+    const centre = (t: HTMLElement) => t.getBoundingClientRect().top + t.offsetHeight / 2 - box.top
+    const first = ticks[0].getBoundingClientRect()
+    const top = centre(ticks[0])
+    flow = { top, height: centre(ticks[end]) - top, x: first.left + first.width / 2 - box.left, ran }
+  }
+  $effect(() => {
+    void foldedCards
+    void view.pipeline
+    if (!cardsEl) return
+    tick().then(measureFlow)
+    const watch = new ResizeObserver(measureFlow)
+    watch.observe(cardsEl)
+    return () => watch.disconnect()
+  })
+  // Cards the owner has folded, by heading; every card starts open.
+  let foldedCards = $state(new Set<string>())
+  function toggleCard(key: string) {
+    const next = new Set(foldedCards)
+    if (!next.delete(key)) next.add(key)
+    foldedCards = next
+  }
   let query = $state('')
   let picked = $state('')
   const tree = $derived(shape === 'tree' && r?.bodyJson !== undefined && r?.bodyJson !== null)
@@ -115,29 +151,44 @@
 </script>
 
 {#snippet timeline(rows: typeof view.pipeline)}
-  <ol class="timeline">
-    {#each rows as row}
-      {#if row.kind === 'section'}
-        <li class="sec"><h5>{row.title}</h5></li>
-      {:else}
-        <li class="tl {row.state}" class:api={row.kind === 'api'} class:builtin={row.kind === 'builtin'}>
-          <span class="tick" aria-label={row.state}>{#if row.state === 'passed'}✓{:else if row.state === 'failed'}✗{:else if row.state === 'running'}…{:else}○{/if}</span>
-          <div class="what">
-            <span class="st">{row.title}</span>{#if row.kind === 'builtin'}<span class="tag">built in</span>{/if}
-            <span class="muted">{row.kind === 'api' ? (row.method ?? '') + ' ' + (row.tip ?? '') : row.detail}</span>
-            {#if row.reason}<div class="err" class:off={row.state === 'not-run'}>{row.reason}</div>{/if}
-            {#if row.kind === 'builtin'}
-              <!-- The version's own schemas.infer: saved with the request, like its other settings. -->
-              <button class="mini switch" onclick={() => RequestService.SetSchemasInfer(view.node, row.state === 'not-run')}>
-                {row.state === 'not-run' ? 'Turn on for this request' : 'Turn off for this request'}
-              </button>
-            {/if}
-          </div>
-          {#if row.ms}<span class="pms">{row.ms.toFixed(0)} ms</span>{/if}
-        </li>
-      {/if}
+  <div class="cards" bind:this={cardsEl} style:--flow-top={`${flow.top}px`} style:--flow-h={`${flow.height}px`} style:--flow-x={`${flow.x}px`}>
+    {#if flow.height > 0}<span class="flow" class:ok={flow.ran} aria-hidden="true"></span>{/if}
+    {#each groupPipeline(rows) as g (g.title + g.steps[0].title)}
+      {@const key = g.title || g.steps[0].title}
+      {@const folded = g.title !== '' && foldedCards.has(key)}
+      <div class="hcard {g.tone}">
+        {#if g.title}
+          <button class="chead" aria-expanded={!folded} onclick={() => toggleCard(key)}>
+            <span class="chev" class:shut={folded}><Icon name="chevd" size={14} /></span>
+            <h5>{g.title}</h5>
+            <span class="count">{g.steps.length} {g.steps.length === 1 ? 'step' : 'steps'}</span>
+          </button>
+        {/if}
+        {#if !folded}
+          <ol class="timeline">
+            {#each g.steps as row}
+              <li class="tl {row.state}" class:api={row.kind === 'api'} class:builtin={row.kind === 'builtin'}>
+                <span class="tick" aria-label={row.state}>{#if row.state === 'passed'}✓{:else if row.state === 'failed'}✗{:else if row.state === 'running'}…{:else if row.state === 'not-run'}<Icon name="pause" size={10} />{:else}○{/if}</span>
+                <div class="what">
+                  <span class="st">{row.title}</span>{#if row.kind === 'builtin'}<span class="tag">built in</span>{/if}{#if row.kind === 'builtin' && row.state === 'not-run'}<span class="tag paused">paused</span>{/if}
+                  <span class="muted">{row.kind === 'api' ? (row.method ?? '') + ' ' + (row.tip ?? '') : row.detail}</span>
+                  {#if row.reason}<div class="err" class:off={row.state === 'not-run'}>{row.reason}</div>{/if}
+                </div>
+                {#if row.kind === 'builtin'}
+                  <!-- The version's own schemas.infer: saved with the request, like its other settings. The icon is what a
+                       press does: pause while it runs, play while it is paused. -->
+                  {@const paused = row.state === 'not-run'}
+                  <button class="switch" class:paused title={paused ? 'Turn on for this request' : 'Turn off for this request'} aria-label={paused ? 'Turn on for this request' : 'Turn off for this request'} onclick={() => RequestService.SetSchemasInfer(view.node, paused)}>
+                    <Icon name={paused ? 'play' : 'pause'} size={13} />
+                  </button>
+                {:else if row.ms}<span class="pms">{row.ms.toFixed(0)} ms</span>{/if}
+              </li>
+            {/each}
+          </ol>
+        {/if}
+      </div>
     {/each}
-  </ol>
+  </div>
 {/snippet}
 
 <section>
@@ -361,32 +412,46 @@
   .sum { margin: 0 0 8px; font-size: var(--fs-sm); color: var(--muted); display: flex; gap: 10px; }
   .okc { color: var(--ok); font-weight: 600; }
   .badc { color: var(--fail); font-weight: 600; }
-  /* The hooks as a timeline: a tick for each step on a line that runs down to the request and past it. */
-  .timeline { list-style: none; margin: 0; padding: 0; }
+  /* The hooks as cards, one per heading: a tick for each step on a line that joins the steps of that card only. */
+  .cards { position: relative; display: flex; flex-direction: column; gap: 8px; }
+  /* The run's line: centred on the ticks (measured), over the card backgrounds and the headings, and under
+     the ticks. */
+  .flow { position: absolute; left: calc(var(--flow-x) - 1px); top: var(--flow-top); height: var(--flow-h); width: 2px; background: var(--line); pointer-events: none; }
+  .flow.ok { background: var(--ok); }
+  .hcard { border: 1px solid var(--line); border-radius: var(--r-lg, 10px); background: var(--panel); overflow: hidden; }
+  .hcard.passed { border-color: color-mix(in srgb, var(--ok) 35%, var(--line)); background: color-mix(in srgb, var(--ok) 6%, var(--panel)); }
+  .hcard.failed { border-color: color-mix(in srgb, var(--fail) 45%, var(--line)); background: color-mix(in srgb, var(--fail) 7%, var(--panel)); }
+  .hcard.off { border-style: dashed; border-color: color-mix(in srgb, var(--warn) 45%, var(--line)); background: color-mix(in srgb, var(--warn) 6%, var(--panel)); }
+  .chead { all: unset; box-sizing: border-box; width: 100%; display: flex; align-items: center; gap: 8px; padding: 6px 10px; cursor: pointer; background: color-mix(in srgb, var(--text) 5%, var(--panel)); border-bottom: 1px solid var(--line); }
+  .chead:hover { background: var(--tint-hover); }
+  .chead:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+  .chead h5 { margin: 0; }
+  .chev { display: grid; color: var(--muted); transition: transform 0.12s; }
+  .chev.shut { transform: rotate(-90deg); }
+  .hcard .count { margin-left: auto; font-size: var(--fs-xs); color: var(--muted); padding: 0 8px; border-radius: var(--r-pill); background: color-mix(in srgb, var(--text) 7%, transparent); }
+  .timeline { list-style: none; margin: 0; padding: 6px 10px; }
   .tl { position: relative; display: flex; align-items: flex-start; gap: 10px; padding: 4px 0 8px; font-size: var(--fs-sm); }
-  .tl::before { content: ''; position: absolute; left: 9px; top: 24px; bottom: -2px; width: 2px; background: var(--line); }
-  .timeline > li:last-child::before { display: none; }
-  .tick { flex: none; width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center; font-size: var(--fs-xs); font-weight: 700; color: var(--muted); border: 2px solid var(--line); background: var(--bg); z-index: 1; }
+  .timeline > li:last-child { padding-bottom: 4px; }
+  .tick { flex: none; width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center; font-size: var(--fs-xs); font-weight: 700; color: var(--muted); border: 2px solid var(--line); background: var(--bg); position: relative; z-index: 2; }
   .tl.passed .tick { color: var(--on-accent); background: var(--ok); border-color: var(--ok); }
   .tl.failed .tick { color: var(--on-accent); background: var(--fail); border-color: var(--fail); }
   .tl.running .tick { color: var(--accent); border-color: var(--accent); }
-  .tl.passed::before { background: var(--ok); }
+  .tl.not-run .tick { color: var(--warn); border-color: var(--warn); }
   .tl.api .tick { border-radius: var(--r-md); }
   .tl.api .st { color: var(--accent); }
   .what { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; gap: 2px 8px; align-items: baseline; padding-top: 2px; }
   .st { font-weight: 600; }
   .what .err { flex-basis: 100%; }
-  .sec h5 { margin: 6px 0 4px 30px; }
-  /* The line carries on past a section's heading, so before, the request and after read as one run. */
-  .sec { position: relative; }
-  .sec:not(:first-child):not(:last-child)::before { content: ''; position: absolute; left: 9px; top: -2px; bottom: -2px; width: 2px; background: var(--line); }
   .edit { margin-top: 12px; }
   .builtins { margin-top: 16px; }
-  .builtins .sec h5 { margin-left: 0; }
   .tl.builtin .tick { border-style: dashed; }
+  .tag.paused { color: var(--warn); border-color: color-mix(in srgb, var(--warn) 50%, var(--line)); }
   .tag { font-size: var(--fs-xs); color: var(--muted); border: 1px solid var(--line); border-radius: var(--r-pill); padding: 0 6px; }
   .err.off { color: var(--muted); }
-  .switch { flex-basis: auto; margin-top: 4px; }
+  /* Press to pause the step, or to start it again: in the colour the debugger uses for a pause. */
+  .switch { flex: none; display: grid; place-items: center; width: var(--ctl-h-sm, 24px); height: var(--ctl-h-sm, 24px); border: 0; border-radius: var(--r-md); background: var(--raised); color: var(--muted); box-shadow: inset 0 0 0 1px var(--line); cursor: pointer; }
+  .switch:hover { color: var(--text); }
+  .switch.paused { color: var(--warn); background: var(--warn-t); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--warn) 50%, var(--line)); }
   .hist { margin: 0; padding: 4px 8px; font-size: var(--fs-sm); background: color-mix(in srgb, var(--accent) 14%, transparent); border-radius: var(--r-md); }
   .mini { background: var(--raised); color: var(--text); border: 0; box-shadow: inset 0 0 0 1px var(--line); border-radius: var(--r-md); padding: 0 10px; min-height: var(--ctl-h-sm); font: inherit; font-weight: 500; font-size: var(--fs-xs); }
   h5 { margin: 8px 0 2px; color: var(--muted); font-size: var(--fs-xs); text-transform: uppercase; letter-spacing: 0.05em; }

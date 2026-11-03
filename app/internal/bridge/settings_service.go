@@ -41,8 +41,10 @@ type Appearance struct {
 	Accent string `json:"accent"`
 	// SendButton is the colour of the Send button: orange, violet, emerald, cyan or outline.
 	SendButton string `json:"sendButton"`
-	Font       string `json:"font"`
-	FontSize   int    `json:"fontSize"`
+	// Density is how much room rows and controls take: comfortable or compact.
+	Density  string `json:"density"`
+	Font     string `json:"font"`
+	FontSize int    `json:"fontSize"`
 	// Custom is the palette of the "custom" theme when its file is read; CustomProblem says why it
 	// is not (the window then keeps the theme it has).
 	Custom        *CustomPalette `json:"custom,omitempty"`
@@ -146,6 +148,8 @@ func (s *SettingsService) fillAppearance(a *Appearance, f vm.SettingField) {
 		a.Accent = f.Value
 	case "appearance.send_button":
 		a.SendButton = f.Value
+	case "appearance.density":
+		a.Density = f.Value
 	case "appearance.font":
 		a.Font = f.Value
 	case "appearance.font_size":

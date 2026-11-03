@@ -576,6 +576,20 @@ func TestSettingsService_State_Given_no_choice_When_read_Then_send_button_is_ora
 	}
 }
 
+func TestSettingsService_State_Given_no_choice_When_read_Then_density_is_comfortable_and_a_choice_is_kept(t *testing.T) {
+	app, _ := fixture(t)
+	svc := app.Settings()
+
+	before := svc.State().Appearance.Density
+	svc.Set("appearance.density", "compact")
+	after := svc.State().Appearance.Density
+
+	// Before: rows, controls and gaps had one size; a crowded workspace could not be shown tighter.
+	if before != "comfortable" || after != "compact" {
+		t.Fatalf("density before %q, after %q; want comfortable then compact", before, after)
+	}
+}
+
 func TestSecretsService_State_should_list_secrets_without_values(t *testing.T) {
 	c := vmtest.SampleCollection()
 	b := &vmtest.Backend{Cols: []model.Collection{c}, SecretList: []flowi.SecretInfo{{Environment: "staging", Name: "password"}}}
@@ -2221,5 +2235,30 @@ func TestFlowService_Connect_should_add_an_arrow_and_keep_the_one_the_step_alrea
 	slices.Sort(from)
 	if !slices.Equal(from, []string{"login", "wait"}) {
 		t.Fatalf("arrows into verify come from %v, want login and wait", from)
+	}
+}
+
+func TestSessionService_ShowWelcome_should_be_true_only_the_first_time(t *testing.T) {
+	b := &vmtest.Backend{Session: t.TempDir()}
+	first := bridge.NewApp(b, bridge.NewInlineActor(), (&published{}).emit).Session().ShowWelcome()
+	second := bridge.NewApp(b, bridge.NewInlineActor(), (&published{}).emit).Session().ShowWelcome() // the next launch
+
+	if !first || second {
+		t.Fatalf("first %v, second %v", first, second)
+	}
+}
+
+// The response judged the checks the request had when it was sent. One added or edited afterwards has not been
+// checked, so the window must not show it as passed.
+func TestRequestService_Send_should_say_which_checks_the_response_judged(t *testing.T) {
+	reqs, v, pub, _ := openLogin(t)
+	reqs.SetAssert(v.Node, []string{"status == 200"})
+
+	reqs.Send(v.Node, "")
+	reqs.SetAssert(v.Node, []string{"status == 200", "body.ok == true"})
+	got := pub.last["request"].(bridge.RequestView)
+
+	if got.Response == nil || len(got.Response.Checks) != 1 || got.Response.Checks[0] != "status == 200" {
+		t.Fatalf("checks judged %+v", got.Response)
 	}
 }

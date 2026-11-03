@@ -1,4 +1,5 @@
 <script lang="ts">
+  import Button from './Button.svelte'
   // A mounted collection that ships environments the workspace does not have
   // (an example, a colleague's folder) offers to add them. The workspace's
   // environments are global, so without this they would be silently unused.
@@ -38,17 +39,12 @@
       <strong>{offer.name}</strong> comes with {offer.environments.length === 1 ? 'an environment' : `${offer.environments.length} environments`}
       ({list(offer.environments)}) that this workspace does not have yet.
     </div>
-    <button class="primary" onclick={() => add(offer)}>Add {offer.environments.length === 1 ? 'it' : 'them'}</button>
-    <button class="quiet" onclick={() => (declined = [...declined, offer.collection])}>Not now</button>
+    <Button variant="primary" small onclick={() => add(offer)}>Add {offer.environments.length === 1 ? 'it' : 'them'}</Button>
+    <Button variant="ghost" small onclick={() => (declined = [...declined, offer.collection])}>Not now</Button>
   </div>
 {/if}
 
 <style>
   .note { display: flex; align-items: center; gap: var(--sp-2); padding: 6px 12px; background: color-mix(in srgb, var(--accent) 14%, var(--panel)); border-bottom: 1px solid var(--line); font-size: var(--fs-sm); }
   .text { flex: 1; }
-  button { background: var(--raised); color: var(--text); border: 0; box-shadow: inset 0 0 0 1px var(--line); border-radius: var(--r-md); padding: 0 10px; min-height: var(--ctl-h-sm); font: inherit; font-weight: 500; }
-  button:hover:not(:disabled) { background: var(--raised-3); }
-  .primary { background: var(--primary-fill); color: var(--on-primary); font-weight: 600; box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.18); }
-  .primary:hover { filter: brightness(1.1); }
-  .quiet { color: var(--muted); border: 0; }
 </style>

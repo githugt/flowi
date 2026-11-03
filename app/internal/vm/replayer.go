@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -102,6 +103,15 @@ func (r *Replayer) Form() ReplayerForm { return r.form }
 // Entries are the calls so far, oldest first.
 func (r *Replayer) Entries() []replay.Entry { return r.entries }
 
+// Entry is the call with that number, if the list still holds it.
+func (r *Replayer) Entry(seq int) (replay.Entry, bool) {
+	i := slices.IndexFunc(r.entries, func(e replay.Entry) bool { return e.Seq == seq })
+	if i < 0 {
+		return replay.Entry{}, false
+	}
+	return r.entries[i], true
+}
+
 // Clear forgets the calls shown.
 func (r *Replayer) Clear() {
 	r.entries = nil
@@ -164,6 +174,7 @@ func (r *Replayer) Start(form ReplayerForm) {
 		}
 		o.Sequence, o.CORS, o.Record, o.RecordTo, o.NoTriggers, o.NoSchedules = form.Sequence, form.CORS, form.Record, form.RecordTo, true, true
 		o.RecordHAR, o.Faults = strings.TrimSpace(form.RecordHAR), faults
+		o.CaptureCalls = true // the screen opens a call to show what it carried
 		srv, err := r.b.Serve(ctx, o)
 		return started{srv, err}
 	}, func(s started) {

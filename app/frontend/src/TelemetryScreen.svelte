@@ -27,7 +27,7 @@
     <div class="levels">
       {#each levels as [id, label]}
         <label class="lv" class:on={view.level === id}>
-          <input type="radio" name="level" checked={view.level === id} onchange={() => WelcomeService.ChooseTelemetry(id)} onfocus={() => (looking = id)} />
+          <input type="radio" name="level" checked={view.level === id} onchange={() => ((looking = id), WelcomeService.ChooseTelemetry(id))} onfocus={() => (looking = id)} />
           {label}
         </label>
       {/each}
@@ -35,7 +35,7 @@
     {#if view.problem}<p class="err">{view.problem}</p>{/if}
     <h4>What “{looking}” would send</h4>
     <div class="tabs">{#each levels as [id, label]}<button class:on={looking === id} onclick={() => (looking = id)}>{label}</button>{/each}</div>
-    <pre>{view.previews[looking]}</pre>
+    {#if view.previews[looking]}<pre>{view.previews[looking]}</pre>{/if}
   </div>
 {/if}
 

@@ -7,6 +7,8 @@ export interface TreeNode {
   /** What a folder's order calls it: the file or folder name ("" for rows that cannot be reordered). */
   name?: string
   draft?: boolean
+  /** The Drafts try-out space: not a collection the person made. */
+  scratch?: boolean
   /** Folders and groups: the tree they belong to, requests or flows. Requests drop only into the first. */
   tree?: string
   children?: TreeNode[]
@@ -461,11 +463,13 @@ export interface ResponseView {
   sent: PartView[]
   received: PartView[]
   diags: string[]
+  /** The checks (assert lines) this response judged; ones added or edited since are untried. */
+  checks: string[]
   bodyJson?: unknown
   /** The body text of an XML response, for the tree and the multi-status list. */
   bodyXml?: string
   phases: { name: string; startMs: number; ms: number }[]
-  messages: { direction: string; at: string; body: string; key?: string }[]
+  messages: { direction: string; at: string; body: string; key?: string; kind?: string; type?: string }[]
   /** The rows of a dataset response, one value per column. */
   table?: TableView
 }
@@ -547,7 +551,7 @@ export interface RequestView {
   pipeline: { kind: string; title: string; detail: string; method?: string; tip?: string; state: string; reason?: string; ms: number }[]
   showingHistory: boolean
   inScratch: boolean
-  live: { direction: string; at: string; body: string; key?: string }[]
+  live: { direction: string; at: string; body: string; key?: string; kind?: string; type?: string }[]
   snippet: { format: string; formats: string[]; exclude: boolean; text: string; error?: string }
 }
 
@@ -638,6 +642,7 @@ export interface SettingsView {
     accent: string
     /** orange, violet, emerald, cyan or outline: the colour of the Send button. */
     sendButton: string
+    density: string
     font: string
     fontSize: number
     /** The palette of the custom theme, when its file reads; customProblem says why it does not. */
@@ -712,7 +717,7 @@ export interface ReplayerView {
   notes: string[]
   form: { addr: string; latency: string; sequence: boolean; cors: boolean; record: string; recordTo: string; recordHar: string; faultErrorPercent: string; faultStatus: string; faultDropPercent: string; faultJitter: string }
   targets: { id: string; label: string; path?: string }[]
-  traffic: { seq: number; at: string; method: string; path: string; status: number; match: string; request: string; duration: string; remote: string }[]
+  traffic: { seq: number; at: string; method: string; path: string; status: number; match: string; request: string; duration: string; remote: string; version: string; example: string; source: string; delay: string }[]
 }
 
 export interface TrashView {
@@ -1015,4 +1020,17 @@ export interface SequenceView {
   hosts: string[]
   steps: { kind: 'call' | 'reply' | 'note'; host: number; text: string; failed: boolean }[]
   mermaid: string
+}
+
+/** What a replayed call carried and was answered with (credential values masked), fetched when its row is opened. */
+export interface CallView {
+  seq: number
+  captured: boolean
+  sent: CallPart
+  got: CallPart
+}
+export interface CallPart {
+  headers: { name: string; value: string }[]
+  body: string
+  truncated: boolean
 }

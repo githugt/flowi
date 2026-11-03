@@ -1,4 +1,6 @@
 <script lang="ts">
+  import TextInput from './TextInput.svelte'
+  import Button from './Button.svelte'
   // "New flow from blueprint": pick a blueprint, where the flow goes, and its
   // parameters. Opened from the New menu, from a folder's menu and from the
   // Blueprints screen.
@@ -60,14 +62,14 @@
         <label><span>Collection</span>
           <select bind:value={collection}>{#each view.collections as c}<option value={c.id}>{c.label}</option>{/each}</select>
         </label>
-        <label><span>Flow path</span><input bind:value={path} spellcheck="false" /></label>
+        <label><span>Flow path</span><TextInput bind:value={path} label="Flow path" /></label>
         {#each Object.keys(values) as name}
-          <label><span>{name}</span><input bind:value={values[name]} spellcheck="false" /></label>
+          <label><span>{name}</span><TextInput bind:value={values[name]} label={name} /></label>
         {/each}
       {/if}
       <div class="actions">
-        <button type="button" onclick={() => (ui.blueprint = null)}>Cancel</button>
-        <button class="primary" type="submit" disabled={!chosen}>Create</button>
+        <Button type="button" onclick={() => (ui.blueprint = null)}>Cancel</Button>
+        <Button variant="primary" type="submit" disabled={!chosen}>Create</Button>
       </div>
     </form>
   </div>
@@ -79,11 +81,6 @@
   .dialog h3 { margin: 0; }
   .muted { color: var(--muted); font-size: var(--fs-sm); margin: 0; }
   label { display: flex; flex-direction: column; gap: 3px; color: var(--muted); font-size: var(--fs-xs); }
-  input, select { background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); padding: 5px 8px; font: inherit; -webkit-user-select: text; user-select: text; }
+  select { background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); padding: 5px 8px; font: inherit; -webkit-user-select: text; user-select: text; }
   .actions { display: flex; justify-content: flex-end; gap: 8px; }
-  button { background: var(--raised); color: var(--text); border: 0; box-shadow: inset 0 0 0 1px var(--line); border-radius: var(--r-md); padding: 0 12px; min-height: var(--ctl-h); font: inherit; font-weight: 500; }
-  button:hover:not(:disabled) { background: var(--raised-3); }
-  .primary { background: var(--primary-fill); color: var(--on-primary); font-weight: 600; box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.18); }
-  .primary:hover { filter: brightness(1.1); }
-  button:disabled { opacity: 0.4; }
 </style>

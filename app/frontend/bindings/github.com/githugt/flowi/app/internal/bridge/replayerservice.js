@@ -17,6 +17,17 @@ import { Call as $Call, CancellablePromise as $CancellablePromise, Create as $Cr
 import * as $models from "./models.js";
 
 /**
+ * Call returns the headers and bodies of one call by its number.
+ * @param {number} seq
+ * @returns {$CancellablePromise<$models.CallView>}
+ */
+export function Call(seq) {
+    return $Call.ByID(1922609451, seq).then(/** @type {($result: any) => any} */(($result) => {
+        return $$createType0($result);
+    }));
+}
+
+/**
  * Clear forgets the calls shown.
  * @returns {$CancellablePromise<void>}
  */
@@ -48,7 +59,7 @@ export function Start(f) {
  */
 export function State() {
     return $Call.ByID(219120924).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType0($result);
+        return $$createType1($result);
     }));
 }
 
@@ -61,4 +72,5 @@ export function Stop() {
 }
 
 // Private type creation functions
-const $$createType0 = $models.ReplayerView.createFrom;
+const $$createType0 = $models.CallView.createFrom;
+const $$createType1 = $models.ReplayerView.createFrom;

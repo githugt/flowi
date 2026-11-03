@@ -1,4 +1,5 @@
 <script lang="ts">
+  import Button from './Button.svelte'
   // The title and the description of one version of a request. The title shows
   // beside the label in the version picker; the description is the version's Docs.
   let { label, name, docs, onsave, oncancel }: { label: string; name: string; docs: string; onsave: (name: string, docs: string) => void; oncancel: () => void } = $props()
@@ -23,8 +24,8 @@
       <textarea bind:value={notes} rows="6" spellcheck="true"></textarea>
     </label>
     <div class="actions">
-      <button type="button" onclick={oncancel}>Cancel</button>
-      <button class="primary" type="submit">Save</button>
+      <Button type="button" onclick={oncancel}>Cancel</Button>
+      <Button variant="primary" type="submit">Save</Button>
     </div>
   </form>
 </div>
@@ -37,8 +38,4 @@
   input, textarea { background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); padding: 5px 8px; font: inherit; -webkit-user-select: text; user-select: text; }
   textarea { resize: vertical; }
   .actions { display: flex; justify-content: flex-end; gap: 8px; }
-  button { background: var(--raised); color: var(--text); border: 0; box-shadow: inset 0 0 0 1px var(--line); border-radius: var(--r-md); padding: 0 12px; min-height: var(--ctl-h); font: inherit; font-weight: 500; }
-  button:hover:not(:disabled) { background: var(--raised-3); }
-  .primary { background: var(--primary-fill); color: var(--on-primary); font-weight: 600; box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.18); }
-  .primary:hover { filter: brightness(1.1); }
 </style>

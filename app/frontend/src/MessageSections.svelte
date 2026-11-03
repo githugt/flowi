@@ -1,4 +1,5 @@
 <script lang="ts">
+  import Toggle from './Toggle.svelte'
   // The sections only message (async) and gRPC requests have.
   import { RequestService } from '../bindings/github.com/githugt/flowi/app/internal/bridge'
   import { ui } from './lib/ui.svelte'
@@ -113,7 +114,7 @@
     <button onclick={() => setReceiveOn(true)}>Wait for messages</button>
   </EmptyState>
 {:else if section === 'Receive'}
-  <label class="check"><input type="checkbox" checked={receive !== null} onchange={(e) => setReceiveOn(e.currentTarget.checked)} /> Wait for messages</label>
+  <Toggle checked={receive !== null} onchange={setReceiveOn}>Wait for messages</Toggle>
   {#if receive}
     <TextField label="Messages (empty: 1)" value={receive.Count ? String(receive.Count) : ''} oninput={(t) => putReceive((r) => (r.Count = Math.max(0, parseInt(t) || 0)))} />
     <TextField
@@ -169,16 +170,12 @@
   <AreaField label=".proto files, relative to the collection (one per line)" rows={4} value={lines(g.block.Proto)} oninput={(t) => putGRPC((b) => (b.Proto = splitLines(t)))}
     empty={{ icon: 'proto', title: 'Using reflection', hint: 'Click to list .proto files instead of asking the server.' }} />
   <AreaField label="Import roots (one per line)" rows={3} value={lines(g.block.Import)} oninput={(t) => putGRPC((b) => (b.Import = splitLines(t)))} />
-  <label class="check" title="Send the call as an HTTP POST to a gRPC-Web proxy (Envoy, a gateway) at the http(s) address of the server. Needs the .proto files; a method that streams from the client cannot be called.">
-    <input type="checkbox" checked={g.block.Web ?? false} onchange={(e) => putGRPC((b) => (b.Web = e.currentTarget.checked))} />
-    <span>Call through gRPC-Web (an http:// or https:// server)</span>
-  </label>
+  <Toggle checked={g.block.Web ?? false} onchange={(on) => putGRPC((b) => (b.Web = on))} title="Send the call as an HTTP POST to a gRPC-Web proxy (Envoy, a gateway) at the http(s) address of the server. Needs the .proto files; a method that streams from the client cannot be called.">Call through gRPC-Web (an http:// or https:// server)</Toggle>
 {/if}
 
 <style>
   .line { display: flex; gap: 12px; align-items: center; }
   .radio { display: flex; gap: 6px; align-items: center; }
-  .check { display: flex; align-items: center; gap: 6px; }
   .f { display: flex; flex-direction: column; gap: 3px; color: var(--muted); font-size: var(--fs-xs); }
   .muted { color: var(--muted); font-size: var(--fs-sm); margin: 0; }
   .err { color: var(--fail); font-size: var(--fs-sm); margin: 0; }

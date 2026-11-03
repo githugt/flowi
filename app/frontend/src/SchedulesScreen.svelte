@@ -1,9 +1,12 @@
 <script lang="ts">
+  import TextInput from './TextInput.svelte'
+  import Button from './Button.svelte'
+  import Toggle from './Toggle.svelte'
   import { onMount } from 'svelte'
   import { live } from './lib/live'
   import { SchedulesService } from '../bindings/github.com/githugt/flowi/app/internal/bridge'
   import { ui } from './lib/ui.svelte'
-  import { untilText } from './lib/until'
+  import { axisClock, untilText } from './lib/until'
   import Icon from './Icon.svelte'
   import type { ScheduleView, SchedulesView } from './lib/types'
 
@@ -49,6 +52,8 @@
 
   const busiestFirst = $derived([...view.schedules].sort((a, b) => b.fires.length - a.fires.length))
   const running = $derived(view.runner.state === 'running' || view.runner.state === 'stopping')
+  const busy = $derived(view.runner.state === 'starting' || view.runner.state === 'stopping')
+  const runnerLabel = $derived({ starting: 'Starting…', stopping: 'Stopping…', running: 'Running' }[view.runner.state as string] ?? 'Stopped')
 
   async function makeToken() {
     try {
@@ -67,14 +72,10 @@
       <p class="muted">Run flows on a timer while this window is open, or from <code>flowi serve</code>. They are kept in workspace.yaml.</p>
     </div>
     <div class="runner" class:on={running}>
-      {#if running}
-        <span class="ok">● Running</span>
-        <button disabled={view.runner.state === 'stopping'} onclick={() => SchedulesService.StopRunner()}>{view.runner.state === 'stopping' ? 'Stopping…' : '■ Stop'}</button>
-      {:else}
-        <span class="muted">Stopped</span>
-        <button class="primary go" disabled={view.runner.state === 'starting' || !view.schedules.length} title={view.schedules.length ? 'Fire the schedules while this window is open' : 'Add a schedule first'} onclick={() => SchedulesService.StartRunner()}>{view.runner.state === 'starting' ? 'Starting…' : '▶ Start schedules'}</button>
-      {/if}
-      <button class="primary" onclick={() => edit(blank())}>+ Add schedule</button>
+      <Toggle framed tone="ok" checked={running} disabled={busy || (!running && !view.schedules.length)} aria-label="Fire the schedules"
+        title={running ? 'Stop firing the schedules' : view.schedules.length ? 'Fire the schedules while this window is open' : 'Add a schedule first'}
+        onchange={(on) => (on ? SchedulesService.StartRunner() : SchedulesService.StopRunner())}>{runnerLabel}</Toggle>
+      <Button variant="primary" onclick={() => edit(blank())}>+ Add schedule</Button>
     </div>
   </header>
   {#if view.error}<p class="err">{view.error}</p>{/if}
@@ -92,8 +93,8 @@
         <span class="next" class:dim={!s.nextAt}>
           <i style:background={s.nextAt ? hues[view.schedules.indexOf(s) % hues.length] : undefined}></i>{s.disabled ? 'Disabled' : s.nextAt ? 'Next run ' + untilText(s.nextAt, now) : 'Never fires'}
         </span>
-        <button onclick={() => edit(s)}>Edit</button>
-        <button class="danger" onclick={() => ui.confirm('Remove schedule', `Remove the schedule ${s.name}?`, () => SchedulesService.Remove(s.name))}>Remove</button>
+        <Button onclick={() => edit(s)}>Edit</Button>
+        <Button variant="danger" onclick={() => ui.confirm('Remove schedule', `Remove the schedule ${s.name}?`, () => SchedulesService.Remove(s.name))}>Remove</Button>
       </div>
     {:else}
       <p class="muted none">No schedules yet.</p>
@@ -109,8 +110,8 @@
           {#each ticks(s.fires) as p}<i class="tick" class:rare={s.fires.length < 12} style:left={`${p}%`} style:background={hues[view.schedules.indexOf(s) % hues.length]}></i>{/each}
         {/each}
       </div>
-      <div class="axis"><span>now</span><span>+6 h</span><span>+12 h</span><span>+18 h</span><span>+24 h</span></div>
-      <div class="legend">{#each view.schedules.filter((s) => s.fires.length) as s (s.name)}<span><i style:background={hues[view.schedules.indexOf(s) % hues.length]}></i>{s.name}</span>{/each}</div>
+      <div class="axis" title="Clock time on this machine">{#each axisClock(now, [0, 6, 12, 18, 24]) as t, i}<span>{i === 0 ? `now ${t}` : t}</span>{/each}</div>
+      <div class="legend">{#each view.schedules.filter((s) => s.fires.length) as s (s.name)}<span><i style:background={hues[view.schedules.indexOf(s) % hues.length]}></i>{s.name}{#if s.tz} <small title="Fires by the clock of this zone">{s.tz}</small>{/if}</span>{/each}</div>
     </div>
   {/if}
   {#if running && view.runner.upcoming.length}
@@ -120,24 +121,24 @@
   {#if editing}
     <form class="edit" onsubmit={(e) => { e.preventDefault(); save() }}>
       <h4>{editing.old ? 'Edit schedule' : 'New schedule'}</h4>
-      <label><span>Name</span><input bind:value={editing.s.name} spellcheck="false" /></label>
+      <label><span>Name</span><TextInput bind:value={editing.s.name} /></label>
       <label><span>Flow</span>
         <select value={editing.s.collection + '/' + editing.s.flow} onchange={(e) => pickFlow(e.currentTarget.value)}>
           <option value="/" disabled>Choose a flow…</option>
           {#each view.flows as f}<option value={f.collection + '/' + f.flow}>{f.label}</option>{/each}
         </select>
       </label>
-      <label><span>Cron (five fields, or @hourly, @daily …)</span><input bind:value={editing.s.cron} spellcheck="false" /></label>
+      <label><span>Cron (five fields, or @hourly, @daily …)</span><TextInput bind:value={editing.s.cron} mono /></label>
       <label><span>Environment (empty: the default)</span>
         <select bind:value={editing.s.env}><option value="">default</option>{#each view.environments as e}<option value={e}>{e}</option>{/each}</select>
       </label>
-      <label><span>Time zone (IANA name; empty: this machine's)</span><input bind:value={editing.s.tz} spellcheck="false" placeholder="Europe/Berlin" /></label>
+      <label><span>Time zone (IANA name; empty: this machine's)</span><TextInput bind:value={editing.s.tz} placeholder="Europe/Berlin" /></label>
       <label><span>Inputs (name=value, one per line)</span><textarea bind:value={editing.s.inputs} spellcheck="false"></textarea></label>
-      <label class="check"><input type="checkbox" bind:checked={editing.s.disabled} /> Disabled</label>
+      <Toggle checked={editing.s.disabled} onchange={(on) => (editing!.s.disabled = on)}>Disabled</Toggle>
       {#if problem}<p class="err">{problem}</p>{/if}
       <div class="actions">
-        <button type="button" onclick={() => (editing = null)}>Cancel</button>
-        <button class="primary" type="submit">Save</button>
+        <Button type="button" onclick={() => (editing = null)}>Cancel</Button>
+        <Button variant="primary" type="submit">Save</Button>
       </div>
     </form>
   {/if}
@@ -151,7 +152,7 @@
 
   <h3>HTTP trigger</h3>
   <p class="muted">`flowi serve` listens on <code>{view.triggerAddr || '—'}</code>. Triggers stay off until a token exists.</p>
-  <button onclick={makeToken}>{view.hasToken ? 'Make a new token' : 'Make a token'}</button>
+  <Button onclick={makeToken}>{view.hasToken ? 'Make a new token' : 'Make a token'}</Button>
   {#if token}<p class="muted">Copy it now; it is shown once:</p><pre>{token}</pre>{/if}
 </div>
 
@@ -178,7 +179,6 @@
   .next i { width: 7px; height: 7px; border-radius: 50%; background: var(--muted); }
   .next.dim { opacity: 0.7; }
   .none { padding: 14px 18px; margin: 0; }
-  .danger { color: var(--fail); }
   .strip-card { padding: 14px 16px; border-radius: var(--r-xl); background: var(--panel); box-shadow: inset 0 0 0 1px var(--line); }
   .strip { position: relative; height: 34px; border-radius: var(--r-md); background: var(--sunk); overflow: hidden; }
   .tick { position: absolute; top: 9px; width: 2px; height: 16px; border-radius: 1px; opacity: 0.8; }
@@ -186,24 +186,16 @@
   .axis { display: flex; justify-content: space-between; margin-top: 8px; color: var(--muted); font: var(--fs-xs) var(--mono); }
   .legend { display: flex; gap: 14px; margin-top: 10px; font-size: var(--fs-sm); color: var(--muted); }
   .legend span { display: flex; align-items: center; gap: 6px; }
+  .legend small { font: var(--fs-xs) var(--mono); }
   .legend i { width: 8px; height: 8px; border-radius: 2px; }
   code, pre { font: var(--fs-sm) var(--mono); }
   pre { background: var(--bg); border: 1px solid var(--line); border-radius: var(--r-md); padding: 8px; -webkit-user-select: text; user-select: text; }
   .edit { border: 1px solid var(--accent); border-radius: var(--r-lg); padding: 12px; margin: 10px 0; display: flex; flex-direction: column; gap: 8px; }
   label { display: flex; flex-direction: column; gap: 3px; color: var(--muted); font-size: var(--fs-xs); }
-  .check { flex-direction: row; align-items: center; gap: 6px; font-size: var(--fs-sm); color: var(--text); }
-  input:not([type]), select, textarea { background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); padding: 5px 8px; font: inherit; -webkit-user-select: text; user-select: text; }
+  select, textarea { background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); padding: 5px 8px; font: inherit; -webkit-user-select: text; user-select: text; }
   textarea { min-height: 70px; font: var(--fs-sm) var(--mono); }
   .actions { display: flex; gap: 8px; justify-content: flex-end; }
-  button { background: var(--raised); color: var(--text); border: 0; box-shadow: inset 0 0 0 1px var(--line); border-radius: var(--r-md); padding: 0 12px; min-height: var(--ctl-h); font: inherit; font-weight: 500; }
-  button:hover:not(:disabled) { background: var(--raised-3); }
   .runner { display: flex; align-items: center; gap: 10px; flex: none; }
-  .runner.on button:not(.primary) { background: var(--fail-t); color: var(--fail); }
-  .ok { color: var(--ok); }
   .cli { margin: 8px 0; font-size: var(--fs-sm); }
   .cli summary { cursor: default; color: var(--accent); }
-  .primary { background: var(--primary-fill); color: var(--on-primary); font-weight: 600; box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.18); }
-  .primary:hover { filter: brightness(1.1); }
-  /* Starting the schedules is a "go" like Run, so it wears the Send colour. */
-  .primary.go { background: var(--send-fill); color: var(--on-send); box-shadow: var(--send-edge); }
 </style>
