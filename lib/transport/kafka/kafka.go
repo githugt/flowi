@@ -337,7 +337,7 @@ func (p *poller) poll(ctx context.Context) {
 }
 
 func received(r *kgo.Record) transport.Message {
-	m := transport.Message{Direction: "received", At: r.Timestamp, Body: r.Value, Key: string(r.Key), Partition: r.Partition, Offset: r.Offset,
+	m := transport.Message{Direction: "received", At: r.Timestamp, Body: r.Value, Type: r.Topic, Key: string(r.Key), Partition: r.Partition, Offset: r.Offset,
 		Headers: []transport.Header{{Name: "topic", Value: r.Topic}}}
 	for _, h := range r.Headers {
 		m.Headers = append(m.Headers, transport.Header{Name: h.Key, Value: string(h.Value)})

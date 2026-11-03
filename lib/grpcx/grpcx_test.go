@@ -483,3 +483,17 @@ func TestMethods_should_write_an_example_message_for_each_request_type(t *testin
 		t.Errorf("Create example\n got %s\nwant %s", example["Create"], want)
 	}
 }
+
+// The type of a gRPC message is the full name of its protobuf message: what the call sent and what it answered with.
+func TestRun_should_name_the_protobuf_type_of_each_message(t *testing.T) {
+	f := startServer(t, true, nil)
+
+	res, err := grpcx.Run(t.Context(), call(f, "acme.orders.v1.Orders/Get", `{"id": "7"}`))
+
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.Messages[0].Type != "acme.orders.v1.GetRequest" || res.Messages[1].Type != "acme.orders.v1.Order" {
+		t.Fatalf("types %q and %q", res.Messages[0].Type, res.Messages[1].Type)
+	}
+}

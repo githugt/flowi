@@ -136,7 +136,7 @@ func deliver(ctx context.Context, in chan<- transport.Message, m transport.Messa
 }
 
 func coreMessage(m *natsgo.Msg, at time.Time) transport.Message {
-	out := transport.Message{Direction: "received", At: at, Body: m.Data, Headers: []transport.Header{{Name: "subject", Value: m.Subject}}}
+	out := transport.Message{Direction: "received", At: at, Body: m.Data, Type: m.Subject, Headers: []transport.Header{{Name: "subject", Value: m.Subject}}}
 	if m.Reply != "" {
 		out.Headers = append(out.Headers, transport.Header{Name: "reply", Value: m.Reply})
 	}
@@ -245,7 +245,7 @@ func consume(ctx context.Context, js jetstream.JetStream, op transport.Operation
 }
 
 func streamMessage(m jetstream.Msg, at time.Time) transport.Message {
-	out := transport.Message{Direction: "received", At: at, Body: m.Data(), Headers: []transport.Header{{Name: "subject", Value: m.Subject()}}}
+	out := transport.Message{Direction: "received", At: at, Body: m.Data(), Type: m.Subject(), Headers: []transport.Header{{Name: "subject", Value: m.Subject()}}}
 	if md, err := m.Metadata(); err == nil {
 		out.Sequence = md.Sequence.Stream
 	}

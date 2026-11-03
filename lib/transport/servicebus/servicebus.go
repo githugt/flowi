@@ -324,7 +324,11 @@ func received(m *azservicebus.ReceivedMessage, at time.Time) transport.Message {
 	for _, name := range names {
 		headers = append(headers, transport.Header{Name: name, Value: fmt.Sprint(m.ApplicationProperties[name])})
 	}
-	return transport.Message{Direction: "received", At: at, Headers: headers, Body: m.Body}
+	msg := transport.Message{Direction: "received", At: at, Headers: headers, Body: m.Body}
+	if m.Subject != nil {
+		msg.Type = *m.Subject
+	}
+	return msg
 }
 
 func headerValue(m transport.Message, name string) string {

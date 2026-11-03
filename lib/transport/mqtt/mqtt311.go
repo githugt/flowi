@@ -182,5 +182,5 @@ func waitFor(ctx context.Context, t paho311.Token) error {
 }
 
 func received311(m paho311.Message, at time.Time) transport.Message {
-	return transport.Message{Direction: "received", At: at, Body: m.Payload(), Headers: []transport.Header{{Name: "topic", Value: m.Topic()}}}
+	return transport.Message{Direction: "received", At: at, Body: m.Payload(), Type: m.Topic(), Headers: []transport.Header{{Name: "topic", Value: m.Topic()}}}
 }

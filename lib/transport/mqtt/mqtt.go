@@ -178,7 +178,7 @@ func publish(ctx context.Context, c *paho.Client, op transport.Operation, qos by
 // received turns a PUBLISH into a message: the topic and user properties
 // become headers.
 func received(p *paho.Publish, at time.Time) transport.Message {
-	m := transport.Message{Direction: "received", At: at, Body: p.Payload, Headers: []transport.Header{{Name: "topic", Value: p.Topic}}}
+	m := transport.Message{Direction: "received", At: at, Body: p.Payload, Type: p.Topic, Headers: []transport.Header{{Name: "topic", Value: p.Topic}}}
 	if p.Properties != nil {
 		for _, u := range p.Properties.User {
 			m.Headers = append(m.Headers, transport.Header{Name: u.Key, Value: u.Value})

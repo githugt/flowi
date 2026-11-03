@@ -45,28 +45,25 @@ type session struct {
 func (s *session) read(ctx context.Context) {
 	defer s.wg.Done()
 	for {
-		_, data, err := s.conn.Read(ctx)
+		kind, data, err := s.conn.Read(ctx)
 		if err != nil {
 			if ctx.Err() == nil {
 				s.inbox.Fail(fmt.Errorf("receiving: %w", err))
 			}
 			return
 		}
-		s.inbox.Push(transport.Message{Direction: "received", At: s.now(), Body: data})
+		s.inbox.Push(transport.Message{Direction: "received", At: s.now(), Body: data, Type: frameName(kind)})
 	}
 }
 
 func (s *session) Send(ctx context.Context, m transport.Message) (transport.Message, error) {
 	s.sendMu.Lock()
 	defer s.sendMu.Unlock()
-	kind := websocket.MessageBinary
-	if transport.IsText(m.Body) {
-		kind = websocket.MessageText
-	}
+	kind := frameKindOf(m.Body)
 	if err := s.conn.Write(ctx, kind, m.Body); err != nil {
 		return m, fmt.Errorf("sending: %w", err)
 	}
-	m.Direction, m.At = "sent", s.now()
+	m.Direction, m.At, m.Type = "sent", s.now(), frameName(kind)
 	return m, nil
 }
 

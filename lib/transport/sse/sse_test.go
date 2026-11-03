@@ -155,3 +155,18 @@ func TestRun_should_not_add_the_channel_to_the_url(t *testing.T) {
 		t.Fatalf("requested %q, want /stream: the channel is an event name", r.URL.Path)
 	}
 }
+
+// The event name is the protocol's own word for what kind of event this is, so it is a field of the message (Type),
+// not only a header. An event with no event: line is a "message", as a browser's EventSource names it.
+func TestRun_should_name_the_type_of_each_event(t *testing.T) {
+	url := stream(t, "event: paid\ndata: one\n\ndata: two\n\n", nil)
+
+	res, err := sse.New().Run(t.Context(), transport.Operation{Server: url, Receive: &transport.Receive{Count: 2, Timeout: 5 * time.Second}})
+
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.Received[0].Type != "paid" || res.Received[1].Type != "message" {
+		t.Fatalf("types %q and %q", res.Received[0].Type, res.Received[1].Type)
+	}
+}

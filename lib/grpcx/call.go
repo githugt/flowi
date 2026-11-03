@@ -126,6 +126,9 @@ func outgoingContext(ctx context.Context, headers []transport.Header) (context.C
 	return metadata.NewOutgoingContext(ctx, md), nil
 }
 
+// typeOf is the full name of a message's protobuf type, the Type of the transport message it becomes.
+func typeOf(m *dynamicpb.Message) string { return string(m.Descriptor().FullName()) }
+
 // sentMessages records the requests as sent. The metadata went with the call,
 // so only the first message carries it.
 func sentMessages(in []*dynamicpb.Message, c Call) ([]transport.Message, error) {
@@ -135,7 +138,7 @@ func sentMessages(in []*dynamicpb.Message, c Call) ([]transport.Message, error) 
 		if err != nil {
 			return nil, err
 		}
-		msg := transport.Message{Direction: "sent", At: c.now(), Body: body}
+		msg := transport.Message{Direction: "sent", At: c.now(), Body: body, Type: typeOf(m)}
 		if i == 0 {
 			msg.Headers = c.sentHeaders()
 		}
@@ -237,7 +240,7 @@ func runUnary(ctx context.Context, conn *grpc.ClientConn, path string, md protor
 	res.Code, res.Message = statusOf(err)
 	if err == nil {
 		if body, jerr := jsonOf(reply); jerr == nil {
-			res.Messages = append(res.Messages, transport.Message{Direction: "received", At: c.now(), Body: body, Headers: res.Header})
+			res.Messages = append(res.Messages, transport.Message{Direction: "received", At: c.now(), Body: body, Headers: res.Header, Type: typeOf(reply)})
 		}
 	}
 }
@@ -309,7 +312,7 @@ func runClientStream(ctx context.Context, conn *grpc.ClientConn, path string, md
 		return
 	}
 	if body, jerr := jsonOf(reply); jerr == nil {
-		res.Messages = append(res.Messages, transport.Message{Direction: "received", At: c.now(), Body: body, Headers: res.Header})
+		res.Messages = append(res.Messages, transport.Message{Direction: "received", At: c.now(), Body: body, Headers: res.Header, Type: typeOf(reply)})
 	}
 }
 
@@ -407,7 +410,7 @@ func readStream(ctx context.Context, stream grpc.ClientStream, md protoreflect.M
 			return
 		}
 		select {
-		case incoming <- transport.Message{Direction: "received", At: now(), Body: body}:
+		case incoming <- transport.Message{Direction: "received", At: now(), Body: body, Type: typeOf(reply)}:
 		case <-ctx.Done():
 			return
 		}

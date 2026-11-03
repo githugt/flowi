@@ -5,6 +5,9 @@ package amqp
 import (
 	"strings"
 	"testing"
+	"time"
+
+	amqp091 "github.com/rabbitmq/amqp091-go"
 
 	"github.com/githugt/flowi/lib/transport"
 )
@@ -65,5 +68,16 @@ func TestReceiveNeedsAQueueOrExchange(t *testing.T) {
 
 	if err := tg.checkReceive(); err == nil {
 		t.Fatal("consuming from the default exchange with no queue named has nothing to bind: want an error")
+	}
+}
+
+// A publisher that sets the AMQP type property says what the message is; without one, the routing key is the best
+// name the message has.
+func TestReceived_should_take_the_type_property_else_the_routing_key(t *testing.T) {
+	named := received(amqp091.Delivery{Type: "order.paid", RoutingKey: "orders"}, time.Time{})
+	unnamed := received(amqp091.Delivery{RoutingKey: "orders"}, time.Time{})
+
+	if named.Type != "order.paid" || unnamed.Type != "orders" {
+		t.Fatalf("types %q and %q", named.Type, unnamed.Type)
 	}
 }
