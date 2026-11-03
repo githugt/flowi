@@ -152,6 +152,17 @@ func TestTelemetryShow_Given_level_flag_Then_that_level_is_previewed(t *testing.
 	}
 }
 
+// Off sends no report, so there is nothing to show; an empty report would suggest otherwise.
+func TestTelemetryShow_Given_off_Then_prints_nothing(t *testing.T) {
+	e := newSendEnv(t)
+
+	code, out, errOut := e.run(context.Background(), "telemetry", "show", "--level", "off")
+
+	if code != 0 || out != "" {
+		t.Fatalf("exit %d\nout:\n%s\nerr:\n%s", code, out, errOut)
+	}
+}
+
 func TestTelemetryShow_Given_bad_level_Then_usage_error(t *testing.T) {
 	e := newSendEnv(t)
 
