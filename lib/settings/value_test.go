@@ -79,3 +79,43 @@ func TestParseValue_Given_list_with_spaces_Then_items_trimmed(t *testing.T) {
 		t.Fatalf("got %v, %v", got, err)
 	}
 }
+
+// A comma inside an item used to be impossible: the typed text was split on every comma, so a header value like
+// "a,b" came back as two items. A backslash now says "this comma belongs to the item".
+func TestParseValue_Given_escaped_comma_Then_it_stays_in_the_item(t *testing.T) {
+	k, _ := Lookup(Schema(), "otel.headers")
+
+	got, err := ParseValue(k, `X-Tags=a\,b, X-Other=c\\,d`)
+
+	want := []string{"X-Tags=a,b", `X-Other=c\`, "d"}
+	if err != nil || !slices.Equal(got.([]string), want) {
+		t.Fatalf("got %q, %v", got, err)
+	}
+}
+
+func TestParseValue_Given_a_backslash_before_other_text_Then_it_is_kept(t *testing.T) {
+	k, _ := Lookup(Schema(), "otel.headers")
+
+	got, _ := ParseValue(k, `X-Path=C:\temp`)
+
+	if want := []string{`X-Path=C:\temp`}; !slices.Equal(got.([]string), want) {
+		t.Fatalf("got %q", got)
+	}
+}
+
+func TestFormatList_should_round_trip_through_ParseValue(t *testing.T) {
+	k, _ := Lookup(Schema(), "otel.headers")
+	items := []string{"X-Tags=a,b", `X-Back=c\`, "plain=1", `X-Mix=\,`}
+
+	got, err := ParseValue(k, FormatList(items))
+
+	if err != nil || !slices.Equal(got.([]string), items) {
+		t.Fatalf("text %q parsed to %q, %v", FormatList(items), got, err)
+	}
+}
+
+func TestFormatList_Given_plain_items_Then_reads_as_typed(t *testing.T) {
+	if got := FormatList([]string{"5xx", "429"}); got != "5xx, 429" {
+		t.Fatalf("got %q", got)
+	}
+}
