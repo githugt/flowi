@@ -12,6 +12,8 @@ parts that each have their own module, licence and releases:
 The licence in each folder's `LICENSE` file applies to that folder only. The library is Apache-2.0 so that it can be
 used in other software; the app and the CLI are AGPL.
 
+![A flow after a run, with the request of the selected step](app/docs/images/flow-editor.png)
+
 Start with the [app README](app/README.md) for what Flowi does and how to run it, or the
 [development guide](lib/docs/development.md) for how the parts fit together.
 
@@ -26,6 +28,6 @@ just check       # tidy, lint and test every module
 
 ## Releases
 
-Each part is tagged on its own, with its folder as a prefix: `lib/v0.3.0`, `cli/v0.3.0`, `app/v0.3.0`. A `cli/` or
+Each part is tagged on its own, with its folder as a prefix: `lib/v0.4.1`, `cli/v0.4.1-alpha.1`, `app/v0.4.1-alpha.1`. A `cli/` or
 `app/` tag builds and publishes that part's release; the `lib/` tag is what `go get github.com/githugt/flowi/lib`
 resolves.
