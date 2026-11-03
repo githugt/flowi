@@ -360,6 +360,14 @@
           ],
           "default": "orange"
         },
+        "density": {
+          "type": "string",
+          "enum": [
+            "comfortable",
+            "compact"
+          ],
+          "default": "comfortable"
+        },
         "font": {
           "type": "string",
           "default": ""

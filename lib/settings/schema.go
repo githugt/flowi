@@ -164,6 +164,8 @@ func Schema() []Key {
 			Description: "GUI accent colour (hex, e.g. #1d4ed8); empty uses the theme's."},
 		{Name: "appearance.send_button", Kind: KindEnum, Default: "orange", Enum: []string{"orange", "violet", "emerald", "cyan", "outline"}, FileLayers: personal,
 			Description: "Colour of the Send button in the GUI: orange (the default), violet, emerald, cyan, or an outline in the accent colour."},
+		{Name: "appearance.density", Kind: KindEnum, Default: "comfortable", Enum: []string{"comfortable", "compact"}, FileLayers: personal,
+			Description: "How much room the GUI's rows and controls take: comfortable (the default) or compact, to fit more on screen."},
 		{Name: "appearance.font", Kind: KindString, Default: "", FileLayers: personal,
 			Description: "GUI font file; empty uses the built-in font."},
 		{Name: "appearance.font_size", Kind: KindInt, Default: int64(13), Min: 8, Max: 48, FileLayers: personal,
