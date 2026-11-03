@@ -44,6 +44,10 @@ type ServeOptions struct {
 	// responses gave. Only used with Record.
 	RecordHAR string
 
+	// CaptureCalls keeps the headers and bodies of each replayed call in the traffic log (credential values
+	// masked; see replay.Options.Capture). For a caller that shows them, such as the app.
+	CaptureCalls bool
+
 	NoReplay, NoTriggers, NoSchedules bool
 
 	// ValkeyAddr (host:port) shares run records and schedule ticks with
