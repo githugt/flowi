@@ -8,7 +8,8 @@
   import JsonNode from './JsonNode.svelte'
   import XmlNode from './XmlNode.svelte'
   import { multiStatus, parseXml, pathsOf } from './lib/xml'
-  import Code from './Code.svelte'
+  import MessageFeed from './MessageFeed.svelte'
+  import { tookTone } from './lib/took'
   import { cellOf } from './lib/cells'
   import { Clipboard } from '@wailsio/runtime'
   import { ui } from './lib/ui.svelte'
@@ -173,9 +174,7 @@
     </div>
   {:else if view.sending}
     <p class="muted">Sending…</p>
-    {#each view.live as m}
-      <div class="msg {m.direction}"><div class="mh">{m.direction === 'sent' ? '→ sent' : '← received'} · {m.at}</div><Code text={m.body} /></div>
-    {/each}
+    {#if view.live.length}<MessageFeed messages={view.live} live />{/if}
   {:else if !r && view.sendError}
     <p class="err sel"><Problem text={view.sendError} /></p>
   {:else if !r}
@@ -197,7 +196,7 @@
     {/if}
     <header>
       <span class="title" class:ok={r.passed} class:bad={!r.passed}>{r.title}</span>
-      {#if r.took}<span class="meta" title="Time the send took">{r.took}</span>{/if}
+      {#if r.took}<span class="meta {tookTone(r.took)}" title="Time the send took">{r.took}</span>{/if}
       {#if r.size}<span class="meta" title="Size of the response body">{r.size}</span>{/if}
       <span class="muted">{r.at}</span>
       {#if tab === 'received'}
@@ -231,11 +230,7 @@
         <div class="phase total"><span class="pname">Total</span><span></span><span class="pms">{end.toFixed(1)} ms</span></div>
       </div>
     {:else if tab === 'messages'}
-      <div class="body">
-        {#each r.messages as m}
-          <div class="msg {m.direction}"><div class="mh">{m.direction === 'sent' ? '→ sent' : '← received'} · {m.at}{m.key ? ' · key ' + m.key : ''}</div><Code text={m.body} /></div>
-        {/each}
-      </div>
+      <div class="body"><MessageFeed messages={r.messages} /></div>
     {:else if tab === 'received' && rowsShown && r.table}
       <div class="body">
         <p class="muted rowsum">
@@ -303,6 +298,8 @@
   header { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
   .grow { flex: 1; }
   /* Time and size beside the title, as quiet chips: the figures people look for first. */
+  .meta.slow { background: var(--warn-t); color: var(--warn); }
+  .meta.verySlow { background: var(--fail-t); color: var(--fail); }
   .meta { padding: 1px 8px; border-radius: var(--r-pill); background: var(--tint-hover); color: var(--text); font: 600 var(--fs-xs)/16px var(--mono); font-variant-numeric: tabular-nums; }
   .title { font-weight: 600; }
   .ok { color: var(--ok); }
@@ -361,10 +358,6 @@
   .total { border-top: 1px solid var(--line); padding-top: 6px; }
   .total .pname, .total .pms { color: var(--text); font-weight: 600; }
   .pms { color: var(--muted); text-align: right; font: var(--fs-xs) var(--mono); }
-  .msg { border-left: 2px solid var(--line); padding: 2px 10px; margin: 8px 0; }
-  .msg.received { border-color: var(--ok); }
-  .msg.sent { border-color: var(--accent); }
-  .mh { color: var(--muted); font-size: var(--fs-xs); }
   .sum { margin: 0 0 8px; font-size: var(--fs-sm); color: var(--muted); display: flex; gap: 10px; }
   .okc { color: var(--ok); font-weight: 600; }
   .badc { color: var(--fail); font-weight: 600; }

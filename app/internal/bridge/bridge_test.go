@@ -640,6 +640,27 @@ func TestSchedulesService_Save_should_add_a_schedule_and_report_bad_input(t *tes
 	}
 }
 
+func TestSchedulesService_State_should_say_a_schedule_in_words_and_when_it_fires(t *testing.T) {
+	c := vmtest.SampleCollection()
+	b := &vmtest.Backend{Cols: []model.Collection{c}}
+	app := bridge.NewApp(b, bridge.NewInlineActor(), (&published{}).emit)
+	app.Start(t.Context())
+	svc := app.Schedules()
+	svc.State()
+	svc.Save("", bridge.ScheduleView{Name: "nightly", Flow: "signup", Cron: "0 3 * * *"})
+	svc.Save("", bridge.ScheduleView{Name: "paused", Flow: "signup", Cron: "@hourly", Disabled: true})
+
+	v := svc.State()
+
+	nightly, paused := v.Schedules[0], v.Schedules[1]
+	if nightly.When != "Every day at 03:00" || nightly.NextAt == "" || len(nightly.Fires) != 1 {
+		t.Fatalf("nightly %+v", nightly)
+	}
+	if paused.NextAt != "" || len(paused.Fires) != 0 || paused.Fires == nil {
+		t.Fatalf("a disabled schedule is never due, and its firings are an empty list, not null: %+v", paused)
+	}
+}
+
 func TestReplayerService_Start_should_report_a_bad_latency_without_starting(t *testing.T) {
 	app, _ := fixture(t)
 	svc := app.Replayer()

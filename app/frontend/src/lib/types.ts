@@ -687,6 +687,12 @@ export interface ScheduleView {
   tz: string
   disabled: boolean
   flowLabel: string
+  /** The cron in words, "" when it is not a common pattern. */
+  when: string
+  /** When it fires next (RFC 3339); "" when disabled. */
+  nextAt: string
+  /** Minutes from the moment the view was made to each firing in the next 24 hours. */
+  fires: number[]
 }
 
 export interface SchedulesView {
