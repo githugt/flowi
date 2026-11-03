@@ -1,4 +1,6 @@
 <script lang="ts">
+  import SearchField from './SearchField.svelte'
+  import Button from './Button.svelte'
   // Move to…: where one or more requests go, any collection or request folder. The old "Rename / move"
   // asked only for a path, inside the request's own collection.
   import { WorkspaceService } from '../bindings/github.com/githugt/flowi/app/internal/bridge'
@@ -51,7 +53,7 @@
     <div class="dialog" role="dialog" aria-label={title} tabindex="-1" onpointerdown={(e) => e.stopPropagation()} onkeydown={keys}>
       <h3>{title}</h3>
       <p class="muted">To a collection, or a folder of its requests. Each request keeps its name.</p>
-      <input bind:this={filter} type="search" placeholder="Filter" bind:value={query} spellcheck="false" aria-label="Filter places" />
+      <SearchField bind:el={filter} bind:value={query} label="Filter places" />
       <div class="list" role="listbox" aria-label="Places">
         {#each shown as t (t.row)}
           <button type="button" role="option" aria-selected={chosen === t.row} class:on={chosen === t.row} class:top={t.depth === 0}
@@ -63,8 +65,8 @@
         {/each}
       </div>
       <div class="actions">
-        <button type="button" onclick={close}>Cancel</button>
-        <button type="button" class="primary" disabled={!chosen} onclick={move}>Move</button>
+        <Button type="button" onclick={close}>Cancel</Button>
+        <Button type="button" variant="primary" disabled={!chosen} onclick={move}>Move</Button>
       </div>
     </div>
   </div>
@@ -75,16 +77,12 @@
   .dialog { width: 420px; max-height: 80vh; display: flex; flex-direction: column; gap: 10px; padding: 16px; background: var(--panel); border: 1px solid var(--line); border-radius: var(--r-lg); outline: none; }
   h3 { margin: 0; }
   .muted { color: var(--muted); font-size: var(--fs-sm); margin: 0; }
-  input { background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); padding: 5px 8px; font: inherit; -webkit-user-select: text; user-select: text; }
   .list { flex: 1; min-height: 120px; max-height: 340px; overflow: auto; border: 1px solid var(--line); border-radius: var(--r-md); padding: 4px; background: var(--bg); }
   .list button { width: 100%; display: flex; align-items: center; gap: 6px; text-align: left; background: none; border: 0; border-radius: var(--r-sm); color: var(--text); font: inherit; padding-block: 4px; padding-right: 10px; }
-  .list button:hover { background: color-mix(in srgb, var(--accent) 10%, transparent); }
+  .list button:hover { background: var(--tint-hover); }
   .list button.on { background: color-mix(in srgb, var(--accent) 24%, transparent); }
   .list button.top { font-weight: 600; }
   .tag { margin-left: auto; color: var(--muted); font-size: var(--fs-xs); font-weight: 400; }
   .empty { padding: 8px; }
   .actions { display: flex; justify-content: flex-end; gap: 8px; }
-  .actions button { background: transparent; color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); padding: 3px 12px; font: inherit; }
-  .actions .primary { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
-  .actions button:disabled { opacity: 0.4; }
 </style>

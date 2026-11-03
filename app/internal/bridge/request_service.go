@@ -31,6 +31,7 @@ type ResponseView struct {
 	Sent     []PartView    `json:"sent"`
 	Received []PartView    `json:"received"`
 	Diags    []string      `json:"diags"`
+	Checks   []string      `json:"checks"`             // the checks (assert lines) this response judged; ones added or edited since are untried
 	BodyJSON any           `json:"bodyJson,omitempty"` // the parsed JSON body, for the tree; absent for other bodies and large ones
 	BodyXML  string        `json:"bodyXml,omitempty"`  // the body text of an XML response (not HTML), for the tree and the multi-status list; absent otherwise and when large
 	Phases   []PhaseView   `json:"phases"`
@@ -302,7 +303,7 @@ func isXMLType(contentType string) bool {
 func responseOf(ex vm.Exchange, f vm.ViewFormat) *ResponseView {
 	rv := &ResponseView{
 		Title: ex.Title, At: ex.At.Local().Format(time.TimeOnly), Passed: ex.Result.Status == engine.StatusPassed,
-		Status: string(ex.Result.Status), Sent: []PartView{}, Received: []PartView{}, Diags: []string{}, Phases: []PhaseView{}, Messages: []MessageView{},
+		Status: string(ex.Result.Status), Sent: []PartView{}, Received: []PartView{}, Diags: []string{}, Checks: append([]string{}, ex.Checks...), Phases: []PhaseView{}, Messages: []MessageView{},
 	}
 	rv.Diags = append(rv.Diags, vm.DiagLines(ex.Result.Diags)...)
 	rv.Code = string(ex.Result.Status)

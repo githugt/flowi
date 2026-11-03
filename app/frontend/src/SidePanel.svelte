@@ -29,8 +29,8 @@
 </aside>
 
 <style>
-  aside { flex: none; display: flex; flex-direction: column; border-left: 1px solid var(--line); background: var(--panel); min-height: 0; }
-  .tabs { display: flex; border-bottom: 1px solid var(--line); flex: none; }
+  aside { flex: none; display: flex; flex-direction: column; border-left: 1px solid var(--line); background: var(--bg); min-height: 0; }
+  .tabs { display: flex; border-bottom: 1px solid var(--line); flex: none; padding: 0 8px; }
   .tabs button {
     flex: 1;
     background: none;
@@ -38,7 +38,9 @@
     border-bottom: 2px solid transparent;
     color: var(--muted);
     font: inherit;
-    padding: 8px 0;
+    font-weight: 500;
+    height: var(--tabbar-h);
+    margin-bottom: -1px;
   }
   .tabs button.active { color: var(--text); border-bottom-color: var(--accent); }
   .body { flex: 1; min-height: 0; overflow: auto; display: flex; flex-direction: column; }

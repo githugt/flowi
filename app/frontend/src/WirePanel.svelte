@@ -1,4 +1,5 @@
 <script lang="ts">
+  import Button from './Button.svelte'
   // A value wire was dropped from one step onto another: say which part of what the first makes to take, and where
   // in the second to put it. The result is a template written into that field, as one change that Undo takes back.
   import { FlowService } from '../bindings/github.com/githugt/flowi/app/internal/bridge'
@@ -53,22 +54,20 @@
       <label class="field"><span class="label">Name</span><input bind:value={name} placeholder="token" spellcheck="false" /></label>
     {/if}
     {#if error}<p class="err">{error}</p>{/if}
-    <div class="actions"><button onclick={onclose}>Cancel</button><button class="primary" onclick={connect}>Connect</button></div>
+    <div class="actions"><Button onclick={onclose}>Cancel</Button><Button variant="primary" onclick={connect}>Connect</Button></div>
   {/if}
 </div>
 
 <style>
-  .wire { position: fixed; z-index: 30; width: 320px; box-sizing: border-box; display: flex; flex-direction: column; gap: 8px; padding: 12px; background: var(--panel); border: 1px solid var(--data); border-radius: 14px; box-shadow: var(--shadow); }
+  .wire { position: fixed; z-index: 30; width: 320px; box-sizing: border-box; display: flex; flex-direction: column; gap: 8px; padding: 12px; background: var(--raised); border: 1px solid var(--data); border-radius: 14px; box-shadow: var(--shadow); }
   .top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
   h4 { margin: 0; font-size: var(--fs-md); }
   .close { background: none; border: 0; color: var(--muted); font: inherit; font-size: var(--fs-lg); line-height: 1; }
   .field { display: flex; flex-direction: column; gap: 3px; }
   .label { color: var(--muted); font-size: var(--fs-xs); }
-  input, select { background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); padding: 5px 6px; font: inherit; }
+  input, select { background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); padding: 5px 6px; font: inherit; }
   input:focus, select:focus { border-color: var(--data); }
   .hint { color: var(--muted); font-size: var(--fs-sm); margin: 0; }
   .err { color: var(--fail); font-size: var(--fs-sm); margin: 0; }
   .actions { display: flex; justify-content: flex-end; gap: 8px; }
-  .actions button { background: transparent; color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); padding: 3px 12px; font: inherit; }
-  .actions .primary { background: var(--act-send); color: var(--on-act); border-color: var(--act-send); font-weight: 600; }
 </style>

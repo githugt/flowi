@@ -1,4 +1,5 @@
 <script lang="ts">
+  import Toggle from './Toggle.svelte'
   // The parameters of a step as form fields: a template or expression field, a choice, a switch. A list or mapping
   // is edited in the file. Used by the side inspector and by the rows of a card.
   import { FlowService } from '../bindings/github.com/githugt/flowi/app/internal/bridge'
@@ -21,10 +22,7 @@
         <em class="muted">(a list or mapping: edit it in the file)</em>
       </div>
     {:else if p.kind === 'bool'}
-      <label class="check">
-        <input type="checkbox" checked={p.value === 'true'} onchange={(e) => FlowService.SetParam(node, p.name, String(e.currentTarget.checked))} />
-        <span>{p.name}{p.required ? ' *' : ''}</span>
-      </label>
+      <Toggle checked={p.value === 'true'} onchange={(on) => FlowService.SetParam(node, p.name, String(on))}>{p.name}{p.required ? ' *' : ''}</Toggle>
     {:else if p.kind === 'enum'}
       <label class="field">
         <span class="label">{p.name}{p.required ? ' *' : ''}</span>
@@ -52,7 +50,6 @@
 <style>
   .field { display: flex; flex-direction: column; gap: 3px; }
   .label { color: var(--muted); font-size: var(--fs-xs); }
-  .check { display: flex; align-items: center; gap: 6px; }
   .hint, .muted { color: var(--muted); font-size: var(--fs-sm); margin: 0; }
-  select { background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); padding: 5px 6px; font: inherit; }
+  select { background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); padding: 5px 6px; font: inherit; }
 </style>

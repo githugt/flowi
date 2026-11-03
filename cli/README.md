@@ -52,14 +52,15 @@ flowi impact auth/login                      # who uses this request, and do the
 | Command | What it does |
 |---|---|
 | `init`, `workspace mount/ls`, `ls`, `new` | Create and mount collections; list and create requests and flows (`flowi new flow team/chain --from two-calls`) |
-| `send <request>` | Send one saved request: HTTP, gRPC, or a message (publish to or receive from Kafka, MQTT, NATS, SQS and more). `--env`, `--with name=value`, `--prefer-version`, `--pin` to keep the answer as an example |
-| `run <flow>` | Run a flow with a live progress tree. `--input`, `--seed` to repeat generated values, `--report junit=report.xml` (also `json`, `markdown`, `text`) |
+| `send <request>` | Send one saved request: HTTP, gRPC, a message (publish to or receive from Kafka, MQTT, NATS, SQS and more) or a database query. `--env`, `--with name=value`, `--prefer-version`, `--flowi-overlay`, `--pin` to keep the answer as an example |
+| `run <flow>` | Run a flow with a live progress tree. `--input`, `--seed` to repeat generated values, `--matrix env=local,staging` to run every combination, `--overlay`, `--bundle` to keep the run for offline replay, `--report junit=report.xml` (also `json`, `markdown`, `text`, `mermaid`, `har`) |
 | `impact <request>` | List everything that uses a request, and whether each still fits its contract. Exits 1 if something is broken |
 | `validate`, `fmt` | Check collections for errors; rewrite files in canonical form |
+| `coverage`, `drift`, `access` | How much of an API description the flows use; whether live responses still match the schemas learned before; whether another user can reach what a flow made |
 | `import <kind> <file>` | Bring in OpenAPI, AsyncAPI, `.proto`, Arazzo, Postman, Bruno, HAR, `.http` or curl (a URL works; `-` reads standard input), and Mermaid sketches |
 | `export arazzo\|mermaid <flow>` | Write a flow as Arazzo 1.0 or as a Mermaid flowchart for docs |
 | `serve` | One process for the replayer, HTTP flow triggers and cron schedules (below) |
-| `schedule`, `env`, `secret`, `cookies`, `blueprint`, `config` | Cron schedules; environments; the secret vault; cookie jars; flow templates; settings (`flowi config explain timeout`) |
+| `schedule`, `env`, `secret`, `cookies`, `blueprint`, `overlay`, `config` | Cron schedules; environments; the secret vault; cookie jars; flow templates; flowi overlays (request variants); settings (`flowi config explain timeout`) |
 
 Every command takes `--output json` for NDJSON events followed by the result. Run `flowi <command> --help`
 for the details.
@@ -80,7 +81,7 @@ flowi schedule add nightly --flow user-creation --cron '0 3 * * *' --env staging
 ```
 
 - **Replayer.** A call is matched to a request by method and path and answered from its pinned example or
-  last saved response. Request headers such as `X-Flowi-Status: 401` or `X-Flowi-Latency: 800ms` steer it.
+  last saved response. Request headers such as `X-Flowi-Status: 401` or `X-Flowi-Latency: 800ms` steer it. `X-Flowi-Fault: error:418` or `drop` makes one call fail on purpose.
 - **Triggers.** `POST /flows/<flow>/run` starts a flow (add `?wait=30s` to wait). Create the bearer token with
   `flowi serve token`; without one, triggers are off. The endpoint speaks plain HTTP, so keep it on
   localhost or put a TLS-terminating proxy in front; ten bad tokens from one address in a minute lock that

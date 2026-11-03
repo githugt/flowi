@@ -1,4 +1,5 @@
 <script lang="ts">
+  import Toggle from './Toggle.svelte'
   // What opens under a card when one of its rows is clicked: the same controls the side inspector has for that part
   // of the step, with nothing else. One row is open at a time; the card's step is the selected one.
   import { FlowService } from '../bindings/github.com/githugt/flowi/app/internal/bridge'
@@ -60,7 +61,7 @@
       <TextField label="Open connection" value={call.open ?? ''} oninput={(v) => text('open', v)} placeholder="name (WebSocket, MQTT 5, NATS)" />
       <TextField label="Use connection" value={call.over ?? ''} oninput={(v) => text('over', v)} placeholder="a name opened by an earlier step" />
       {#if call.over}
-        <label class="check"><input type="checkbox" checked={call.close ?? false} onchange={(e) => FlowService.SetClose(node, e.currentTarget.checked)} /> Close it after this step</label>
+        <Toggle checked={call.close ?? false} onchange={(on) => FlowService.SetClose(node, on)}>Close it after this step</Toggle>
       {/if}
     {:else if row === 'settings'}
       <TextField label="Timeout (e.g. 5s)" value={step.timeout} oninput={(v) => text('timeout', v)} />
@@ -99,6 +100,5 @@
   .hint { color: var(--muted); font-size: var(--fs-sm); margin: 0; }
   .field { display: flex; flex-direction: column; gap: 3px; }
   .label { color: var(--muted); font-size: var(--fs-xs); }
-  .check { display: flex; align-items: center; gap: 6px; }
-  select { background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); padding: 5px 6px; font: inherit; }
+  select { background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); padding: 5px 6px; font: inherit; }
 </style>

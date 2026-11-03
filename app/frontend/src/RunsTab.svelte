@@ -119,7 +119,7 @@
     padding: 4px 6px;
     border-radius: var(--r-md);
   }
-  .run:hover { background: color-mix(in srgb, var(--accent) 10%, transparent); }
+  .run:hover { background: var(--tint-hover); }
   .run.active { background: color-mix(in srgb, var(--accent) 22%, transparent); }
   .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); flex: none; }
   .dot.passed { background: var(--ok); }
@@ -130,9 +130,9 @@
   .changed td { color: var(--accent); }
   .gap { color: var(--muted); text-align: right; }
   .pick { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
-  .pick select { flex: 1; min-width: 0; background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); padding: 3px 4px; font: inherit; font-size: var(--fs-sm); }
+  .pick select { flex: 1; min-width: 0; background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); padding: 3px 4px; font: inherit; font-size: var(--fs-sm); }
   tr.body { cursor: default; }
-  tr.body:hover td { background: color-mix(in srgb, var(--accent) 8%, transparent); }
+  tr.body:hover td { background: var(--tint-hover); }
   .chev { margin-left: 8px; color: var(--accent); }
   .val { font-family: var(--mono); word-break: break-all; }
   .lines pre { margin: 0 0 6px; padding: 6px 8px; background: var(--bg); border: 1px solid var(--line); border-radius: var(--r-md); font: var(--fs-xs) var(--mono); overflow: auto; max-height: 260px; }

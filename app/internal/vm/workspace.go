@@ -40,6 +40,7 @@ type TreeNode struct {
 	File       string   // NodeRequest, NodeEnvironment, NodeFlow
 	Path       string   // NodeRequest, NodeFlow: the path in the collection; NodeFolder: the folder
 	Draft      bool     // NodeCollection: not saved to a folder yet
+	Scratch    bool     // NodeCollection: the Drafts try-out space, which is not a collection the person made
 	Method     string   // NodeRequest: the verb of its default version
 	Tree       string   // NodeFolder and the two groups: "requests" or "flows"
 }
@@ -204,6 +205,11 @@ func (ws *Workspace) WorkspaceName() string { return ws.b.WorkspaceName() }
 
 // IsDraftCollection reports whether collection id is a draft (not saved to a folder yet).
 func (ws *Workspace) IsDraftCollection(id model.ID) bool { return ws.snap.drafts[id] }
+
+// IsScratch reports whether c is the Scratch try-out space (not any other unsaved collection).
+func (ws *Workspace) IsScratch(c model.Collection) bool {
+	return ws.snap.drafts[c.Manifest.ID] && c.Manifest.Name == scratchName
+}
 
 // InDraft reports whether the node belongs to a draft collection.
 func (ws *Workspace) InDraft(nodeID string) bool {
@@ -390,7 +396,7 @@ func addCollection(add func(string, TreeNode), c model.Collection, draft bool) {
 	if draft && label == scratchName {
 		label = "Drafts" // the scratch space; other collections in Flowi's folder are ordinary collections
 	}
-	add("", TreeNode{ID: root, Label: label, Kind: NodeCollection, Collection: cid, Draft: draft})
+	add("", TreeNode{ID: root, Label: label, Kind: NodeCollection, Collection: cid, Draft: draft, Scratch: draft && c.Manifest.Name == scratchName})
 	reqs := root + "/requests"
 	add(root, TreeNode{ID: reqs, Label: "Requests", Kind: NodeRequestsGroup, Collection: cid, Tree: "requests"})
 	addNested(add, reqs, "requests", c, requestLeaves(c))

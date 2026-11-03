@@ -1,4 +1,5 @@
 <script lang="ts">
+  import Button from './Button.svelte'
   // The flow as text: the flow body (editable, applied as one undoable edit)
   // and the Arazzo file saving would write (read-only).
   import { FlowService } from '../bindings/github.com/githugt/flowi/app/internal/bridge'
@@ -109,11 +110,11 @@
     </span>
     <span class="spacer"></span>
     {#if tab === 'standalone' && standalone}
-      <button onclick={saveStandalone}>Save as…</button>
+      <Button onclick={saveStandalone}>Save as…</Button>
     {/if}
     {#if tab === 'flow' && editable}
-      <button disabled={!edited} onclick={discard}>Discard</button>
-      <button class="primary" disabled={!edited} onclick={apply}>Apply</button>
+      <Button disabled={!edited} onclick={discard}>Discard</Button>
+      <Button variant="primary" disabled={!edited} onclick={apply}>Apply</Button>
     {/if}
   </div>
   {#if problems.length}
@@ -173,10 +174,9 @@
     padding: 3px 12px;
     font: inherit;
   }
-  button:hover:not(:disabled) { border-color: var(--accent); }
+  button:hover:not(:disabled) { background: var(--raised-3); }
   button:disabled { opacity: 0.4; }
   .tabs .active { border-color: var(--accent); }
-  .primary:not(:disabled) { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
   .problems { margin: 0; padding: 6px 12px; list-style: none; background: color-mix(in srgb, var(--fail) 12%, transparent); flex: none; max-height: 140px; overflow: auto; }
   .problems button { background: none; border: 0; color: var(--fail); padding: 1px 0; text-align: left; font: var(--fs-sm) var(--mono); }
   .notes { margin: 0; padding: 6px 12px; list-style: none; background: color-mix(in srgb, var(--warn) 14%, transparent); flex: none; max-height: 120px; overflow: auto; }

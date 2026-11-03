@@ -84,18 +84,18 @@
   .dd { position: relative; display: inline-block; }
   .btn {
     display: inline-flex; align-items: center; gap: 6px; width: 100%; box-sizing: border-box;
-    background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); font: inherit; padding: 5px 8px;
+    background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); font: inherit; padding: 5px 8px;
   }
-  .btn:hover { border-color: var(--accent); }
+  .btn:hover { background: var(--raised-3); }
   .t { flex: 1; text-align: left; white-space: nowrap; }
   .chev { color: var(--muted); margin-left: auto; flex: none; }
   .menu {
     position: fixed; z-index: 30; overflow: auto;
-    display: flex; flex-direction: column; padding: 4px; background: var(--panel); border: 1px solid var(--line); border-radius: var(--r-lg);
+    display: flex; flex-direction: column; padding: 4px; background: var(--raised); border: 1px solid var(--line); border-radius: var(--r-lg);
     box-shadow: var(--shadow);
   }
   .menu button { display: flex; align-items: center; gap: 8px; border: 0; background: transparent; color: var(--text); font: inherit; text-align: left; padding: 5px 10px; border-radius: var(--r-sm); white-space: nowrap; }
-  .menu button:hover:not(:disabled) { background: color-mix(in srgb, var(--accent) 16%, transparent); }
+  .menu button:hover:not(:disabled) { background: var(--tint-hover); }
   .menu button.cur { background: color-mix(in srgb, var(--accent) 24%, transparent); }
   .menu button:disabled { opacity: 0.4; }
   .grow { flex: 1; }

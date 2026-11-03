@@ -35,7 +35,7 @@
   .q:hover, .q:focus-visible { color: var(--text); border-color: var(--accent); }
   .pop {
     display: none; position: fixed; z-index: 40; width: 260px; padding: var(--sp-2) 10px;
-    background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: var(--r-lg); box-shadow: var(--shadow);
+    background: var(--raised); color: var(--text); border: 1px solid var(--line); border-radius: var(--r-lg); box-shadow: var(--shadow);
     font-size: var(--fs-sm); line-height: 1.45;
   }
   .hint:hover .pop, .q:focus-visible + .pop { display: block; }

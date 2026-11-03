@@ -1,4 +1,5 @@
 <script lang="ts">
+  import Button from './Button.svelte'
   // Two questions about the API descriptions you imported: how much of them do your flows use (coverage), and what would
   // a changed description break (before you import it). Neither writes anything.
   import { onMount } from 'svelte'
@@ -76,7 +77,7 @@
   <h3>Coverage: how much of the spec do your flows use?</h3>
   <p class="note">For every operation of an imported API description: which flows call it, which of its documented statuses a saved run ever got, and which response fields a flow reads. Statuses come from the run history, so a flow that never ran leaves them unseen.</p>
   <div class="line">
-    <button class="primary" disabled={!collection || coverageBusy} onclick={measure}>{coverageBusy ? 'Measuring…' : 'Measure'}</button>
+    <Button variant="primary" disabled={!collection || coverageBusy} onclick={measure}>{coverageBusy ? 'Measuring…' : 'Measure'}</Button>
     <label class="inline">Flag it below <input class="num" type="number" min="0" max="100" bind:value={failUnder} /> % of operations used</label>
   </div>
   {#if coverageError}<p class="err">{coverageError}</p>{/if}
@@ -117,7 +118,7 @@
     {/if}
   </div>
   <div class="line">
-    <button class="primary" disabled={!collection || !newSpec || changeBusy || (specs.length > 1 && !spec)} onclick={check}>{changeBusy ? 'Checking…' : 'Check'}</button>
+    <Button variant="primary" disabled={!collection || !newSpec || changeBusy || (specs.length > 1 && !spec)} onclick={check}>{changeBusy ? 'Checking…' : 'Check'}</Button>
   </div>
   {#if !specs.length}<p class="muted">This collection kept no OpenAPI description, so only what the new one has can be judged, never what it dropped.</p>{/if}
   {#if changeError}<p class="err">{changeError}</p>{/if}
@@ -139,7 +140,7 @@
 </div>
 
 <style>
-  .page { position: absolute; inset: 0; overflow: auto; padding: 16px 24px 48px; max-width: 860px; }
+  .page { position: absolute; inset: 0; overflow: auto; padding: 28px 32px 56px; max-width: 860px; }
   h3 { margin: 22px 0 4px; }
   h4 { margin: 14px 0 4px; color: var(--muted); }
   .note, .muted { color: var(--muted); font-size: var(--fs-sm); margin: 0 0 6px; }
@@ -150,10 +151,7 @@
   .line { display: flex; align-items: center; gap: 14px; margin: 8px 0; }
   .inline { font-size: var(--fs-sm); color: var(--muted); display: flex; align-items: center; gap: 6px; }
   .num { width: 56px; }
-  select, input { background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); padding: 4px 8px; font: inherit; }
-  button { background: transparent; color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); padding: 3px 14px; font: inherit; cursor: pointer; }
-  button:disabled { opacity: 0.4; }
-  .primary:not(:disabled) { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
+  select, input { background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); padding: 4px 8px; font: inherit; }
   .totals { border: 1px solid var(--line); border-radius: var(--r-lg); padding: 8px 12px; display: flex; flex-direction: column; gap: 2px; margin: 8px 0; font-size: var(--fs-sm); }
   .totals.bad { border-color: var(--fail); }
   .badnote, .badline { color: var(--fail); }

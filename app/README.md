@@ -6,7 +6,7 @@ git repository; secrets stay in an encrypted local vault.
 
 > Status: **pre-alpha**. The file format and the app will change.
 
-![A flow with its run results and the inspector](docs/images/flow-editor.png)
+![A flow after a run, with the request of the selected step](docs/images/flow-editor.png)
 
 Flowi is one repository with three parts: this app (`app/`), the [command-line tool](../cli) that
 runs the same collections in CI, and the [core library](../lib) both are built on.
@@ -23,7 +23,12 @@ change to a request would break.
 
 Build and send HTTP and gRPC requests. Use `{{templates}}` from environments, secrets and generators, keep several
 **versions** of a request, attach pre and post **hooks**, and pin a response as an example. Responses show as a
-tree, with timing, the exact request sent, and a history. Copy a request as curl and other snippets.
+tree, with timing, the exact request sent, and a history. Copy a request as curl and other snippets. Besides the
+usual methods you can use `QUERY` or any method of your own.
+
+A **flowi overlay** is a named variant you lay over a request when you send it: the same call as a VIP customer, with
+a slow connection, or with a bad token. Save one from what you have on screen, and Flowi shows what it changes before
+it writes anything.
 
 ![The request editor with a response](docs/images/api-explorer.png)
 
@@ -38,11 +43,23 @@ Each run connects, does its work and closes.
 
 ![Receiving server-sent events, with message requests for each protocol in the tree](docs/images/async-messages.png)
 
+### Query a database
+
+A request can also be a query: PostgreSQL, MySQL, MariaDB or SQLite. Write the SQL, give its values as parameters, and
+see the rows in a table. A query only reads, and a flow's request step can run it like any other request, so a flow
+can check what an API wrote.
+
 ### Build flows on a canvas
 
 Drag steps onto the canvas: request, extract, assert, condition, delay, batch, parallel, run until, subflow and
-more. Steps run in order; dotted arcs show which values pass from one step to another. Run the flow and watch each
-step turn green or red, then open its response, or run only part of it.
+more. Dotted arcs show which values pass from one step to another. Run the flow and watch each step turn green or red,
+then open what it sent and what came back, or run only part of it.
+
+Every step has **outcomes**: success and failure to begin with, and you can add your own, such as "401" or "slow".
+Drag from an outcome to the step that should run when it happens, and click an arrow to say whether it fires on
+success, on failure or on either. That is how a flow handles a failed login without stopping. The **Checks** menu
+runs a flow across a matrix of environments and overlays, checks that another user cannot reach what the flow made,
+looks for drift from the responses seen before, and draws a sequence diagram of the last run.
 
 ### Arazzo and the file view
 
@@ -64,6 +81,8 @@ copied into files.
 
 Serve your saved responses as a local API, so a front end can work before the back end exists. Or point it at a
 real API to **record**: it forwards each call, saves the answer, and turns calls it has not seen into new requests.
+It can also misbehave on purpose, to try retries and error handling: answer a share of calls with an error, drop the
+connection, or add a random delay. One call can ask for it with a header, such as `X-Flowi-Fault: error:418`.
 
 ![The replayer answering calls](docs/images/replayer.png)
 

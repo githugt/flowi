@@ -70,6 +70,24 @@ func (s *SessionService) restoreHistory() {
 	})
 }
 
+// ShowWelcome says whether the welcome page is what the window should open with: true on the first launch only.
+// It marks the welcome as shown, so every later launch opens the home page. When the marker cannot be kept the
+// answer is still true this once; the welcome page then comes back next launch, which is better than never.
+func (s *SessionService) ShowWelcome() bool {
+	shown, err := s.store.WelcomeShown()
+	if err != nil {
+		s.logger.Warn("the first-run marker could not be read", "Event", "SessionRestoreProblem", "Error", err)
+		return false // an unreadable marker is not evidence of a first run
+	}
+	if shown {
+		return false
+	}
+	if err := s.store.MarkWelcomeShown(); err != nil {
+		s.logger.Warn("the first-run marker could not be kept", "Event", "SessionSaveProblem", "Error", err)
+	}
+	return true
+}
+
 // SaveTabs stores the rows of the open tabs.
 func (s *SessionService) SaveTabs(rows []string) {
 	s.writer.Queue("tabs", func() error { return s.store.SaveTabs(rows) })

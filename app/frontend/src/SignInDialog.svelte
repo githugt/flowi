@@ -1,4 +1,5 @@
 <script lang="ts">
+  import Button from './Button.svelte'
   // A request is waiting for the person: open the provider's page and approve (authorization code),
   // or enter a code at an address on any device (device code). The dialog stays until the request
   // goes on (a send or a run ends) or it is closed; the request waits meanwhile, up to five minutes.
@@ -35,9 +36,9 @@
       {/if}
       <p class="url"><a href={p.url} onclick={(e) => { e.preventDefault(); Browser.OpenURL(p.url) }}>{p.url}</a></p>
       <div class="actions">
-        <button onclick={() => { Clipboard.SetText(p.kind === 'device' ? (p.code ?? '') : p.url); ui.toast('Copied') }}>{p.kind === 'device' ? 'Copy code' : 'Copy link'}</button>
-        <button class="primary" onclick={() => Browser.OpenURL(p.url)}>{p.kind === 'device' ? 'Open page' : 'Open again'}</button>
-        <button onclick={() => (ui.signIn = null)}>Close</button>
+        <Button onclick={() => { Clipboard.SetText(p.kind === 'device' ? (p.code ?? '') : p.url); ui.toast('Copied') }}>{p.kind === 'device' ? 'Copy code' : 'Copy link'}</Button>
+        <Button variant="primary" onclick={() => Browser.OpenURL(p.url)}>{p.kind === 'device' ? 'Open page' : 'Open again'}</Button>
+        <Button onclick={() => (ui.signIn = null)}>Close</Button>
       </div>
     </div>
   </div>
@@ -50,6 +51,4 @@
   .code { font: 600 28px/1.2 var(--mono); letter-spacing: 0.12em; text-align: center; padding: 8px 0; -webkit-user-select: text; user-select: text; }
   .url { word-break: break-all; font-size: var(--fs-sm); color: var(--muted); }
   .actions { display: flex; justify-content: flex-end; gap: 8px; }
-  button { background: transparent; color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); padding: 4px 14px; font: inherit; }
-  .primary { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
 </style>

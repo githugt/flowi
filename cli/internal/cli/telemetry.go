@@ -158,6 +158,9 @@ func newTelemetryShowCommand(i do.Injector) *cobra.Command {
 			if err != nil {
 				return err
 			}
+			if l == telemetry.LevelOff {
+				return nil // off sends no report; showing an empty one would suggest otherwise
+			}
 			client := telemetry.Client{App: "cli", Version: buildinfo.Version(), OS: runtime.GOOS, Arch: runtime.GOARCH}
 			enc := json.NewEncoder(cmd.OutOrStdout())
 			enc.SetIndent("", "  ")

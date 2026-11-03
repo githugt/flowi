@@ -16,7 +16,8 @@ type TreeNode struct {
 	Method   string     `json:"method,omitempty"`
 	Name     string     `json:"name,omitempty"` // what a folder's order calls it: the file or folder name
 	Draft    bool       `json:"draft,omitempty"`
-	Tree     string     `json:"tree,omitempty"` // folders and groups: requests or flows; requests can be dropped only on the first
+	Scratch  bool       `json:"scratch,omitempty"` // the Drafts try-out space
+	Tree     string     `json:"tree,omitempty"`    // folders and groups: requests or flows; requests can be dropped only on the first
 	Children []TreeNode `json:"children,omitempty"`
 }
 
@@ -150,7 +151,7 @@ func (s *WorkspaceService) nodes(ids []string) []TreeNode {
 		n := s.app.workspace.Node(id)
 		out = append(out, TreeNode{
 			ID: id, Label: s.app.workspace.Display(id), Kind: kindNames()[n.Kind],
-			Method: n.Method, Name: entryName(n), Draft: n.Draft, Tree: n.Tree, Children: s.nodes(s.app.workspace.Children(id)),
+			Method: n.Method, Name: entryName(n), Draft: n.Draft, Scratch: n.Scratch, Tree: n.Tree, Children: s.nodes(s.app.workspace.Children(id)),
 		})
 	}
 	return out

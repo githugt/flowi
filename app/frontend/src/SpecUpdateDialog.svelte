@@ -1,4 +1,5 @@
 <script lang="ts">
+  import Button from './Button.svelte'
   // Update from spec: import a kept spec again with its overlays, from the kept copy or a newer
   // document. Requests it replaces keep your edits, checks, extractions and hooks; the preview says
   // what changes before anything is written.
@@ -82,11 +83,11 @@
       {/if}
     {/if}
     <div class="actions">
-      <button type="button" onclick={onclose}>Cancel</button>
+      <Button type="button" onclick={onclose}>Cancel</Button>
       {#if preview && !nothing}
-        <button class="primary" disabled={busy} onclick={apply}>Update</button>
+        <Button variant="primary" disabled={busy} onclick={apply}>Update</Button>
       {:else}
-        <button class="primary" disabled={busy || (from === 'newer' && !source.trim())} onclick={look}>Preview</button>
+        <Button variant="primary" disabled={busy || (from === 'newer' && !source.trim())} onclick={look}>Preview</Button>
       {/if}
     </div>
   </div>
@@ -105,7 +106,4 @@
   .muted { color: var(--muted); font-size: var(--fs-sm); }
   .err { color: var(--fail); }
   .actions { display: flex; justify-content: flex-end; gap: 8px; }
-  button { background: transparent; color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); padding: 3px 12px; font: inherit; }
-  button:disabled { opacity: 0.4; }
-  .primary { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
 </style>

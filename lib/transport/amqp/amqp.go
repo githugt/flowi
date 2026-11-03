@@ -251,10 +251,19 @@ func (s *session) skipOwn(next func(transport.Message) (bool, error)) func(trans
 	}
 }
 
+// deliveryType is what the message says it is: its own type property when the publisher set one, else the routing
+// key it arrived with.
+func deliveryType(d amqp091.Delivery) string {
+	if d.Type != "" {
+		return d.Type
+	}
+	return d.RoutingKey
+}
+
 // received turns a delivery into a message: the exchange, routing key and
 // message id become headers, then the AMQP headers.
 func received(d amqp091.Delivery, at time.Time) transport.Message {
-	m := transport.Message{Direction: "received", At: at, Body: d.Body}
+	m := transport.Message{Direction: "received", At: at, Body: d.Body, Type: deliveryType(d)}
 	add := func(name, value string) {
 		if value != "" {
 			m.Headers = append(m.Headers, transport.Header{Name: name, Value: value})

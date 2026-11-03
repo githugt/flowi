@@ -102,7 +102,7 @@ func (b *serveBuild) assembleReplay() error {
 	}
 	b.replayLn, b.s.replayAddr = ln, ln.Addr().String()
 	ro := replay.Options{
-		Collections: b.w.Collections, DataDir: b.w.DataDir, Latency: b.o.Latency, Faults: b.o.Faults, Sequence: b.o.Sequence, CORS: b.o.CORS,
+		Collections: b.w.Collections, DataDir: b.w.DataDir, Latency: b.o.Latency, Faults: b.o.Faults, Sequence: b.o.Sequence, CORS: b.o.CORS, Capture: b.o.CaptureCalls,
 		Log: b.s.traffic, Logger: b.log, Sleep: b.o.replaySleep, Hosts: loopbackHosts(b.s.replayAddr),
 	}
 	if b.o.Record != "" {

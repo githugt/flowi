@@ -43,6 +43,10 @@ type Options struct {
 	// DNS rebinding points at 127.0.0.1.
 	Hosts []string
 
+	// Capture keeps the headers and bodies of each call in its log Entry (credential values masked, bodies cut at
+	// CaptureLimit). Off by default: it reads every request body. Not applied in record mode.
+	Capture bool
+
 	Log    *Log         // receives every call; nil keeps none
 	Logger *slog.Logger // bad response files are reported at debug level; nil discards
 
@@ -172,6 +176,13 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	start := time.Now()
+	var kept *Exchange
+	var cw *captureWriter
+	if h.opts.Capture && h.opts.Log != nil {
+		kept = &Exchange{Sent: captureRequest(r)}
+		cw = &captureWriter{ResponseWriter: w}
+		w = cw
+	}
 	a, dropped := h.applyFaults(r, h.decide(r))
 	if a.wait > 0 {
 		if err := h.opts.Sleep(r.Context(), a.wait); err != nil {
@@ -179,13 +190,16 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	if dropped {
-		h.record(r, a, time.Since(start))
+		h.record(r, a, time.Since(start), kept)
 		// ErrAbortHandler is how a handler closes the connection without an answer: net/http ends the
 		// connection (or resets an HTTP/2 stream) and logs nothing.
 		panic(http.ErrAbortHandler)
 	}
 	h.deliver(w, r, a)
-	h.record(r, a, time.Since(start))
+	if cw != nil {
+		kept.Got = cw.message() // before record: the log hands entries to readers, so none is changed after Add
+	}
+	h.record(r, a, time.Since(start), kept)
 }
 
 // applyFaults adds the jitter and turns the answer into an injected error, or marks it to be dropped,
@@ -326,12 +340,12 @@ func (h *Handler) preflight(w http.ResponseWriter, r *http.Request) bool {
 	return true
 }
 
-func (h *Handler) record(r *http.Request, a answer, took time.Duration) {
+func (h *Handler) record(r *http.Request, a answer, took time.Duration, kept *Exchange) {
 	if h.opts.Log == nil {
 		return
 	}
 	e := Entry{At: time.Now(), Method: r.Method, Path: r.URL.Path, Status: a.status, Match: a.match,
-		Latency: a.wait, Duration: took, Remote: r.RemoteAddr}
+		Latency: a.wait, Duration: took, Remote: r.RemoteAddr, Exchange: kept}
 	if a.route != nil {
 		e.Request, e.Version = a.route.req.Path, a.route.ver.Label
 	}

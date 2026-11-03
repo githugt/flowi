@@ -1,4 +1,5 @@
 <script lang="ts">
+  import Button from './Button.svelte'
   // The flowi overlays of this request's collection: list them, open one to read or edit its file, add
   // one (type it, or paste one brought from elsewhere), delete one. An overlay is a named set of changes
   // laid over a request version when it is sent; this is not the spec overlay of an imported API.
@@ -112,10 +113,10 @@
           </details>
           {#if problem}<p class="err">{problem}</p>{/if}
           <div class="actions">
-            {#if !isNew}<button class="danger" onclick={remove}>Delete</button>{/if}
-            {#if !isNew}<button title="Write what a spec can hold as an OpenAPI Overlay" onclick={exportSpec}>Export as OpenAPI Overlay…</button>{/if}
+            {#if !isNew}<Button variant="danger" onclick={remove}>Delete</Button>{/if}
+            {#if !isNew}<Button title="Write what a spec can hold as an OpenAPI Overlay" onclick={exportSpec}>Export as OpenAPI Overlay…</Button>{/if}
             <span class="grow"></span>
-            <button class="primary" disabled={!name || !!nameProblem} onclick={save}>Save</button>
+            <Button variant="primary" disabled={!name || !!nameProblem} onclick={save}>Save</Button>
           </div>
           {#if exported}
             <div class="export" role="region" aria-label="OpenAPI Overlay export">
@@ -124,7 +125,7 @@
               {/if}
               {#each exported.documents as d}
                 <p class="muted"><strong>{d.file}</strong> for {d.spec} · {d.requests.length} {d.requests.length === 1 ? 'request' : 'requests'}
-                  <button onclick={() => saveExport(d)}>Save…</button></p>
+                  <Button small onclick={() => saveExport(d)}>Save…</Button></p>
                 <textarea readonly spellcheck="false" aria-label={`OpenAPI Overlay for ${d.spec}`}>{d.yaml}</textarea>
               {/each}
               {#if exported.notCarried.length}
@@ -139,7 +140,7 @@
         {/if}
       </div>
     </div>
-    <div class="actions"><span class="grow"></span><button onclick={onclose}>Close</button></div>
+    <div class="actions"><span class="grow"></span><Button onclick={onclose}>Close</Button></div>
   </div>
 </div>
 
@@ -156,10 +157,10 @@
   .list .add { color: var(--accent); }
   .none { padding: 6px 8px; }
   .edit { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
-  textarea { flex: 1; min-height: 180px; resize: none; background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); padding: 8px; font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; }
+  textarea { flex: 1; min-height: 180px; resize: none; background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); padding: 8px; font: var(--fs-sm)/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; }
   .field { display: flex; align-items: center; gap: 8px; }
   .field span { color: var(--muted); font-size: var(--fs-sm); width: 44px; }
-  .field input { flex: 1; background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); padding: 4px 8px; font: inherit; }
+  .field input { flex: 1; background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); padding: 4px 8px; font: inherit; }
   .export { border-top: 1px solid var(--line); padding-top: 8px; display: flex; flex-direction: column; gap: 6px; }
   .export textarea { min-height: 90px; flex: none; }
   .export ul { margin: 4px 0 0; padding-left: 18px; font-size: var(--fs-xs); color: var(--muted); }
@@ -169,8 +170,7 @@
   .err { color: var(--fail); font-size: var(--fs-sm); }
   .actions { display: flex; gap: 8px; align-items: center; }
   .grow { flex: 1; }
-  button { background: transparent; color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); padding: 3px 12px; font: inherit; }
+  button { background: var(--raised); color: var(--text); border: 0; box-shadow: inset 0 0 0 1px var(--line); border-radius: var(--r-md); padding: 0 12px; min-height: var(--ctl-h); font: inherit; font-weight: 500; }
+  button:hover:not(:disabled) { background: var(--raised-3); }
   button:disabled { opacity: 0.4; }
-  .primary { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
-  .danger { color: var(--fail); }
 </style>

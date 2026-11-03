@@ -7,6 +7,8 @@ export interface MenuItem {
   run: () => void
   disabled?: boolean
   separator?: boolean
+  /** Shown with a check: the current choice in a list of options. */
+  checked?: boolean
 }
 
 export interface PromptDialog {

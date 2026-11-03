@@ -123,17 +123,45 @@ func parseStringList(k Key, raw any) (any, error) {
 	return list, nil
 }
 
+// splitList splits typed list text on commas, except those after a backslash. `\,` is a comma in the item and `\\`
+// a backslash; a backslash before anything else stays as typed, so a path like C:\temp needs no care.
+func splitList(text string) []string {
+	var parts []string
+	var item strings.Builder
+	runes := []rune(text)
+	for i := 0; i < len(runes); i++ {
+		r := runes[i]
+		switch {
+		case r == '\\' && i+1 < len(runes) && (runes[i+1] == ',' || runes[i+1] == '\\'):
+			i++
+			item.WriteRune(runes[i])
+		case r == ',':
+			parts = append(parts, strings.TrimSpace(item.String())) // "5xx, 429" as people type it
+			item.Reset()
+		default:
+			item.WriteRune(r)
+		}
+	}
+	return append(parts, strings.TrimSpace(item.String()))
+}
+
+// FormatList writes items the way splitList reads them back: comma-separated, with a backslash before any comma or
+// backslash inside an item. Items without either read exactly as typed ("5xx, 429").
+func FormatList(items []string) string {
+	escaped := make([]string, len(items))
+	for i, it := range items {
+		escaped[i] = strings.NewReplacer(`\`, `\\`, ",", `\,`).Replace(it)
+	}
+	return strings.Join(escaped, ", ")
+}
+
 func stringList(raw any) (any, error) {
 	switch v := raw.(type) {
 	case string:
 		if v == "" {
 			return []string{}, nil
 		}
-		parts := strings.Split(v, ",")
-		for i, p := range parts {
-			parts[i] = strings.TrimSpace(p) // "5xx, 429" as people type it
-		}
-		return parts, nil
+		return splitList(v), nil
 	case []any:
 		out := make([]string, 0, len(v))
 		for _, item := range v {

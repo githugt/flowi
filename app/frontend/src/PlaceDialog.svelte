@@ -1,4 +1,6 @@
 <script lang="ts">
+  import TextInput from './TextInput.svelte'
+  import Button from './Button.svelte'
   // Where it goes: one chooser for New request, New message request, New gRPC request, New flow, Save and
   // the importer. A searchable tree of collections and the folders in them (the Move dialog's list); a
   // collection or a folder can be made here, so nobody has to leave the dialog to have somewhere to put it.
@@ -93,7 +95,7 @@
       {#if d.note}<p class="muted">{d.note}</p>{/if}
       {#if d.name}
         <label class="f"><span>{d.name.label}</span>
-          <input bind:this={nameBox} bind:value={name} spellcheck="false" autocomplete="off" />
+          <TextInput bind:el={nameBox} bind:value={name} label={d.name.label} />
         </label>
       {/if}
       {#if d.protocols}
@@ -104,15 +106,15 @@
       <div class="where">
         <span class="label">{d.collectionsOnly ? 'Collection' : 'Collection or folder'}</span>
         <span class="make">
-          <button type="button" onclick={() => startMaking('collection')}>New collection</button>
-          {#if !d.collectionsOnly}<button type="button" disabled={!chosen} onclick={() => startMaking('folder')} title={chosen ? 'Inside the chosen place' : 'Choose a collection first'}>New folder</button>{/if}
+          <Button type="button" onclick={() => startMaking('collection')}>New collection</Button>
+          {#if !d.collectionsOnly}<Button type="button" disabled={!chosen} onclick={() => startMaking('folder')} title={chosen ? 'Inside the chosen place' : 'Choose a collection first'}>New folder</Button>{/if}
         </span>
       </div>
       {#if making}
         <div class="making">
-          <input bind:this={madeBox} bind:value={madeName} placeholder={making === 'collection' ? 'Collection name' : `Folder name, inside ${place?.label.split(' / ').pop() ?? ''}`} spellcheck="false" aria-label={making === 'collection' ? 'New collection name' : 'New folder name'} />
-          <button type="button" class="primary" disabled={madeName.trim() === ''} onclick={make}>Create</button>
-          <button type="button" onclick={() => (making = null)}>Cancel</button>
+          <TextInput bind:el={madeBox} bind:value={madeName} placeholder={making === 'collection' ? 'Collection name' : `Folder name, inside ${place?.label.split(' / ').pop() ?? ''}`} label={making === 'collection' ? 'New collection name' : 'New folder name'} style="flex: 1" />
+          <Button type="button" variant="primary" disabled={madeName.trim() === ''} onclick={make}>Create</Button>
+          <Button type="button" onclick={() => (making = null)}>Cancel</Button>
         </div>
       {/if}
       <input bind:this={filter} type="search" placeholder="Search" bind:value={query} spellcheck="false" aria-label="Search places" />
@@ -128,8 +130,8 @@
       </div>
       {#if place && d.name}<p class="muted at">Goes to <strong>{place.label}</strong> as <code>{name.trim() || 'untitled'}</code></p>{/if}
       <div class="actions">
-        <button type="button" onclick={close}>Cancel</button>
-        <button type="button" class="primary" disabled={!ready} onclick={accept}>{d.action}</button>
+        <Button type="button" onclick={close}>Cancel</Button>
+        <Button type="button" variant="primary" disabled={!ready} onclick={accept}>{d.action}</Button>
       </div>
     </div>
   </div>
@@ -142,22 +144,17 @@
   .muted { color: var(--muted); font-size: var(--fs-sm); margin: 0; }
   .at code { font: var(--fs-xs) var(--mono); }
   .f { display: flex; flex-direction: column; gap: 3px; color: var(--muted); font-size: var(--fs-xs); }
-  input { background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); padding: 5px 8px; font: inherit; -webkit-user-select: text; user-select: text; }
+  input { background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); padding: 5px 8px; font: inherit; -webkit-user-select: text; user-select: text; }
   input:focus { border-color: var(--accent); }
   .where { display: flex; align-items: center; justify-content: space-between; gap: 8px; color: var(--muted); font-size: var(--fs-xs); }
   .make { display: flex; gap: 6px; }
-  .make button, .making button, .actions button { background: transparent; color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); padding: 3px 10px; font: inherit; white-space: nowrap; }
-  .make button { color: var(--accent); font-size: var(--fs-sm); }
   .making { display: flex; gap: 6px; }
-  .making input { flex: 1; min-width: 0; }
   .list { flex: 1; min-height: 120px; max-height: 280px; overflow: auto; border: 1px solid var(--line); border-radius: var(--r-md); padding: 4px; background: var(--bg); }
   .list button { width: 100%; display: flex; align-items: center; gap: 6px; text-align: left; background: none; border: 0; border-radius: var(--r-sm); color: var(--text); font: inherit; padding-block: 4px; padding-right: 10px; }
-  .list button:hover { background: color-mix(in srgb, var(--accent) 10%, transparent); }
+  .list button:hover { background: var(--tint-hover); }
   .list button.on { background: color-mix(in srgb, var(--accent) 24%, transparent); }
   .list button.top { font-weight: 600; }
   .tag { margin-left: auto; color: var(--muted); font-size: var(--fs-xs); font-weight: 400; }
   .empty { padding: 8px; }
   .actions { display: flex; justify-content: flex-end; gap: 8px; }
-  .primary { background: var(--accent) !important; color: var(--on-accent) !important; border-color: var(--accent) !important; }
-  button:disabled { opacity: 0.4; }
 </style>

@@ -82,6 +82,22 @@ func dial(ctx context.Context, op transport.Operation) (*websocket.Conn, error) 
 	return conn, nil
 }
 
+// frameKindOf is the frame a body is sent as: text when it is text, binary otherwise.
+func frameKindOf(body []byte) websocket.MessageType {
+	if transport.IsText(body) {
+		return websocket.MessageText
+	}
+	return websocket.MessageBinary
+}
+
+// frameName is the word for a frame kind, the Type of the messages it carries.
+func frameName(kind websocket.MessageType) string {
+	if kind == websocket.MessageText {
+		return "text"
+	}
+	return "binary"
+}
+
 func tlsTransport(op transport.Operation) *http.Transport {
 	t := http.DefaultTransport.(*http.Transport).Clone()
 	t.TLSClientConfig = op.TLS
@@ -89,15 +105,12 @@ func tlsTransport(op transport.Operation) *http.Transport {
 }
 
 func send(ctx context.Context, conn *websocket.Conn, op transport.Operation) (*transport.Message, error) {
-	kind := websocket.MessageBinary
-	if transport.IsText(op.Send.Body) {
-		kind = websocket.MessageText
-	}
+	kind := frameKindOf(op.Send.Body)
 	if err := conn.Write(ctx, kind, op.Send.Body); err != nil {
 		return nil, fmt.Errorf("sending: %w", err)
 	}
 	m := *op.Send
-	m.Direction, m.At = "sent", op.Now()
+	m.Direction, m.At, m.Type = "sent", op.Now(), frameName(kind)
 	return &m, nil
 }
 
@@ -116,7 +129,7 @@ func startReader(ctx context.Context, conn *websocket.Conn, op transport.Operati
 	go func() {
 		defer rd.wg.Done()
 		for {
-			_, data, err := conn.Read(ctx)
+			kind, data, err := conn.Read(ctx)
 			if err != nil {
 				if ctx.Err() == nil {
 					rd.failed <- fmt.Errorf("receiving: %w", err)
@@ -124,7 +137,7 @@ func startReader(ctx context.Context, conn *websocket.Conn, op transport.Operati
 				return
 			}
 			select {
-			case rd.messages <- transport.Message{Direction: "received", At: op.Now(), Body: data}:
+			case rd.messages <- transport.Message{Direction: "received", At: op.Now(), Body: data, Type: frameName(kind)}:
 			case <-ctx.Done():
 				return
 			}

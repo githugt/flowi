@@ -1,4 +1,6 @@
 <script lang="ts">
+  import TextInput from './TextInput.svelte'
+  import Button from './Button.svelte'
   // Save as flowi overlay: the changes of the working copy against its saved version, each with a
   // choice. Ticked changes go to the overlay's shared part (every request that uses it gets them);
   // the others stay with this request. An existing overlay keeps what it holds for other requests.
@@ -56,13 +58,13 @@
       <p class="muted">An overlay is the same request with some changes laid over it when it is sent: as a VIP customer, slow, with a bad token. The saved version stays as it is.</p>
       <label class="field">
         <span>Overlay</span>
-        <input list="flowi-overlay-names" bind:value={name} placeholder="vip" aria-label="Overlay name" />
+        <TextInput list="flowi-overlay-names" bind:value={name} placeholder="vip" label="Overlay name" />
         <datalist id="flowi-overlay-names">{#each diff.names as n}<option value={n}></option>{/each}</datalist>
       </label>
       {#if nameProblem}<p class="err">{nameProblem}</p>{/if}
       <label class="field">
         <span>About</span>
-        <input bind:value={description} placeholder={exists ? 'unchanged' : 'The VIP customer'} aria-label="Description" />
+        <TextInput bind:value={description} placeholder={exists ? 'unchanged' : 'The VIP customer'} label="Description" />
       </label>
       <h4>Changes from the saved version</h4>
       {#if diff.ops.length}
@@ -87,8 +89,8 @@
       {/if}
     {/if}
     <div class="actions">
-      <button type="button" onclick={onclose}>Cancel</button>
-      <button class="primary" type="submit" disabled={!canSave}>{exists ? 'Update overlay' : 'Save overlay'}</button>
+      <Button type="button" onclick={onclose}>Cancel</Button>
+      <Button variant="primary" type="submit" disabled={!canSave}>{exists ? 'Update overlay' : 'Save overlay'}</Button>
     </div>
   </form>
 </div>
@@ -102,14 +104,9 @@
   .notes li { color: var(--muted); font-size: var(--fs-sm); }
   label { display: flex; align-items: center; gap: 8px; }
   .field span { width: 64px; color: var(--muted); font-size: var(--fs-sm); }
-  .field input { flex: 1; min-width: 0; }
-  input:not([type='checkbox']) { background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); padding: 4px 8px; font: inherit; }
   .tag { margin-left: auto; padding: 1px 6px; border-radius: var(--r-sm); font-size: var(--fs-xs); color: var(--muted); background: color-mix(in srgb, var(--muted) 14%, transparent); white-space: nowrap; }
   .muted { color: var(--muted); font-size: var(--fs-sm); }
   .small { font-size: var(--fs-xs); }
   .err { color: var(--fail); font-size: var(--fs-sm); }
   .actions { display: flex; justify-content: flex-end; gap: 8px; }
-  button { background: transparent; color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); padding: 3px 12px; font: inherit; }
-  button:disabled { opacity: 0.4; }
-  .primary { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
 </style>

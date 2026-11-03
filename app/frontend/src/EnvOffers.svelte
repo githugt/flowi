@@ -1,4 +1,5 @@
 <script lang="ts">
+  import Button from './Button.svelte'
   // A mounted collection that ships environments the workspace does not have
   // (an example, a colleague's folder) offers to add them. The workspace's
   // environments are global, so without this they would be silently unused.
@@ -38,15 +39,12 @@
       <strong>{offer.name}</strong> comes with {offer.environments.length === 1 ? 'an environment' : `${offer.environments.length} environments`}
       ({list(offer.environments)}) that this workspace does not have yet.
     </div>
-    <button class="primary" onclick={() => add(offer)}>Add {offer.environments.length === 1 ? 'it' : 'them'}</button>
-    <button class="quiet" onclick={() => (declined = [...declined, offer.collection])}>Not now</button>
+    <Button variant="primary" small onclick={() => add(offer)}>Add {offer.environments.length === 1 ? 'it' : 'them'}</Button>
+    <Button variant="ghost" small onclick={() => (declined = [...declined, offer.collection])}>Not now</Button>
   </div>
 {/if}
 
 <style>
   .note { display: flex; align-items: center; gap: var(--sp-2); padding: 6px 12px; background: color-mix(in srgb, var(--accent) 14%, var(--panel)); border-bottom: 1px solid var(--line); font-size: var(--fs-sm); }
   .text { flex: 1; }
-  button { background: transparent; color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); padding: 2px 10px; font: inherit; }
-  .primary { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
-  .quiet { color: var(--muted); border: 0; }
 </style>

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import Button from './Button.svelte'
   // A request's own hooks: pre and post steps, and for message requests a step run for each message, each a small flow canvas.
   import { HooksService } from '../bindings/github.com/githugt/flowi/app/internal/bridge'
   import { app } from './lib/app.svelte'
@@ -49,8 +50,8 @@
         {#each view.blueprints as b}<option value={b.id}>{b.label}</option>{/each}
       </select>
     {/if}
-    <button onclick={exit}>Exit</button>
-    <button class="primary" disabled={!view.dirty} onclick={() => save()}>Save</button>
+    <Button onclick={exit}>Exit</Button>
+    <Button variant="primary" disabled={!view.dirty} onclick={() => save()}>Save</Button>
   </header>
   {#if problem}<p class="err">{problem}</p>{/if}
   <div class="phases">
@@ -65,7 +66,7 @@
 
 <style>
   .hooks { position: absolute; inset: 0; display: flex; flex-direction: column; }
-  header { height: 40px; flex: none; display: flex; align-items: center; gap: 8px; padding: 0 12px; border-bottom: 1px solid var(--line); }
+  header { height: var(--head-h); flex: none; display: flex; align-items: center; gap: 8px; padding: 0 12px; border-bottom: 1px solid var(--line); }
   .dirty { color: var(--accent); font-size: var(--fs-xs); }
   .spacer { flex: 1; }
   .err { margin: 0; padding: 6px 12px; color: var(--fail); }
@@ -74,8 +75,6 @@
   h4 { margin: 0; padding: 6px 12px; font-size: var(--fs-sm); }
   .muted { color: var(--muted); font-weight: 400; }
   .canvas { flex: 1; min-height: 0; position: relative; }
-  button, select { background: transparent; color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); padding: 3px 12px; font: inherit; }
+  select { background: var(--raised); color: var(--text); border: 0; box-shadow: inset 0 0 0 1px var(--line); border-radius: var(--r-md); padding: 0 12px; min-height: var(--ctl-h); font: inherit; font-weight: 500; }
   select { background: var(--bg); }
-  .primary:not(:disabled) { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
-  button:disabled { opacity: 0.4; }
 </style>

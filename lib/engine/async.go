@@ -335,7 +335,7 @@ func headlineBody(msgs []RecordMessage) Body {
 // recordMessage is a transport message as recorded: text or base64, parsed
 // when it looks like a JSON object or array.
 func recordMessage(m transport.Message) RecordMessage {
-	out := RecordMessage{Direction: m.Direction, At: m.At, Key: m.Key, Partition: m.Partition, Offset: m.Offset, Sequence: m.Sequence}
+	out := RecordMessage{Direction: m.Direction, At: m.At, Type: m.Type, Key: m.Key, Partition: m.Partition, Offset: m.Offset, Sequence: m.Sequence}
 	for _, h := range m.Headers {
 		out.Headers = append(out.Headers, Header{Name: h.Name, Value: h.Value})
 	}

@@ -337,7 +337,7 @@ func readWebFrames(ctx context.Context, body io.Reader, md protoreflect.MethodDe
 			return
 		}
 		select {
-		case incoming <- transport.Message{Direction: "received", At: now(), Body: text}:
+		case incoming <- transport.Message{Direction: "received", At: now(), Body: text, Type: typeOf(reply)}:
 		case <-ctx.Done():
 			return
 		}

@@ -1,12 +1,17 @@
 <script lang="ts">
+  import TextInput from './TextInput.svelte'
+  import Button from './Button.svelte'
   import { onMount } from 'svelte'
   import { live } from './lib/live'
   import { ImportService } from '../bindings/github.com/githugt/flowi/app/internal/bridge'
   import type { ImportView } from './lib/types'
   import PathField from './PathField.svelte'
+  import FileTree from './FileTree.svelte'
+  import { buildFileTree } from './lib/filetree'
   import { ui } from './lib/ui.svelte'
 
   let view = $state<ImportView | null>(null)
+  const fileTree = $derived(buildFileTree(view?.files ?? []))
   let file = $state('')
   let overlay = $state('')
   let existing = $state('refuse')
@@ -82,12 +87,12 @@
     {/if}
     {#if kind?.overlay}
       <label class="f"><span>Overlay (fixes applied before the import): file(s) or URL(s), separated by ;</span>
-        <input bind:value={overlay} oninput={() => ImportService.SetOverlay(overlay)} spellcheck="false" />
+        <TextInput bind:value={overlay} label="Overlay" oninput={() => ImportService.SetOverlay(overlay)} />
       </label>
     {/if}
 
     <div class="actions">
-      <button class="primary" disabled={!hasSource} onclick={() => ImportService.Preview()}>Preview</button>
+      <Button variant="primary" disabled={!hasSource} onclick={() => ImportService.Preview()}>Preview</Button>
     </div>
     {#if view.error}<p class="err">{view.error}</p>{/if}
 
@@ -112,9 +117,7 @@
         {/if}
       {/if}
       <h4>Files</h4>
-      <div class="files">
-        {#each view.files as f}<div class:exists={f.exists}>{f.remove ? '− ' : '+ '}{f.rel}{f.exists ? ' (exists)' : ''}</div>{/each}
-      </div>
+      <div class="files"><FileTree nodes={fileTree} /></div>
       {#if view.existing}
         <label class="f"><span>{view.existing} file(s) already exist</span>
           <select bind:value={existing}>
@@ -125,9 +128,9 @@
         </label>
       {/if}
       <div class="actions">
-        <button class="primary" disabled={!view.canImport} onclick={() => ImportService.Import(existing, view!.skipped > 0)}>
+        <Button variant="primary" disabled={!view.canImport} onclick={() => ImportService.Import(existing, view!.skipped > 0)}>
           {view.skipped > 0 ? 'Import the rest' : 'Import'}
-        </button>
+        </Button>
       </div>
     {/if}
     {#if view.done}<p class="ok">{view.done}</p>{/if}
@@ -135,20 +138,17 @@
 {/if}
 
 <style>
-  .page { position: absolute; inset: 0; overflow: auto; padding: 16px 24px 48px; max-width: 860px; display: flex; flex-direction: column; gap: 10px; }
+  .page { position: absolute; inset: 0; overflow: auto; padding: 28px 32px 56px; max-width: 860px; display: flex; flex-direction: column; gap: 10px; }
   .note { color: var(--muted); margin: 0; }
   .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
   .f { display: flex; flex-direction: column; gap: 3px; color: var(--muted); font-size: var(--fs-xs); }
-  .choose { display: flex; justify-content: space-between; align-items: center; gap: 8px; text-align: left; background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); padding: 5px 8px; font: inherit; }
+  .choose { min-height: var(--ctl-h); display: flex; justify-content: space-between; align-items: center; gap: 8px; text-align: left; background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); padding: 5px 8px; font: inherit; }
   .choose:hover { border-color: var(--accent); }
   .chev { color: var(--muted); }
-  select, input, textarea { background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); padding: 5px 8px; font: inherit; -webkit-user-select: text; user-select: text; }
+  select, textarea { background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); padding: 5px 8px; font: inherit; -webkit-user-select: text; user-select: text; }
   textarea { min-height: 90px; font: var(--fs-sm) var(--mono); resize: vertical; }
   .actions { display: flex; gap: 8px; }
-  button { background: transparent; color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); padding: 4px 16px; font: inherit; }
-  button:disabled { opacity: 0.4; }
-  .primary:not(:disabled) { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
-  .link { border: 0; color: var(--text); padding: 0; font-weight: 600; }
+  .link { background: none; border: 0; color: var(--text); padding: 0; font: inherit; font-weight: 600; }
   h3 { margin: 12px 0 0; }
   h4 { margin: 8px 0 2px; font-size: var(--fs-sm); }
   .muted { color: var(--muted); font-weight: 400; font-size: var(--fs-sm); }
@@ -161,6 +161,5 @@
   .prob.error { color: var(--fail); }
   .prob.warning { color: var(--warn); }
   pre { margin: 2px 0; font: var(--fs-xs) var(--mono); white-space: pre-wrap; }
-  .files { font: var(--fs-sm) var(--mono); max-height: 220px; overflow: auto; border: 1px solid var(--line); border-radius: var(--r-md); padding: 6px 10px; }
-  .exists { color: var(--warn); }
+  .files { max-height: 320px; overflow: auto; border: 1px solid var(--line); border-radius: var(--r-md); padding: 6px 10px; }
 </style>

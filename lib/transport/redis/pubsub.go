@@ -89,7 +89,7 @@ func pubSubMessage(m *goredis.Message, at time.Time) transport.Message {
 	if m.Pattern != "" {
 		headers = append(headers, transport.Header{Name: "pattern", Value: m.Pattern})
 	}
-	return transport.Message{Direction: "received", At: at, Headers: headers, Body: []byte(m.Payload)}
+	return transport.Message{Direction: "received", At: at, Type: m.Channel, Headers: headers, Body: []byte(m.Payload)}
 }
 
 // sentMessage is the message as sent, with extra headers (a stream entry id).

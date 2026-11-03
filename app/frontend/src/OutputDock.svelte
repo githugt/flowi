@@ -82,5 +82,5 @@
   .muted { color: var(--muted); font-size: var(--fs-sm); margin: 0; }
   pre { margin: 2px 0 0; font: var(--fs-xs) var(--mono); white-space: pre-wrap; -webkit-user-select: text; user-select: text; }
   .diag { color: var(--fail); }
-  select { align-self: flex-end; background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); font: inherit; font-size: var(--fs-xs); }
+  select { align-self: flex-end; background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); font: inherit; font-size: var(--fs-xs); }
 </style>

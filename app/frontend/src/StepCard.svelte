@@ -90,6 +90,9 @@
 
 <g class="stepcard {status}" class:selected class:skipped role="group" aria-label={`${title}, ${type}`}>
   <rect class="body" width={w} height={h} rx="14" />
+  <!-- The header is a band a step lighter than the card; a step that has run tints it with how it went. -->
+  <path class="band" d={`M0,${CARD.header} V14 a14,14 0 0 1 14,-14 H${w - 14} a14,14 0 0 1 14,14 V${CARD.header} Z`} />
+  <line class="bandline" x1="0" x2={w} y1={CARD.header} y2={CARD.header} />
 
   {#if skipped}<path class="hatch" d={`M0,${h > CARD.header ? CARD.header : h} V14 a14,14 0 0 1 14,-14 H${w - 14} a14,14 0 0 1 14,14 V${CARD.header} Z`} />{/if}
   {#if chipInHeader}
@@ -100,7 +103,18 @@
     <g class="tileicon" transform="translate(16 13)" style:color={colour ? 'var(--on-tile)' : 'var(--text)'}><Icon name={typeIcon(type)} size={20} /></g>
   {/if}
   <text class="title" x={headX} y="28">{clipText(title, Math.floor((w - headX - 30) / 7.6))}<title>{title}</title></text>
-  {#if status}<circle class="dot {status}" cx={w - 16} cy="23" r="5" />{/if}
+  <!-- How it went is a shape as well as a colour: a tick, a cross, or a ring for a step still running. -->
+  {#if status}
+    <g class="state {status}" transform={`translate(${w - 28} 12)`} aria-hidden="true">
+      {#if status === 'passed'}
+        <circle cx="10" cy="10" r="9" /><path d="M5.8,10.4 L8.8,13.2 L14.4,7.2" />
+      {:else if status === 'failed' || status === 'error' || status === 'aborted'}
+        <circle cx="10" cy="10" r="9" /><path d="M6.8,6.8 L13.2,13.2 M13.2,6.8 L6.8,13.2" />
+      {:else}
+        <circle class="ring" cx="10" cy="10" r="7" />
+      {/if}
+    </g>
+  {/if}
 
   <g transform={`translate(0 ${CARD.header})`}>
     {#if face.badge && !chipInHeader}
@@ -192,11 +206,21 @@
 </g>
 
 <style>
-  .body { fill: var(--panel); stroke: var(--line); stroke-width: 1.2; filter: drop-shadow(0 2px 8px rgb(0 0 0 / 0.28)); transition: stroke 0.15s; }
-  .selected .body { stroke: var(--accent); stroke-width: 2.2; }
-  .passed .body { stroke: var(--ok); }
-  .failed .body, .error .body, .aborted .body { stroke: var(--fail); stroke-width: 2.2; }
+  .body { fill: var(--panel); stroke: var(--line-strong); stroke-width: 1; filter: drop-shadow(0 1px 1px rgb(0 0 0 / 0.3)) drop-shadow(0 6px 14px rgb(0 0 0 / 0.22)); transition: stroke var(--t-base) var(--ease-out), filter var(--t-base) var(--ease-out); }
+  .band { fill: var(--raised); pointer-events: none; }
+  .bandline { stroke: var(--line); stroke-width: 1; pointer-events: none; }
+  .passed .band { fill: color-mix(in srgb, var(--ok) 11%, var(--raised)); }
+  .failed .band, .error .band, .aborted .band { fill: color-mix(in srgb, var(--fail) 14%, var(--raised)); }
+  .running .band { fill: color-mix(in srgb, var(--accent) 12%, var(--raised)); }
+  .selected .body { stroke: var(--accent); stroke-width: 1.6; filter: drop-shadow(0 0 0 transparent) drop-shadow(0 0 10px color-mix(in srgb, var(--accent) 45%, transparent)); }
+  .passed .body { stroke: color-mix(in srgb, var(--ok) 55%, var(--line-strong)); }
+  .failed .body, .error .body, .aborted .body { stroke: var(--fail); stroke-width: 1.6; }
   .running .body { stroke: var(--accent); }
+  .selected.passed .body { stroke: var(--accent); }
+  .state circle { fill: var(--ok); stroke: none; }
+  .state path { fill: none; stroke: var(--on-tile); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  .state.failed circle, .state.error circle, .state.aborted circle { fill: var(--fail); }
+  .state circle.ring { fill: none; stroke: var(--accent); stroke-width: 2.2; stroke-dasharray: 22 22; stroke-linecap: round; }
   .hatch { fill: url(#skiphatch); pointer-events: none; }
   .skipped .body { stroke-dasharray: 5 4; }
   .bpdot { fill: var(--fail); stroke: var(--bg); stroke-width: 2; pointer-events: none; }
@@ -243,10 +267,6 @@
   .portlabel { font-size: 12px; font-weight: 600; pointer-events: none; }
   .portlabel.edit { pointer-events: auto; cursor: text; }
   .portlabel.edit:hover { text-decoration: underline; }
-  .dot { fill: var(--muted); }
-  .dot.passed { fill: var(--ok); }
-  .dot.failed, .dot.error, .dot.aborted { fill: var(--fail); }
-  .dot.running { fill: var(--accent); }
   .result { fill: var(--muted); font-size: 12px; pointer-events: none; }
   .result.failed, .result.error { fill: var(--fail); }
 </style>

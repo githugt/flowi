@@ -1,4 +1,5 @@
 <script lang="ts">
+  import Button from './Button.svelte'
   // What to do with text pasted into a request's address that is really something to import (a curl
   // command, an OpenAPI document …): fill the request from it, import it as new requests, or paste it
   // as typed. Importing shows the import screen's preview here, in short.
@@ -157,16 +158,16 @@
       {/if}
       {#if error}<p class="err">{error}</p>{/if}
       <div class="actions">
-        <button type="button" class="link" onclick={moreOptions}>More options…</button>
+        <Button type="button" variant="ghost" onclick={moreOptions}>More options…</Button>
         <span class="grow"></span>
-        <button type="button" onclick={pasteAsText}>Paste as text</button>
+        <Button type="button" onclick={pasteAsText}>Paste as text</Button>
         {#if !preview}
-          {#if !isRequestFile}<button type="button" class:primary={!canFill} onclick={importNew}>Import as new…</button>{/if}
-          {#if canFill}<button type="button" class="primary" onclick={fill}>Fill this request</button>{/if}
+          {#if !isRequestFile}<Button type="button" variant={canFill ? 'secondary' : 'primary'} onclick={importNew}>Import as new…</Button>{/if}
+          {#if canFill}<Button type="button" variant="primary" onclick={fill}>Fill this request</Button>{/if}
         {:else}
-          <button type="button" class="primary" disabled={!preview.canImport} onclick={() => ImportService.Import(existing, preview!.skipped > 0)}>
+          <Button type="button" variant="primary" disabled={!preview.canImport} onclick={() => ImportService.Import(existing, preview!.skipped > 0)}>
             {preview.skipped > 0 ? 'Import the rest' : 'Import'}
-          </button>
+          </Button>
         {/if}
       </div>
     </div>
@@ -184,9 +185,10 @@
   .files { margin: 0; padding: 8px 10px; max-height: 180px; overflow: auto; background: var(--bg); border: 1px solid var(--line); border-radius: var(--r-md); font: var(--fs-sm) var(--mono); white-space: pre-wrap; word-break: break-all; -webkit-user-select: text; user-select: text; }
   .sum { font-weight: 600; }
   .f { display: flex; flex-direction: column; gap: 3px; color: var(--muted); font-size: var(--fs-xs); }
-  .choose { display: flex; justify-content: space-between; align-items: center; gap: 8px; text-align: left; width: 100%; box-sizing: border-box; }
+  .choose { display: flex; justify-content: space-between; align-items: center; gap: 8px; text-align: left; width: 100%; box-sizing: border-box; background: var(--raised); color: var(--text); border: 0; box-shadow: inset 0 0 0 1px var(--line); border-radius: var(--r-md); padding: 0 12px; min-height: var(--ctl-h); font: inherit; font-weight: 500; }
+  .choose:hover { background: var(--raised-3); }
   .chev { color: var(--muted); }
-  select { background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); padding: 5px 8px; font: inherit; }
+  select { background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); padding: 5px 8px; font: inherit; }
   .item { border-left: 2px solid var(--line); padding: 2px 10px; font-size: var(--fs-sm); }
   .item.skipped { border-color: var(--fail); }
   .tag { margin-left: 8px; color: var(--fail); font-size: var(--fs-xs); }
@@ -196,10 +198,4 @@
   .err { color: var(--fail); font-size: var(--fs-sm); }
   .actions { display: flex; align-items: center; gap: 8px; }
   .grow { flex: 1; }
-  button { background: transparent; color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); padding: 5px 12px; font: inherit; white-space: nowrap; }
-  button:hover:not(:disabled) { border-color: var(--accent); }
-  button:disabled { opacity: 0.4; }
-  .primary { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
-  .link { border: 0; padding: 5px 0; color: var(--muted); }
-  .link:hover:not(:disabled) { color: var(--text); }
 </style>

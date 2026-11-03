@@ -62,7 +62,7 @@
   .row { display: flex; flex-direction: column; gap: 4px; padding-bottom: 8px; border-bottom: 1px solid var(--line); }
   .row:last-of-type { border-bottom: 0; }
   .line { display: flex; gap: 4px; align-items: center; }
-  input, select { min-width: 0; background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); padding: 4px 6px; font: var(--fs-md) var(--mono); }
+  input, select { min-width: 0; background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); padding: 4px 6px; font: var(--fs-md) var(--mono); }
   select { font-family: inherit; }
   input { flex: 1; }
   input:focus, select:focus { border-color: var(--accent); }

@@ -61,9 +61,9 @@
 <style>
   .note { margin: 8px 0 0; font-size: var(--fs-xs); }
   .limit { display: inline-flex; gap: 6px; align-items: center; margin-top: 8px; color: var(--muted); font-size: var(--fs-xs); }
-  .mini { width: 5em; box-sizing: border-box; background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); padding: 3px 6px; font: inherit; }
+  .mini { width: 5em; box-sizing: border-box; background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); padding: 3px 6px; font: inherit; }
   .row { display: grid; grid-template-columns: 2.4em 1fr auto; gap: 6px; align-items: center; margin-bottom: 6px; }
   .n { color: var(--muted); font-family: var(--mono, monospace); font-size: var(--fs-xs); text-align: right; }
-  .x, .add { background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); font: inherit; padding: 4px 10px; cursor: pointer; }
+  .x, .add { background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); font: inherit; padding: 4px 10px; cursor: pointer; }
   .x { padding: 2px 8px; }
 </style>

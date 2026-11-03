@@ -1,4 +1,5 @@
 <script lang="ts">
+  import Button from './Button.svelte'
   // The chosen flowi overlay does not fit this version (or its base has changed since it was saved):
   // each part that was left out, with the reason. The rest of the overlay is applied.
   let { overlay, notes, version, onclose }: { overlay: string; notes: string[]; version: string; onclose: () => void } = $props()
@@ -9,7 +10,7 @@
     <h3>“{overlay}” does not fit version {version} in full</h3>
     <p class="muted">What fits is applied. These parts were left out, or applied although the version has changed since the overlay was saved:</p>
     <ul>{#each notes as n}<li>{n}</li>{/each}</ul>
-    <div class="actions"><button class="primary" onclick={onclose}>OK</button></div>
+    <div class="actions"><Button variant="primary" onclick={onclose}>OK</Button></div>
   </div>
 </div>
 
@@ -21,5 +22,4 @@
   .muted { color: var(--muted); font-size: var(--fs-sm); }
   ul { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 4px; font-size: var(--fs-sm); }
   .actions { display: flex; justify-content: flex-end; }
-  button { background: var(--accent); color: var(--on-accent); border: 1px solid var(--accent); border-radius: var(--r-md); padding: 3px 16px; font: inherit; }
 </style>

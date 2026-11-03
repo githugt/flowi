@@ -6,6 +6,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/Azure/azure-sdk-for-go/sdk/messaging/azservicebus"
 )
 
 func TestSendTarget_should_send_to_the_queue_or_to_the_topic_of_a_topic_path(t *testing.T) {
@@ -129,5 +131,15 @@ func TestReadModeOf_Given_another_value_Then_says_what_is_allowed(t *testing.T) 
 
 	if err == nil || !strings.Contains(err.Error(), "peek or lock") {
 		t.Fatalf("got %v", err)
+	}
+}
+
+func TestReceived_should_take_the_subject_as_the_type(t *testing.T) {
+	subject := "order.paid"
+
+	got := received(&azservicebus.ReceivedMessage{Subject: &subject}, time.Time{})
+
+	if got.Type != "order.paid" {
+		t.Fatalf("type %q", got.Type)
 	}
 }

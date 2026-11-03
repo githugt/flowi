@@ -61,12 +61,13 @@
 <style>
   .replay { display: flex; align-items: center; gap: var(--sp-2); padding: 4px 12px; border-bottom: 1px solid var(--line); font-size: var(--fs-sm); }
   .close { border: 0; color: var(--muted); padding: 0 4px; }
-  button { background: transparent; color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); padding: 2px 10px; font: inherit; white-space: nowrap; }
+  button { background: var(--raised); color: var(--text); border: 0; box-shadow: inset 0 0 0 1px var(--line); border-radius: var(--r-md); padding: 0 10px; min-height: var(--ctl-h-sm); font: inherit; font-weight: 500; white-space: nowrap; }
+  button:hover:not(:disabled) { background: var(--raised-3); }
   button:disabled { opacity: 0.5; }
   .on .toggle { border-color: var(--fail); color: var(--fail); }
   .toggle:not(:disabled):hover { border-color: var(--accent); }
   .port { display: flex; align-items: center; gap: 4px; color: var(--muted); }
-  .port input { width: 52px; background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); padding: 2px 6px; font: var(--fs-sm) var(--mono); }
+  .port input { width: 52px; background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); padding: 2px 6px; font: var(--fs-sm) var(--mono); }
   .url { flex: 1; min-width: 0; background: color-mix(in srgb, var(--bg) 70%, transparent); color: var(--muted); border: 1px dashed var(--line); border-radius: var(--r-md); padding: 2px 8px; font: var(--fs-sm) var(--mono); -webkit-user-select: text; user-select: text; cursor: text; }
   .muted { color: var(--muted); }
   .state { color: var(--ok); white-space: nowrap; }

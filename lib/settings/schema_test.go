@@ -23,8 +23,8 @@ func TestSchema_should_have_unique_names_and_valid_defaults(t *testing.T) {
 		}
 	}
 
-	if len(seen) != 74 {
-		t.Fatalf("got %d keys, want 74", len(seen))
+	if len(seen) != 76 {
+		t.Fatalf("got %d keys, want 76", len(seen))
 	}
 }
 

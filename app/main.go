@@ -14,6 +14,7 @@ import (
 	"runtime"
 	"sync/atomic"
 	"syscall"
+	"time"
 
 	flowi "github.com/githugt/flowi/lib"
 	"github.com/githugt/flowi/lib/diag"
@@ -25,6 +26,7 @@ import (
 	"github.com/githugt/flowi/app/internal/backend"
 	"github.com/githugt/flowi/app/internal/bridge"
 	"github.com/githugt/flowi/app/internal/buildinfo"
+	"github.com/githugt/flowi/app/internal/tracing"
 	"github.com/githugt/flowi/app/internal/uithread"
 )
 
@@ -62,7 +64,8 @@ func run() error {
 	// The vault asks for its passphrase only when a secret is first used,
 	// by which time app is set and the window shows.
 	ask := func() (string, error) { return app.Passphrase().Ask() }
-	ws, openProblems, err := openWorkspace(os.Environ(), userHome(), ask)
+	tracer := tracing.NewHolder(slog.Default())
+	ws, openProblems, err := openWorkspace(os.Environ(), userHome(), ask, tracer)
 	if err != nil {
 		return err
 	}
@@ -71,12 +74,15 @@ func run() error {
 	}
 	emit := func(name string, data any) { wails.Event.Emit(name, data) }
 	app = bridge.NewApp(backend.New(ws, uithread.NewGuard(false)), bridge.NewActor(ctx), emit,
-		bridge.WithLogger(slog.Default()), bridge.WithChangelog(changelog), bridge.WithOpenProblems(openProblems), bridge.WithWorkspaceFile(ws), bridge.WithSpecOverlays(ws), bridge.WithCollectionVariables(ws))
+		bridge.WithLogger(slog.Default()), bridge.WithTracer(tracer), bridge.WithChangelog(changelog), bridge.WithOpenProblems(openProblems), bridge.WithWorkspaceFile(ws), bridge.WithSpecOverlays(ws), bridge.WithCollectionVariables(ws))
 
 	wails = application.New(application.Options{
 		Name:        "Flowi",
 		Description: "Flowi",
-		OnShutdown:  app.Shutdown,
+		OnShutdown: func() {
+			app.Shutdown()
+			closeTracing(tracer)
+		},
 		// Cmd+Q and the Quit menu item do not close the window first, so the
 		// guard sits here too.
 		ShouldQuit: func() bool { return mayQuit() },
@@ -100,6 +106,7 @@ func run() error {
 			application.NewService(app.Session()),
 			application.NewService(app.Passphrase()),
 			application.NewService(app.Welcome()),
+			application.NewService(app.Tracing()),
 		},
 		Assets: application.AssetOptions{Handler: application.AssetFileServerFS(assets)},
 		Mac:    application.MacOptions{ApplicationShouldTerminateAfterLastWindowClosed: true},
@@ -175,7 +182,7 @@ func userHome() string {
 // another one. The problems it returns are what the files got wrong: the
 // window lists them in the Problems panel. passphrase asks for the vault's
 // passphrase where no OS keychain holds its key.
-func openWorkspace(environ []string, home string, passphrase func() (string, error)) (*flowi.Workspace, diag.List, error) {
+func openWorkspace(environ []string, home string, passphrase func() (string, error), tracer *tracing.Holder) (*flowi.Workspace, diag.List, error) {
 	paths, err := settings.DiscoverPaths(environ)
 	if err != nil {
 		return nil, nil, fmt.Errorf("finding the config folder: %w", err)
@@ -183,6 +190,21 @@ func openWorkspace(environ []string, home string, passphrase func() (string, err
 	ws, problems, err := flowi.OpenWorkspace(context.Background(), flowi.WorkspaceOptions{
 		Paths: paths, Environ: environ, Home: home, Keys: vault.OSKeyStore(), Passphrase: passphrase,
 		UserAgent: "Flowi-UI/" + buildinfo.Version(),
+		// The holder forwards to whichever exporter the Tracing page has switched on, if any.
+		Observe: tracer.Observe, Traceparent: tracer.Traceparent,
 	})
 	return ws, problems, err
+}
+
+// tracingFlushTimeout is how long quitting waits for queued traces to reach the collector.
+const tracingFlushTimeout = 2 * time.Second
+
+// closeTracing sends what the exporter still holds; a collector that does not answer in time loses it,
+// since quitting must not hang on someone else's server.
+func closeTracing(t *tracing.Holder) {
+	ctx, cancel := context.WithTimeout(context.Background(), tracingFlushTimeout)
+	defer cancel()
+	if err := t.Close(ctx); err != nil {
+		slog.Warn("traces were not all sent", "Event", "TraceFlushIncomplete", "Error", err)
+	}
 }

@@ -447,3 +447,15 @@ func TestSend_Async_message_hooks_should_be_skippable_and_ignored_without_a_rece
 		t.Errorf("skipped %v %v, send only %v %v", skipped.Status, skipped.Diags, sendOnly.Status, sendOnly.Diags)
 	}
 }
+
+// Before: the event name of an SSE message, or a WebSocket frame kind, was lost on its way into the record, so
+// nothing downstream could show or filter by it.
+func TestRecordMessage_should_keep_the_type_the_protocol_named(t *testing.T) {
+	m := transport.Message{Direction: "received", Body: []byte("x"), Type: "order.paid"}
+
+	got := recordMessage(m)
+
+	if got.Type != "order.paid" {
+		t.Fatalf("type %q", got.Type)
+	}
+}

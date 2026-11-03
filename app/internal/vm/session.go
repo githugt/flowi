@@ -18,6 +18,9 @@ import (
 	"github.com/githugt/flowi/lib/model"
 )
 
+// welcomeMarker is the file whose presence says the first run is over.
+const welcomeMarker = "welcome-shown.json"
+
 const (
 	sessionDirMode  = 0o700
 	sessionFileMode = 0o600 // histories hold response bodies
@@ -41,6 +44,21 @@ func (s *SessionStore) LoadTabs() ([]string, error) {
 	var out []string
 	return out, s.read("tabs.json", &out)
 }
+
+// WelcomeShown reports whether the welcome page was opened on an earlier run. A missing marker means it was not.
+func (s *SessionStore) WelcomeShown() (bool, error) {
+	_, err := os.Stat(filepath.Join(s.dir, welcomeMarker))
+	if errors.Is(err, fs.ErrNotExist) {
+		return false, nil
+	}
+	if err != nil {
+		return false, fmt.Errorf("reading %s: %w", welcomeMarker, err)
+	}
+	return true, nil
+}
+
+// MarkWelcomeShown remembers that the welcome page was opened, so later runs open the home page instead.
+func (s *SessionStore) MarkWelcomeShown() error { return s.write(welcomeMarker, true) }
 
 // SaveLog stores the run log's lines.
 func (s *SessionStore) SaveLog(lines []string) error { return s.write("log.json", lines) }

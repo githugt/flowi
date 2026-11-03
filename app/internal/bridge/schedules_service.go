@@ -3,6 +3,8 @@
 package bridge
 
 import (
+	"time"
+
 	"github.com/githugt/flowi/lib/model"
 
 	"github.com/githugt/flowi/app/internal/vm"
@@ -19,6 +21,9 @@ type ScheduleView struct {
 	TZ         string `json:"tz"`
 	Disabled   bool   `json:"disabled"`
 	FlowLabel  string `json:"flowLabel"` // the flow it runs, as "Collection › path", "" when none matches
+	When       string `json:"when"`      // the cron in words ("Every day at 03:00"), "" when it is not a common pattern
+	NextAt     string `json:"nextAt"`    // when it fires next, RFC 3339; "" when disabled or invalid
+	Fires      []int  `json:"fires"`     // minutes from now of each firing in the next 24 hours
 }
 
 // FlowChoice is a flow a schedule can run.
@@ -157,7 +162,10 @@ func (s *SchedulesService) view() SchedulesView {
 		v.Flows = append(v.Flows, FlowChoice{Label: f.Label(), Collection: string(f.CollectionID), Flow: string(f.ID)})
 	}
 	for _, x := range s.vm.List() {
-		sv := ScheduleView{Name: x.Name, Flow: x.Flow, Collection: x.Collection, Cron: x.Cron, Env: x.Env, Inputs: vm.FormatInputs(x.Inputs), TZ: x.TZ, Disabled: x.Disabled}
+		sv := ScheduleView{Name: x.Name, Flow: x.Flow, Collection: x.Collection, Cron: x.Cron, Env: x.Env, Inputs: vm.FormatInputs(x.Inputs), TZ: x.TZ, Disabled: x.Disabled, When: vm.DescribeCron(x.Cron), Fires: []int{}}
+		if next, fires := vm.ScheduleOutlook(x, time.Now()); !next.IsZero() {
+			sv.NextAt, sv.Fires = next.Format(time.RFC3339), fires
+		}
 		if i := s.vm.MatchFlow(x); i >= 0 {
 			sv.FlowLabel = flows[i].Label()
 		}

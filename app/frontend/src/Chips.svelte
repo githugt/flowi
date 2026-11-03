@@ -1,4 +1,5 @@
 <script lang="ts">
+  import Button from './Button.svelte'
   // What the flow has to tell: errors, steps out of order, Flowi-only steps,
   // a change on disk, unsaved edits. A chip opens its message under it.
   import { FlowService } from '../bindings/github.com/githugt/flowi/app/internal/bridge'
@@ -30,12 +31,12 @@
             <p>{c.text}</p>
           {:else if c.kind === 'needs'}
             <p>These steps wait for a step that comes after them, so they can never start and a run fails: {c.steps?.join(', ')}</p>
-            <button class="act" onclick={() => { open = null; FlowService.RepairNeeds(node) }}>Repair</button>
+            <Button variant="primary" small onclick={() => { open = null; FlowService.RepairNeeds(node) }}>Repair</Button>
           {:else if c.kind === 'warning'}
             <p>{c.steps?.length} steps are Flowi steps that other Arazzo tools cannot run: {c.steps?.join(', ')}</p>
           {:else if c.kind === 'disk'}
             <p>This file changed on disk.</p>
-            <button class="act" onclick={() => { open = null; FlowService.Revert(node) }}>Load from disk</button>
+            <Button variant="primary" small onclick={() => { open = null; FlowService.Revert(node) }}>Load from disk</Button>
           {/if}
         </div>
       {/if}
@@ -51,7 +52,6 @@
   .error, .needs { color: var(--fail) !important; border-color: var(--fail) !important; }
   .warning, .disk { color: var(--warn) !important; border-color: var(--warn) !important; }
   .unsaved { color: var(--accent) !important; }
-  .pop { position: absolute; top: 100%; left: 0; margin-top: 6px; width: 320px; padding: 10px 12px; background: var(--panel); border: 1px solid var(--line); border-radius: var(--r-lg); box-shadow: 0 8px 24px rgb(0 0 0 / 0.35); z-index: 25; font-size: var(--fs-sm); }
+  .pop { position: absolute; top: 100%; left: 0; margin-top: 6px; width: 320px; padding: 10px 12px; background: var(--raised); border: 1px solid var(--line); border-radius: var(--r-lg); box-shadow: var(--shadow); z-index: 25; font-size: var(--fs-sm); }
   .pop p { margin: 0 0 6px; line-height: 1.45; }
-  .act { background: var(--accent); color: var(--on-accent); border: 0; border-radius: var(--r-md); padding: 3px 12px; font: inherit; }
 </style>

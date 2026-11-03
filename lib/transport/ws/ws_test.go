@@ -215,3 +215,26 @@ func TestRun_should_fail_when_the_handshake_is_refused(t *testing.T) {
 		t.Fatalf("err %v, want it to name status 403", err)
 	}
 }
+
+// A frame is text or binary, and the protocol says which: that is the message's Type, whatever the bytes look like.
+func TestRun_should_name_the_frame_kind_of_what_it_receives_and_sends(t *testing.T) {
+	server := serve(t, func(ctx context.Context, c *websocket.Conn, _ *http.Request) {
+		_ = c.Write(ctx, websocket.MessageText, []byte("hello"))
+		_ = c.Write(ctx, websocket.MessageBinary, []byte("hello"))
+		waitClosed(ctx, c)
+	})
+
+	res, err := ws.New().Run(t.Context(), transport.Operation{
+		Server: server, Send: &transport.Message{Body: []byte{0xff, 0x00}}, Receive: &transport.Receive{Count: 2, Timeout: 5 * time.Second},
+	})
+
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.Received[0].Type != "text" || res.Received[1].Type != "binary" {
+		t.Fatalf("received types %q and %q", res.Received[0].Type, res.Received[1].Type)
+	}
+	if res.Sent.Type != "binary" {
+		t.Fatalf("sent type %q", res.Sent.Type)
+	}
+}

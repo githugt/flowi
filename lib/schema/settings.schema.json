@@ -349,6 +349,25 @@
           "type": "string",
           "default": ""
         },
+        "send_button": {
+          "type": "string",
+          "enum": [
+            "orange",
+            "violet",
+            "emerald",
+            "cyan",
+            "outline"
+          ],
+          "default": "orange"
+        },
+        "density": {
+          "type": "string",
+          "enum": [
+            "comfortable",
+            "compact"
+          ],
+          "default": "comfortable"
+        },
         "font": {
           "type": "string",
           "default": ""

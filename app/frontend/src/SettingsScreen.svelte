@@ -1,4 +1,6 @@
 <script lang="ts">
+  import TextInput from './TextInput.svelte'
+  import Toggle from './Toggle.svelte'
   import { SettingsService } from '../bindings/github.com/githugt/flowi/app/internal/bridge'
   import { app } from './lib/app.svelte'
   import { SECTIONS, labelOf, matches, sectionOf, type Section } from './lib/settings'
@@ -56,21 +58,27 @@
     </div>
     <p class="desc">{f.description} <code title="The key in settings.yaml">{f.name}</code>{#if !f.userSet} <span class="src">default</span>{/if}</p>
     {#if f.kind === 'bool'}
-      <input id={'set-' + f.name} type="checkbox" checked={f.value === 'true'} onchange={(e) => SettingsService.Set(f.name, String(e.currentTarget.checked))} />
+      <Toggle id={'set-' + f.name} checked={f.value === 'true'} onchange={(on) => SettingsService.Set(f.name, String(on))}>{f.value === 'true' ? 'On' : 'Off'}</Toggle>
+    {:else if f.name === 'appearance.send_button'}
+      <div class="swatches" role="radiogroup" aria-label="Send button colour">
+        {#each f.enum ?? [] as o}
+          <button class="swatch" role="radio" aria-checked={f.value === o} class:on={f.value === o} data-send={o} title={o} onclick={() => SettingsService.Set(f.name, o)}>
+            <span class="sample">Send</span>{o}
+          </button>
+        {/each}
+      </div>
     {:else if f.kind === 'enum'}
       <select id={'set-' + f.name} value={f.value} onchange={(e) => SettingsService.Set(f.name, e.currentTarget.value)}>
         {#each f.enum ?? [] as o}<option value={o}>{o}</option>{/each}
       </select>
     {:else}
-      <input
+      <TextInput
         id={'set-' + f.name}
-        class="text"
         value={text(f)}
         placeholder={f.kind === 'list' ? 'comma-separated' : ''}
-        oninput={(e) => (typed[f.name] = e.currentTarget.value)}
+        oninput={(e) => (typed[f.name] = (e.currentTarget as HTMLInputElement).value)}
         onblur={() => apply(f)}
         onkeydown={(e) => e.key === 'Enter' && apply(f)}
-        spellcheck="false"
       />
     {/if}
     {#if f.problem}<p class="problem">{f.problem}</p>{/if}
@@ -83,7 +91,7 @@
 <div class="page">
   <header>
     <h2>Settings</h2>
-    <input class="search" type="search" placeholder="Search settings" aria-label="Search settings" bind:value={query} spellcheck="false" />
+    <TextInput bind:value={query} placeholder="Search settings" label="Search settings" style="width: 260px" />
   </header>
   <p class="note">Your personal settings. Collections, folders and requests can override some of them.</p>
   <div class="tabs" role="tablist" aria-label="Settings sections">
@@ -113,14 +121,13 @@
   .page { position: absolute; inset: 0; overflow: auto; padding: var(--sp-4) var(--sp-6) 48px; max-width: 760px; }
   header { display: flex; align-items: center; gap: var(--sp-3); }
   h2 { margin: 0; font-size: var(--fs-lg); flex: 1; }
-  .search { width: 260px; background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); padding: 5px 10px; font: inherit; -webkit-user-select: text; user-select: text; }
   .note { color: var(--muted); margin: var(--sp-2) 0 0; font-size: var(--fs-sm); }
   .tabs { display: flex; flex-wrap: wrap; gap: 2px; margin: var(--sp-3) 0 0; border-bottom: 1px solid var(--line); }
   .tabs button { background: none; border: 0; border-bottom: 2px solid transparent; color: var(--muted); font: inherit; padding: 6px 12px; margin-bottom: -1px; display: flex; gap: 6px; align-items: baseline; }
   .tabs button:hover { color: var(--text); }
   .tabs button.on { color: var(--text); border-bottom-color: var(--accent); }
   .tabs button.hit { color: var(--text); }
-  h3, summary { margin: var(--sp-6) 0 var(--sp-2); font-size: var(--fs-md); font-weight: 600; border-bottom: 1px solid var(--line); padding-bottom: 4px; }
+  h3, summary { margin: var(--sp-6) 0 var(--sp-2); font-size: var(--fs-lg); font-weight: 600; font-weight: 600; }
   summary { cursor: pointer; display: flex; align-items: center; gap: var(--sp-2); }
   .sub summary { font-weight: 500; margin-top: var(--sp-4); }
   .count { color: var(--muted); font-weight: 400; font-size: var(--fs-xs); }
@@ -130,11 +137,14 @@
   code { margin-left: 0.4em; font: var(--fs-xs) var(--mono); color: var(--muted); opacity: 0.8; }
   .desc { margin: 2px 0 6px; color: var(--muted); font-size: var(--fs-sm); }
   .src { margin-left: 0.4em; font-size: var(--fs-xs); opacity: 0.7; }
-  .text, select {
-    width: 100%; box-sizing: border-box; background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); padding: 5px 8px; font: inherit;
+  select {
+    box-sizing: border-box; background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); padding: 5px 8px; font: inherit;
     -webkit-user-select: text; user-select: text;
   }
-  select { width: auto; }
+  .swatches { display: flex; flex-wrap: wrap; gap: var(--sp-2); }
+  .swatch { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 10px 14px; background: var(--panel); border: 1px solid var(--line); border-radius: var(--r-lg); color: var(--muted); font: inherit; font-size: var(--fs-xs); text-transform: capitalize; }
+  .swatch.on { border-color: var(--accent); color: var(--text); box-shadow: 0 0 0 3px var(--tint-accent); }
+  .sample { display: inline-block; padding: 0 14px; line-height: 26px; border-radius: var(--r-md); background: var(--send-fill); color: var(--on-send); box-shadow: var(--send-edge), 0 4px 14px var(--send-glow); font-size: var(--fs-sm); font-weight: 600; text-transform: none; }
   .problem { color: var(--fail); margin: 4px 0 0; font-size: var(--fs-sm); }
   .link { background: none; border: 0; color: var(--accent); font: inherit; font-size: var(--fs-sm); font-weight: 400; margin-left: auto; }
 </style>

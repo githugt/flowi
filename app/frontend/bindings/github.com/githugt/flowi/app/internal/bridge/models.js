@@ -244,6 +244,22 @@ export class Appearance {
              */
             this["accent"] = "";
         }
+        if (!("sendButton" in $$source)) {
+            /**
+             * SendButton is the colour of the Send button: orange, violet, emerald, cyan or outline.
+             * @member
+             * @type {string}
+             */
+            this["sendButton"] = "";
+        }
+        if (!("density" in $$source)) {
+            /**
+             * Density is how much room rows and controls take: comfortable or compact.
+             * @member
+             * @type {string}
+             */
+            this["density"] = "";
+        }
         if (!("font" in $$source)) {
             /**
              * @member
@@ -284,10 +300,10 @@ export class Appearance {
      * @returns {Appearance}
      */
     static createFrom($$source = {}) {
-        const $$createField4_0 = $$createType5;
+        const $$createField6_0 = $$createType5;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("custom" in $$parsedSource) {
-            $$parsedSource["custom"] = $$createField4_0($$parsedSource["custom"]);
+            $$parsedSource["custom"] = $$createField6_0($$parsedSource["custom"]);
         }
         return new Appearance(/** @type {Partial<Appearance>} */($$parsedSource));
     }
@@ -1039,6 +1055,154 @@ export class Call {
 }
 
 /**
+ * CallHeader is one header line of a captured call.
+ */
+export class CallHeader {
+    /**
+     * Creates a new CallHeader instance.
+     * @param {Partial<CallHeader>} [$$source = {}] - The source object to create the CallHeader.
+     */
+    constructor($$source = {}) {
+        if (!("name" in $$source)) {
+            /**
+             * @member
+             * @type {string}
+             */
+            this["name"] = "";
+        }
+        if (!("value" in $$source)) {
+            /**
+             * @member
+             * @type {string}
+             */
+            this["value"] = "";
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new CallHeader instance from a string or object.
+     * @param {any} [$$source = {}]
+     * @returns {CallHeader}
+     */
+    static createFrom($$source = {}) {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new CallHeader(/** @type {Partial<CallHeader>} */($$parsedSource));
+    }
+}
+
+/**
+ * CallPart is one side of a captured call.
+ */
+export class CallPart {
+    /**
+     * Creates a new CallPart instance.
+     * @param {Partial<CallPart>} [$$source = {}] - The source object to create the CallPart.
+     */
+    constructor($$source = {}) {
+        if (!("headers" in $$source)) {
+            /**
+             * @member
+             * @type {CallHeader[]}
+             */
+            this["headers"] = [];
+        }
+        if (!("body" in $$source)) {
+            /**
+             * @member
+             * @type {string}
+             */
+            this["body"] = "";
+        }
+        if (!("truncated" in $$source)) {
+            /**
+             * @member
+             * @type {boolean}
+             */
+            this["truncated"] = false;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new CallPart instance from a string or object.
+     * @param {any} [$$source = {}]
+     * @returns {CallPart}
+     */
+    static createFrom($$source = {}) {
+        const $$createField0_0 = $$createType23;
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        if ("headers" in $$parsedSource) {
+            $$parsedSource["headers"] = $$createField0_0($$parsedSource["headers"]);
+        }
+        return new CallPart(/** @type {Partial<CallPart>} */($$parsedSource));
+    }
+}
+
+/**
+ * CallView is what a call carried and what it was answered with. Credential values are masked.
+ */
+export class CallView {
+    /**
+     * Creates a new CallView instance.
+     * @param {Partial<CallView>} [$$source = {}] - The source object to create the CallView.
+     */
+    constructor($$source = {}) {
+        if (!("seq" in $$source)) {
+            /**
+             * @member
+             * @type {number}
+             */
+            this["seq"] = 0;
+        }
+        if (!("captured" in $$source)) {
+            /**
+             * false for a call made before capture was on, or one the log has dropped
+             * @member
+             * @type {boolean}
+             */
+            this["captured"] = false;
+        }
+        if (!("sent" in $$source)) {
+            /**
+             * @member
+             * @type {CallPart}
+             */
+            this["sent"] = (new CallPart());
+        }
+        if (!("got" in $$source)) {
+            /**
+             * @member
+             * @type {CallPart}
+             */
+            this["got"] = (new CallPart());
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new CallView instance from a string or object.
+     * @param {any} [$$source = {}]
+     * @returns {CallView}
+     */
+    static createFrom($$source = {}) {
+        const $$createField2_0 = $$createType24;
+        const $$createField3_0 = $$createType24;
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        if ("sent" in $$parsedSource) {
+            $$parsedSource["sent"] = $$createField2_0($$parsedSource["sent"]);
+        }
+        if ("got" in $$parsedSource) {
+            $$parsedSource["got"] = $$createField3_0($$parsedSource["got"]);
+        }
+        return new CallView(/** @type {Partial<CallView>} */($$parsedSource));
+    }
+}
+
+/**
  * Card is what a canvas unit shows.
  */
 export class Card {
@@ -1119,8 +1283,8 @@ export class Card {
      * @returns {Card}
      */
     static createFrom($$source = {}) {
-        const $$createField2_0 = $$createType23;
-        const $$createField3_0 = $$createType24;
+        const $$createField2_0 = $$createType26;
+        const $$createField3_0 = $$createType27;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("hooks" in $$parsedSource) {
             $$parsedSource["hooks"] = $$createField2_0($$parsedSource["hooks"]);
@@ -1372,7 +1536,7 @@ export class CollectionView {
      * @returns {CollectionView}
      */
     static createFrom($$source = {}) {
-        const $$createField5_0 = $$createType26;
+        const $$createField5_0 = $$createType29;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("deps" in $$parsedSource) {
             $$parsedSource["deps"] = $$createField5_0($$parsedSource["deps"]);
@@ -1494,7 +1658,7 @@ export class CookiesView {
      * @returns {CookiesView}
      */
     static createFrom($$source = {}) {
-        const $$createField0_0 = $$createType28;
+        const $$createField0_0 = $$createType31;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("cookies" in $$parsedSource) {
             $$parsedSource["cookies"] = $$createField0_0($$parsedSource["cookies"]);
@@ -1571,7 +1735,7 @@ export class CoverageView {
      * @returns {CoverageView}
      */
     static createFrom($$source = {}) {
-        const $$createField0_0 = $$createType30;
+        const $$createField0_0 = $$createType33;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("operations" in $$parsedSource) {
             $$parsedSource["operations"] = $$createField0_0($$parsedSource["operations"]);
@@ -1622,7 +1786,7 @@ export class CustomPalette {
      * @returns {CustomPalette}
      */
     static createFrom($$source = {}) {
-        const $$createField1_0 = $$createType31;
+        const $$createField1_0 = $$createType34;
         const $$createField2_0 = $$createType8;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("vars" in $$parsedSource) {
@@ -1715,8 +1879,8 @@ export class DatasetInfo {
      * @returns {DatasetInfo}
      */
     static createFrom($$source = {}) {
-        const $$createField0_0 = $$createType32;
-        const $$createField1_0 = $$createType34;
+        const $$createField0_0 = $$createType35;
+        const $$createField1_0 = $$createType37;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("block" in $$parsedSource) {
             $$parsedSource["block"] = $$createField0_0($$parsedSource["block"]);
@@ -1773,7 +1937,7 @@ export class DebugView {
      */
     static createFrom($$source = {}) {
         const $$createField0_0 = $$createType8;
-        const $$createField2_0 = $$createType36;
+        const $$createField2_0 = $$createType39;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("breaks" in $$parsedSource) {
             $$parsedSource["breaks"] = $$createField0_0($$parsedSource["breaks"]);
@@ -1910,7 +2074,7 @@ export class DetailsView {
      * @returns {DetailsView}
      */
     static createFrom($$source = {}) {
-        const $$createField2_0 = $$createType38;
+        const $$createField2_0 = $$createType41;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("rows" in $$parsedSource) {
             $$parsedSource["rows"] = $$createField2_0($$parsedSource["rows"]);
@@ -2079,7 +2243,7 @@ export class DriftView {
      * @returns {DriftView}
      */
     static createFrom($$source = {}) {
-        const $$createField1_0 = $$createType40;
+        const $$createField1_0 = $$createType43;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("requests" in $$parsedSource) {
             $$parsedSource["requests"] = $$createField1_0($$parsedSource["requests"]);
@@ -2346,7 +2510,7 @@ export class EnvView {
      * @returns {EnvView}
      */
     static createFrom($$source = {}) {
-        const $$createField2_0 = $$createType42;
+        const $$createField2_0 = $$createType45;
         const $$createField4_0 = $$createType8;
         const $$createField6_0 = $$createType8;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
@@ -2424,9 +2588,9 @@ export class ExprHelpView {
      * @returns {ExprHelpView}
      */
     static createFrom($$source = {}) {
-        const $$createField2_0 = $$createType44;
-        const $$createField3_0 = $$createType44;
-        const $$createField4_0 = $$createType44;
+        const $$createField2_0 = $$createType47;
+        const $$createField3_0 = $$createType47;
+        const $$createField4_0 = $$createType47;
         const $$createField5_0 = $$createType8;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("names" in $$parsedSource) {
@@ -2832,21 +2996,21 @@ export class FlowView {
      */
     static createFrom($$source = {}) {
         const $$createField2_0 = $$createType8;
-        const $$createField3_0 = $$createType46;
-        const $$createField4_0 = $$createType47;
-        const $$createField5_0 = $$createType49;
-        const $$createField6_0 = $$createType51;
-        const $$createField7_0 = $$createType24;
-        const $$createField8_0 = $$createType53;
-        const $$createField9_0 = $$createType53;
-        const $$createField10_0 = $$createType54;
-        const $$createField11_0 = $$createType55;
-        const $$createField12_0 = $$createType56;
-        const $$createField13_0 = $$createType57;
-        const $$createField14_0 = $$createType58;
-        const $$createField23_0 = $$createType59;
-        const $$createField24_0 = $$createType61;
-        const $$createField25_0 = $$createType63;
+        const $$createField3_0 = $$createType49;
+        const $$createField4_0 = $$createType50;
+        const $$createField5_0 = $$createType52;
+        const $$createField6_0 = $$createType54;
+        const $$createField7_0 = $$createType27;
+        const $$createField8_0 = $$createType56;
+        const $$createField9_0 = $$createType56;
+        const $$createField10_0 = $$createType57;
+        const $$createField11_0 = $$createType58;
+        const $$createField12_0 = $$createType59;
+        const $$createField13_0 = $$createType60;
+        const $$createField14_0 = $$createType61;
+        const $$createField23_0 = $$createType62;
+        const $$createField24_0 = $$createType64;
+        const $$createField25_0 = $$createType66;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("selection" in $$parsedSource) {
             $$parsedSource["selection"] = $$createField2_0($$parsedSource["selection"]);
@@ -2950,7 +3114,7 @@ export class FlowiOverlayDiffView {
      * @returns {FlowiOverlayDiffView}
      */
     static createFrom($$source = {}) {
-        const $$createField0_0 = $$createType65;
+        const $$createField0_0 = $$createType68;
         const $$createField1_0 = $$createType8;
         const $$createField2_0 = $$createType8;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
@@ -3145,8 +3309,8 @@ export class Form {
      * @returns {Form}
      */
     static createFrom($$source = {}) {
-        const $$createField0_0 = $$createType67;
-        const $$createField1_0 = $$createType68;
+        const $$createField0_0 = $$createType70;
+        const $$createField1_0 = $$createType71;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("step" in $$parsedSource) {
             $$parsedSource["step"] = $$createField0_0($$parsedSource["step"]);
@@ -3221,8 +3385,8 @@ export class GRPCInfo {
      * @returns {GRPCInfo}
      */
     static createFrom($$source = {}) {
-        const $$createField0_0 = $$createType69;
-        const $$createField1_0 = $$createType71;
+        const $$createField0_0 = $$createType72;
+        const $$createField1_0 = $$createType74;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("block" in $$parsedSource) {
             $$parsedSource["block"] = $$createField0_0($$parsedSource["block"]);
@@ -3452,6 +3616,140 @@ export class HistoryItem {
 }
 
 /**
+ * HomeView is what the home page shows about the workspace: counts of what is set up, and the features that are
+ * not used yet.
+ */
+export class HomeView {
+    /**
+     * Creates a new HomeView instance.
+     * @param {Partial<HomeView>} [$$source = {}] - The source object to create the HomeView.
+     */
+    constructor($$source = {}) {
+        if (!("collections" in $$source)) {
+            /**
+             * @member
+             * @type {number}
+             */
+            this["collections"] = 0;
+        }
+        if (!("requests" in $$source)) {
+            /**
+             * @member
+             * @type {number}
+             */
+            this["requests"] = 0;
+        }
+        if (!("http" in $$source)) {
+            /**
+             * @member
+             * @type {number}
+             */
+            this["http"] = 0;
+        }
+        if (!("messaging" in $$source)) {
+            /**
+             * @member
+             * @type {number}
+             */
+            this["messaging"] = 0;
+        }
+        if (!("grpc" in $$source)) {
+            /**
+             * @member
+             * @type {number}
+             */
+            this["grpc"] = 0;
+        }
+        if (!("datasets" in $$source)) {
+            /**
+             * @member
+             * @type {number}
+             */
+            this["datasets"] = 0;
+        }
+        if (!("flows" in $$source)) {
+            /**
+             * @member
+             * @type {number}
+             */
+            this["flows"] = 0;
+        }
+        if (!("environments" in $$source)) {
+            /**
+             * @member
+             * @type {number}
+             */
+            this["environments"] = 0;
+        }
+        if (!("secretVars" in $$source)) {
+            /**
+             * @member
+             * @type {number}
+             */
+            this["secretVars"] = 0;
+        }
+        if (!("schedules" in $$source)) {
+            /**
+             * @member
+             * @type {number}
+             */
+            this["schedules"] = 0;
+        }
+        if (!("blueprints" in $$source)) {
+            /**
+             * @member
+             * @type {number}
+             */
+            this["blueprints"] = 0;
+        }
+        if (!("overlays" in $$source)) {
+            /**
+             * @member
+             * @type {number}
+             */
+            this["overlays"] = 0;
+        }
+        if (!("withHooks" in $$source)) {
+            /**
+             * @member
+             * @type {number}
+             */
+            this["withHooks"] = 0;
+        }
+        if (!("tracingOn" in $$source)) {
+            /**
+             * @member
+             * @type {boolean}
+             */
+            this["tracingOn"] = false;
+        }
+        if (!("ideas" in $$source)) {
+            /**
+             * @member
+             * @type {IdeaView[]}
+             */
+            this["ideas"] = [];
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new HomeView instance from a string or object.
+     * @param {any} [$$source = {}]
+     * @returns {HomeView}
+     */
+    static createFrom($$source = {}) {
+        const $$createField14_0 = $$createType76;
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        if ("ideas" in $$parsedSource) {
+            $$parsedSource["ideas"] = $$createField14_0($$parsedSource["ideas"]);
+        }
+        return new HomeView(/** @type {Partial<HomeView>} */($$parsedSource));
+    }
+}
+
+/**
  * HookTick is one hook that runs around a request step of a flow: before the
  * request (pre) or after its response (post). State is "" until a run reaches
  * it, then how it went: passed, failed and so on.
@@ -3660,6 +3958,65 @@ export class IOView {
 }
 
 /**
+ * IdeaView is a feature the person has not used yet.
+ */
+export class IdeaView {
+    /**
+     * Creates a new IdeaView instance.
+     * @param {Partial<IdeaView>} [$$source = {}] - The source object to create the IdeaView.
+     */
+    constructor($$source = {}) {
+        if (!("id" in $$source)) {
+            /**
+             * @member
+             * @type {string}
+             */
+            this["id"] = "";
+        }
+        if (!("title" in $$source)) {
+            /**
+             * @member
+             * @type {string}
+             */
+            this["title"] = "";
+        }
+        if (!("why" in $$source)) {
+            /**
+             * @member
+             * @type {string}
+             */
+            this["why"] = "";
+        }
+        if (!("action" in $$source)) {
+            /**
+             * @member
+             * @type {string}
+             */
+            this["action"] = "";
+        }
+        if (!("label" in $$source)) {
+            /**
+             * @member
+             * @type {string}
+             */
+            this["label"] = "";
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new IdeaView instance from a string or object.
+     * @param {any} [$$source = {}]
+     * @returns {IdeaView}
+     */
+    static createFrom($$source = {}) {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new IdeaView(/** @type {Partial<IdeaView>} */($$parsedSource));
+    }
+}
+
+/**
  * ImportFileView is a file the import writes.
  */
 export class ImportFileView {
@@ -3744,7 +4101,7 @@ export class ImportItemView {
      * @returns {ImportItemView}
      */
     static createFrom($$source = {}) {
-        const $$createField2_0 = $$createType73;
+        const $$createField2_0 = $$createType78;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("problems" in $$parsedSource) {
             $$parsedSource["problems"] = $$createField2_0($$parsedSource["problems"]);
@@ -4009,10 +4366,10 @@ export class ImportView {
      * @returns {ImportView}
      */
     static createFrom($$source = {}) {
-        const $$createField0_0 = $$createType75;
+        const $$createField0_0 = $$createType80;
         const $$createField5_0 = $$createType7;
-        const $$createField9_0 = $$createType77;
-        const $$createField10_0 = $$createType79;
+        const $$createField9_0 = $$createType82;
+        const $$createField10_0 = $$createType84;
         const $$createField11_0 = $$createType8;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("kinds" in $$parsedSource) {
@@ -4319,7 +4676,7 @@ export class LogSection {
      * @returns {LogSection}
      */
     static createFrom($$source = {}) {
-        const $$createField1_0 = $$createType81;
+        const $$createField1_0 = $$createType86;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("lines" in $$parsedSource) {
             $$parsedSource["lines"] = $$createField1_0($$parsedSource["lines"]);
@@ -4361,7 +4718,7 @@ export class ManagerView {
      * @returns {ManagerView}
      */
     static createFrom($$source = {}) {
-        const $$createField0_0 = $$createType83;
+        const $$createField0_0 = $$createType88;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("collections" in $$parsedSource) {
             $$parsedSource["collections"] = $$createField0_0($$parsedSource["collections"]);
@@ -4502,8 +4859,8 @@ export class MatrixView {
      * @returns {MatrixView}
      */
     static createFrom($$source = {}) {
-        const $$createField0_0 = $$createType85;
-        const $$createField1_0 = $$createType87;
+        const $$createField0_0 = $$createType90;
+        const $$createField1_0 = $$createType92;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("dims" in $$parsedSource) {
             $$parsedSource["dims"] = $$createField0_0($$parsedSource["dims"]);
@@ -4580,7 +4937,7 @@ export class MenuEntry {
      * @returns {MenuEntry}
      */
     static createFrom($$source = {}) {
-        const $$createField2_0 = $$createType89;
+        const $$createField2_0 = $$createType94;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("prompt" in $$parsedSource) {
             $$parsedSource["prompt"] = $$createField2_0($$parsedSource["prompt"]);
@@ -4626,6 +4983,14 @@ export class MessageView {
              * @type {string | undefined}
              */
             this["key"] = undefined;
+        }
+        if (/** @type {any} */(false)) {
+            /**
+             * json, text or binary; empty for a message with no body
+             * @member
+             * @type {string | undefined}
+             */
+            this["kind"] = undefined;
         }
 
         Object.assign(this, $$source);
@@ -4726,7 +5091,7 @@ export class MissingView {
      * @returns {MissingView}
      */
     static createFrom($$source = {}) {
-        const $$createField1_0 = $$createType91;
+        const $$createField1_0 = $$createType96;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("vars" in $$parsedSource) {
             $$parsedSource["vars"] = $$createField1_0($$parsedSource["vars"]);
@@ -4943,11 +5308,11 @@ export class NodeData {
      * @returns {NodeData}
      */
     static createFrom($$source = {}) {
-        const $$createField4_0 = $$createType93;
-        const $$createField5_0 = $$createType93;
-        const $$createField6_0 = $$createType95;
+        const $$createField4_0 = $$createType98;
+        const $$createField5_0 = $$createType98;
+        const $$createField6_0 = $$createType100;
         const $$createField7_0 = $$createType8;
-        const $$createField10_0 = $$createType97;
+        const $$createField10_0 = $$createType102;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("input" in $$parsedSource) {
             $$parsedSource["input"] = $$createField4_0($$parsedSource["input"]);
@@ -5040,7 +5405,7 @@ export class OperationView {
      */
     static createFrom($$source = {}) {
         const $$createField3_0 = $$createType8;
-        const $$createField4_0 = $$createType99;
+        const $$createField4_0 = $$createType104;
         const $$createField5_0 = $$createType8;
         const $$createField6_0 = $$createType8;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
@@ -5240,8 +5605,8 @@ export class OverlayPreviewView {
      * @returns {OverlayPreviewView}
      */
     static createFrom($$source = {}) {
-        const $$createField2_0 = $$createType101;
-        const $$createField3_0 = $$createType103;
+        const $$createField2_0 = $$createType106;
+        const $$createField3_0 = $$createType108;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("changes" in $$parsedSource) {
             $$parsedSource["changes"] = $$createField2_0($$parsedSource["changes"]);
@@ -5392,9 +5757,9 @@ export class Panels {
      * @returns {Panels}
      */
     static createFrom($$source = {}) {
-        const $$createField0_0 = $$createType105;
-        const $$createField1_0 = $$createType107;
-        const $$createField3_0 = $$createType109;
+        const $$createField0_0 = $$createType110;
+        const $$createField1_0 = $$createType112;
+        const $$createField3_0 = $$createType114;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("log" in $$parsedSource) {
             $$parsedSource["log"] = $$createField0_0($$parsedSource["log"]);
@@ -6030,9 +6395,9 @@ export class ReplayerView {
      */
     static createFrom($$source = {}) {
         const $$createField3_0 = $$createType8;
-        const $$createField4_0 = $$createType110;
+        const $$createField4_0 = $$createType115;
         const $$createField5_0 = $$createType7;
-        const $$createField6_0 = $$createType112;
+        const $$createField6_0 = $$createType117;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("notes" in $$parsedSource) {
             $$parsedSource["notes"] = $$createField3_0($$parsedSource["notes"]);
@@ -6104,7 +6469,7 @@ export class RequestDriftView {
      * @returns {RequestDriftView}
      */
     static createFrom($$source = {}) {
-        const $$createField4_0 = $$createType114;
+        const $$createField4_0 = $$createType119;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("differences" in $$parsedSource) {
             $$parsedSource["differences"] = $$createField4_0($$parsedSource["differences"]);
@@ -6153,8 +6518,8 @@ export class RequestSettingsView {
      * @returns {RequestSettingsView}
      */
     static createFrom($$source = {}) {
-        const $$createField0_0 = $$createType116;
-        const $$createField1_0 = $$createType118;
+        const $$createField0_0 = $$createType121;
+        const $$createField1_0 = $$createType123;
         const $$createField2_0 = $$createType8;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("rows" in $$parsedSource) {
@@ -6474,21 +6839,21 @@ export class RequestView {
     static createFrom($$source = {}) {
         const $$createField5_0 = $$createType8;
         const $$createField6_0 = $$createType8;
-        const $$createField13_0 = $$createType119;
+        const $$createField13_0 = $$createType124;
         const $$createField16_0 = $$createType8;
-        const $$createField20_0 = $$createType120;
-        const $$createField23_0 = $$createType122;
-        const $$createField24_0 = $$createType123;
-        const $$createField25_0 = $$createType125;
-        const $$createField26_0 = $$createType127;
-        const $$createField29_0 = $$createType129;
-        const $$createField30_0 = $$createType131;
-        const $$createField31_0 = $$createType133;
-        const $$createField32_0 = $$createType135;
-        const $$createField33_0 = $$createType137;
-        const $$createField35_0 = $$createType139;
+        const $$createField20_0 = $$createType125;
+        const $$createField23_0 = $$createType127;
+        const $$createField24_0 = $$createType128;
+        const $$createField25_0 = $$createType130;
+        const $$createField26_0 = $$createType132;
+        const $$createField29_0 = $$createType134;
+        const $$createField30_0 = $$createType136;
+        const $$createField31_0 = $$createType138;
+        const $$createField32_0 = $$createType140;
+        const $$createField33_0 = $$createType142;
+        const $$createField35_0 = $$createType144;
         const $$createField36_0 = $$createType8;
-        const $$createField37_0 = $$createType141;
+        const $$createField37_0 = $$createType146;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("versions" in $$parsedSource) {
             $$parsedSource["versions"] = $$createField5_0($$parsedSource["versions"]);
@@ -6628,6 +6993,14 @@ export class ResponseView {
              */
             this["diags"] = [];
         }
+        if (!("checks" in $$source)) {
+            /**
+             * the checks (assert lines) this response judged; ones added or edited since are untried
+             * @member
+             * @type {string[]}
+             */
+            this["checks"] = [];
+        }
         if (/** @type {any} */(false)) {
             /**
              * the parsed JSON body, for the tree; absent for other bodies and large ones
@@ -6676,12 +7049,13 @@ export class ResponseView {
      * @returns {ResponseView}
      */
     static createFrom($$source = {}) {
-        const $$createField7_0 = $$createType93;
-        const $$createField8_0 = $$createType93;
+        const $$createField7_0 = $$createType98;
+        const $$createField8_0 = $$createType98;
         const $$createField9_0 = $$createType8;
-        const $$createField12_0 = $$createType143;
-        const $$createField13_0 = $$createType127;
-        const $$createField14_0 = $$createType145;
+        const $$createField10_0 = $$createType8;
+        const $$createField13_0 = $$createType148;
+        const $$createField14_0 = $$createType132;
+        const $$createField15_0 = $$createType150;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("sent" in $$parsedSource) {
             $$parsedSource["sent"] = $$createField7_0($$parsedSource["sent"]);
@@ -6692,14 +7066,17 @@ export class ResponseView {
         if ("diags" in $$parsedSource) {
             $$parsedSource["diags"] = $$createField9_0($$parsedSource["diags"]);
         }
+        if ("checks" in $$parsedSource) {
+            $$parsedSource["checks"] = $$createField10_0($$parsedSource["checks"]);
+        }
         if ("phases" in $$parsedSource) {
-            $$parsedSource["phases"] = $$createField12_0($$parsedSource["phases"]);
+            $$parsedSource["phases"] = $$createField13_0($$parsedSource["phases"]);
         }
         if ("messages" in $$parsedSource) {
-            $$parsedSource["messages"] = $$createField13_0($$parsedSource["messages"]);
+            $$parsedSource["messages"] = $$createField14_0($$parsedSource["messages"]);
         }
         if ("table" in $$parsedSource) {
-            $$parsedSource["table"] = $$createField14_0($$parsedSource["table"]);
+            $$parsedSource["table"] = $$createField15_0($$parsedSource["table"]);
         }
         return new ResponseView(/** @type {Partial<ResponseView>} */($$parsedSource));
     }
@@ -6740,8 +7117,8 @@ export class RunComparisonView {
      * @returns {RunComparisonView}
      */
     static createFrom($$source = {}) {
-        const $$createField0_0 = $$createType148;
-        const $$createField1_0 = $$createType150;
+        const $$createField0_0 = $$createType153;
+        const $$createField1_0 = $$createType155;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("steps" in $$parsedSource) {
             $$parsedSource["steps"] = $$createField0_0($$parsedSource["steps"]);
@@ -6810,8 +7187,8 @@ export class RunView {
      * @returns {RunView}
      */
     static createFrom($$source = {}) {
-        const $$createField3_0 = $$createType31;
-        const $$createField4_0 = $$createType31;
+        const $$createField3_0 = $$createType34;
+        const $$createField4_0 = $$createType34;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("statuses" in $$parsedSource) {
             $$parsedSource["statuses"] = $$createField3_0($$parsedSource["statuses"]);
@@ -6880,7 +7257,7 @@ export class RunnerView {
      */
     static createFrom($$source = {}) {
         const $$createField2_0 = $$createType8;
-        const $$createField3_0 = $$createType152;
+        const $$createField3_0 = $$createType157;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("notes" in $$parsedSource) {
             $$parsedSource["notes"] = $$createField2_0($$parsedSource["notes"]);
@@ -6966,6 +7343,30 @@ export class ScheduleView {
              */
             this["flowLabel"] = "";
         }
+        if (!("when" in $$source)) {
+            /**
+             * the cron in words ("Every day at 03:00"), "" when it is not a common pattern
+             * @member
+             * @type {string}
+             */
+            this["when"] = "";
+        }
+        if (!("nextAt" in $$source)) {
+            /**
+             * when it fires next, RFC 3339; "" when disabled or invalid
+             * @member
+             * @type {string}
+             */
+            this["nextAt"] = "";
+        }
+        if (!("fires" in $$source)) {
+            /**
+             * minutes from now of each firing in the next 24 hours
+             * @member
+             * @type {number[]}
+             */
+            this["fires"] = [];
+        }
 
         Object.assign(this, $$source);
     }
@@ -6976,7 +7377,11 @@ export class ScheduleView {
      * @returns {ScheduleView}
      */
     static createFrom($$source = {}) {
+        const $$createField11_0 = $$createType158;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        if ("fires" in $$parsedSource) {
+            $$parsedSource["fires"] = $$createField11_0($$parsedSource["fires"]);
+        }
         return new ScheduleView(/** @type {Partial<ScheduleView>} */($$parsedSource));
     }
 }
@@ -7049,9 +7454,9 @@ export class SchedulesView {
      * @returns {SchedulesView}
      */
     static createFrom($$source = {}) {
-        const $$createField0_0 = $$createType153;
-        const $$createField1_0 = $$createType155;
-        const $$createField2_0 = $$createType157;
+        const $$createField0_0 = $$createType159;
+        const $$createField1_0 = $$createType161;
+        const $$createField2_0 = $$createType163;
         const $$createField3_0 = $$createType8;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("runner" in $$parsedSource) {
@@ -7211,7 +7616,7 @@ export class SecretsView {
      * @returns {SecretsView}
      */
     static createFrom($$source = {}) {
-        const $$createField0_0 = $$createType159;
+        const $$createField0_0 = $$createType165;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("secrets" in $$parsedSource) {
             $$parsedSource["secrets"] = $$createField0_0($$parsedSource["secrets"]);
@@ -7322,7 +7727,7 @@ export class SequenceView {
      */
     static createFrom($$source = {}) {
         const $$createField1_0 = $$createType8;
-        const $$createField2_0 = $$createType161;
+        const $$createField2_0 = $$createType167;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("hosts" in $$parsedSource) {
             $$parsedSource["hosts"] = $$createField1_0($$parsedSource["hosts"]);
@@ -7367,7 +7772,7 @@ export class SettingGroup {
      * @returns {SettingGroup}
      */
     static createFrom($$source = {}) {
-        const $$createField1_0 = $$createType163;
+        const $$createField1_0 = $$createType169;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("fields" in $$parsedSource) {
             $$parsedSource["fields"] = $$createField1_0($$parsedSource["fields"]);
@@ -7535,8 +7940,8 @@ export class SettingsView {
      * @returns {SettingsView}
      */
     static createFrom($$source = {}) {
-        const $$createField0_0 = $$createType165;
-        const $$createField1_0 = $$createType166;
+        const $$createField0_0 = $$createType171;
+        const $$createField1_0 = $$createType172;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("groups" in $$parsedSource) {
             $$parsedSource["groups"] = $$createField0_0($$parsedSource["groups"]);
@@ -7643,7 +8048,7 @@ export class SkipView {
      */
     static createFrom($$source = {}) {
         const $$createField0_0 = $$createType8;
-        const $$createField2_0 = $$createType168;
+        const $$createField2_0 = $$createType174;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("steps" in $$parsedSource) {
             $$parsedSource["steps"] = $$createField0_0($$parsedSource["steps"]);
@@ -7854,7 +8259,7 @@ export class SpecChangeView {
      * @returns {SpecChangeView}
      */
     static createFrom($$source = {}) {
-        const $$createField2_0 = $$createType170;
+        const $$createField2_0 = $$createType176;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("breakages" in $$parsedSource) {
             $$parsedSource["breakages"] = $$createField2_0($$parsedSource["breakages"]);
@@ -7897,7 +8302,7 @@ export class SpecExportView {
      * @returns {SpecExportView}
      */
     static createFrom($$source = {}) {
-        const $$createField0_0 = $$createType172;
+        const $$createField0_0 = $$createType178;
         const $$createField1_0 = $$createType8;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("documents" in $$parsedSource) {
@@ -7958,7 +8363,7 @@ export class SpecOriginView {
      * @returns {SpecOriginView}
      */
     static createFrom($$source = {}) {
-        const $$createField3_0 = $$createType174;
+        const $$createField3_0 = $$createType180;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("fields" in $$parsedSource) {
             $$parsedSource["fields"] = $$createField3_0($$parsedSource["fields"]);
@@ -8492,17 +8897,17 @@ export class StepForm {
     static createFrom($$source = {}) {
         const $$createField6_0 = $$createType8;
         const $$createField8_0 = $$createType8;
-        const $$createField9_0 = $$createType176;
-        const $$createField10_0 = $$createType176;
+        const $$createField9_0 = $$createType182;
+        const $$createField10_0 = $$createType182;
         const $$createField16_0 = $$createType8;
         const $$createField19_0 = $$createType8;
         const $$createField20_0 = $$createType8;
-        const $$createField21_0 = $$createType178;
-        const $$createField22_0 = $$createType180;
-        const $$createField23_0 = $$createType181;
-        const $$createField24_0 = $$createType183;
-        const $$createField27_0 = $$createType185;
-        const $$createField28_0 = $$createType185;
+        const $$createField21_0 = $$createType184;
+        const $$createField22_0 = $$createType186;
+        const $$createField23_0 = $$createType187;
+        const $$createField24_0 = $$createType189;
+        const $$createField27_0 = $$createType191;
+        const $$createField28_0 = $$createType191;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("needs" in $$parsedSource) {
             $$parsedSource["needs"] = $$createField6_0($$parsedSource["needs"]);
@@ -8701,7 +9106,7 @@ export class SuggestView {
      * @returns {SuggestView}
      */
     static createFrom($$source = {}) {
-        const $$createField2_0 = $$createType187;
+        const $$createField2_0 = $$createType193;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("items" in $$parsedSource) {
             $$parsedSource["items"] = $$createField2_0($$parsedSource["items"]);
@@ -8798,7 +9203,7 @@ export class TableView {
      */
     static createFrom($$source = {}) {
         const $$createField0_0 = $$createType8;
-        const $$createField1_0 = $$createType189;
+        const $$createField1_0 = $$createType195;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("columns" in $$parsedSource) {
             $$parsedSource["columns"] = $$createField0_0($$parsedSource["columns"]);
@@ -8859,7 +9264,7 @@ export class TelemetryView {
      * @returns {TelemetryView}
      */
     static createFrom($$source = {}) {
-        const $$createField3_0 = $$createType31;
+        const $$createField3_0 = $$createType34;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("previews" in $$parsedSource) {
             $$parsedSource["previews"] = $$createField3_0($$parsedSource["previews"]);
@@ -8910,6 +9315,155 @@ export class TestView {
     static createFrom($$source = {}) {
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         return new TestView(/** @type {Partial<TestView>} */($$parsedSource));
+    }
+}
+
+/**
+ * TraceTestView is the outcome of the last test trace.
+ */
+export class TraceTestView {
+    /**
+     * Creates a new TraceTestView instance.
+     * @param {Partial<TraceTestView>} [$$source = {}] - The source object to create the TraceTestView.
+     */
+    constructor($$source = {}) {
+        if (!("state" in $$source)) {
+            /**
+             * "", testing, ok or failed
+             * @member
+             * @type {string}
+             */
+            this["state"] = "";
+        }
+        if (!("message" in $$source)) {
+            /**
+             * @member
+             * @type {string}
+             */
+            this["message"] = "";
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new TraceTestView instance from a string or object.
+     * @param {any} [$$source = {}]
+     * @returns {TraceTestView}
+     */
+    static createFrom($$source = {}) {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new TraceTestView(/** @type {Partial<TraceTestView>} */($$parsedSource));
+    }
+}
+
+/**
+ * TracingView is the Tracing page. Header values are never part of it.
+ */
+export class TracingView {
+    /**
+     * Creates a new TracingView instance.
+     * @param {Partial<TracingView>} [$$source = {}] - The source object to create the TracingView.
+     */
+    constructor($$source = {}) {
+        if (!("endpoint" in $$source)) {
+            /**
+             * @member
+             * @type {string}
+             */
+            this["endpoint"] = "";
+        }
+        if (!("headerNames" in $$source)) {
+            /**
+             * @member
+             * @type {string[]}
+             */
+            this["headerNames"] = [];
+        }
+        if (!("propagate" in $$source)) {
+            /**
+             * @member
+             * @type {boolean}
+             */
+            this["propagate"] = false;
+        }
+        if (/** @type {any} */(false)) {
+            /**
+             * @member
+             * @type {string | undefined}
+             */
+            this["problem"] = undefined;
+        }
+        if (!("running" in $$source)) {
+            /**
+             * @member
+             * @type {boolean}
+             */
+            this["running"] = false;
+        }
+        if (!("sent" in $$source)) {
+            /**
+             * @member
+             * @type {number}
+             */
+            this["sent"] = 0;
+        }
+        if (!("failed" in $$source)) {
+            /**
+             * @member
+             * @type {number}
+             */
+            this["failed"] = 0;
+        }
+        if (!("dropped" in $$source)) {
+            /**
+             * @member
+             * @type {number}
+             */
+            this["dropped"] = 0;
+        }
+        if (/** @type {any} */(false)) {
+            /**
+             * @member
+             * @type {string | undefined}
+             */
+            this["lastError"] = undefined;
+        }
+        if (/** @type {any} */(false)) {
+            /**
+             * RFC 3339, "" before the first export
+             * @member
+             * @type {string | undefined}
+             */
+            this["lastExport"] = undefined;
+        }
+        if (!("test" in $$source)) {
+            /**
+             * @member
+             * @type {TraceTestView}
+             */
+            this["test"] = (new TraceTestView());
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new TracingView instance from a string or object.
+     * @param {any} [$$source = {}]
+     * @returns {TracingView}
+     */
+    static createFrom($$source = {}) {
+        const $$createField1_0 = $$createType8;
+        const $$createField10_0 = $$createType196;
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        if ("headerNames" in $$parsedSource) {
+            $$parsedSource["headerNames"] = $$createField1_0($$parsedSource["headerNames"]);
+        }
+        if ("test" in $$parsedSource) {
+            $$parsedSource["test"] = $$createField10_0($$parsedSource["test"]);
+        }
+        return new TracingView(/** @type {Partial<TracingView>} */($$parsedSource));
     }
 }
 
@@ -8984,6 +9538,35 @@ export class TrafficRow {
              * @type {string}
              */
             this["remote"] = "";
+        }
+        if (!("version" in $$source)) {
+            /**
+             * Which saved answer was given, and the delay added on purpose ("" when there was none).
+             * @member
+             * @type {string}
+             */
+            this["version"] = "";
+        }
+        if (!("example" in $$source)) {
+            /**
+             * @member
+             * @type {string}
+             */
+            this["example"] = "";
+        }
+        if (!("source" in $$source)) {
+            /**
+             * @member
+             * @type {string}
+             */
+            this["source"] = "";
+        }
+        if (!("delay" in $$source)) {
+            /**
+             * @member
+             * @type {string}
+             */
+            this["delay"] = "";
         }
 
         Object.assign(this, $$source);
@@ -9103,7 +9686,7 @@ export class TrashView {
      * @returns {TrashView}
      */
     static createFrom($$source = {}) {
-        const $$createField0_0 = $$createType191;
+        const $$createField0_0 = $$createType198;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("items" in $$parsedSource) {
             $$parsedSource["items"] = $$createField0_0($$parsedSource["items"]);
@@ -9175,9 +9758,9 @@ export class Tree {
      * @returns {Tree}
      */
     static createFrom($$source = {}) {
-        const $$createField2_0 = $$createType193;
+        const $$createField2_0 = $$createType200;
         const $$createField3_0 = $$createType8;
-        const $$createField4_0 = $$createType31;
+        const $$createField4_0 = $$createType34;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("roots" in $$parsedSource) {
             $$parsedSource["roots"] = $$createField2_0($$parsedSource["roots"]);
@@ -9247,6 +9830,14 @@ export class TreeNode {
         }
         if (/** @type {any} */(false)) {
             /**
+             * the Drafts try-out space
+             * @member
+             * @type {boolean | undefined}
+             */
+            this["scratch"] = undefined;
+        }
+        if (/** @type {any} */(false)) {
+            /**
              * folders and groups: requests or flows; requests can be dropped only on the first
              * @member
              * @type {string | undefined}
@@ -9270,10 +9861,10 @@ export class TreeNode {
      * @returns {TreeNode}
      */
     static createFrom($$source = {}) {
-        const $$createField7_0 = $$createType193;
+        const $$createField8_0 = $$createType200;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("children" in $$parsedSource) {
-            $$parsedSource["children"] = $$createField7_0($$parsedSource["children"]);
+            $$parsedSource["children"] = $$createField8_0($$parsedSource["children"]);
         }
         return new TreeNode(/** @type {Partial<TreeNode>} */($$parsedSource));
     }
@@ -9481,7 +10072,7 @@ export class UsedByView {
      * @returns {UsedByView}
      */
     static createFrom($$source = {}) {
-        const $$createField0_0 = $$createType195;
+        const $$createField0_0 = $$createType202;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("rows" in $$parsedSource) {
             $$parsedSource["rows"] = $$createField0_0($$parsedSource["rows"]);
@@ -9729,7 +10320,7 @@ export class VarsView {
         const $$createField0_0 = $$createType8;
         const $$createField1_0 = $$createType8;
         const $$createField2_0 = $$createType8;
-        const $$createField3_0 = $$createType36;
+        const $$createField3_0 = $$createType39;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("set" in $$parsedSource) {
             $$parsedSource["set"] = $$createField0_0($$parsedSource["set"]);
@@ -9788,7 +10379,7 @@ export class WelcomeView {
      * @returns {WelcomeView}
      */
     static createFrom($$source = {}) {
-        const $$createField2_0 = $$createType197;
+        const $$createField2_0 = $$createType204;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("announcements" in $$parsedSource) {
             $$parsedSource["announcements"] = $$createField2_0($$parsedSource["announcements"]);
@@ -9880,7 +10471,7 @@ export class WireChoices {
      */
     static createFrom($$source = {}) {
         const $$createField1_0 = $$createType8;
-        const $$createField2_0 = $$createType199;
+        const $$createField2_0 = $$createType206;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("outputs" in $$parsedSource) {
             $$parsedSource["outputs"] = $$createField1_0($$parsedSource["outputs"]);
@@ -9961,181 +10552,188 @@ const $$createType18 = Pair.createFrom;
 const $$createType19 = $Create.Array($$createType18);
 const $$createType20 = model$0.Outcome.createFrom;
 const $$createType21 = $Create.Array($$createType20);
-const $$createType22 = HookTick.createFrom;
+const $$createType22 = CallHeader.createFrom;
 const $$createType23 = $Create.Array($$createType22);
-const $$createType24 = card$0.Card.createFrom;
-const $$createType25 = DepView.createFrom;
+const $$createType24 = CallPart.createFrom;
+const $$createType25 = HookTick.createFrom;
 const $$createType26 = $Create.Array($$createType25);
-const $$createType27 = CookieView.createFrom;
-const $$createType28 = $Create.Array($$createType27);
-const $$createType29 = OperationView.createFrom;
-const $$createType30 = $Create.Array($$createType29);
-const $$createType31 = $Create.Map($Create.Any, $Create.Any);
-const $$createType32 = model$0.Dataset.createFrom;
-const $$createType33 = DriverChoice.createFrom;
-const $$createType34 = $Create.Array($$createType33);
-const $$createType35 = VarValue.createFrom;
-const $$createType36 = $Create.Array($$createType35);
-const $$createType37 = DetailRow.createFrom;
-const $$createType38 = $Create.Array($$createType37);
-const $$createType39 = RequestDriftView.createFrom;
-const $$createType40 = $Create.Array($$createType39);
-const $$createType41 = EnvRow.createFrom;
-const $$createType42 = $Create.Array($$createType41);
-const $$createType43 = HelpItemView.createFrom;
-const $$createType44 = $Create.Array($$createType43);
-const $$createType45 = ChipView.createFrom;
-const $$createType46 = $Create.Array($$createType45);
-const $$createType47 = Form.createFrom;
-const $$createType48 = PaletteEntry.createFrom;
+const $$createType27 = card$0.Card.createFrom;
+const $$createType28 = DepView.createFrom;
+const $$createType29 = $Create.Array($$createType28);
+const $$createType30 = CookieView.createFrom;
+const $$createType31 = $Create.Array($$createType30);
+const $$createType32 = OperationView.createFrom;
+const $$createType33 = $Create.Array($$createType32);
+const $$createType34 = $Create.Map($Create.Any, $Create.Any);
+const $$createType35 = model$0.Dataset.createFrom;
+const $$createType36 = DriverChoice.createFrom;
+const $$createType37 = $Create.Array($$createType36);
+const $$createType38 = VarValue.createFrom;
+const $$createType39 = $Create.Array($$createType38);
+const $$createType40 = DetailRow.createFrom;
+const $$createType41 = $Create.Array($$createType40);
+const $$createType42 = RequestDriftView.createFrom;
+const $$createType43 = $Create.Array($$createType42);
+const $$createType44 = EnvRow.createFrom;
+const $$createType45 = $Create.Array($$createType44);
+const $$createType46 = HelpItemView.createFrom;
+const $$createType47 = $Create.Array($$createType46);
+const $$createType48 = ChipView.createFrom;
 const $$createType49 = $Create.Array($$createType48);
-const $$createType50 = StepChoice.createFrom;
-const $$createType51 = $Create.Array($$createType50);
-const $$createType52 = IOView.createFrom;
-const $$createType53 = $Create.Array($$createType52);
-const $$createType54 = $Create.Nullable($$createType24);
-const $$createType55 = RunView.createFrom;
-const $$createType56 = SkipView.createFrom;
-const $$createType57 = DebugView.createFrom;
-const $$createType58 = VarsView.createFrom;
-const $$createType59 = canvas$0.Diagram.createFrom;
-const $$createType60 = Card.createFrom;
-const $$createType61 = $Create.Map($Create.Any, $$createType60);
-const $$createType62 = DataEdge.createFrom;
-const $$createType63 = $Create.Array($$createType62);
-const $$createType64 = FlowiOverlayOpView.createFrom;
-const $$createType65 = $Create.Array($$createType64);
-const $$createType66 = StepForm.createFrom;
-const $$createType67 = $Create.Nullable($$createType66);
-const $$createType68 = FlowForm.createFrom;
-const $$createType69 = model$0.GRPC.createFrom;
-const $$createType70 = GRPCMethodView.createFrom;
-const $$createType71 = $Create.Array($$createType70);
-const $$createType72 = ImportProblemView.createFrom;
-const $$createType73 = $Create.Array($$createType72);
-const $$createType74 = ImportKindView.createFrom;
-const $$createType75 = $Create.Array($$createType74);
-const $$createType76 = ImportFileView.createFrom;
-const $$createType77 = $Create.Array($$createType76);
-const $$createType78 = ImportItemView.createFrom;
-const $$createType79 = $Create.Array($$createType78);
-const $$createType80 = LogLine.createFrom;
-const $$createType81 = $Create.Array($$createType80);
-const $$createType82 = CollectionView.createFrom;
-const $$createType83 = $Create.Array($$createType82);
-const $$createType84 = MatrixDimView.createFrom;
-const $$createType85 = $Create.Array($$createType84);
-const $$createType86 = MatrixCellView.createFrom;
-const $$createType87 = $Create.Array($$createType86);
-const $$createType88 = Prompt.createFrom;
-const $$createType89 = $Create.Nullable($$createType88);
-const $$createType90 = MissingVar.createFrom;
-const $$createType91 = $Create.Array($$createType90);
-const $$createType92 = PartView.createFrom;
-const $$createType93 = $Create.Array($$createType92);
-const $$createType94 = TestView.createFrom;
-const $$createType95 = $Create.Array($$createType94);
-const $$createType96 = StepMessage.createFrom;
-const $$createType97 = $Create.Array($$createType96);
-const $$createType98 = StatusView.createFrom;
-const $$createType99 = $Create.Array($$createType98);
-const $$createType100 = OverlayChangeView.createFrom;
-const $$createType101 = $Create.Array($$createType100);
-const $$createType102 = OverlayNoteView.createFrom;
-const $$createType103 = $Create.Array($$createType102);
-const $$createType104 = LogSection.createFrom;
-const $$createType105 = $Create.Array($$createType104);
-const $$createType106 = ProblemRow.createFrom;
-const $$createType107 = $Create.Array($$createType106);
-const $$createType108 = HistoryItem.createFrom;
-const $$createType109 = $Create.Array($$createType108);
-const $$createType110 = ReplayerForm.createFrom;
-const $$createType111 = TrafficRow.createFrom;
+const $$createType50 = Form.createFrom;
+const $$createType51 = PaletteEntry.createFrom;
+const $$createType52 = $Create.Array($$createType51);
+const $$createType53 = StepChoice.createFrom;
+const $$createType54 = $Create.Array($$createType53);
+const $$createType55 = IOView.createFrom;
+const $$createType56 = $Create.Array($$createType55);
+const $$createType57 = $Create.Nullable($$createType27);
+const $$createType58 = RunView.createFrom;
+const $$createType59 = SkipView.createFrom;
+const $$createType60 = DebugView.createFrom;
+const $$createType61 = VarsView.createFrom;
+const $$createType62 = canvas$0.Diagram.createFrom;
+const $$createType63 = Card.createFrom;
+const $$createType64 = $Create.Map($Create.Any, $$createType63);
+const $$createType65 = DataEdge.createFrom;
+const $$createType66 = $Create.Array($$createType65);
+const $$createType67 = FlowiOverlayOpView.createFrom;
+const $$createType68 = $Create.Array($$createType67);
+const $$createType69 = StepForm.createFrom;
+const $$createType70 = $Create.Nullable($$createType69);
+const $$createType71 = FlowForm.createFrom;
+const $$createType72 = model$0.GRPC.createFrom;
+const $$createType73 = GRPCMethodView.createFrom;
+const $$createType74 = $Create.Array($$createType73);
+const $$createType75 = IdeaView.createFrom;
+const $$createType76 = $Create.Array($$createType75);
+const $$createType77 = ImportProblemView.createFrom;
+const $$createType78 = $Create.Array($$createType77);
+const $$createType79 = ImportKindView.createFrom;
+const $$createType80 = $Create.Array($$createType79);
+const $$createType81 = ImportFileView.createFrom;
+const $$createType82 = $Create.Array($$createType81);
+const $$createType83 = ImportItemView.createFrom;
+const $$createType84 = $Create.Array($$createType83);
+const $$createType85 = LogLine.createFrom;
+const $$createType86 = $Create.Array($$createType85);
+const $$createType87 = CollectionView.createFrom;
+const $$createType88 = $Create.Array($$createType87);
+const $$createType89 = MatrixDimView.createFrom;
+const $$createType90 = $Create.Array($$createType89);
+const $$createType91 = MatrixCellView.createFrom;
+const $$createType92 = $Create.Array($$createType91);
+const $$createType93 = Prompt.createFrom;
+const $$createType94 = $Create.Nullable($$createType93);
+const $$createType95 = MissingVar.createFrom;
+const $$createType96 = $Create.Array($$createType95);
+const $$createType97 = PartView.createFrom;
+const $$createType98 = $Create.Array($$createType97);
+const $$createType99 = TestView.createFrom;
+const $$createType100 = $Create.Array($$createType99);
+const $$createType101 = StepMessage.createFrom;
+const $$createType102 = $Create.Array($$createType101);
+const $$createType103 = StatusView.createFrom;
+const $$createType104 = $Create.Array($$createType103);
+const $$createType105 = OverlayChangeView.createFrom;
+const $$createType106 = $Create.Array($$createType105);
+const $$createType107 = OverlayNoteView.createFrom;
+const $$createType108 = $Create.Array($$createType107);
+const $$createType109 = LogSection.createFrom;
+const $$createType110 = $Create.Array($$createType109);
+const $$createType111 = ProblemRow.createFrom;
 const $$createType112 = $Create.Array($$createType111);
-const $$createType113 = DifferenceView.createFrom;
+const $$createType113 = HistoryItem.createFrom;
 const $$createType114 = $Create.Array($$createType113);
-const $$createType115 = SettingRowView.createFrom;
-const $$createType116 = $Create.Array($$createType115);
-const $$createType117 = AvailableSettingView.createFrom;
-const $$createType118 = $Create.Array($$createType117);
-const $$createType119 = model$0.RequestVersion.createFrom;
-const $$createType120 = AuthView.createFrom;
-const $$createType121 = ResponseView.createFrom;
-const $$createType122 = $Create.Nullable($$createType121);
-const $$createType123 = SnippetView.createFrom;
-const $$createType124 = PipelineRowView.createFrom;
-const $$createType125 = $Create.Array($$createType124);
-const $$createType126 = MessageView.createFrom;
-const $$createType127 = $Create.Array($$createType126);
-const $$createType128 = AsyncInfo.createFrom;
-const $$createType129 = $Create.Nullable($$createType128);
-const $$createType130 = GRPCInfo.createFrom;
-const $$createType131 = $Create.Nullable($$createType130);
-const $$createType132 = DatasetInfo.createFrom;
-const $$createType133 = $Create.Nullable($$createType132);
-const $$createType134 = MultipartPartView.createFrom;
-const $$createType135 = $Create.Array($$createType134);
-const $$createType136 = JSONRPCView.createFrom;
-const $$createType137 = $Create.Nullable($$createType136);
-const $$createType138 = FlowiOverlayView.createFrom;
-const $$createType139 = $Create.Array($$createType138);
-const $$createType140 = FlowiOverlayMark.createFrom;
-const $$createType141 = $Create.Array($$createType140);
-const $$createType142 = PhaseView.createFrom;
-const $$createType143 = $Create.Array($$createType142);
-const $$createType144 = TableView.createFrom;
-const $$createType145 = $Create.Nullable($$createType144);
-const $$createType146 = BodyLineView.createFrom;
-const $$createType147 = $Create.Array($$createType146);
-const $$createType148 = $Create.Map($Create.Any, $$createType147);
-const $$createType149 = VarChangeView.createFrom;
-const $$createType150 = $Create.Array($$createType149);
-const $$createType151 = UpcomingView.createFrom;
+const $$createType115 = ReplayerForm.createFrom;
+const $$createType116 = TrafficRow.createFrom;
+const $$createType117 = $Create.Array($$createType116);
+const $$createType118 = DifferenceView.createFrom;
+const $$createType119 = $Create.Array($$createType118);
+const $$createType120 = SettingRowView.createFrom;
+const $$createType121 = $Create.Array($$createType120);
+const $$createType122 = AvailableSettingView.createFrom;
+const $$createType123 = $Create.Array($$createType122);
+const $$createType124 = model$0.RequestVersion.createFrom;
+const $$createType125 = AuthView.createFrom;
+const $$createType126 = ResponseView.createFrom;
+const $$createType127 = $Create.Nullable($$createType126);
+const $$createType128 = SnippetView.createFrom;
+const $$createType129 = PipelineRowView.createFrom;
+const $$createType130 = $Create.Array($$createType129);
+const $$createType131 = MessageView.createFrom;
+const $$createType132 = $Create.Array($$createType131);
+const $$createType133 = AsyncInfo.createFrom;
+const $$createType134 = $Create.Nullable($$createType133);
+const $$createType135 = GRPCInfo.createFrom;
+const $$createType136 = $Create.Nullable($$createType135);
+const $$createType137 = DatasetInfo.createFrom;
+const $$createType138 = $Create.Nullable($$createType137);
+const $$createType139 = MultipartPartView.createFrom;
+const $$createType140 = $Create.Array($$createType139);
+const $$createType141 = JSONRPCView.createFrom;
+const $$createType142 = $Create.Nullable($$createType141);
+const $$createType143 = FlowiOverlayView.createFrom;
+const $$createType144 = $Create.Array($$createType143);
+const $$createType145 = FlowiOverlayMark.createFrom;
+const $$createType146 = $Create.Array($$createType145);
+const $$createType147 = PhaseView.createFrom;
+const $$createType148 = $Create.Array($$createType147);
+const $$createType149 = TableView.createFrom;
+const $$createType150 = $Create.Nullable($$createType149);
+const $$createType151 = BodyLineView.createFrom;
 const $$createType152 = $Create.Array($$createType151);
-const $$createType153 = RunnerView.createFrom;
-const $$createType154 = ScheduleView.createFrom;
+const $$createType153 = $Create.Map($Create.Any, $$createType152);
+const $$createType154 = VarChangeView.createFrom;
 const $$createType155 = $Create.Array($$createType154);
-const $$createType156 = FlowChoice.createFrom;
+const $$createType156 = UpcomingView.createFrom;
 const $$createType157 = $Create.Array($$createType156);
-const $$createType158 = SecretView.createFrom;
-const $$createType159 = $Create.Array($$createType158);
-const $$createType160 = SequenceStepView.createFrom;
+const $$createType158 = $Create.Array($Create.Any);
+const $$createType159 = RunnerView.createFrom;
+const $$createType160 = ScheduleView.createFrom;
 const $$createType161 = $Create.Array($$createType160);
-const $$createType162 = SettingView.createFrom;
+const $$createType162 = FlowChoice.createFrom;
 const $$createType163 = $Create.Array($$createType162);
-const $$createType164 = SettingGroup.createFrom;
+const $$createType164 = SecretView.createFrom;
 const $$createType165 = $Create.Array($$createType164);
-const $$createType166 = Appearance.createFrom;
-const $$createType167 = SkipProblem.createFrom;
-const $$createType168 = $Create.Array($$createType167);
-const $$createType169 = BreakageView.createFrom;
-const $$createType170 = $Create.Array($$createType169);
-const $$createType171 = SpecOverlayDocumentView.createFrom;
-const $$createType172 = $Create.Array($$createType171);
-const $$createType173 = OverlayFieldView.createFrom;
+const $$createType166 = SequenceStepView.createFrom;
+const $$createType167 = $Create.Array($$createType166);
+const $$createType168 = SettingView.createFrom;
+const $$createType169 = $Create.Array($$createType168);
+const $$createType170 = SettingGroup.createFrom;
+const $$createType171 = $Create.Array($$createType170);
+const $$createType172 = Appearance.createFrom;
+const $$createType173 = SkipProblem.createFrom;
 const $$createType174 = $Create.Array($$createType173);
-const $$createType175 = Use.createFrom;
+const $$createType175 = BreakageView.createFrom;
 const $$createType176 = $Create.Array($$createType175);
-const $$createType177 = Call.createFrom;
-const $$createType178 = $Create.Nullable($$createType177);
-const $$createType179 = Param.createFrom;
+const $$createType177 = SpecOverlayDocumentView.createFrom;
+const $$createType178 = $Create.Array($$createType177);
+const $$createType179 = OverlayFieldView.createFrom;
 const $$createType180 = $Create.Array($$createType179);
-const $$createType181 = $Create.Nullable($$createType19);
-const $$createType182 = ValueRow.createFrom;
-const $$createType183 = $Create.Array($$createType182);
-const $$createType184 = Lane.createFrom;
-const $$createType185 = $Create.Array($$createType184);
-const $$createType186 = SuggestionView.createFrom;
-const $$createType187 = $Create.Array($$createType186);
-const $$createType188 = $Create.Array($Create.Any);
+const $$createType181 = Use.createFrom;
+const $$createType182 = $Create.Array($$createType181);
+const $$createType183 = Call.createFrom;
+const $$createType184 = $Create.Nullable($$createType183);
+const $$createType185 = Param.createFrom;
+const $$createType186 = $Create.Array($$createType185);
+const $$createType187 = $Create.Nullable($$createType19);
+const $$createType188 = ValueRow.createFrom;
 const $$createType189 = $Create.Array($$createType188);
-const $$createType190 = TrashItemView.createFrom;
+const $$createType190 = Lane.createFrom;
 const $$createType191 = $Create.Array($$createType190);
-const $$createType192 = TreeNode.createFrom;
+const $$createType192 = SuggestionView.createFrom;
 const $$createType193 = $Create.Array($$createType192);
-const $$createType194 = UsedByRow.createFrom;
+const $$createType194 = $Create.Array($Create.Any);
 const $$createType195 = $Create.Array($$createType194);
-const $$createType196 = AnnouncementView.createFrom;
-const $$createType197 = $Create.Array($$createType196);
-const $$createType198 = WireField.createFrom;
-const $$createType199 = $Create.Array($$createType198);
+const $$createType196 = TraceTestView.createFrom;
+const $$createType197 = TrashItemView.createFrom;
+const $$createType198 = $Create.Array($$createType197);
+const $$createType199 = TreeNode.createFrom;
+const $$createType200 = $Create.Array($$createType199);
+const $$createType201 = UsedByRow.createFrom;
+const $$createType202 = $Create.Array($$createType201);
+const $$createType203 = AnnouncementView.createFrom;
+const $$createType204 = $Create.Array($$createType203);
+const $$createType205 = WireField.createFrom;
+const $$createType206 = $Create.Array($$createType205);

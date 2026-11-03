@@ -497,3 +497,15 @@ func TestServe_Record_should_save_calls_no_request_matches_as_requests(t *testin
 		t.Fatalf("the request file:\n%s", text)
 	}
 }
+
+func TestServe_Given_CaptureCalls_When_a_call_is_made_Then_the_log_keeps_what_it_carried(t *testing.T) {
+	w := demoWorkspace(t)
+	s := serveOnFreePorts(t, w, func(o *ServeOptions) { o.NoTriggers, o.CaptureCalls = true, true })
+
+	call(t, "POST", "http://"+s.ReplayAddr()+"/v1/login", "", `{"user":"demo"}`, "Authorization", "Bearer s3cret")
+
+	e := s.Traffic().Entries()[0]
+	if e.Exchange == nil || e.Exchange.Sent.Body != `{"user":"demo"}` || e.Exchange.Sent.Header.Get("Authorization") != replay.Masked {
+		t.Fatalf("exchange %+v", e.Exchange)
+	}
+}

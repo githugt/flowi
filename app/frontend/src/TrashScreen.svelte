@@ -58,7 +58,7 @@
 </div>
 
 <style>
-  .page { position: absolute; inset: 0; overflow: auto; padding: 16px 24px 48px; max-width: 820px; }
+  .page { position: absolute; inset: 0; overflow: auto; padding: 28px 32px 56px; max-width: 820px; }
   .note, .muted { color: var(--muted); font-size: var(--fs-sm); margin: 0 0 6px; }
   .bar { display: flex; align-items: center; margin: 10px 0 6px; }
   .spacer { flex: 1; }
@@ -67,7 +67,8 @@
   .kind { font-size: var(--fs-xs); border: 1px solid var(--line); border-radius: var(--r-pill); padding: 0 8px; color: var(--muted); }
   .at { white-space: nowrap; }
   code { font: var(--fs-xs) var(--mono); }
-  button { background: transparent; color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); padding: 2px 10px; font: inherit; cursor: pointer; }
+  button { background: var(--raised); color: var(--text); border: 0; box-shadow: inset 0 0 0 1px var(--line); border-radius: var(--r-md); padding: 0 10px; min-height: var(--ctl-h-sm); font: inherit; font-weight: 500; cursor: pointer; }
+  button:hover:not(:disabled) { background: var(--raised-3); }
   button:disabled { opacity: 0.4; }
   .del:hover { color: var(--fail); border-color: var(--fail); }
 </style>

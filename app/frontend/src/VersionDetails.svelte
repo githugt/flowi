@@ -1,4 +1,5 @@
 <script lang="ts">
+  import Button from './Button.svelte'
   // The title and the description of one version of a request. The title shows
   // beside the label in the version picker; the description is the version's Docs.
   let { label, name, docs, onsave, oncancel }: { label: string; name: string; docs: string; onsave: (name: string, docs: string) => void; oncancel: () => void } = $props()
@@ -23,8 +24,8 @@
       <textarea bind:value={notes} rows="6" spellcheck="true"></textarea>
     </label>
     <div class="actions">
-      <button type="button" onclick={oncancel}>Cancel</button>
-      <button class="primary" type="submit">Save</button>
+      <Button type="button" onclick={oncancel}>Cancel</Button>
+      <Button variant="primary" type="submit">Save</Button>
     </div>
   </form>
 </div>
@@ -34,9 +35,7 @@
   .dialog { width: 440px; max-height: 80vh; overflow: auto; display: flex; flex-direction: column; gap: 10px; padding: 16px; background: var(--panel); border: 1px solid var(--line); border-radius: var(--r-lg); }
   .dialog h3 { margin: 0; }
   label { display: flex; flex-direction: column; gap: 3px; color: var(--muted); font-size: var(--fs-xs); }
-  input, textarea { background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); padding: 5px 8px; font: inherit; -webkit-user-select: text; user-select: text; }
+  input, textarea { background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); padding: 5px 8px; font: inherit; -webkit-user-select: text; user-select: text; }
   textarea { resize: vertical; }
   .actions { display: flex; justify-content: flex-end; gap: 8px; }
-  button { background: transparent; color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); padding: 3px 12px; font: inherit; }
-  .primary { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
 </style>

@@ -35,13 +35,23 @@ export function Dismiss(id) {
 }
 
 /**
+ * Home counts the workspace as it is now. The page asks again when the workspace changes.
+ * @returns {$CancellablePromise<$models.HomeView>}
+ */
+export function Home() {
+    return $Call.ByID(1696623800).then(/** @type {($result: any) => any} */(($result) => {
+        return $$createType0($result);
+    }));
+}
+
+/**
  * State is the welcome screen. The announcements load in the background and
  * arrive as the "welcome" event.
  * @returns {$CancellablePromise<$models.WelcomeView>}
  */
 export function State() {
     return $Call.ByID(4294750108).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType0($result);
+        return $$createType1($result);
     }));
 }
 
@@ -51,7 +61,7 @@ export function State() {
  */
 export function Telemetry() {
     return $Call.ByID(359446174).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType1($result);
+        return $$createType2($result);
     }));
 }
 
@@ -64,5 +74,6 @@ export function TurnOffAnnouncements() {
 }
 
 // Private type creation functions
-const $$createType0 = $models.WelcomeView.createFrom;
-const $$createType1 = $models.TelemetryView.createFrom;
+const $$createType0 = $models.HomeView.createFrom;
+const $$createType1 = $models.WelcomeView.createFrom;
+const $$createType2 = $models.TelemetryView.createFrom;

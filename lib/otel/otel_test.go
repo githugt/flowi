@@ -426,3 +426,69 @@ func TestExporter_should_bound_the_events_of_one_span(t *testing.T) {
 		t.Fatalf("%d events", got)
 	}
 }
+
+func waitForExports(t *testing.T, e *Exporter, want int64) Status {
+	t.Helper()
+	deadline := time.Now().Add(3 * time.Second)
+	for time.Now().Before(deadline) {
+		if s := e.Status(); s.Sent+s.Failed >= want {
+			return s
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+	t.Fatalf("exports did not finish: %+v", e.Status())
+	return Status{}
+}
+
+func TestExporter_Status_Given_exports_Then_counts_sent_and_remembers_the_last_failure(t *testing.T) {
+	c := newCollector(t)
+	e := newExporter(t, c, nil)
+
+	flowRun(e, "RUN1", false)
+	ok := waitForExports(t, e, 1)
+	c.mu.Lock()
+	c.status = http.StatusUnauthorized
+	c.mu.Unlock()
+	flowRun(e, "RUN2", false)
+	bad := waitForExports(t, e, 2)
+
+	if ok.Sent != 1 || ok.LastError != "" || ok.LastExport.IsZero() {
+		t.Fatalf("after a good export: %+v", ok)
+	}
+	if bad.Sent != 1 || bad.Failed != 1 || !strings.Contains(bad.LastError, "401") {
+		t.Fatalf("after a refused export: %+v", bad)
+	}
+}
+
+func TestCheck_should_post_a_test_trace_with_the_configured_headers(t *testing.T) {
+	c := newCollector(t)
+
+	err := Check(context.Background(), Config{Endpoint: c.srv.URL, Headers: map[string]string{"Authorization": "Bearer t"}, Version: "1"})
+
+	got := c.received()
+	if err != nil || len(got) != 1 || c.headers[0].Get("Authorization") != "Bearer t" {
+		t.Fatalf("err %v, received %d", err, len(got))
+	}
+	if spans := spansOf(t, got[0]); len(spans) != 1 || spans[0].Name != "flowi connection test" {
+		t.Fatalf("spans %+v", spans)
+	}
+}
+
+func TestCheck_Given_a_refusing_collector_Then_says_what_it_answered(t *testing.T) {
+	c := newCollector(t)
+	c.status = http.StatusForbidden
+
+	err := Check(context.Background(), Config{Endpoint: c.srv.URL})
+
+	if err == nil || !strings.Contains(err.Error(), "403") {
+		t.Fatalf("got %v", err)
+	}
+}
+
+func TestCheck_Given_an_endpoint_nobody_answers_Then_fails_quickly(t *testing.T) {
+	err := Check(context.Background(), Config{Endpoint: "http://127.0.0.1:1", Timeout: time.Second})
+
+	if err == nil {
+		t.Fatal("expected an error")
+	}
+}

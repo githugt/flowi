@@ -16,14 +16,16 @@ import (
 func CredentialHeaders(rec Record) []string {
 	var out []string
 	for _, h := range rec.Header {
-		if looksLikeCredential(h.Name) && !slices.ContainsFunc(out, func(n string) bool { return strings.EqualFold(n, h.Name) }) {
+		if LooksLikeCredential(h.Name) && !slices.ContainsFunc(out, func(n string) bool { return strings.EqualFold(n, h.Name) }) {
 			out = append(out, h.Name)
 		}
 	}
 	return out
 }
 
-func looksLikeCredential(name string) bool {
+// LooksLikeCredential says whether a header's name suggests its value is a secret: cookies, authorization and
+// anything named like a token, key or session.
+func LooksLikeCredential(name string) bool {
 	n := strings.ToLower(name)
 	switch n {
 	case "set-cookie", "set-cookie2", "authorization", "proxy-authorization", "cookie":

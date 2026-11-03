@@ -1,4 +1,5 @@
 <script lang="ts">
+  import TextInput from './TextInput.svelte'
   import { onMount } from 'svelte'
   import { live } from './lib/live'
   import { ManagerService } from '../bindings/github.com/githugt/flowi/app/internal/bridge'
@@ -135,7 +136,7 @@
   </div>
 
   <h3>New collection</h3>
-  <label class="f"><span>Name</span><input bind:value={newName} spellcheck="false" /></label>
+  <label class="f"><span>Name</span><TextInput bind:value={newName} label="Name" /></label>
   <div class="line">
     <PathField bind:value={newLocation} label="Folder (empty: Flowi’s own folder)" />
     <button disabled={!newName} onclick={() => { ManagerService.NewCollection(newName, newLocation); newName = ''; newLocation = '' }}>Create</button>
@@ -143,11 +144,11 @@
 </div>
 
 <style>
-  .page { position: absolute; inset: 0; overflow: auto; padding: 16px 24px 40px; max-width: 820px; }
-  h3 { margin: 24px 0 8px; font-size: var(--fs-md); border-bottom: 1px solid var(--line); padding-bottom: 4px; }
+  .page { position: absolute; inset: 0; overflow: auto; padding: 28px 32px 56px; max-width: 820px; }
+  h3 { margin: 24px 0 8px; font-size: var(--fs-lg); font-weight: 600; }
   h3:first-of-type { margin-top: 0; }
   .err { color: var(--fail); }
-  .card { border: 1px solid var(--line); border-radius: var(--r-lg); padding: 10px 12px; margin: 8px 0; display: flex; flex-direction: column; gap: 6px; }
+  .card { border: 1px solid var(--line); border-radius: var(--r-xl); background: var(--panel); padding: 10px 12px; margin: 8px 0; display: flex; flex-direction: column; gap: 6px; }
   .top { display: flex; align-items: center; gap: 8px; }
   .spacer { flex: 1; }
   .path { color: var(--muted); font: var(--fs-sm) var(--mono); }
@@ -163,7 +164,7 @@
   .line.spec { align-items: center; font-size: var(--fs-sm); }
   .line.spec code { font-size: var(--fs-xs); }
   .f { display: flex; flex-direction: column; gap: 3px; color: var(--muted); font-size: var(--fs-xs); margin-bottom: 8px; }
-  input { background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); padding: 5px 8px; font: inherit; -webkit-user-select: text; user-select: text; }
-  button { background: transparent; color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); padding: 4px 12px; font: inherit; }
+  button { background: var(--raised); color: var(--text); border: 0; box-shadow: inset 0 0 0 1px var(--line); border-radius: var(--r-md); padding: 0 12px; min-height: var(--ctl-h); font: inherit; font-weight: 500; }
+  button:hover:not(:disabled) { background: var(--raised-3); }
   button:disabled { opacity: 0.4; }
 </style>

@@ -176,7 +176,7 @@ func (h *Handler) serveRecording(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		a := problem(r, http.StatusBadGateway, MatchUpstreamError, "upstream: "+err.Error())
 		h.deliver(w, r, a)
-		h.record(r, a, time.Since(start))
+		h.record(r, a, time.Since(start), nil)
 		return
 	}
 	a := answer{status: res.status, match: MatchForwarded}
@@ -190,7 +190,7 @@ func (h *Handler) serveRecording(w http.ResponseWriter, r *http.Request) {
 	}
 	h.relay(w, r, a, res)
 	h.keepOnTape(r, body, res, time.Since(start))
-	h.record(r, a, time.Since(start))
+	h.record(r, a, time.Since(start), nil)
 }
 
 // keepOnTape adds the call to the tape; a tape that cannot be written is a warning, never a failed call.

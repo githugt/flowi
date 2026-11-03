@@ -1,4 +1,5 @@
 <script lang="ts">
+  import Toggle from './Toggle.svelte'
   import { errorText } from './lib/errors'
   import { app } from './lib/app.svelte'
   import { ui } from './lib/ui.svelte'
@@ -327,6 +328,14 @@
     app.pasteOffer = { node, kind, text, http: view.kind === 'http', field: e.target instanceof HTMLElement ? e.target : null }
   }
 
+  // The palette's Send command: only the editor that is showing sends.
+  let seenSend = app.sendRequests
+  $effect(() => {
+    if (app.sendRequests === seenSend) return
+    seenSend = app.sendRequests
+    if (app.active === node) RequestService.Send(node, hooks)
+  })
+
   function onkeydown(e: KeyboardEvent) {
     if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 's') {
       e.preventDefault()
@@ -346,6 +355,8 @@
 
 <div class="req">
   <header {onpaste}>
+    <!-- The method and the address are one field: one outline and one focus ring around both. -->
+    <div class="addr">
     {#if view.kind === 'http'}
       <Dropdown pill title="Method" options={methodOptions} value={v.Method} width="108px" onpick={pickMethod} />
       <div class="url">
@@ -381,14 +392,13 @@
         <MethodPicker {node} info={view.grpc} />
       </div>
     {/if}
-    <VersionPicker {view} {node} onmanage={() => (overlaysOpen = true)} />
-    <div class="send" style:--act={`var(--act-${action.tone})`}>
+    <div class="send" data-tone={action.tone} style:--act={`var(--act-${action.tone})`}>
       {#if view.sending}
         <button class="act main" onclick={() => RequestService.Cancel(node)}>Cancel</button>
       {:else}
-        <button class="act main" onclick={() => RequestService.Send(node, hooks)}>{action.label}</button>
+        <button class="act main" onclick={() => RequestService.Send(node, hooks)}>{action.label}<kbd>⌘↵</kbd></button>
       {/if}
-      <button class="act more" aria-label="Send options" onpointerdown={(e) => e.stopPropagation()} onclick={() => (menu = menu === 'send' ? null : 'send')}>▾</button>
+      <button class="act more" aria-label="Send options" onpointerdown={(e) => e.stopPropagation()} onclick={() => (menu = menu === 'send' ? null : 'send')}><Icon name="chevd" size={14} /></button>
       {#if menu === 'send'}
         <div class="menu" role="menu" tabindex="-1" onpointerdown={(e) => e.stopPropagation()}>
           {#if view.async && view.async.modes.length}
@@ -406,6 +416,8 @@
         </div>
       {/if}
     </div>
+    </div>
+    <VersionPicker {view} {node} onmanage={() => (overlaysOpen = true)} />
     {#if view.dirty}
       <button title="Throw away the unsaved changes" onclick={() => ui.confirm('Discard changes', 'Throw away the unsaved changes of this version?', () => RequestService.DiscardEdit(node), 'Discard')}>Discard</button>
     {/if}
@@ -417,7 +429,7 @@
       {:else}
         <button class="saveicon main" class:pending={view.dirty} title={view.flowiOverlay ? `Save to the flowi overlay ${view.flowiOverlay} (⌘S)` : 'Save (⌘S)'} aria-label="Save" disabled={!view.dirty} onclick={save}><Icon name="save" size={15} /></button>
       {/if}
-      <button class="more" aria-label="Save options" aria-expanded={menu === 'save'} onpointerdown={(e) => e.stopPropagation()} onclick={() => (menu = menu === 'save' ? null : 'save')}>▾</button>
+      <button class="more" aria-label="Save options" aria-expanded={menu === 'save'} onpointerdown={(e) => e.stopPropagation()} onclick={() => (menu = menu === 'save' ? null : 'save')}><Icon name="chevd" size={14} /></button>
       {#if menu === 'save'}
         <div class="menu" role="menu" tabindex="-1" onpointerdown={(e) => e.stopPropagation()}>
           {#if view.flowiOverlay}
@@ -503,6 +515,30 @@
             </span>
           {/if}
         </div>
+        {#if section === 'Body'}
+          <div class="typebar">
+            <Dropdown title="Body type" options={bodyKindOptions} value={view.bodyKind} onpick={(k) => RequestService.SetBodyKind(node, k)} />
+            {#if view.bodyKind === 'text'}
+              <Dropdown title="Format" options={formatOptions} value={view.bodyFormat} onpick={(f) => RequestService.SetBodyFormat(node, f)} />
+            {/if}
+            {#if view.bodyKind === 'text' && view.bodyFormat === 'json'}
+              {#if view.jsonrpc}
+                <span class="rpc" title="This body is a JSON-RPC 2.0 call. Its parameters are edited above.">
+                  <span class="muted">JSON-RPC</span>
+                  <input class="mini" aria-label="JSON-RPC method" placeholder="method" value={view.jsonrpc.method} onchange={(e) => RequestService.SetJSONRPC(node, 'method', e.currentTarget.value)} />
+                  <input class="mini id" aria-label="JSON-RPC id" placeholder="id" title="The call's id. Empty makes it a notification: no id, no answer." value={view.jsonrpc.id} onchange={(e) => RequestService.SetJSONRPC(node, 'id', e.currentTarget.value)} />
+                </span>
+              {:else}
+                <button class="link" title="Wrap this body as the parameters of a JSON-RPC 2.0 call" onclick={() => RequestService.MakeJSONRPC(node)}>Make it a JSON-RPC call</button>
+              {/if}
+            {/if}
+            {#if view.bodyKind === 'form'}
+              <Toggle checked={view.multipart} onchange={(on) => RequestService.SetMultipart(node, on)}>Multipart</Toggle>
+            {/if}
+          </div>
+        {:else if section === 'Auth'}
+          <div class="typebar"><Dropdown title="Auth type" options={authOptions} value={view.auth.kind} onpick={pickAuth} /></div>
+        {/if}
         <div class="section">
           {#if ['Message', 'Receive', 'Credentials', 'Binding', 'Proto'].includes(section)}
             <MessageSections {view} {section} />
@@ -531,11 +567,13 @@
             {:else if view.bodyKind === 'file'}
               <TextField label="File path" mono value={v.Body.File} oninput={(t) => RequestService.SetBodyFile(node, t)} />
             {:else}
-              <EmptyState icon="body" title="No body" hint="Pick a body type below to send text, a form or a file." compact />
+              <EmptyState icon="body" title="No body" hint="Pick a body type above to send text, a form or a file." compact />
             {/if}
           {:else if section === 'Auth'}
             {#if view.auth.kind === 'none'}
-              <EmptyState icon="auth" title="No auth" hint={'Pick a type below. Keep credentials out of the file: use {{secret.name}}.'} compact />
+              <EmptyState icon="auth" title="No auth" hint={'Pick a type above. Keep credentials out of the file: use {{secret.name}}.'} compact>
+                <button onclick={() => pickAuth('bearer')}>Bearer token</button><button onclick={() => pickAuth('basic')}>Basic</button>
+              </EmptyState>
             {:else if isScheme}
               {#each view.auth.fields as f (f.name)}
                 <TextField label={f.name + (f.known ? '' : ' (not a parameter of this scheme)')} mono placeholder={f.secret ? '{{secret.' + f.name + '}}' : ''} value={f.value} oninput={(t) => RequestService.SetAuthParam(node, f.name, t)} />
@@ -612,30 +650,6 @@
           {/if}
         </div>
       {/if}
-        {#if section === 'Body'}
-          <div class="typebar">
-            <Dropdown title="Body type" options={bodyKindOptions} value={view.bodyKind} onpick={(k) => RequestService.SetBodyKind(node, k)} />
-            {#if view.bodyKind === 'text'}
-              <Dropdown title="Format" options={formatOptions} value={view.bodyFormat} onpick={(f) => RequestService.SetBodyFormat(node, f)} />
-            {/if}
-            {#if view.bodyKind === 'text' && view.bodyFormat === 'json'}
-              {#if view.jsonrpc}
-                <span class="rpc" title="This body is a JSON-RPC 2.0 call. Its parameters are edited above.">
-                  <span class="muted">JSON-RPC</span>
-                  <input class="mini" aria-label="JSON-RPC method" placeholder="method" value={view.jsonrpc.method} onchange={(e) => RequestService.SetJSONRPC(node, 'method', e.currentTarget.value)} />
-                  <input class="mini id" aria-label="JSON-RPC id" placeholder="id" title="The call's id. Empty makes it a notification: no id, no answer." value={view.jsonrpc.id} onchange={(e) => RequestService.SetJSONRPC(node, 'id', e.currentTarget.value)} />
-                </span>
-              {:else}
-                <button class="link" title="Wrap this body as the parameters of a JSON-RPC 2.0 call" onclick={() => RequestService.MakeJSONRPC(node)}>Make it a JSON-RPC call</button>
-              {/if}
-            {/if}
-            {#if view.bodyKind === 'form'}
-              <label class="radio"><input type="checkbox" checked={view.multipart} onchange={(e) => RequestService.SetMultipart(node, e.currentTarget.checked)} />Multipart</label>
-            {/if}
-          </div>
-        {:else if section === 'Auth'}
-          <div class="typebar"><Dropdown title="Auth type" options={authOptions} value={view.auth.kind} onpick={pickAuth} /></div>
-        {/if}
     </div>
     <Splitter name="request-left" side="left" min={300} max={1000} bind:width={leftWidth} />
     <div class="right"><ResponsePane {view} /></div>
@@ -646,29 +660,34 @@
   .xmlnote { margin: 4px 0 0; font-size: var(--fs-xs); color: var(--muted); }
   .xmlnote.bad { color: var(--warn); }
   .req { position: absolute; inset: 0; display: flex; flex-direction: column; }
-  header { display: flex; gap: 8px; padding: 10px 12px; border-bottom: 1px solid var(--line); align-items: center; }
+  header { display: flex; gap: 8px; padding: 12px 16px; border-bottom: 1px solid var(--line); align-items: center; }
+  .addr { flex: 1; min-width: 0; display: flex; align-items: center; height: var(--addr-h); box-sizing: border-box; background: var(--panel); border: 1px solid var(--line); border-radius: var(--r-lg); transition: border-color var(--t-fast) var(--ease-out), box-shadow var(--t-fast) var(--ease-out); }
+  .addr:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px var(--tint-accent); }
+  /* The fields inside draw no edge of their own: the bar does. */
+  .addr :global(input), .addr :global(.field), .addr :global(.box) { background: none; border: 0; box-shadow: none; min-height: 0; }
+  .addr :global(.dd .btn) { background: none; border: 0; border-right: 1px solid var(--line); border-radius: var(--r-lg) 0 0 var(--r-lg); min-height: 36px; }
+  .addr > .url2 { padding-right: 6px; }
   .url { flex: 1; min-width: 0; }
   .url2 { flex: 1; min-width: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
   .url2 :global(input) { width: 100%; box-sizing: border-box; }
   .url :global(input) { width: 100%; box-sizing: border-box; }
   select, button {
-    background: var(--bg);
+    background: var(--raised);
     color: var(--text);
-    border: 1px solid var(--line);
+    border: 0;
     border-radius: var(--r-md);
     font: inherit;
   }
   /* The toolbar's controls share one height, so the method, the address and the buttons sit on one line. */
-  select, button { padding: 5px 10px; min-height: 32px; box-sizing: border-box; }
-  header :global(input) { min-height: 32px; box-sizing: border-box; }
-  button { background: transparent; }
-  button:hover:not(:disabled) { border-color: var(--accent); }
+  select, button { padding: 0 12px; min-height: var(--addr-h); box-sizing: border-box; font-weight: 500; }
+  header :global(input) { min-height: var(--addr-h-sm); box-sizing: border-box; }
+  button:hover:not(:disabled) { background: var(--raised-3); }
   button:disabled { opacity: 0.4; }
   .send { position: relative; display: flex; gap: 2px; }
-  .more { padding: 5px 8px; min-height: 32px; }
+  .more { padding: 0 8px; min-height: var(--addr-h); }
   .menu {
     position: absolute; top: 100%; right: 0; margin-top: 4px; min-width: 150px; display: flex; flex-direction: column; padding: 4px;
-    background: var(--panel); border: 1px solid var(--line); border-radius: var(--r-lg); box-shadow: var(--shadow); z-index: 20;
+    background: var(--raised); border: 1px solid var(--line); border-radius: var(--r-lg); box-shadow: var(--shadow); z-index: 20;
   }
   .menu button { border: 0; text-align: left; }
   .hd { color: var(--muted); font-size: var(--fs-xs); padding: 2px 10px; }
@@ -682,9 +701,10 @@
   .specbar code, .overlaynote code { font-size: var(--fs-xs); }
   .specbar .link { background: none; border: 0; padding: 0; color: var(--accent); font: inherit; }
   .rpc { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; min-width: 0; }
-  .rpc .mini { width: 110px; background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); padding: 2px 6px; font: inherit; font-size: var(--fs-sm); }
+  .rpc .mini { width: 110px; background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); padding: 2px 6px; font: inherit; font-size: var(--fs-sm); }
   .rpc .mini.id { width: 64px; }
-  .typebar .link { background: none; border: 0; padding: 0; color: var(--accent); font: inherit; font-size: var(--fs-sm); }
+  .typebar .link { background: none; border: 0; box-shadow: none; padding: 0 10px; min-height: var(--ctl-h); border-radius: var(--r-md); color: var(--accent); font: inherit; font-size: var(--fs-sm); }
+  .typebar .link:hover { background: var(--tint-accent); }
   .overlaynote { margin: 0 0 6px; font-size: var(--fs-xs); }
   .err { color: var(--fail); background: color-mix(in srgb, var(--fail) 12%, transparent); }
   .panels { flex: 1; min-height: 0; display: flex; }
@@ -708,14 +728,24 @@
   .docsbar button.on { color: var(--text); background: var(--panel); }
   .docsbar button:disabled { opacity: 0.5; }
   .docsview { flex: 1; min-height: 0; overflow: auto; padding: 4px 2px; }
-  .typebar { flex: none; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; padding: 6px 10px; border-top: 1px solid var(--line); }
-  .act { background: var(--act); color: var(--on-act); border-color: var(--act); font-weight: 600; box-shadow: 0 2px 10px color-mix(in srgb, var(--act) 32%, transparent); }
-  .act:hover:not(:disabled) { border-color: var(--act); background: color-mix(in srgb, var(--act) 88%, white); }
+  .typebar { flex: none; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; padding: 6px 10px; border-bottom: 1px solid var(--line); }
+  /* Every main action is a gradient with a soft glow: Send in the colour chosen in Settings, listening and the
+     two-way modes in their own, so the mode still reads at a glance. */
+  .send { --act-fill: linear-gradient(135deg, color-mix(in srgb, var(--act) 78%, white), var(--act)); --act-glow: color-mix(in srgb, var(--act) 34%, transparent); --act-ink: var(--on-act); }
+  .send[data-tone='send'] { --act-fill: var(--send-fill); --act-glow: var(--send-glow); --act-ink: var(--on-send); }
+  .act { background: var(--act-fill); color: var(--act-ink); border: 0; font-weight: 600; box-shadow: var(--send-edge), 0 2px 6px var(--act-glow); }
+  .act:hover:not(:disabled) { background: var(--act-fill); filter: brightness(1.1); }
+  .act:active:not(:disabled) { filter: brightness(0.95); }
   /* The floppy disk is the save everyone knows; the words stay as the tooltip and the name read aloud. */
   .saveicon { display: flex; align-items: center; padding-inline: 9px; }
-  .send .main { border-radius: 6px 0 0 6px; white-space: nowrap; }
-  .send .more { border-radius: 0 6px 6px 0; border-left-color: color-mix(in srgb, var(--on-act) 35%, transparent); }
-  .savegrp .more:not(.primary) { border-left-color: var(--line); }
+  .send .main { border-radius: var(--r-md) 0 0 var(--r-md); white-space: nowrap; display: inline-flex; align-items: center; gap: 7px; }
+  .send .main kbd { font: 500 var(--fs-xs) var(--font, system-ui); padding: 0 5px; border-radius: var(--r-sm); background: rgb(255 255 255 / 0.22); color: inherit; text-shadow: none; }
+  /* Inside the address bar the buttons are shorter than the bar, so it frames them. */
+  .addr .send { margin-right: 4px; }
+  .addr .send button { min-height: var(--ctl-h); }
+  .send .more { border-radius: 0 var(--r-md) var(--r-md) 0; display: inline-flex; align-items: center; justify-content: center; }
+  .send .act.more { border-left: 1px solid rgb(0 0 0 / 0.22); }
+  .send:not(.savegrp) { gap: 0; }
   /* The button stays dark; the disk takes the accent colour while there is something to save. */
   .savegrp .pending { color: var(--accent); }
   .menu .tick { width: 14px; display: inline-block; }
@@ -723,11 +753,10 @@
   .menu kbd { margin-left: auto; padding-left: 16px; color: var(--muted); font: inherit; font-size: var(--fs-xs); }
   .menu button { display: flex; align-items: center; white-space: nowrap; }
   .section { flex: 1; overflow: auto; padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; }
-  .radio { display: flex; gap: 4px; align-items: center; }
   .muted { color: var(--muted); font-size: var(--fs-sm); margin: 0; }
   .row { display: flex; gap: 4px; }
   .row input {
-    flex: 1; min-width: 0; background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); padding: 5px 8px;
+    flex: 1; min-width: 0; background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); padding: 5px 8px;
     font: var(--fs-sm) var(--mono); -webkit-user-select: text; user-select: text;
   }
   .row .k { flex: 0 0 28%; }

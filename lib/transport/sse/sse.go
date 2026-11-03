@@ -97,7 +97,7 @@ func readEvents(ctx context.Context, resp *http.Response, op transport.Operation
 		if len(data) == 0 || (op.Channel != "" && eventType(event) != op.Channel) {
 			return true
 		}
-		m := transport.Message{Direction: "received", At: op.Now(), Body: []byte(strings.Join(data, "\n"))}
+		m := transport.Message{Direction: "received", At: op.Now(), Body: []byte(strings.Join(data, "\n")), Type: eventType(event)}
 		if id != "" {
 			m.Headers = append(m.Headers, transport.Header{Name: "id", Value: id})
 		}

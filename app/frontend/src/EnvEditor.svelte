@@ -1,4 +1,5 @@
 <script lang="ts">
+  import Button from './Button.svelte'
   import HiddenChars from './HiddenChars.svelte'
   import { EnvironmentService } from '../bindings/github.com/githugt/flowi/app/internal/bridge'
   import type { EnvRow, EnvView, MissingVar } from './lib/types'
@@ -65,7 +66,7 @@
         <button class="sw" class:on={view.colour === c} role="radio" aria-checked={view.colour === c} title={c} aria-label={c} style:background={envSwatch(c)} onclick={() => EnvironmentService.SetColour(node, c)}></button>
       {/each}
     </div>
-    <button class="primary" disabled={!view.dirty} onclick={() => EnvironmentService.Save(node)}>Save</button>
+    <Button variant="primary" disabled={!view.dirty} onclick={() => EnvironmentService.Save(node)}>Save</Button>
   </header>
   <FileBanner
     onDisk={view.onDisk}
@@ -116,13 +117,13 @@
 
 <style>
   .env { position: absolute; inset: 0; display: flex; flex-direction: column; }
-  .base { display: flex; align-items: center; gap: 6px; margin-right: 12px; font-size: 12px; color: var(--muted); }
-  .base select { height: 28px; }
+  .base { display: flex; align-items: center; gap: 6px; margin-right: 12px; font-size: var(--fs-sm); color: var(--muted); }
+  .base select { height: var(--ctl-h); }
   .swatches { display: flex; align-items: center; gap: 6px; margin-right: 8px; }
   .sw { width: 16px; height: 16px; padding: 0; border-radius: 50%; border: 2px solid transparent; box-sizing: border-box; background: var(--bg); }
   .sw.none { border: 1px dashed var(--muted); }
   .sw.on { outline: 2px solid var(--text); outline-offset: 1px; }
-  header { height: 40px; flex: none; display: flex; align-items: center; gap: 8px; padding: 0 12px; border-bottom: 1px solid var(--line); }
+  header { height: var(--head-h); flex: none; display: flex; align-items: center; gap: 8px; padding: 0 12px; border-bottom: 1px solid var(--line); }
   .dirty { color: var(--accent); font-size: var(--fs-xs); }
   .spacer { flex: 1; }
   .body { padding: 12px 16px; overflow: auto; display: flex; flex-direction: column; gap: 6px; max-width: 900px; }
@@ -131,17 +132,17 @@
   .head, .row { display: grid; grid-template-columns: 1fr 1.6fr 96px 70px 24px; gap: 6px; align-items: center; }
   .head { color: var(--muted); font-size: var(--fs-xs); }
   input[type='text'], input[type='password'], input:not([type]) {
-    min-width: 0; background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); padding: 5px 8px;
+    min-width: 0; background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); padding: 5px 8px;
     font: var(--fs-sm) var(--mono); -webkit-user-select: text; user-select: text;
   }
   input:focus { border-color: var(--accent); }
   .cell { position: relative; display: flex; min-width: 0; }
   .cell input { flex: 1; min-width: 0; }
-  .kind { height: 28px; min-width: 0; }
+  .kind { height: var(--ctl-h); min-width: 0; }
   .secret { display: flex; align-items: center; gap: 4px; font-size: var(--fs-xs); color: var(--muted); }
-  button { background: transparent; color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); padding: 3px 12px; font: inherit; }
+  button { background: var(--raised); color: var(--text); border: 0; box-shadow: inset 0 0 0 1px var(--line); border-radius: var(--r-md); padding: 0 12px; min-height: var(--ctl-h); font: inherit; font-weight: 500; }
+  button:hover:not(:disabled) { background: var(--raised-3); }
   button:disabled { opacity: 0.4; }
-  .primary:not(:disabled) { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
   .x { border: 0; color: var(--muted); padding: 0; }
   .unset { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-1) var(--sp-2); padding: var(--sp-2) var(--sp-3); margin-bottom: var(--sp-2); border: 1px solid color-mix(in srgb, var(--warn) 45%, var(--line)); border-radius: var(--r-lg); background: color-mix(in srgb, var(--warn) 8%, transparent); font-size: var(--fs-sm); }
   .chip { font-family: var(--mono); font-size: var(--fs-xs); border-radius: var(--r-pill); padding: 1px 10px; }

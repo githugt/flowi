@@ -46,10 +46,10 @@
 
 <style>
   .picker { position: relative; }
-  .btn { height: 32px; box-sizing: border-box; background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); padding: 4px 8px; font: inherit; white-space: nowrap; }
+  .btn { height: 32px; box-sizing: border-box; background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); padding: 4px 8px; font: inherit; white-space: nowrap; }
   .muted { color: var(--muted); }
   .caret { color: var(--muted); font-size: var(--fs-xs); }
-  .menu { position: absolute; z-index: 20; top: calc(100% + 4px); right: 0; min-width: 200px; background: var(--panel); border: 1px solid var(--line); border-radius: var(--r-md); box-shadow: var(--shadow); padding: 4px; display: flex; flex-direction: column; }
+  .menu { position: absolute; z-index: 20; top: calc(100% + 4px); right: 0; min-width: 200px; background: var(--raised); border: 1px solid var(--line); border-radius: var(--r-md); box-shadow: var(--shadow); padding: 4px; display: flex; flex-direction: column; }
   .menu button { display: flex; gap: 6px; text-align: left; background: none; border: 0; color: var(--text); font: inherit; padding: 4px 8px; border-radius: var(--r-sm, 6px); }
   .menu button:hover { background: var(--tint-hover); }
   .tick { width: 14px; color: var(--accent); }

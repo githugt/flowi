@@ -125,10 +125,12 @@ type RecordMessage struct {
 	At        time.Time `json:"at"`
 	Headers   []Header  `json:"headers,omitempty"`
 	Body      Body      `json:"body"`
-	Key       string    `json:"key,omitempty"`
-	Partition int32     `json:"partition,omitempty"`
-	Offset    int64     `json:"offset,omitempty"`
-	Sequence  uint64    `json:"sequence,omitempty"`
+	// Type is the protocol's name for the kind of message (an SSE event name, a WebSocket frame kind), when it has one.
+	Type      string `json:"type,omitempty"`
+	Key       string `json:"key,omitempty"`
+	Partition int32  `json:"partition,omitempty"`
+	Offset    int64  `json:"offset,omitempty"`
+	Sequence  uint64 `json:"sequence,omitempty"`
 }
 
 // The kinds of record, and the outcomes of an async one.

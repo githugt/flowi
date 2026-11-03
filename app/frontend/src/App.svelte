@@ -10,7 +10,7 @@
   import { collapsedOnOpen, loadPins, savePins, type TabKind } from './lib/sidebar'
   import Verb from './Verb.svelte'
   import Icon from './Icon.svelte'
-  import { ui } from './lib/ui.svelte'
+  import { ui, type MenuItem } from './lib/ui.svelte'
   import { newMenu, promptNewEnvironment } from './lib/menus'
   import EnvOffers from './EnvOffers.svelte'
 
@@ -56,8 +56,11 @@
   import Overlays from './Overlays.svelte'
   import PasteOffer from './PasteOffer.svelte'
   import HooksEditor from './HooksEditor.svelte'
+  import HomeScreen from './HomeScreen.svelte'
+  import Logo from './Logo.svelte'
   import WelcomeScreen from './WelcomeScreen.svelte'
   import TelemetryScreen from './TelemetryScreen.svelte'
+  import TracingScreen from './TracingScreen.svelte'
   import Announcements from './Announcements.svelte'
   import EnvEditor from './EnvEditor.svelte'
   import Footer from './Footer.svelte'
@@ -104,7 +107,13 @@
   const tab = $derived(app.tabs.find((t) => t.node === app.active))
   // The picker takes the colour of the environment it shows, so a production one cannot be mistaken for a test one.
   const selectedSwatch = $derived(envSwatch(app.tree?.envColours?.[app.tree?.selected ?? '']))
-  const NEW_ENV = ':new' // the picker's "New environment…" entry; ':' is not allowed in an environment name
+  // The environment chip's menu: "No environment", each environment (the current one ticked), then a way to make one.
+  function environmentMenu(): MenuItem[] {
+    const selected = app.tree?.selected ?? ''
+    const choices = ['', ...(app.tree?.environments ?? [])]
+    const items: MenuItem[] = choices.map((name) => ({ label: name || 'No environment', checked: name === selected, run: () => app.selectEnvironment(name) }))
+    return [...items, { label: '', separator: true, run: () => {} }, { label: 'New environment…', run: promptNewEnvironment }]
+  }
 
   // Tabs are reordered by dragging with the pointer (the browser's own drag and drop
   // is not reliable in the window's web view). A press only becomes a drag after a few pixels.
@@ -179,6 +188,10 @@
   <section class:folded={collapsed}>
     <Announcements />
     <nav class="tabs">
+      <!-- With the sidebar folded, Home is the top of the rail instead. -->
+      {#if !collapsed}
+        <button class="home" class:on={app.active === 'screen:home'} title="Home" aria-label="Home" aria-current={app.active === 'screen:home' ? 'page' : undefined} onpointerdown={(e) => e.stopPropagation()} onclick={() => app.openScreen('screen:home', 'Home')}><Logo size={22} /></button>
+      {/if}
       <div class="strip" class:fade-left={overflow.left} class:fade-right={overflow.right} bind:this={strip} onscroll={measureOverflow} onwheel={stripWheel}>
         {#each app.tabs as t (t.node)}
           {@const verb = t.kind === 'flow' ? 'FLOW' : app.requests[t.node]?.verb || app.find(t.node)?.method || ''}
@@ -212,19 +225,12 @@
         <button class="plus" title="New…" aria-label="New" onpointerdown={(e) => e.stopPropagation()} onclick={(e) => { const r = e.currentTarget.getBoundingClientRect(); ui.openMenu(r.left, r.bottom + 4, newMenu()) }}><Icon name="plus" /></button>
         {#if app.tree}
           <!-- Always shown, even with no environments yet: it is where a new user learns they need one. -->
-          <select class="envsel" class:none={!app.tree.selected} class:tinted={!!selectedSwatch} style:--env={selectedSwatch} title="Environment: where {'{{env.…}}'} values come from" aria-label="Environment" value={app.tree.selected}
-            onchange={(e) => {
-              const v = e.currentTarget.value
-              if (v === NEW_ENV) {
-                e.currentTarget.value = app.tree?.selected ?? ''
-                promptNewEnvironment()
-              } else app.selectEnvironment(v)
-            }}>
-            <option value="">No environment</option>
-            {#each app.tree.environments as name}<option value={name}>{name}</option>{/each}
-            <option disabled>──────────</option>
-            <option value={NEW_ENV}>New environment…</option>
-          </select>
+          <button class="envsel" class:none={!app.tree.selected} class:tinted={!!selectedSwatch} style:--env={selectedSwatch} title="Environment: where {'{{env.…}}'} values come from" aria-label="Environment: {app.tree.selected || 'none'}" aria-haspopup="menu"
+            onpointerdown={(e) => e.stopPropagation()} onclick={(e) => { const r = e.currentTarget.getBoundingClientRect(); ui.openMenu(r.left, r.bottom + 4, environmentMenu()) }}>
+            <span class="envdot" aria-hidden="true"></span>
+            <span class="envname">{app.tree.selected || 'No environment'}</span>
+            <svg class="envchev" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6" /></svg>
+          </button>
         {/if}
       </div>
     </nav>
@@ -247,10 +253,14 @@
         {#key tab.node}
           <EnvEditor view={app.envs[tab.node]} />
         {/key}
+      {:else if tab && tab.node === 'screen:home'}
+        <HomeScreen />
       {:else if tab && tab.node === 'screen:welcome'}
         <WelcomeScreen />
       {:else if tab && tab.node === 'screen:telemetry'}
         <TelemetryScreen />
+      {:else if tab && tab.node === 'screen:tracing'}
+        <TracingScreen />
       {:else if tab && tab.node === 'screen:settings'}
         <SettingsScreen />
       {:else if tab && tab.node === 'screen:secrets'}
@@ -292,10 +302,13 @@
     flex: none;
     display: flex;
     align-items: flex-end;
-    background: var(--panel);
-    border-bottom: 1px solid var(--line);
+    background: var(--chrome);
     --wails-draggable: drag;
   }
+  /* The way back to Home, ahead of the tabs and outside their scrolling strip, so it is always there. */
+  .home { flex: none; align-self: center; --wails-draggable: no-drag; margin: 0 0 0 8px; padding: 4px; display: grid; place-items: center; background: none; border: 0; border-radius: var(--r-md); opacity: 0.85; }
+  .home:hover { background: var(--tint-hover); opacity: 1; }
+  .home.on { background: var(--tint-sel); opacity: 1; }
   .strip { flex: 1; min-width: 0; display: flex; align-items: flex-end; gap: 2px; padding: 0 8px; overflow-x: auto; scrollbar-width: none; align-self: stretch; }
   .strip::-webkit-scrollbar { display: none; }
   /* A soft edge where more tabs are scrolled out of sight. A mask reads only alpha, so black is opaque, not a colour. */
@@ -308,14 +321,14 @@
     align-items: center;
     max-width: 240px;
     border: 1px solid transparent;
-    border-bottom: 2px solid transparent;
-    border-radius: 8px 8px 0 0;
+    border-bottom: 0;
+    border-radius: var(--r-lg) var(--r-lg) 0 0;
     --wails-draggable: no-drag;
   }
   .tab.dragging { opacity: 0.35; cursor: grabbing; }
   .ghost {
     position: fixed; z-index: 80; pointer-events: none; display: flex; align-items: center; gap: 6px; padding: 6px 12px;
-    background: var(--panel); color: var(--text); border: 1px solid var(--accent); border-radius: var(--r-md); box-shadow: var(--shadow); white-space: nowrap;
+    background: var(--raised); color: var(--text); border: 1px solid var(--accent); border-radius: var(--r-md); box-shadow: var(--shadow); white-space: nowrap;
   }
   .dropmark { position: fixed; z-index: 79; width: 2px; margin-left: -1px; background: var(--accent); border-radius: 1px; pointer-events: none; }
   .dropmark span {
@@ -324,7 +337,7 @@
     font-size: var(--fs-xs); color: var(--on-accent); background: var(--accent); border-radius: var(--r-sm);
   }
   .tab:hover { background: var(--tint-hover); }
-  .tab.active { background: var(--bg); border-color: var(--line); border-bottom-color: var(--accent); }
+  .tab.active { background: var(--bg); border-color: var(--line); margin-bottom: -1px; position: relative; z-index: 2; }
   .tab button { background: none; border: 0; color: var(--text); font: inherit; }
   .tab .name { display: flex; align-items: center; gap: 6px; padding: 8px 6px 8px 8px; min-width: 0; }
   .tab:not(.active) .name { color: var(--muted); }
@@ -339,8 +352,12 @@
   .plus:hover { color: var(--text); border-color: var(--accent); }
   .envsel.tinted { background: color-mix(in srgb, var(--env) 30%, var(--bg)); border-color: var(--env); }
   .envsel.none { color: var(--warn); border-color: color-mix(in srgb, var(--warn) 60%, var(--line)); }
-  .envsel { background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); font: inherit; padding: 3px 6px; max-width: 160px; }
-  .body { flex: 1; min-height: 0; position: relative; }
+  .envsel { display: flex; align-items: center; gap: 6px; background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: var(--r-pill); font: inherit; padding: 3px 8px 3px 10px; max-width: 180px; }
+  .envdot { flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--env, var(--muted)); }
+  .envsel.none .envdot { background: var(--warn); }
+  .envname { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .envchev { flex: none; color: var(--muted); }
+  .body { flex: 1; min-height: 0; position: relative; background: var(--bg); border-top: 1px solid var(--line); border-left: 1px solid var(--line); }
   .empty { color: var(--muted); text-align: center; margin-top: 20vh; }
   .err { position: absolute; left: 16px; bottom: 16px; color: var(--fail); }
 </style>

@@ -562,6 +562,34 @@ func TestSettingsService_State_should_list_groups_and_the_appearance(t *testing.
 	}
 }
 
+func TestSettingsService_State_Given_no_choice_When_read_Then_send_button_is_orange_and_a_choice_is_kept(t *testing.T) {
+	app, _ := fixture(t)
+	svc := app.Settings()
+
+	before := svc.State().Appearance.SendButton
+	svc.Set("appearance.send_button", "emerald")
+	after := svc.State().Appearance.SendButton
+
+	// Before: the Send button had one fixed colour; the window could not be told another.
+	if before != "orange" || after != "emerald" {
+		t.Fatalf("send button before %q, after %q; want orange then emerald", before, after)
+	}
+}
+
+func TestSettingsService_State_Given_no_choice_When_read_Then_density_is_comfortable_and_a_choice_is_kept(t *testing.T) {
+	app, _ := fixture(t)
+	svc := app.Settings()
+
+	before := svc.State().Appearance.Density
+	svc.Set("appearance.density", "compact")
+	after := svc.State().Appearance.Density
+
+	// Before: rows, controls and gaps had one size; a crowded workspace could not be shown tighter.
+	if before != "comfortable" || after != "compact" {
+		t.Fatalf("density before %q, after %q; want comfortable then compact", before, after)
+	}
+}
+
 func TestSecretsService_State_should_list_secrets_without_values(t *testing.T) {
 	c := vmtest.SampleCollection()
 	b := &vmtest.Backend{Cols: []model.Collection{c}, SecretList: []flowi.SecretInfo{{Environment: "staging", Name: "password"}}}
@@ -623,6 +651,27 @@ func TestSchedulesService_Save_should_add_a_schedule_and_report_bad_input(t *tes
 	}
 	if !strings.Contains(badInput, "name=value") {
 		t.Fatalf("bad input said %q", badInput)
+	}
+}
+
+func TestSchedulesService_State_should_say_a_schedule_in_words_and_when_it_fires(t *testing.T) {
+	c := vmtest.SampleCollection()
+	b := &vmtest.Backend{Cols: []model.Collection{c}}
+	app := bridge.NewApp(b, bridge.NewInlineActor(), (&published{}).emit)
+	app.Start(t.Context())
+	svc := app.Schedules()
+	svc.State()
+	svc.Save("", bridge.ScheduleView{Name: "nightly", Flow: "signup", Cron: "0 3 * * *"})
+	svc.Save("", bridge.ScheduleView{Name: "paused", Flow: "signup", Cron: "@hourly", Disabled: true})
+
+	v := svc.State()
+
+	nightly, paused := v.Schedules[0], v.Schedules[1]
+	if nightly.When != "Every day at 03:00" || nightly.NextAt == "" || len(nightly.Fires) != 1 {
+		t.Fatalf("nightly %+v", nightly)
+	}
+	if paused.NextAt != "" || len(paused.Fires) != 0 || paused.Fires == nil {
+		t.Fatalf("a disabled schedule is never due, and its firings are an empty list, not null: %+v", paused)
 	}
 }
 
@@ -2186,5 +2235,30 @@ func TestFlowService_Connect_should_add_an_arrow_and_keep_the_one_the_step_alrea
 	slices.Sort(from)
 	if !slices.Equal(from, []string{"login", "wait"}) {
 		t.Fatalf("arrows into verify come from %v, want login and wait", from)
+	}
+}
+
+func TestSessionService_ShowWelcome_should_be_true_only_the_first_time(t *testing.T) {
+	b := &vmtest.Backend{Session: t.TempDir()}
+	first := bridge.NewApp(b, bridge.NewInlineActor(), (&published{}).emit).Session().ShowWelcome()
+	second := bridge.NewApp(b, bridge.NewInlineActor(), (&published{}).emit).Session().ShowWelcome() // the next launch
+
+	if !first || second {
+		t.Fatalf("first %v, second %v", first, second)
+	}
+}
+
+// The response judged the checks the request had when it was sent. One added or edited afterwards has not been
+// checked, so the window must not show it as passed.
+func TestRequestService_Send_should_say_which_checks_the_response_judged(t *testing.T) {
+	reqs, v, pub, _ := openLogin(t)
+	reqs.SetAssert(v.Node, []string{"status == 200"})
+
+	reqs.Send(v.Node, "")
+	reqs.SetAssert(v.Node, []string{"status == 200", "body.ok == true"})
+	got := pub.last["request"].(bridge.RequestView)
+
+	if got.Response == nil || len(got.Response.Checks) != 1 || got.Response.Checks[0] != "status == 200" {
+		t.Fatalf("checks judged %+v", got.Response)
 	}
 }

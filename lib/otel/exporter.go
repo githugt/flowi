@@ -67,6 +67,43 @@ type Exporter struct {
 	errMu   sync.Mutex
 	errs    []error
 	done    chan struct{}
+
+	statMu     sync.Mutex // guards the fields below
+	sent       int64
+	failed     int64
+	lastErr    string
+	lastExport time.Time
+}
+
+// Status is how exporting has gone since the exporter started.
+type Status struct {
+	Sent       int64     // traces the collector accepted
+	Failed     int64     // traces it refused or that could not be sent
+	Dropped    int64     // traces discarded because the queue was full or too many runs were open
+	LastError  string    // why the latest export failed; "" when the latest one worked
+	LastExport time.Time // when the latest export finished, either way; zero before the first
+}
+
+// Status reports the exporter's progress, for a screen that shows whether
+// traces are arriving.
+func (e *Exporter) Status() Status {
+	e.statMu.Lock()
+	defer e.statMu.Unlock()
+	return Status{Sent: e.sent, Failed: e.failed, Dropped: e.dropped.Load(), LastError: e.lastErr, LastExport: e.lastExport}
+}
+
+// noteExport records the outcome of one export for Status.
+func (e *Exporter) noteExport(err error) {
+	e.statMu.Lock()
+	defer e.statMu.Unlock()
+	e.lastExport = e.cfg.Now()
+	if err != nil {
+		e.failed++
+		e.lastErr = err.Error()
+		return
+	}
+	e.sent++
+	e.lastErr = ""
 }
 
 // New starts an exporter. An empty or malformed endpoint is an error:
@@ -196,7 +233,9 @@ func (e *Exporter) Dropped() int64 { return e.dropped.Load() }
 func (e *Exporter) work() {
 	defer close(e.done)
 	for body := range e.queue {
-		if err := e.post(body); err != nil {
+		err := e.post(body)
+		e.noteExport(err)
+		if err != nil {
 			e.record(err)
 		}
 	}

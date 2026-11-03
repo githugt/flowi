@@ -18,6 +18,7 @@ import * as SecretsService from "./secretsservice.js";
 import * as SessionService from "./sessionservice.js";
 import * as SettingsService from "./settingsservice.js";
 import * as SystemService from "./systemservice.js";
+import * as TracingService from "./tracingservice.js";
 import * as TrashService from "./trashservice.js";
 import * as WelcomeService from "./welcomeservice.js";
 import * as WorkspaceService from "./workspaceservice.js";
@@ -38,6 +39,7 @@ export {
     SessionService,
     SettingsService,
     SystemService,
+    TracingService,
     TrashService,
     WelcomeService,
     WorkspaceService
@@ -59,6 +61,9 @@ export {
     BodyLineView,
     BreakageView,
     Call,
+    CallHeader,
+    CallPart,
+    CallView,
     Card,
     ChecksChoices,
     ChipView,
@@ -96,9 +101,11 @@ export {
     GeneratedView,
     HelpItemView,
     HistoryItem,
+    HomeView,
     HookTick,
     HooksView,
     IOView,
+    IdeaView,
     ImportFileView,
     ImportItemView,
     ImportKindView,
@@ -177,6 +184,8 @@ export {
     TableView,
     TelemetryView,
     TestView,
+    TraceTestView,
+    TracingView,
     TrafficRow,
     TrashItemView,
     TrashView,

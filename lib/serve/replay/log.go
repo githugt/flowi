@@ -34,6 +34,8 @@ type Entry struct {
 	Latency  time.Duration `json:"latency"`  // simulated delay
 	Duration time.Duration `json:"duration"` // time to answer, delay included
 	Remote   string        `json:"remote,omitempty"`
+	// Exchange is what the call carried and got, when Options.Capture is set. Not in the JSON: see Exchange.
+	Exchange *Exchange `json:"-"`
 }
 
 // subscriberBuffer is how many entries a slow subscriber can fall behind

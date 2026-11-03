@@ -125,8 +125,8 @@
 </footer>
 
 <style>
-  footer { flex: none; border-top: 1px solid var(--line); background: var(--panel); display: flex; flex-direction: column; }
-  .tabs { display: flex; align-items: flex-end; gap: 2px; padding: 0 8px; height: 28px; }
+  footer { flex: none; background: var(--chrome); display: flex; flex-direction: column; }
+  .tabs { display: flex; align-items: flex-end; gap: 2px; padding: 0 8px; height: var(--ctl-h); }
   .tabs button { background: none; border: 0; border-bottom: 2px solid transparent; color: var(--muted); font: inherit; font-size: var(--fs-sm); padding: 4px 10px 2px; border-radius: 0; }
   .tabs button.on { color: var(--text); border-bottom-color: var(--accent); }
   .tabs button:hover { color: var(--text); }
@@ -138,7 +138,7 @@
   .branch { color: var(--text); }
   .sum { color: var(--muted); font-size: var(--fs-sm); margin-left: 12px; }
   .link { color: var(--accent) !important; }
-  .body { height: 220px; overflow: auto; padding: 6px 12px; border-top: 1px solid var(--line); font: var(--fs-sm) var(--mono); -webkit-user-select: text; user-select: text; }
+  .body { height: 220px; overflow: auto; padding: 6px 12px; border-top: 1px solid var(--line); background: var(--sunk); font: var(--fs-sm) var(--mono); -webkit-user-select: text; user-select: text; }
   .muted { color: var(--muted); font-family: inherit; }
   summary { color: var(--muted); cursor: default; padding: 3px 0; }
   .opening { margin: 0 0 var(--sp-2); color: var(--warn); }
@@ -153,7 +153,7 @@
   .pending { color: var(--pending); }
   .cancelled { color: var(--muted); }
   .prob { display: flex; gap: 10px; width: 100%; text-align: left; background: none; border: 0; color: var(--text); font: inherit; padding: 3px 0; }
-  .prob:enabled:hover { background: color-mix(in srgb, var(--accent) 10%, transparent); }
+  .prob:enabled:hover { background: var(--tint-hover); }
   .hrow { display: flex; align-items: center; }
   .hdel { background: none; border: 0; color: var(--muted); font: inherit; padding: 0 8px; cursor: pointer; }
   .hdel:hover { color: var(--fail); }

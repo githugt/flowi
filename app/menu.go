@@ -37,12 +37,16 @@ func buildMenu(wails *application.App, emit func(name string, data any)) *applic
 		menuAction{"New request", "CmdOrCtrl+N", "new-request"},
 		menuAction{"New flow", "CmdOrCtrl+Shift+N", "new-flow"},
 		menuAction{"", "", ""},
+		menuAction{"Jump to…", "CmdOrCtrl+K", "jump"},
+		menuAction{"Command palette…", "CmdOrCtrl+Shift+P", "palette"},
 		menuAction{"Close tab", "CmdOrCtrl+W", "close-tab"},
 		menuAction{"Next tab", "CmdOrCtrl+Shift+]", "next-tab"},
 		menuAction{"Previous tab", "CmdOrCtrl+Shift+[", "previous-tab"},
 	)
 	menu.AddRole(application.EditMenu)
 	add(menu.AddSubmenu("Workspace"),
+		menuAction{"Home", "", "home"},
+		menuAction{"", "", ""},
 		menuAction{"Collections…", "", "collections"},
 		menuAction{"Import…", "CmdOrCtrl+I", "import"},
 		menuAction{"", "", ""},
@@ -51,6 +55,7 @@ func buildMenu(wails *application.App, emit func(name string, data any)) *applic
 		menuAction{"Replayer…", "", "replayer"},
 		menuAction{"Checks…", "", "checks"},
 		menuAction{"Blueprints…", "", "blueprints"},
+		menuAction{"Tracing…", "", "tracing"},
 		menuAction{"", "", ""},
 		menuAction{"Settings…", "CmdOrCtrl+,", "settings"},
 	)

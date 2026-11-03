@@ -24,6 +24,10 @@ type Message struct {
 	At        time.Time
 	Headers   []Header
 	Body      []byte
+	// Type is the protocol's own name for what kind of message this is, when it has one: an SSE event name
+	// ("message" when the event has none), a WebSocket frame kind ("text" or "binary"), a gRPC message's full name.
+	// Empty when the protocol says nothing of the kind. It is not what the body looks like (the body decides that).
+	Type string
 	// Channel, on a message sent over a Session, is where to send it; empty
 	// means the channel the connection was opened on.
 	Channel   string
