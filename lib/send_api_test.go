@@ -11,6 +11,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -487,3 +488,47 @@ func TestNewAsyncRequest_for_Service_Bus_should_only_peek_by_default(t *testing.
 		t.Fatalf("another protocol got a binding: %+v", o.Versions[0].Async.Binding)
 	}
 }
+
+func TestSendRequest_Given_error_in_flow_it_does_not_run_Then_still_sent(t *testing.T) {
+	w := demoWorkspace(t)
+	c := w.Collections()[0]
+	file := filepath.Join(c.Root, "flows", "unrelated.arazzo.yaml")
+	if err := os.MkdirAll(filepath.Dir(file), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(file, []byte(brokenFlowYAML), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := w.Reload(Change{Root: c.Root, File: file, Op: ChangeCreated}); err != nil {
+		t.Fatal(err)
+	}
+	if !slices.ContainsFunc(w.Validate(), func(d diag.Diagnostic) bool { return d.File == file && d.Severity == diag.SeverityError }) {
+		t.Fatal("the flow should be invalid, or the test proves nothing")
+	}
+	target, _ := w.FindRequest("auth/login", "")
+	_, req, _ := w.requestFor(target)
+
+	err := w.sendable(c, "local", flowFilesNotRun(w.Collections(), c, req))
+
+	if err != nil {
+		t.Fatalf("a flow the send does not run blocked it: %v", err)
+	}
+}
+
+// brokenFlowYAML is a flow with an empty set step, which the validator rejects.
+const brokenFlowYAML = `arazzo: 1.1.0
+info: {title: unrelated, version: 1.0.0}
+sourceDescriptions: []
+workflows:
+  - workflowId: unrelated
+    steps:
+      - stepId: set
+        operationId: $sourceDescriptions.flowi.flowiCustomStep
+        x-flowi-node: set
+    x-flowi-flow:
+      id: 01M65NC2FFNAH2TXY5XYNJN4KV
+      name: unrelated
+      nodes:
+        - id: set
+          type: set
+`

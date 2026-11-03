@@ -126,7 +126,7 @@ func (w *Workspace) RunFlow(ctx context.Context, t FlowTarget, o RunOptions) (*e
 	if _, missing := flowioverlay.Resolve(c.Overlays, o.Overlay, ""); o.Overlay != "" && missing != "" {
 		return nil, diagErr(diag.CodeOverlayNotFound, map[string]string{"name": missing})
 	}
-	if err := w.sendable(c, o.Env); err != nil {
+	if err := w.sendable(c, o.Env, nil); err != nil {
 		return nil, err
 	}
 	if err := checkInputs(f, o.Inputs); err != nil {

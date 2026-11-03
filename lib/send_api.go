@@ -137,7 +137,7 @@ func (w *Workspace) SendRequest(ctx context.Context, t RequestTarget, o SendOpti
 	if err != nil {
 		return nil, err
 	}
-	if err := w.sendable(c, o.Env); err != nil {
+	if err := w.sendable(c, o.Env, flowFilesNotRun(w.Collections(), c, r)); err != nil {
 		return nil, err
 	}
 	if err := w.unlockFor(c, o.Env); err != nil {
@@ -275,8 +275,10 @@ func (w *Workspace) requestFor(t RequestTarget) (model.Collection, model.Request
 }
 
 // sendable refuses a send whose collection has validation errors (in its
-// own files or its dependencies'), or whose environment does not exist.
-func (w *Workspace) sendable(c model.Collection, env string) error {
+// own files or its dependencies'), or whose environment does not exist. Flows the
+// send does not run are left out: a broken flow, even one that uses this request, does not stop the request
+// from being sent (see flowFilesNotRun); a run passes none, and every file counts.
+func (w *Workspace) sendable(c model.Collection, env string, skipped map[string]bool) error {
 	if env != "" && !slices.ContainsFunc(c.Environments, func(e model.Environment) bool { return e.Name == env }) {
 		return diagErr(diag.CodeRequestEnvUnknown, map[string]string{"env": env, "collection": c.Manifest.Name})
 	}
@@ -289,7 +291,7 @@ func (w *Workspace) sendable(c model.Collection, env string) error {
 	// Contract warnings never block, so they are not computed here.
 	var blocking diag.List
 	for _, d := range w.validateStructure() {
-		if d.Severity == diag.SeverityError && underAny(d.File, roots) {
+		if d.Severity == diag.SeverityError && underAny(d.File, roots) && !skipped[d.File] {
 			blocking = append(blocking, d)
 		}
 	}
