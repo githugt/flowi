@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/githugt/flowi/lib/diag"
+	"github.com/githugt/flowi/lib/report"
 )
 
 // Status is the outcome of a run, hook or node.
@@ -64,6 +65,8 @@ type NodeFinished struct {
 	// Reason says why a node was skipped by the person ("skipped by you");
 	// "" otherwise, including a node skipped by its when.
 	Reason string
+	// Wrote are the variables the node set and what it set them to, masked.
+	Wrote []report.VarWrite
 }
 
 // RecordCaptured carries the record of a request node's call: the request as

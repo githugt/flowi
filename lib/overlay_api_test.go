@@ -341,3 +341,35 @@ func TestRunFlow_Given_a_known_overlay_Then_the_result_says_which_one_it_ran_wit
 		t.Fatalf("report overlay %q, status %s %v", res.Report.Overlay, res.Status, res.Diags)
 	}
 }
+
+func TestOverlayEffects_should_list_what_the_overlay_changes_for_one_request_and_say_when_it_is_an_identity(t *testing.T) {
+	w := demoWorkspace(t)
+	target, _ := overlayLoginTarget(t, w)
+	ov := model.Overlay{Name: "ann",
+		Shared: []model.OverlayOp{{Verb: model.OverlaySet, Path: "headers.Authorization", Value: "Bearer ann"}},
+		Requests: []model.RequestOverlay{
+			{Request: target.Request, Path: "auth/login", Ops: []model.OverlayOp{{Verb: model.OverlaySet, Path: "url", Value: "x"}}},
+			{Request: "someone-else", Ops: []model.OverlayOp{{Verb: model.OverlaySet, Path: "url", Value: "y"}, {Verb: model.OverlayRemove, Path: "headers.X"}}},
+		}}
+	if err := w.WriteOverlay(target.Collection, ov, SaveOptions{}); err != nil {
+		t.Fatal(err)
+	}
+	slow := model.Overlay{Name: "slow", Shared: []model.OverlayOp{{Verb: model.OverlaySet, Path: "headers.X-Delay", Value: "2s"}}}
+	if err := w.WriteOverlay(target.Collection, slow, SaveOptions{}); err != nil {
+		t.Fatal(err)
+	}
+
+	ann, err := w.OverlayEffects(target, "ann")
+	plain, _ := w.OverlayEffects(target, "slow")
+	_, missing := w.OverlayEffects(target, "nope")
+
+	if err != nil || len(ann.Changes) != 2 || !ann.Identity || !strings.Contains(ann.Changes[0], "Authorization") {
+		t.Fatalf("ann %+v err %v: want its shared header and its own url, as an identity", ann, err)
+	}
+	if len(plain.Changes) != 1 || plain.Identity {
+		t.Fatalf("slow %+v: one change, not an identity", plain)
+	}
+	if missing == nil {
+		t.Fatal("an unknown overlay is an error")
+	}
+}

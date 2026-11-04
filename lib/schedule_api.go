@@ -26,7 +26,7 @@ func (w *Workspace) Schedules() []model.Schedule {
 func (w *Workspace) AddSchedule(s model.Schedule) error {
 	w.mu.Lock()
 	defer w.mu.Unlock()
-	problems := scheduleProblems(s)
+	problems := append(scheduleProblems(s), w.watchScheduleProblems(s)...)
 	if slices.ContainsFunc(w.model.Schedules, func(x model.Schedule) bool { return x.Name == s.Name }) {
 		problems = append(problems, scheduleDiag(s.Name, "", "a schedule with this name already exists"))
 	}
@@ -49,7 +49,7 @@ func (w *Workspace) SaveSchedule(old string, s model.Schedule) error {
 	if i < 0 {
 		return diag.List{scheduleDiag(old, "", "there is no schedule with this name")}.Err()
 	}
-	problems := scheduleProblems(s)
+	problems := append(scheduleProblems(s), w.watchScheduleProblems(s)...)
 	for j, x := range w.model.Schedules {
 		if j != i && x.Name == s.Name {
 			problems = append(problems, scheduleDiag(s.Name, "", "a schedule with this name already exists"))
@@ -91,6 +91,28 @@ func scheduleProblems(s model.Schedule) diag.List {
 	return out
 }
 
+// watchScheduleProblems are the reasons a watching schedule's flow may not be run unattended. A flow that cannot be
+// found is not one of them: collections come and go, and Validate warns about it. Callers hold mu.
+func (w *Workspace) watchScheduleProblems(s model.Schedule) diag.List {
+	if !s.Watch {
+		return nil
+	}
+	target, err := w.findFlow(s.Flow, s.Collection)
+	if err != nil {
+		return nil
+	}
+	c, _ := w.collection(target.Collection)
+	i := slices.IndexFunc(c.Flows, func(f model.Flow) bool { return f.ID == target.Flow })
+	if i < 0 {
+		return nil
+	}
+	var out diag.List
+	for _, p := range watchProblemsOf(c, c.Flows[i]) {
+		out = append(out, scheduleDiag(s.Name, "watch", "is on, but "+p))
+	}
+	return out
+}
+
 func scheduleDiag(name, field, detail string) diag.Diagnostic {
 	if field != "" {
 		detail = field + " " + detail
@@ -118,6 +140,10 @@ func (w *Workspace) scheduleDiags() diag.List {
 		}
 		if _, err := w.findFlow(s.Flow, s.Collection); err != nil {
 			out = append(out, diag.New(diag.CodeServeScheduleFlow, at("flow"), map[string]string{"name": s.Name, "detail": flowProblem(err)}))
+		}
+		for _, d := range w.watchScheduleProblems(s) {
+			d.Location = at("watch")
+			out = append(out, d)
 		}
 	}
 	return out

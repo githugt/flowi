@@ -3,10 +3,12 @@
 package bridge
 
 import (
+	"encoding/json"
 	"fmt"
 	"slices"
 	"strings"
 
+	flowi "github.com/githugt/flowi/lib"
 	"github.com/githugt/flowi/lib/analysis"
 	"github.com/githugt/flowi/lib/model"
 
@@ -30,6 +32,7 @@ type Card struct {
 // FlowView is an open flow as the canvas shows it.
 type FlowView struct {
 	Rev       int             `json:"rev"`       // bumped by every change to the flow
+	Replay    bool            `json:"replay"`    // the flow comes from a run bundle: a step can be forked
 	Selected  string          `json:"selected"`  // the selected step id, "" for none
 	Selection []string        `json:"selection"` // every selected step, the primary last
 	Chips     []ChipView      `json:"chips"`
@@ -107,6 +110,9 @@ func (s *FlowService) open(node string) (FlowView, error) {
 		doc := vm.NewFlowDoc(s.app.backend, s.app.worker, c, f)
 		doc.UseGraphView()
 		o := &openFlow{doc: doc, run: vm.NewFlowRun(s.app.backend, s.app.worker, doc), history: vm.NewRunHistory(s.app.backend, s.app.worker, doc)}
+		if original, ok := s.app.backend.ReplayOriginal(c.Manifest.ID); ok {
+			o.run.LoadResult(original) // a bundle's flow opens showing the run it recorded
+		}
 		doc.OnChange(func() { s.app.emit("flow", s.view(node, o)) })
 		o.run.OnPrompt(s.app.promptPerson)
 		o.run.OnStatus(func(string, string) { s.app.emit("flowrun", FlowRunEvent{Node: node, Run: runViewOf(o)}) })
@@ -184,8 +190,15 @@ func (s *FlowService) view(node string, o *openFlow) FlowView {
 		Node: node, Name: d.Draft().Name, Dirty: d.Dirty(), OnDisk: d.ChangedOnDisk(), NeedsDrop: d.NeedsDropConfirm(), CanUndo: d.CanUndo(), CanRedo: d.CanRedo(),
 		Error: d.Err(), Diagram: diagram, Cards: s.cardsOf(o, diagram), Data: dataEdgesOf(d, diagram), Selection: o.selection(), Chips: chipsOf(d),
 		Selected: o.selected, Form: s.formOf(d, o.run, o.selected), Palette: paletteOf(), Steps: stepsOf(),
-		Run: runViewOf(o), Skips: skipsOf(o), Debug: debugOf(o), Vars: varsOf(o), Start: start, End: end, Inputs: inputViewsOf(d.Draft()), Outputs: outputViewsOf(d.Draft()),
+		Replay: s.isReplay(node), Run: runViewOf(o), Skips: skipsOf(o), Debug: debugOf(o), Vars: varsOf(o), Start: start, End: end, Inputs: inputViewsOf(d.Draft()), Outputs: outputViewsOf(d.Draft()),
 	}
+}
+
+// isReplay says whether the flow of a tree node comes from a run bundle, so it can be forked.
+func (s *FlowService) isReplay(node string) bool {
+	n := s.app.workspace.Node(node)
+	_, ok := s.app.backend.ReplayOriginal(n.Collection)
+	return ok
 }
 
 // dataEdgesOf maps the data links of the flow to the units that hold their
@@ -320,4 +333,88 @@ func chipsOf(d *vm.FlowDoc) []ChipView {
 		out = append(out, ChipView{Kind: string(c.Kind), Text: c.Text, Steps: nonNil(c.Steps)})
 	}
 	return out
+}
+
+// TraceView is where one value of the open flow comes from and who reads it. Lit lists the steps the canvas
+// keeps bright while the trace is on: the makers and the readers.
+type TraceView struct {
+	Name      string   `json:"name"`
+	Kind      string   `json:"kind"`
+	Producers []string `json:"producers"`
+	Readers   []string `json:"readers"`
+	Generated bool     `json:"generated"`
+	Lit       []string `json:"lit"`
+	// Hops are the value at each maker and reader in the last run of the flow; empty before it ran.
+	Hops []HopView `json:"hops"`
+}
+
+// HopView is the value at one step of a trace, said as text.
+type HopView struct {
+	Node  string `json:"node"`
+	Role  string `json:"role"` // "made" or "read"
+	Value string `json:"value"`
+	Known bool   `json:"known"`
+}
+
+// maxHopText keeps one value from filling the trace bar; the response pane has the whole value.
+const maxHopText = 80
+
+// hopViewsOf says the values of a trace in text, a long one cut short.
+func hopViewsOf(hops []flowi.ValueHop) []HopView {
+	out := make([]HopView, 0, len(hops))
+	for _, h := range hops {
+		text := ""
+		if h.Known {
+			text = shortText(h.Value, maxHopText)
+		}
+		out = append(out, HopView{Node: h.Node, Role: h.Role, Value: text, Known: h.Known})
+	}
+	return out
+}
+
+// shortText is v as JSON-like text, cut to limit runes with an ellipsis.
+func shortText(v any, limit int) string {
+	text := fmt.Sprint(v)
+	if s, ok := v.(string); !ok {
+		if data, err := json.Marshal(v); err == nil {
+			text = string(data)
+		}
+	} else {
+		text = s
+	}
+	if r := []rune(text); len(r) > limit {
+		return string(r[:limit]) + "…"
+	}
+	return text
+}
+
+// Trace follows a value (a variable, a flow input or a step's output) through the open flow, as written:
+// it needs no run.
+func (s *FlowService) Trace(node, name string) TraceView {
+	out := TraceView{Producers: []string{}, Readers: []string{}, Lit: []string{}, Hops: []HopView{}}
+	_ = s.edit(node, func(o *openFlow) error {
+		t := analysis.Trace(o.doc.Draft(), name)
+		out = TraceView{Name: t.Name, Kind: t.Kind, Producers: t.Producers, Readers: t.Readers, Generated: t.Generated, Lit: litSteps(t), Hops: lastRunHops(o, t)}
+		return nil
+	})
+	return out
+}
+
+// litSteps are the makers and readers of a trace, each once, in flow order of first appearance.
+func litSteps(t analysis.ValueTrace) []string {
+	out := []string{}
+	for _, id := range slices.Concat(t.Producers, t.Readers) {
+		if !slices.Contains(out, id) {
+			out = append(out, id)
+		}
+	}
+	return out
+}
+
+// lastRunHops are the values of a trace in the flow's last run, or none when it has not run.
+func lastRunHops(o *openFlow, t analysis.ValueTrace) []HopView {
+	if o.run == nil || len(o.run.Result().Report.Nodes) == 0 {
+		return []HopView{}
+	}
+	return hopViewsOf(flowi.TraceHops(t, o.run.Result().Report))
 }

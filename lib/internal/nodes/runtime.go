@@ -206,6 +206,17 @@ type State struct {
 	// Runtime does what nodes cannot do alone; nil only in contexts
 	// that need none of it.
 	Runtime Runtime
+	// OnWrite is told of every variable the node writes through SetVar, so the run can say what each step wrote.
+	// Nil means nobody is told.
+	OnWrite func(name string, value any)
+}
+
+// SetVar writes variable name and tells OnWrite.
+func (s *State) SetVar(name string, value any) {
+	s.Vars.Set(name, value)
+	if s.OnWrite != nil {
+		s.OnWrite(name, value)
+	}
 }
 
 // derived registers r's value as secret material when it read a secret.

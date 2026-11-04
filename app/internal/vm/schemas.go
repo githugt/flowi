@@ -14,8 +14,10 @@ import (
 type SchemaItem struct {
 	Part   flowi.SchemaPart
 	Source flowi.SchemaSource
-	Title  string
-	Text   string
+	// Shallow marks a schema a discovery inferred from one answer, which nothing has confirmed yet.
+	Shallow bool
+	Title   string
+	Text    string
 }
 
 // Schemas is the schemas learned from (or imported for) the selected version
@@ -66,7 +68,7 @@ func (s *Schemas) read(t flowi.RequestTarget, version string) []SchemaItem {
 		if err != nil {
 			continue
 		}
-		out = append(out, SchemaItem{Part: part, Source: source, Title: schemaTitle(part), Text: string(text)})
+		out = append(out, SchemaItem{Part: part, Source: source, Shallow: flowi.IsShallowSchema(schema), Title: schemaTitle(part), Text: string(text)})
 	}
 	return out
 }
@@ -84,6 +86,19 @@ func (s *Schemas) Delete(item SchemaItem) {
 	t, version := s.req.Target(), s.req.SelectedLabel()
 	Run(s.w, func() []SchemaItem {
 		_ = s.b.DeleteSchema(t, version, item.Part) // a failure shows as the schema still being listed after the reload
+		return s.read(t, version)
+	}, func(items []SchemaItem) {
+		s.items = items
+		s.onChange.fire()
+	})
+}
+
+// Promote keeps the inferred schemas of the selected version as the drift baseline: later sends are checked against
+// them instead of widening them.
+func (s *Schemas) Promote() {
+	t, version := s.req.Target(), s.req.SelectedLabel()
+	Run(s.w, func() []SchemaItem {
+		_, _ = s.b.PromoteBaseline(t, version) // a failure shows as the schemas still being inferred after the reload
 		return s.read(t, version)
 	}, func(items []SchemaItem) {
 		s.items = items

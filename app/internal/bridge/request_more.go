@@ -34,9 +34,11 @@ type RequestSettingsView struct {
 type SchemaView struct {
 	Title  string `json:"title"`
 	Source string `json:"source"`
-	Text   string `json:"text"`
-	Kind   string `json:"kind"`   // request, response or message
-	Status int    `json:"status"` // for a response
+	// Shallow: inferred from one discovery answer, not yet confirmed by a send or promoted.
+	Shallow bool   `json:"shallow"`
+	Text    string `json:"text"`
+	Kind    string `json:"kind"`   // request, response or message
+	Status  int    `json:"status"` // for a response
 }
 
 // Settings is the version's own settings, and the ones it could set.
@@ -89,7 +91,7 @@ func (s *RequestService) Schemas(node string) []SchemaView {
 	out := []SchemaView{}
 	s.app.actor.Do(func() {
 		for _, it := range sc.Items() {
-			out = append(out, SchemaView{Title: it.Title, Source: string(it.Source), Text: it.Text, Kind: it.Part.Kind, Status: it.Part.Status})
+			out = append(out, SchemaView{Title: it.Title, Source: string(it.Source), Shallow: it.Shallow, Text: it.Text, Kind: it.Part.Kind, Status: it.Part.Status})
 		}
 	})
 	return out
@@ -99,4 +101,10 @@ func (s *RequestService) Schemas(node string) []SchemaView {
 func (s *RequestService) DeleteSchema(node, kind string, status int) {
 	part := flowi.SchemaPart{Kind: kind, Status: status}
 	s.with(node, func(o *openRequest) { _ = s.app.backend.DeleteSchema(o.req.Target(), o.req.SelectedLabel(), part) })
+}
+
+// PromoteSchemas keeps the inferred schemas of the version as the drift baseline: later sends are checked against
+// them instead of widening them.
+func (s *RequestService) PromoteSchemas(node string) {
+	s.with(node, func(o *openRequest) { _, _ = s.app.backend.PromoteBaseline(o.req.Target(), o.req.SelectedLabel()) })
 }

@@ -20,6 +20,11 @@
   import Toasts from './Toasts.svelte'
   import CommandPalette from './CommandPalette.svelte'
   import BlueprintDialog from './BlueprintDialog.svelte'
+  import SuggestDialog from './SuggestDialog.svelte'
+  import NegativesDialog from './NegativesDialog.svelte'
+  import EnvCompareDialog from './EnvCompareDialog.svelte'
+  import DiscoverDialog from './DiscoverDialog.svelte'
+  import ForkDialog from './ForkDialog.svelte'
   import MoveDialog from './MoveDialog.svelte'
   import PlaceDialog from './PlaceDialog.svelte'
   import SignInDialog from './SignInDialog.svelte'
@@ -102,6 +107,11 @@
 {/if}
 
 <BlueprintDialog />
+<SuggestDialog />
+<NegativesDialog />
+<EnvCompareDialog />
+<DiscoverDialog />
+<ForkDialog />
 <MoveDialog />
 <PlaceDialog />
 <SignInDialog />

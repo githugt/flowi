@@ -79,6 +79,8 @@ type ImportService struct {
 	vm    *vm.ImportWizard
 	first *firstLoad
 
+	found discovered // the last discovery, for saving it
+
 	pasteMu   sync.Mutex // guards pasteFile
 	pasteFile string     // holds pasted text for kinds the wizard reads from a file; "" until a paste needs it
 }

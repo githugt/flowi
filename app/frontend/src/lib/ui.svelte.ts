@@ -76,6 +76,16 @@ class UIState {
   dialog = $state<PromptDialog | ConfirmDialog | UnsavedDialog | null>(null)
   /** The "New flow from blueprint" dialog: where it was asked from, and a blueprint to start with. */
   blueprint = $state<{ collection: string; folder: string; blueprint?: string } | null>(null)
+  /** The compare dialog: the two environments to compare. */
+  envCompare = $state<{ a: string; b: string } | null>(null)
+  /** The "Suggest flows" review dialog: the collection to read. */
+  suggest = $state<{ collection: string } | null>(null)
+  /** The "Negative variants" dialog: the tree row of the request to break. */
+  negatives = $state<{ node: string } | null>(null)
+  /** The fork dialog: the flow of a bundle and the step to run again from. */
+  fork = $state<{ node: string; step: string } | null>(null)
+  /** The "Discover an API" dialog: the collection to offer for saving what it finds, "" for the first. */
+  discover = $state<{ collection: string } | null>(null)
   /** The place chooser (New request, Save…, Import). */
   place = $state<PlaceDialog | null>(null)
   /** The Move dialog: the request rows to move. */

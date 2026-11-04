@@ -169,7 +169,7 @@ func (s *Scheduler) fire(j Job, at time.Time) {
 		inputs[kv.Key] = kv.Value
 	}
 	source := "schedule:" + j.Name
-	rec, err := s.start(runs.Request{Flow: j.Flow, Collection: j.Collection, Env: j.Env, Inputs: inputs, Source: source, Key: source})
+	rec, err := s.start(runs.Request{Flow: j.Flow, Collection: j.Collection, Env: j.Env, Inputs: inputs, Source: source, Key: source, Watch: j.Watch})
 	log := s.opts.Logger.With("Schedule", j.Name, "Flow", j.Flow)
 	switch {
 	case err == nil:

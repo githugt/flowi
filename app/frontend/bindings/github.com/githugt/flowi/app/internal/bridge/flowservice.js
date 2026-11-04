@@ -434,6 +434,17 @@ export function Duplicate(node, step) {
 }
 
 /**
+ * Explain tells the open flow in words, edits not yet saved included, and lists what looks wrong with it.
+ * @param {string} node
+ * @returns {$CancellablePromise<$models.ExplainView>}
+ */
+export function Explain(node) {
+    return $Call.ByID(2550715478, node).then(/** @type {($result: any) => any} */(($result) => {
+        return $$createType9($result);
+    }));
+}
+
+/**
  * ExpressionNames lists the names an expression in the selected step can read, written out in
  * full: flow inputs, environment keys, secrets, and the outputs of earlier steps, including body
  * fields known from their pinned examples or last saved responses.
@@ -442,7 +453,43 @@ export function Duplicate(node, step) {
  */
 export function ExpressionNames(node) {
     return $Call.ByID(1623945963, node).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType10($result);
+        return $$createType11($result);
+    }));
+}
+
+/**
+ * Fork runs the flow of a bundle again as req says. Calls are answered from the recording: nothing is sent.
+ * @param {string} node
+ * @param {$models.ForkRequest} req
+ * @returns {$CancellablePromise<$models.ForkView>}
+ */
+export function Fork(node, req) {
+    return $Call.ByID(231029203, node, req).then(/** @type {($result: any) => any} */(($result) => {
+        return $$createType12($result);
+    }));
+}
+
+/**
+ * ForkVars are the variables the recording held before step from, for the person to change. Nothing is sent.
+ * @param {string} node
+ * @param {string} $from
+ * @returns {$CancellablePromise<$models.VarValue[]>}
+ */
+export function ForkVars(node, $from) {
+    return $Call.ByID(1914755601, node, $from).then(/** @type {($result: any) => any} */(($result) => {
+        return $$createType14($result);
+    }));
+}
+
+/**
+ * GhostBars lays the saved run runID behind the run the flow shows, step by step, so a slower step stands out.
+ * @param {string} node
+ * @param {string} runID
+ * @returns {$CancellablePromise<$models.GhostView[]>}
+ */
+export function GhostBars(node, runID) {
+    return $Call.ByID(804639672, node, runID).then(/** @type {($result: any) => any} */(($result) => {
+        return $$createType16($result);
     }));
 }
 
@@ -512,7 +559,7 @@ export function MoveInput(node, $from, to) {
  */
 export function NodeData(node, step, format) {
     return $Call.ByID(1833498023, node, step, format).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType11($result);
+        return $$createType17($result);
     }));
 }
 
@@ -524,7 +571,7 @@ export function NodeData(node, step, format) {
  */
 export function Open(node) {
     return $Call.ByID(641892547, node).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType12($result);
+        return $$createType18($result);
     }));
 }
 
@@ -545,7 +592,7 @@ export function Open(node) {
  */
 export function Preview(node, unit, step, lift, x, y, snap) {
     return $Call.ByID(167706761, node, unit, step, lift, x, y, snap).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType13($result);
+        return $$createType19($result);
     }));
 }
 
@@ -628,6 +675,17 @@ export function RepairNeeds(node) {
 }
 
 /**
+ * RequestNode is the tree node of the request a step calls, so the window can open it beside the flow. A step that
+ * calls no request (a delay, a variable set) has none, and a request that cannot be found says so.
+ * @param {string} node
+ * @param {string} step
+ * @returns {$CancellablePromise<string>}
+ */
+export function RequestNode(node, step) {
+    return $Call.ByID(3168654444, node, step);
+}
+
+/**
  * Revert reloads the flow from disk, dropping edits.
  * @param {string} node
  * @returns {$CancellablePromise<void>}
@@ -670,7 +728,7 @@ export function Run(node, inputs) {
  */
 export function RunMatrix(node, dims, inputs) {
     return $Call.ByID(124973761, node, dims, inputs).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType14($result);
+        return $$createType20($result);
     }));
 }
 
@@ -755,7 +813,7 @@ export function Select(node, step) {
  */
 export function Sequence(node) {
     return $Call.ByID(1938749126, node).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType15($result);
+        return $$createType21($result);
     }));
 }
 
@@ -1030,7 +1088,7 @@ export function SetValues(node, rows) {
  */
 export function Source(node) {
     return $Call.ByID(1216649946, node).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType16($result);
+        return $$createType22($result);
     }));
 }
 
@@ -1041,7 +1099,7 @@ export function Source(node) {
  */
 export function StandaloneArazzo(node) {
     return $Call.ByID(387293967, node).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType17($result);
+        return $$createType23($result);
     }));
 }
 
@@ -1095,12 +1153,38 @@ export function ToggleSkip(node, step) {
 }
 
 /**
+ * Trace follows a value (a variable, a flow input or a step's output) through the open flow, as written:
+ * it needs no run.
+ * @param {string} node
+ * @param {string} name
+ * @returns {$CancellablePromise<$models.TraceView>}
+ */
+export function Trace(node, name) {
+    return $Call.ByID(1536831260, node, name).then(/** @type {($result: any) => any} */(($result) => {
+        return $$createType24($result);
+    }));
+}
+
+/**
  * Undo undoes the last structural edit.
  * @param {string} node
  * @returns {$CancellablePromise<void>}
  */
 export function Undo(node) {
     return $Call.ByID(2707827113, node);
+}
+
+/**
+ * Watch runs the saved flow once in env (the selected one when empty) and says what its calls answered differently
+ * from the last pass. A flow with a step that may change something on the server is refused, not run.
+ * @param {string} node
+ * @param {string} env
+ * @returns {$CancellablePromise<$models.WatchView>}
+ */
+export function Watch(node, env) {
+    return $Call.ByID(1379663734, node, env).then(/** @type {($result: any) => any} */(($result) => {
+        return $$createType25($result);
+    }));
 }
 
 /**
@@ -1112,7 +1196,7 @@ export function Undo(node) {
  */
 export function WireChoices(node, $from, to) {
     return $Call.ByID(252791798, node, $from, to).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType18($result);
+        return $$createType26($result);
     }));
 }
 
@@ -1126,13 +1210,21 @@ const $$createType5 = $models.DiffView.createFrom;
 const $$createType6 = $Create.Array($$createType5);
 const $$createType7 = $models.SuggestView.createFrom;
 const $$createType8 = $Create.Array($Create.Any);
-const $$createType9 = $models.SuggestionView.createFrom;
-const $$createType10 = $Create.Array($$createType9);
-const $$createType11 = $models.NodeData.createFrom;
-const $$createType12 = $models.FlowView.createFrom;
-const $$createType13 = canvas$0.Slot.createFrom;
-const $$createType14 = $models.MatrixView.createFrom;
-const $$createType15 = $models.SequenceView.createFrom;
-const $$createType16 = $models.FlowSourceView.createFrom;
-const $$createType17 = $models.StandaloneView.createFrom;
-const $$createType18 = $models.WireChoices.createFrom;
+const $$createType9 = $models.ExplainView.createFrom;
+const $$createType10 = $models.SuggestionView.createFrom;
+const $$createType11 = $Create.Array($$createType10);
+const $$createType12 = $models.ForkView.createFrom;
+const $$createType13 = $models.VarValue.createFrom;
+const $$createType14 = $Create.Array($$createType13);
+const $$createType15 = $models.GhostView.createFrom;
+const $$createType16 = $Create.Array($$createType15);
+const $$createType17 = $models.NodeData.createFrom;
+const $$createType18 = $models.FlowView.createFrom;
+const $$createType19 = canvas$0.Slot.createFrom;
+const $$createType20 = $models.MatrixView.createFrom;
+const $$createType21 = $models.SequenceView.createFrom;
+const $$createType22 = $models.FlowSourceView.createFrom;
+const $$createType23 = $models.StandaloneView.createFrom;
+const $$createType24 = $models.TraceView.createFrom;
+const $$createType25 = $models.WatchView.createFrom;
+const $$createType26 = $models.WireChoices.createFrom;

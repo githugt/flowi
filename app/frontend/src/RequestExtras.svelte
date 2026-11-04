@@ -23,6 +23,7 @@
   interface SchemaView {
     title: string
     source: string
+    shallow: boolean
     text: string
     kind: string
     status: number
@@ -126,9 +127,18 @@
   {:else}
     <p class="muted">What a send learned about this version's request and responses, or what a spec said. Contracts are used to check what flows read from them.</p>
   {/if}
+  {#if schemas?.some((s) => s.source === 'inferred')}
+    <div class="bar">
+      <span class="muted">Inferred schemas widen as later sends differ. Keep them as they are to check sends, and <code>flowi drift</code>, against them.</span><span class="spacer"></span>
+      <button onclick={async () => { await RequestService.PromoteSchemas(node); loadSchemas() }}>Promote to drift baseline</button>
+    </div>
+  {/if}
   {#each schemas ?? [] as sc}
     <div class="schema">
-      <div class="bar"><strong>{sc.title}</strong><span class="muted">{sc.source}</span><span class="spacer"></span>
+      <div class="bar"><strong>{sc.title}</strong>
+        <span class="muted">{sc.source}</span>
+        {#if sc.shallow}<span class="chip" title="Inferred from the single answer a discovery got: empty arrays and optional fields are unseen. A send that reaches it confirms it.">inferred: shallow</span>{/if}
+        <span class="spacer"></span>
         <button onclick={async () => { await RequestService.DeleteSchema(node, sc.kind, sc.status); loadSchemas() }}>Delete</button></div>
       <Code text={sc.text} lang="json" />
     </div>
@@ -151,8 +161,10 @@
 {/if}
 
 <style>
-  .bar { display: flex; align-items: center; gap: 10px; }
+  .bar { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 10px; }
+  .bar button { white-space: nowrap; }
   .spacer { flex: 1; }
+  .chip { border: 1px solid var(--warn, var(--line)); border-radius: var(--r-pill); padding: 0 8px; font-size: var(--fs-xs); color: var(--warn, var(--muted)); }
   select, button { background: var(--raised); color: var(--text); border: 0; box-shadow: inset 0 0 0 1px var(--line); border-radius: var(--r-md); padding: 0 10px; min-height: var(--ctl-h); font: inherit; font-weight: 500; }
   select { appearance: none; -webkit-appearance: none; padding-right: 28px; background: var(--panel) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='rgb(140 146 158)' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E") no-repeat right 8px center / 14px; }
   button:disabled { opacity: 0.4; }

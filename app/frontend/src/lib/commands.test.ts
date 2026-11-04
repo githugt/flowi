@@ -33,6 +33,11 @@ describe('commandList', () => {
     themes: ['dark', 'light'],
     theme: 'dark',
     canSend: true,
+    steps: [{ id: 'login', label: 'Call auth/login' }, { id: 'verify', label: 'Call auth/verify' }],
+    variables: ['token', 'subject'],
+    selectStep: (id) => ran.push('step:' + id),
+    traceValue: (n) => ran.push('trace:' + n),
+    compareEnvironments: (a, b) => ran.push(`compare:${a}:${b}`),
     selectEnvironment: (n) => ran.push('env:' + n),
     setTheme: (n) => ran.push('theme:' + n),
     ...over,
@@ -43,6 +48,20 @@ describe('commandList', () => {
     expect(titles(ctx())).toEqual(expect.arrayContaining(['Use environment prod', 'Use no environment']))
     expect(titles(ctx())).not.toContain('Use environment dev')
     expect(titles(ctx({ selected: '' }))).not.toContain('Use no environment')
+  })
+
+  it('offers to compare each other environment with the one in use, and nothing with none in use', () => {
+    expect(titles(ctx())).toContain('Compare environment prod with dev')
+    expect(titles(ctx())).not.toContain('Compare environment dev with dev')
+    expect(titles(ctx({ selected: '' })).some((t) => t.startsWith('Compare environment'))).toBe(false)
+  })
+
+  it('runs the comparison with the one in use first', () => {
+    ran.length = 0
+
+    commandList(() => {}, ctx()).find((c) => c.id === 'compare:prod')!.run()
+
+    expect(ran).toEqual(['compare:dev:prod'])
   })
 
   it('offers each theme but the one in use', () => {
@@ -56,6 +75,7 @@ describe('commandList', () => {
   })
 
   it('runs the chosen environment, theme and send', () => {
+    ran.length = 0
     const sent: string[] = []
     const list = commandList((a) => sent.push(a), ctx())
     list.find((c) => c.title === 'Use environment prod')!.run()
@@ -64,5 +84,67 @@ describe('commandList', () => {
     list.find((c) => c.title === 'Send the request')!.run()
     expect(ran).toEqual(['env:prod', 'theme:light', 'env:'])
     expect(sent).toContain('send')
+  })
+})
+
+describe('flow commands', () => {
+  const ran: string[] = []
+  const flowCtx = (over: Partial<PaletteContext> = {}): PaletteContext => ({
+    environments: [],
+    selected: '',
+    themes: [],
+    theme: '',
+    canSend: false,
+    steps: [{ id: 'login', label: 'Call auth/login' }, { id: 'verify', label: 'Call auth/verify' }],
+    variables: ['token'],
+    selectStep: (id) => ran.push('step:' + id),
+    traceValue: (n) => ran.push('trace:' + n),
+    compareEnvironments: () => {},
+    selectEnvironment: () => {},
+    setTheme: () => {},
+    ...over,
+  })
+  const titles = (c: PaletteContext) => commandList(() => {}, c).map((x) => x.title)
+
+  it('offers a step of the open flow by its id and what it does, and a trace for each variable it sets', () => {
+    expect(titles(flowCtx())).toEqual(expect.arrayContaining(['Go to step: login (Call auth/login)', 'Trace value: token']))
+  })
+
+  it('says a step once when its title is just its id', () => {
+    const got = titles(flowCtx({ steps: [{ id: 'create', label: 'create' }] }))
+
+    expect(got).toContain('Go to step: create')
+  })
+
+  it('offers neither with no flow open', () => {
+    const none = titles(flowCtx({ steps: [], variables: [] }))
+
+    expect(none.some((t) => t.startsWith('Go to step') || t.startsWith('Trace value'))).toBe(false)
+  })
+
+  it('runs the chosen step and trace', () => {
+    ran.length = 0
+    const list = commandList(() => {}, flowCtx())
+
+    list.find((c) => c.id === 'step:verify')!.run()
+    list.find((c) => c.id === 'trace:token')!.run()
+
+    expect(ran).toEqual(['step:verify', 'trace:token'])
+  })
+
+  it('shows only the steps for a query that starts with @, filtered by what follows', () => {
+    const list = commandList(() => {}, flowCtx())
+
+    expect(filterCommands(list, '@').map((c) => c.id)).toEqual(['step:login', 'step:verify'])
+    expect(filterCommands(list, '@ver').map((c) => c.id)).toEqual(['step:verify'])
+  })
+
+  it('shows only the actions, never a step, for a query that starts with >', () => {
+    const list = commandList(() => {}, flowCtx())
+
+    const got = filterCommands(list, '>new').map((c) => c.id)
+
+    expect(got).toContain('new-flow')
+    expect(got.some((id) => id.startsWith('step:') || id.startsWith('trace:'))).toBe(false)
   })
 })

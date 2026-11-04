@@ -5,6 +5,7 @@ package bridge_test
 import (
 	"testing"
 
+	flowi "github.com/githugt/flowi/lib"
 	"github.com/githugt/flowi/lib/model"
 
 	"github.com/githugt/flowi/app/internal/bridge"
@@ -48,5 +49,22 @@ func TestWelcomeService_Home_Given_tracing_on_Then_the_tracing_idea_goes_away(t 
 	}
 	if !v.TracingOn {
 		t.Fatalf("%+v", v)
+	}
+}
+
+func TestWelcomeService_Home_Given_flows_to_suggest_Then_the_first_idea_opens_the_review_in_that_collection(t *testing.T) {
+	c := vmtest.SampleCollection()
+	c.Flows = nil
+	b := &vmtest.Backend{
+		Cols:        []model.Collection{c},
+		Suggestions: map[model.ID][]flowi.FlowSuggestion{"C1": {{Name: "pets", Path: "suggested/pets"}}},
+	}
+	app := bridge.NewApp(b, bridge.NewInlineActor(), (&published{}).emit)
+	app.Start(t.Context())
+
+	v := app.Welcome().Home()
+
+	if len(v.Ideas) == 0 || v.Ideas[0].ID != "suggested-flows" || v.Ideas[0].Action != "suggest-flows:C1" {
+		t.Fatalf("ideas %+v", v.Ideas)
 	}
 }

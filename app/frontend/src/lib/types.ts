@@ -195,6 +195,25 @@ export interface Use {
   type?: string
 }
 
+/** Where one value of a flow comes from and who reads it (FlowService.Trace); `lit` are the steps the canvas keeps bright. */
+export interface TraceView {
+  name: string
+  kind: 'variable' | 'output' | 'input'
+  producers: string[]
+  readers: string[]
+  generated: boolean
+  lit: string[]
+  /** The value at each maker and reader in the flow's last run; empty before it ran. */
+  hops: TraceHop[]
+}
+
+export interface TraceHop {
+  node: string
+  role: 'made' | 'read'
+  value: string
+  known: boolean
+}
+
 export interface DataEdge {
   from: string
   to: string
@@ -314,12 +333,41 @@ export interface Slot {
   w?: number
 }
 
+/** A finished run in time (bridge.TimelineView). */
+export interface TimelineView {
+  totalMS: number
+  bars: BarView[]
+}
+
+export interface BarView {
+  id: string
+  type: string
+  status: string
+  lane: number
+  startMS: number
+  endMS: number
+  /** The variables the step set, and what it set them to. */
+  wrote: { name: string; value: string }[]
+}
+
+/** The bar a step had in an earlier run, drawn behind the current one. */
+export interface GhostView {
+  id: string
+  lane: number
+  status: string
+  startMS: number
+  endMS: number
+  /** How much longer the step took in the run shown than in the earlier one (negative: quicker). */
+  deltaMS: number
+}
+
 export interface RunView {
   running: boolean
   error?: string
   summary?: string
   statuses: Record<string, string>
   results: Record<string, string>
+  timeline: TimelineView
 }
 
 export interface VarsView {
@@ -388,6 +436,8 @@ export interface Chip {
 }
 
 export interface FlowView {
+  /** The flow comes from a run bundle: a step can be forked. */
+  replay: boolean
   selection: string[]
   chips: Chip[]
   onDisk: boolean
@@ -698,6 +748,19 @@ export interface ScheduleView {
   nextAt: string
   /** Minutes from the moment the view was made to each firing in the next 24 hours. */
   fires: number[]
+  /** Each run is a watch pass over a read-only flow: its answers are compared with the pass before. */
+  watch: boolean
+  /** The passes of a watching schedule, oldest first. */
+  history: WatchPass[]
+}
+
+export interface WatchPass {
+  at: string
+  status: string
+  /** How many things had moved since the pass before. */
+  changes: number
+  /** The calls' latencies added up, in milliseconds. */
+  ms: number
 }
 
 export interface SchedulesView {
@@ -1003,6 +1066,15 @@ export interface AccessView {
   exposed: boolean
 }
 
+export interface WatchView {
+  status?: string
+  first: boolean
+  steps: number
+  changes: { request: string; kind: 'status' | 'shape' | 'latency'; detail: string }[]
+  /** Why the flow may not be watched; it was not run. */
+  refused: string[]
+}
+
 export interface DriftView {
   runStatus: string
   failing: boolean
@@ -1033,4 +1105,62 @@ export interface CallPart {
   headers: { name: string; value: string }[]
   body: string
   truncated: boolean
+}
+
+/** A flow Flowi proposes for a collection (see SuggestFlows in the lib). */
+export interface FlowSuggestion {
+  name: string
+  path: string
+  steps: { id: string; request: string; method: string; takes: { param: string; from: string; field: string; confidence: number }[] }[]
+}
+
+/** A flow told in words (see Explain in the lib), for the storyboard. */
+export interface ExplainView {
+  sentences: { indent: number; text: string; node: string }[]
+  problems: { node: string; text: string }[]
+}
+
+/** How two environments differ (see CompareEnvironments in the lib). Secret values are never in it. */
+export interface EnvComparisonView {
+  a: string
+  b: string
+  onlyA: string[]
+  onlyB: string[]
+  changed: { name: string; a: string; b: string }[]
+  same: number
+  secrets: string[]
+  error?: string
+}
+
+export interface ProbeView {
+  method: 'GET' | 'reflect'
+  path: string
+  why: string
+}
+
+export interface DiscoveryView {
+  findings: { path: string; status: number; contentType: string; kind: 'spec' | 'json' | 'other' | 'grpc' }[]
+  stopped: string
+  created: number
+  skipped: string[]
+}
+
+export interface ForkView {
+  status: string
+  steps: { id: string; status: string }[]
+  changes: { node: string; what: string; from: string; to: string }[]
+  why?: string
+}
+
+/** The ways a request can be sent wrong, offered by "Negative variants". */
+export interface NegativesView {
+  variants: { name: string; description: string }[]
+  error: string
+}
+
+/** What saving the ticked negative variants made. */
+export interface AcceptedNegatives {
+  saved: string[]
+  skipped: string[]
+  error: string
 }

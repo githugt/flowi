@@ -141,6 +141,7 @@ type body struct {
 	Inputs        map[string]any `json:"inputs"`
 	PreferVersion string         `json:"prefer_version"`
 	Seed          uint64         `json:"seed"`
+	Watch         bool           `json:"watch"` // run it as a watch pass, comparing with the last one
 }
 
 func (h *handler) start(w http.ResponseWriter, r *http.Request, flow string) {
@@ -160,7 +161,7 @@ func (h *handler) start(w http.ResponseWriter, r *http.Request, flow string) {
 	}
 	rec, err := h.runs.Start(runs.Request{
 		Flow: flow, Collection: r.URL.Query().Get("collection"), Env: b.Env, PreferVersion: b.PreferVersion,
-		Inputs: stringInputs(b.Inputs), Seed: b.Seed, Source: "trigger",
+		Inputs: stringInputs(b.Inputs), Seed: b.Seed, Source: "trigger", Watch: b.Watch,
 	})
 	if err != nil {
 		h.refuse(w, flow, err)

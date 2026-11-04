@@ -10,6 +10,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/githugt/flowi/lib/report"
+
 	"github.com/githugt/flowi/app/internal/vm"
 )
 
@@ -20,6 +22,7 @@ type RunView struct {
 	Summary  string            `json:"summary,omitempty"` // "passed · seed 7 · report file"
 	Statuses map[string]string `json:"statuses"`          // by step id
 	Results  map[string]string `json:"results"`           // by step id: "passed · 120ms"
+	Timeline TimelineView      `json:"timeline"`          // the finished run in time; no bars before one finishes
 }
 
 // VarsView is what the flow does with variables and secrets.
@@ -36,6 +39,8 @@ type VarsView struct {
 type VarValue struct {
 	Name  string `json:"name"`
 	Value string `json:"value"`
+	// Stale says why a value a recording froze should not be trusted now (an expired token); "" otherwise.
+	Stale string `json:"stale,omitempty"`
 }
 
 // varValueWidth bounds a value shown in the variables bar.
@@ -276,7 +281,7 @@ func runComparisonViewOf(c vm.RunComparison) RunComparisonView {
 
 // runViewOf builds the RunView; call it on the actor.
 func runViewOf(o *openFlow) RunView {
-	v := RunView{Running: o.run.Running(), Error: o.run.Err(), Statuses: map[string]string{}, Results: map[string]string{}}
+	v := RunView{Running: o.run.Running(), Error: o.run.Err(), Statuses: map[string]string{}, Results: map[string]string{}, Timeline: timelineOf(report.Run{})}
 	for _, id := range o.doc.NodeIDs() {
 		d, ok := o.run.Detail(id)
 		if !ok || d.Status == "" {
@@ -290,6 +295,7 @@ func runViewOf(o *openFlow) RunView {
 	}
 	if r := o.run.Result(); r.RunID != "" && v.Error == "" && !v.Running {
 		v.Summary = fmt.Sprintf("%s · seed %d", r.Status, r.Seed)
+		v.Timeline = timelineOf(r.Report)
 	}
 	return v
 }

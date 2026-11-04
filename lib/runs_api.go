@@ -110,6 +110,8 @@ type RunDetail struct {
 	ID      string
 	Outputs map[string]map[string]any // by node id
 	Vars    map[string]any
+	// Report is the whole saved report: the steps with their times, for laying one run over another.
+	Report report.Run
 }
 
 // FlowRunDetail reads the saved run id of flow t. The id is a report's file
@@ -128,7 +130,7 @@ func (w *Workspace) FlowRunDetail(t FlowTarget, id string) (RunDetail, error) {
 	if err := json.Unmarshal(data, &raw); err != nil {
 		return RunDetail{}, fmt.Errorf("reading run %s: %w", id, err)
 	}
-	out := RunDetail{ID: raw.ID, Outputs: map[string]map[string]any{}, Vars: raw.Vars}
+	out := RunDetail{ID: raw.ID, Outputs: map[string]map[string]any{}, Vars: raw.Vars, Report: raw}
 	for _, n := range raw.Nodes {
 		out.Outputs[n.ID] = n.Outputs
 	}

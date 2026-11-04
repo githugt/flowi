@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 	"testing"
 
 	"github.com/githugt/flowi/lib/diag"
@@ -185,5 +186,48 @@ func TestSaveSchedule_should_allow_keeping_the_name(t *testing.T) {
 
 	if err != nil || w.Schedules()[0].Cron != "30 3 * * *" {
 		t.Fatalf("err %v schedules %+v", err, w.Schedules())
+	}
+}
+
+func TestAddSchedule_should_keep_the_watch_flag_across_reopening(t *testing.T) {
+	e := newEnv(t)
+	w := e.open(t)
+	s := nightly()
+	s.Watch = true
+
+	err := w.AddSchedule(s)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := e.open(t).Schedules(); len(got) != 1 || !got[0].Watch {
+		t.Fatalf("schedules %+v", got)
+	}
+}
+
+func TestAddSchedule_Given_a_watched_flow_that_posts_Then_refused_with_the_reason(t *testing.T) {
+	var body atomic.Value
+	body.Store(`{}`)
+	w, _ := watchWorkspace(t, &body, true)
+	s := model.Schedule{Name: "contract", Flow: "watched", Cron: "@hourly", Env: "local", Watch: true}
+
+	err := w.AddSchedule(s)
+
+	if err == nil || !strings.Contains(flowProblem(err), "POST") {
+		t.Fatalf("err %v: want a refusal naming the POST step", err)
+	}
+	if len(w.Schedules()) != 0 {
+		t.Fatalf("saved anyway: %+v", w.Schedules())
+	}
+}
+
+func TestAddSchedule_Given_a_watch_for_a_flow_not_found_yet_Then_allowed_like_any_schedule(t *testing.T) {
+	w := newEnv(t).open(t)
+	s := model.Schedule{Name: "later", Flow: "not-mounted-yet", Cron: "@hourly", Watch: true}
+
+	err := w.AddSchedule(s)
+
+	if err != nil {
+		t.Fatalf("err %v: collections come and go, so a flow that is missing now is not a refusal", err)
 	}
 }

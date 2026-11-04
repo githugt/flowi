@@ -4,12 +4,12 @@
   import { errorText } from './lib/errors'
   import { FlowService } from '../bindings/github.com/githugt/flowi/app/internal/bridge'
   import SequenceDiagram from './SequenceDiagram.svelte'
-  import type { AccessView, ChecksChoices, DriftView, FlowView, MatrixView, SequenceView } from './lib/types'
+  import type { AccessView, ChecksChoices, DriftView, FlowView, MatrixView, SequenceView, WatchView } from './lib/types'
 
   let { view }: { view: FlowView } = $props()
   const node = $derived(view.node)
 
-  type Tool = '' | 'matrix' | 'access' | 'drift' | 'sequence'
+  type Tool = '' | 'matrix' | 'access' | 'drift' | 'watch' | 'sequence'
   let menu = $state(false)
   let tool = $state<Tool>('')
   let choices = $state<ChecksChoices>({ envs: [], overlays: [], inputs: [], steps: [] })
@@ -33,6 +33,9 @@
   let failNew = $state(false)
   let drift = $state<DriftView | null>(null)
 
+  // watch
+  let watch = $state<WatchView | null>(null)
+
   // sequence
   let sequence = $state<SequenceView | null>(null)
   let copied = $state(false)
@@ -41,7 +44,7 @@
     menu = false
     error = ''
     tool = t
-    matrix = access = drift = sequence = null
+    matrix = access = drift = watch = sequence = null
     try {
       choices = (await FlowService.CheckChoices(node)) as unknown as ChecksChoices
       if (t === 'sequence') await draw()
@@ -81,6 +84,7 @@
   const runMatrix = () => run(() => FlowService.RunMatrix(node, dims, {}), (v) => (matrix = v as unknown as MatrixView))
   const runAccess = () => run(() => FlowService.CheckAccess(node, owner, others, stepsChosen, {}), (v) => (access = v as unknown as AccessView))
   const runDrift = () => run(() => FlowService.CheckDrift(node, '', failNew ? ['new', 'missing', 'changed'] : ['missing', 'changed']), (v) => (drift = v as unknown as DriftView))
+  const runWatch = () => run(() => FlowService.Watch(node, ''), (v) => (watch = v as unknown as WatchView))
   const draw = () => run(() => FlowService.Sequence(node), (v) => (sequence = v as unknown as SequenceView))
 
   async function copy() {
@@ -112,6 +116,7 @@
       <button role="menuitem" onclick={() => open('matrix')}>Run a matrix…</button>
       <button role="menuitem" onclick={() => open('access')}>Check access…</button>
       <button role="menuitem" onclick={() => open('drift')}>Check drift…</button>
+      <button role="menuitem" onclick={() => open('watch')}>Watch for changes…</button>
       <hr />
       <button role="menuitem" onclick={() => open('sequence')}>Sequence diagram of the last run…</button>
     </div>
@@ -207,6 +212,25 @@
             </div>
           {/each}
           <p class={drift.failing ? 'bad' : 'ok'}>{drift.failing ? 'This check fails.' : 'This check passes.'}</p>
+        {/if}
+
+      {:else if tool === 'watch'}
+        <h3>Watch for changes</h3>
+        <p class="note">Runs the flow and compares what each call answered with the last watch pass: another status, a response whose shape moved, a call more than three times slower. Only a flow whose steps all read (GET, HEAD, OPTIONS) can be watched, since a watch runs again and again. A passing run becomes the new baseline; <code>flowi watch</code> does the same from a terminal or a schedule.</p>
+        <div class="actions">
+          <button class="primary" disabled={busy} onclick={runWatch}>{busy ? 'Running…' : 'Run a watch pass'}</button>
+          <button onclick={close}>Close</button>
+        </div>
+        {#if watch}
+          {#if watch.refused.length}
+            <p class="bad">This flow cannot be watched:</p>
+            {#each watch.refused as why}<div class="diff fails">✗ {why}</div>{/each}
+          {:else}
+            <p class="muted">The run {watch.status} · {watch.steps} calls compared.</p>
+            {#if watch.first}<p class="ok">First pass: this run is now the baseline.</p>
+            {:else if !watch.changes.length}<p class="ok">No change since the last pass.</p>{/if}
+            {#each watch.changes as c}<div class="diff fails">✗ <strong>{c.kind}</strong> <code>{c.request}</code> <span class="muted">{c.detail}</span></div>{/each}
+          {/if}
         {/if}
 
       {:else if tool === 'sequence'}

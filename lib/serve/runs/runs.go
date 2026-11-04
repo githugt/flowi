@@ -27,6 +27,9 @@ type Request struct {
 	Inputs        map[string]string
 	Seed          uint64
 	Source        string // "trigger" or "schedule:<name>", for records and logs
+	// Watch runs the flow as a watch pass: its answers are compared with the last pass and a moved contract ends the
+	// run as StatusChanged. Only a read-only flow may be watched.
+	Watch bool
 	// Key, when set, allows one run in flight per key: a schedule uses its
 	// name so a slow run is not started again on top of itself.
 	Key string
@@ -83,6 +86,9 @@ var (
 
 // StatusRunning is the status of a run that has not ended.
 const StatusRunning = "running"
+
+// StatusChanged is the status of a watch pass that ran fine but found the contract moved.
+const StatusChanged = "changed"
 
 // Record is what the manager knows about a run.
 type Record struct {

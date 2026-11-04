@@ -21,6 +21,24 @@ type Setup struct {
 	Overlays     int
 	WithHooks    int // requests with at least one hook step
 	TracingOn    bool
+	// Suggestable is how many flows Flowi can propose from what the requests of SuggestIn return, SuggestIn being the
+	// first collection that has any. NoteSuggestions fills them.
+	Suggestable int
+	SuggestIn   model.ID
+}
+
+// NoteSuggestions records the flows Flowi can propose: count is asked for each collection, skip leaves out the
+// try-out space, and the first collection with any is the one the home page offers them in.
+func (s *Setup) NoteSuggestions(cols []model.Collection, skip func(model.Collection) bool, count func(model.ID) int) {
+	for _, c := range cols {
+		if skip(c) {
+			continue
+		}
+		if n := count(c.Manifest.ID); n > 0 {
+			s.Suggestable, s.SuggestIn = n, c.Manifest.ID
+			return
+		}
+	}
 }
 
 // SetupOf counts what collections, environments and schedules hold. skip names the collections to leave out.
@@ -82,7 +100,8 @@ type FeatureIdea struct {
 	Title string
 	Why   string
 	// Action is what the button does: "screen:<name>" opens that screen; "new-request", "new-flow",
-	// "new-environment" and "open-request" are the window's own actions.
+	// "new-environment" and "open-request" are the window's own actions; "suggest-flows:<collection>" opens the review
+	// of suggested flows in that collection.
 	Action string
 	Label  string // the button's text
 }
@@ -98,10 +117,12 @@ type featureRule struct {
 // variable, so nothing global can be changed.
 func featureRules() []featureRule {
 	return []featureRule{
+		{FeatureIdea{"suggested-flows", "Flows found in your requests", "A request that makes something (a POST that returns an id) and others that take it in their path are already a flow: review the ones Flowi found.", "suggest-flows", "Review the flows"},
+			func(s Setup) bool { return s.Suggestable > 0 && s.Flows == 0 }},
 		{FeatureIdea{"environments", "Keep settings per environment", "Put the address and keys of local, staging and production in an environment, and switch between them in one click.", "new-environment", "New environment"},
 			func(s Setup) bool { return s.Collections > 0 && s.Environments == 0 }},
 		{FeatureIdea{"flows", "Chain requests into a flow", "Log in, create something, check it: a flow runs several requests in order and passes values along.", "new-flow", "New flow"},
-			func(s Setup) bool { return s.Requests >= 3 && s.Flows == 0 }},
+			func(s Setup) bool { return s.Requests >= 3 && s.Flows == 0 && s.Suggestable == 0 }},
 		{FeatureIdea{"hooks", "Check responses automatically", "A hook runs after a request: capture a token for the next call, or fail the run when something is wrong.", "open-request", "Open a request"},
 			func(s Setup) bool { return s.Requests > 0 && s.WithHooks == 0 }},
 		{FeatureIdea{"schedules", "Run a flow on a schedule", "Run a flow every hour or every morning and find out when an API breaks before your users do.", "screen:schedules", "Schedules"},
@@ -123,9 +144,14 @@ func featureRules() []featureRule {
 func SuggestFeatures(s Setup) []FeatureIdea {
 	var out []FeatureIdea
 	for _, r := range featureRules() {
-		if r.applies(s) {
-			out = append(out, r.idea)
+		if !r.applies(s) {
+			continue
 		}
+		idea := r.idea
+		if idea.ID == "suggested-flows" {
+			idea.Action += ":" + string(s.SuggestIn) // the card opens the review in the collection that has them
+		}
+		out = append(out, idea)
 	}
 	return out
 }

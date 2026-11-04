@@ -47,7 +47,7 @@ func runSet(_ context.Context, n model.Node, s *State) Outcome {
 // apply writes v; it returns why it could not, or "".
 func apply(target string, v any, s *State) string {
 	if name, ok := strings.CutPrefix(target, "vars."); ok && name != "" {
-		s.Vars.Set(name, v)
+		s.SetVar(name, v)
 		return ""
 	}
 	if !strings.HasPrefix(target, "request.") && !strings.HasPrefix(target, "cookies.") {

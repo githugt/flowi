@@ -39,6 +39,16 @@ const (
 	SchemaUser     SchemaSource = "user"
 )
 
+// schemaShallowKey marks an inferred schema that rests on one answer a discovery got, not on sends: its arrays may
+// have been empty and its optional fields unseen. A later send that reaches the schema ends the mark, as does promoting.
+const schemaShallowKey = "x-flowi-shallow"
+
+// IsShallowSchema says whether s was inferred from the single answer of a discovery and nothing has confirmed it since.
+func IsShallowSchema(s schemainfer.Schema) bool {
+	shallow, _ := s[schemaShallowKey].(bool)
+	return shallow
+}
+
 // SchemaChange is a change a send made to a stored schema.
 type SchemaChange struct {
 	Part   SchemaPart
@@ -181,7 +191,9 @@ func learnOne(requestFile, version string, part SchemaPart, sample any) ([]Schem
 		return nil, writeSchema(file, schemainfer.Infer(sample))
 	}
 	merged, found2 := schemainfer.Merge(existing, sample)
-	if len(found2) == 0 {
+	// A shallow schema is rewritten even when the sample agrees with it: Merge drops the mark, and an agreeing send
+	// is the first confirmation the shape ever had.
+	if len(found2) == 0 && !IsShallowSchema(existing) {
 		return nil, nil
 	}
 	if err := writeSchema(file, merged); err != nil {
@@ -229,15 +241,70 @@ func (w *Workspace) ReplaceSchema(t RequestTarget, version string, part SchemaPa
 	if err != nil {
 		return err
 	}
+	if err := writeSchema(file, markedUser(s)); err != nil {
+		return err
+	}
+	return w.RegenerateDescription(t.Collection)
+}
+
+// markedUser is a copy of s that later sends leave alone, and that is no longer shallow.
+func markedUser(s schemainfer.Schema) schemainfer.Schema {
 	edited := schemainfer.Schema{}
 	for k, v := range s {
 		edited[k] = v
 	}
+	delete(edited, schemaShallowKey)
 	edited["x-flowi-source"] = string(SchemaUser)
-	if err := writeSchema(file, edited); err != nil {
-		return err
+	return edited
+}
+
+// PromoteBaseline makes the schemas inferred for version of request t the drift baseline: they are kept as they are,
+// so later sends are checked against them instead of widening them, and a shape a discovery guessed from one answer
+// is no longer called shallow. Schemas from a spec or edited by hand already are baselines and are left alone. An
+// empty version promotes the schemas of every version. It returns how many schemas it promoted.
+func (w *Workspace) PromoteBaseline(t RequestTarget, version string) (int, error) {
+	_, r, err := w.requestFor(t)
+	if err != nil {
+		return 0, err
 	}
-	return w.RegenerateDescription(t.Collection)
+	labels := []string{version}
+	if version == "" {
+		labels = labels[:0]
+		for _, v := range r.Versions {
+			labels = append(labels, v.Label)
+		}
+	}
+	promoted := 0
+	for _, label := range labels {
+		n, err := promoteVersion(w, t, r, label)
+		promoted += n
+		if err != nil {
+			return promoted, err
+		}
+	}
+	if promoted == 0 {
+		return 0, nil
+	}
+	return promoted, w.RegenerateDescription(t.Collection)
+}
+
+func promoteVersion(w *Workspace, t RequestTarget, r model.Request, version string) (int, error) {
+	promoted := 0
+	for _, part := range w.ListSchemas(t, version) {
+		file, err := schemaFile(r.File, version, part)
+		if err != nil {
+			return promoted, err
+		}
+		s, source, ok := readSchema(file)
+		if !ok || source != SchemaInferred {
+			continue
+		}
+		if err := writeSchema(file, markedUser(s)); err != nil {
+			return promoted, err
+		}
+		promoted++
+	}
+	return promoted, nil
 }
 
 // maxViolationsShown caps the diagnostics one body can raise, so a response

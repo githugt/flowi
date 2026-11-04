@@ -23,10 +23,14 @@
     { icon: 'blueprint', title: 'Flows', id: 'flows' as RailGroup },
   ]
 
+  // Only a group icon (or Cmd+K) opens the panel. Entering the rest of the rail, the panel itself included, just
+  // cancels a pending close: opening from there showed whichever group was last looked at (the flows alone, say) when
+  // the pointer only passed over Secrets.
   function enter(group: RailGroup | '' = '') {
     clearTimeout(closing)
+    if (!group) return
     peek = true
-    if (group) shown = group
+    shown = group
   }
   // The Jump to field has the focus: the panel stays when the pointer leaves, and goes with a click elsewhere or Escape.
   const typing = () => !!wrap?.contains(document.activeElement) && document.activeElement instanceof HTMLInputElement
@@ -83,14 +87,14 @@
 <div class="wrap" bind:this={wrap} onpointerenter={() => enter()} onpointerleave={leave} role="presentation">
   <nav class="rail" aria-label="Sidebar">
     <div class="spacer"></div>
-    <button class="homebtn" class:on={app.active === 'screen:home'} title="Home" aria-label="Home" aria-current={app.active === 'screen:home' ? 'page' : undefined} onclick={() => app.openScreen('screen:home', 'Home')}><Logo size={22} /></button>
-    <button class="expand" title="Show the sidebar" aria-label="Show the sidebar" onclick={onexpand}><Icon name="list" /></button>
+    <button class="homebtn" onpointerenter={leave} class:on={app.active === 'screen:home'} title="Home" aria-label="Home" aria-current={app.active === 'screen:home' ? 'page' : undefined} onclick={() => app.openScreen('screen:home', 'Home')}><Logo size={22} /></button>
+    <button class="expand" title="Show the sidebar" aria-label="Show the sidebar" onpointerenter={leave} onclick={onexpand}><Icon name="list" /></button>
     {#each groups as g}
       <button title={`${g.title}: show the tree`} aria-label={g.title} aria-haspopup="tree" aria-expanded={peek} onpointerenter={() => enter(g.id)} onclick={() => enter(g.id)} onfocus={() => enter(g.id)}><Icon name={g.icon} /></button>
     {/each}
     <span class="grow"></span>
     {#each tools as t}
-      <button title={t.title} aria-label={t.title} class:on={app.active === t.id} onclick={() => app.openScreen(t.id, t.title)}><Icon name={t.icon} /></button>
+      <button title={t.title} aria-label={t.title} class:on={app.active === t.id} onpointerenter={leave} onclick={() => app.openScreen(t.id, t.title)}><Icon name={t.icon} /></button>
     {/each}
   </nav>
   {#if peek}

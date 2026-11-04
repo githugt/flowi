@@ -25,6 +25,18 @@ export function Close(node) {
 }
 
 /**
+ * Compare says how the environments named a and b differ. Secret values are never part of it.
+ * @param {string} a
+ * @param {string} b
+ * @returns {$CancellablePromise<$models.EnvComparisonView>}
+ */
+export function Compare(a, b) {
+    return $Call.ByID(1138852001, a, b).then(/** @type {($result: any) => any} */(($result) => {
+        return $$createType0($result);
+    }));
+}
+
+/**
  * DeclineDrop gives up a save that would drop comments.
  * @param {string} node
  * @returns {$CancellablePromise<void>}
@@ -41,7 +53,18 @@ export function DeclineDrop(node) {
  */
 export function Open(node) {
     return $Call.ByID(1934938562, node).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType0($result);
+        return $$createType1($result);
+    }));
+}
+
+/**
+ * Overrides counts what the environment named name changes about the one it extends, for the context chip.
+ * @param {string} name
+ * @returns {$CancellablePromise<$models.EnvOverridesView>}
+ */
+export function Overrides(name) {
+    return $Call.ByID(1863608659, name).then(/** @type {($result: any) => any} */(($result) => {
+        return $$createType2($result);
     }));
 }
 
@@ -111,11 +134,13 @@ export function SetRows(node, rows) {
  */
 export function Unset(node) {
     return $Call.ByID(2264062559, node).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType2($result);
+        return $$createType4($result);
     }));
 }
 
 // Private type creation functions
-const $$createType0 = $models.EnvView.createFrom;
-const $$createType1 = $models.MissingVar.createFrom;
-const $$createType2 = $Create.Array($$createType1);
+const $$createType0 = $models.EnvComparisonView.createFrom;
+const $$createType1 = $models.EnvView.createFrom;
+const $$createType2 = $models.EnvOverridesView.createFrom;
+const $$createType3 = $models.MissingVar.createFrom;
+const $$createType4 = $Create.Array($$createType3);

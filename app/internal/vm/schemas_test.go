@@ -69,3 +69,34 @@ func TestSchemas_Load_Given_no_schemas_Then_empty(t *testing.T) {
 		t.Fatalf("items %v", s.Items())
 	}
 }
+
+func TestSchemas_Load_should_mark_a_schema_a_discovery_guessed_as_shallow(t *testing.T) {
+	b := sampleBackend()
+	b.SchemaStore = vmtest.Schemas{{Kind: "response", Status: 200}: {"type": "array", "x-flowi-shallow": true}}
+	r, w := newRequestVM(t, b)
+	s := vm.NewSchemas(b, w, r)
+
+	s.Load()
+	w.Wait()
+
+	if items := s.Items(); len(items) != 1 || !items[0].Shallow {
+		t.Fatalf("items %+v", items)
+	}
+}
+
+func TestSchemas_Promote_should_keep_the_inferred_schemas_as_the_baseline_and_show_them_so(t *testing.T) {
+	b := sampleBackend()
+	b.SchemaStore = vmtest.Schemas{{Kind: "response", Status: 200}: {"type": "array", "x-flowi-shallow": true}}
+	r, w := newRequestVM(t, b)
+	s := vm.NewSchemas(b, w, r)
+	s.Load()
+	w.Wait()
+
+	s.Promote()
+	w.Wait()
+
+	items := s.Items()
+	if !b.Called("PromoteBaseline 1") || len(items) != 1 || items[0].Shallow || items[0].Source != flowi.SchemaUser {
+		t.Fatalf("calls %v items %+v", b.Calls, items)
+	}
+}

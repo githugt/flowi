@@ -14,12 +14,14 @@ import (
 	"github.com/githugt/flowi/lib/analysis"
 	"github.com/githugt/flowi/lib/announce"
 	"github.com/githugt/flowi/lib/diag"
+	"github.com/githugt/flowi/lib/discover"
 	"github.com/githugt/flowi/lib/engine"
 	"github.com/githugt/flowi/lib/flowioverlay"
 	"github.com/githugt/flowi/lib/grpcx"
 	"github.com/githugt/flowi/lib/model"
 	"github.com/githugt/flowi/lib/schemainfer"
 	"github.com/githugt/flowi/lib/settings"
+	"github.com/githugt/flowi/lib/watch"
 
 	"github.com/githugt/flowi/app/internal/uithread"
 	"github.com/githugt/flowi/app/internal/vm"
@@ -241,6 +243,12 @@ func (b *Workspace) DeleteOverlay(collection model.ID, name string) error {
 	return b.ws.DeleteOverlay(collection, name)
 }
 
+// OverlayEffects says what a flowi overlay changes for one request.
+func (b *Workspace) OverlayEffects(t flowi.RequestTarget, name string) (flowi.OverlayEffects, error) {
+	b.guard.Check("OverlayEffects")
+	return b.ws.OverlayEffects(t, name)
+}
+
 // OverlayText reads a flowi overlay's file.
 func (b *Workspace) OverlayText(collection model.ID, name string) (string, error) {
 	b.guard.Check("OverlayText")
@@ -406,6 +414,61 @@ func (b *Workspace) CheckDrift(ctx context.Context, t flowi.FlowTarget, o flowi.
 	return b.ws.CheckDrift(ctx, t, o)
 }
 
+func (b *Workspace) WatchProblems(t flowi.FlowTarget) ([]string, error) {
+	b.guard.Check("WatchProblems")
+	return b.ws.WatchProblems(t)
+}
+
+func (b *Workspace) ScheduleWatchHistory(s model.Schedule) ([]watch.Pass, error) {
+	b.guard.Check("ScheduleWatchHistory")
+	return b.ws.ScheduleWatchHistory(s)
+}
+
+func (b *Workspace) ForkReplay(ctx context.Context, t flowi.FlowTarget, o flowi.ForkOptions) (flowi.ForkResult, error) {
+	b.guard.Check("ForkReplay")
+	return b.ws.ForkReplay(ctx, t, o)
+}
+
+func (b *Workspace) ForkVariables(t flowi.FlowTarget, from string) (map[string]any, error) {
+	b.guard.Check("ForkVariables")
+	return b.ws.ForkVariables(t, from)
+}
+
+func (b *Workspace) DiscoverPlan(base string) ([]discover.Probe, error) {
+	b.guard.Check("DiscoverPlan")
+	return b.ws.DiscoverPlan(base)
+}
+
+func (b *Workspace) Discover(ctx context.Context, base string, auth discover.Auth, perSecond int, paths []string) (discover.Report, error) {
+	b.guard.Check("Discover")
+	return b.ws.Discover(ctx, base, auth, perSecond, paths)
+}
+
+func (b *Workspace) DiscoverGRPC(ctx context.Context, target string) ([]grpcx.Method, error) {
+	b.guard.Check("DiscoverGRPC")
+	return b.ws.DiscoverGRPC(ctx, target)
+}
+
+func (b *Workspace) SaveGRPCDiscovery(collection model.ID, server string, methods []grpcx.Method) (flowi.DiscoveredRequests, error) {
+	b.guard.Check("SaveGRPCDiscovery")
+	return b.ws.SaveGRPCDiscovery(collection, server, methods)
+}
+
+func (b *Workspace) PromoteBaseline(t flowi.RequestTarget, version string) (int, error) {
+	b.guard.Check("PromoteBaseline")
+	return b.ws.PromoteBaseline(t, version)
+}
+
+func (b *Workspace) SaveDiscovery(collection model.ID, base string, rep discover.Report) (flowi.DiscoveredRequests, error) {
+	b.guard.Check("SaveDiscovery")
+	return b.ws.SaveDiscovery(collection, base, rep)
+}
+
+func (b *Workspace) WatchFlow(ctx context.Context, t flowi.FlowTarget, o flowi.RunOptions) (flowi.WatchResult, error) {
+	b.guard.Check("WatchFlow")
+	return b.ws.WatchFlow(ctx, t, o)
+}
+
 // OpenBundle reads the run bundle at path and keeps it open as a collection of replays.
 func (b *Workspace) OpenBundle(path string) error {
 	b.guard.Check("OpenBundle")
@@ -415,6 +478,12 @@ func (b *Workspace) OpenBundle(path string) error {
 	}
 	_, err = b.ws.KeepBundle(data)
 	return err
+}
+
+// ReplayOriginal is the run a bundle recorded, when the collection was opened from one.
+func (b *Workspace) ReplayOriginal(collection model.ID) (engine.RunResult, bool) {
+	b.guard.Check("ReplayOriginal")
+	return b.ws.ReplayOriginal(collection)
 }
 
 func (b *Workspace) Unmount(id model.ID) error {
@@ -582,6 +651,11 @@ func (b *Workspace) Environments() []model.Environment {
 	return b.ws.Environments()
 }
 
+func (b *Workspace) CompareEnvironments(a, c string) (flowi.EnvComparison, error) {
+	b.guard.Check("CompareEnvironments")
+	return b.ws.CompareEnvironments(a, c)
+}
+
 func (b *Workspace) NewUntitledFlow(collection model.ID) (flowi.FlowTarget, error) {
 	b.guard.Check("NewUntitledFlow")
 	return b.ws.NewUntitledFlow(collection)
@@ -590,6 +664,26 @@ func (b *Workspace) NewUntitledFlow(collection model.ID) (flowi.FlowTarget, erro
 func (b *Workspace) NewFlow(collection model.ID, path string) (flowi.FlowTarget, error) {
 	b.guard.Check("NewFlow")
 	return b.ws.NewFlow(collection, path)
+}
+
+func (b *Workspace) SuggestFlows(collection model.ID) ([]flowi.FlowSuggestion, error) {
+	b.guard.Check("SuggestFlows")
+	return b.ws.SuggestFlows(collection)
+}
+
+func (b *Workspace) SuggestNegatives(t flowi.RequestTarget, version string) ([]model.Overlay, error) {
+	b.guard.Check("SuggestNegatives")
+	return b.ws.SuggestNegatives(t, version)
+}
+
+func (b *Workspace) AcceptNegatives(collection model.ID, overlays []model.Overlay) (saved, skipped []string, err error) {
+	b.guard.Check("AcceptNegatives")
+	return b.ws.AcceptNegatives(collection, overlays)
+}
+
+func (b *Workspace) AcceptSuggestion(collection model.ID, s flowi.FlowSuggestion) (flowi.FlowTarget, error) {
+	b.guard.Check("AcceptSuggestion")
+	return b.ws.AcceptSuggestion(collection, s)
 }
 
 func (b *Workspace) NewFlowFromBlueprint(bp flowi.BlueprintTarget, collection model.ID, path string, values map[string]string) (flowi.FlowTarget, error) {

@@ -3,7 +3,7 @@
   import { app } from './lib/app.svelte'
   import { ui } from './lib/ui.svelte'
   import type { LocationView } from './lib/types'
-  import { footerLabel } from './lib/footer'
+  import { footerLabel, overlayChipText } from './lib/footer'
   import DetailsPane from './DetailsPane.svelte'
 
   type Tab = 'details' | 'log' | 'problems' | 'history'
@@ -21,6 +21,32 @@
 
   // The open request's version and overlays, kept up to date by the request view the window already holds.
   const verLabel = $derived(footerLabel(app.requests[app.active]?.selected ?? '', app.requests[app.active]?.flowiOverlay ?? ''))
+
+  // The overlays laid over the open request: what they change, as a chip that lists the changes on click.
+  let effects = $state<{ name: string; changes: string[]; identity: boolean }[]>([])
+  $effect(() => {
+    const node = app.active
+    const stack = (app.requests[node]?.flowiOverlay ?? '').split('+').filter(Boolean)
+    if (!stack.length) {
+      effects = []
+      return
+    }
+    Promise.all(stack.map((name) => RequestService.OverlayEffects(node, name).then((v) => ({ name, changes: v.changes as string[], identity: v.identity as boolean })))).then(
+      (all) => {
+        if (node === app.active) effects = all
+      },
+      () => (effects = []),
+    )
+  })
+  const chip = $derived(overlayChipText(effects))
+  function showEffects(e: MouseEvent) {
+    const r = (e.currentTarget as HTMLElement).getBoundingClientRect()
+    const items = effects.flatMap((o) => [
+      { label: o.name + (o.identity ? ' (identity)' : ''), run: () => {}, disabled: true },
+      ...o.changes.map((c) => ({ label: c, run: () => {} })),
+    ])
+    ui.openMenu(r.left, r.top - 4, items)
+  }
 
   const errors = $derived(app.panels.problems.filter((p) => p.severity === 'error').length)
   const items = $derived(app.panels.problems.length)
@@ -79,6 +105,7 @@
       <span class="sum"></span>
       <button class="link" onclick={() => PanelsService.ClearHistory()}>Clear</button>
     {/if}
+    {#if chip}<button class="link chip" title="What the overlays laid over this request change: click to list them" onclick={showEffects}>{chip}</button>{/if}
     {#if verLabel}<span class="ver-tab" title="The version of the open request, and the overlays laid over it">{verLabel}</span>{/if}
     {#if where.name}
       <span class="where-tab" title={where.scratch ? 'Scratch: drafts that are not saved to a folder yet' : where.path}>
@@ -132,6 +159,7 @@
   .tabs button:hover { color: var(--text); }
   .badge { margin-left: 6px; background: color-mix(in srgb, var(--muted) 22%, transparent); color: var(--text); border-radius: var(--r-pill); padding: 0 6px; font-size: var(--fs-xs); }
   .badge.err { background: var(--fail); color: var(--on-accent); }
+  .chip { margin-right: 10px; font-size: var(--fs-xs); }
   .ver-tab { margin-left: auto; color: var(--text); font-size: var(--fs-sm); padding: 4px 12px 2px 10px; margin-right: 2px; border-right: 1px solid var(--line); white-space: nowrap; }
   .ver-tab + .where-tab { margin-left: 8px; }
   .where-tab { margin-left: auto; color: var(--muted); font-size: var(--fs-sm); padding: 4px 4px 2px 0; white-space: nowrap; cursor: default; }

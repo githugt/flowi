@@ -3,11 +3,13 @@
 package vm
 
 import (
+	"errors"
 	"fmt"
 	"slices"
 	"strings"
 
 	"github.com/githugt/flowi/lib/model"
+	"github.com/githugt/flowi/lib/watch"
 )
 
 // FlowOption is a flow a schedule can run.
@@ -29,6 +31,7 @@ type Schedules struct {
 	w        *Worker
 	ws       *Workspace
 	list     []model.Schedule
+	history  map[string][]watch.Pass
 	addr     string
 	hasToken bool
 	err      string
@@ -65,6 +68,9 @@ func (s *Schedules) Find(name string) (model.Schedule, bool) {
 	}
 	return s.list[i], true
 }
+
+// History is the passes of a watching schedule, oldest first; none for a schedule that does not watch.
+func (s *Schedules) History(name string) []watch.Pass { return s.history[name] }
 
 // Flows are the flows of every mounted collection.
 func (s *Schedules) Flows() []FlowOption {
@@ -151,6 +157,8 @@ func (s *Schedules) change(act func() error, done func(error)) {
 func (s *Schedules) run(act func() error, done func(error), finish func()) {
 	type loaded struct {
 		list     []model.Schedule
+		history  map[string][]watch.Pass
+		histErr  error
 		addr     string
 		hasToken bool
 		actErr   error
@@ -159,14 +167,18 @@ func (s *Schedules) run(act func() error, done func(error), finish func()) {
 	Run(s.w, func() loaded {
 		actErr := act()
 		has, err := s.b.HasTriggerToken()
-		return loaded{s.b.Schedules(), s.b.ServeDefaults().TriggerAddr, has, actErr, err}
+		list := s.b.Schedules()
+		history, histErr := s.watchHistories(list)
+		return loaded{list, history, histErr, s.b.ServeDefaults().TriggerAddr, has, actErr, err}
 	}, func(l loaded) {
-		s.list, s.addr, s.hasToken, s.err = l.list, l.addr, l.hasToken, ""
+		s.list, s.history, s.addr, s.hasToken, s.err = l.list, l.history, l.addr, l.hasToken, ""
 		switch {
 		case l.actErr != nil:
 			s.err = ErrorText(l.actErr)
 		case l.err != nil:
 			s.err = ErrorText(l.err)
+		case l.histErr != nil:
+			s.err = ErrorText(l.histErr)
 		}
 		s.onChange.fire()
 		if done != nil {
@@ -174,6 +186,25 @@ func (s *Schedules) run(act func() error, done func(error), finish func()) {
 		}
 		finish()
 	})
+}
+
+// watchHistories reads the passes of every watching schedule. One that cannot be read leaves that schedule without a
+// history and is reported, so the list itself still shows.
+func (s *Schedules) watchHistories(list []model.Schedule) (map[string][]watch.Pass, error) {
+	out := map[string][]watch.Pass{}
+	var failed error
+	for _, x := range list {
+		if !x.Watch {
+			continue
+		}
+		passes, err := s.b.ScheduleWatchHistory(x)
+		if err != nil {
+			failed = errors.Join(failed, err)
+			continue
+		}
+		out[x.Name] = passes
+	}
+	return out, failed
 }
 
 // FormatInputs writes inputs as one key=value line each.

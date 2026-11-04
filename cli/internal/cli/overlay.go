@@ -92,10 +92,10 @@ func printOverlays(cmd *cobra.Command, found []jsonOverlay) {
 }
 
 func newOverlayShowCommand(i do.Injector) *cobra.Command {
-	var collection string
+	var collection, forRequest string
 	cmd := &cobra.Command{
 		Use:   "show <name>",
-		Short: "Print a flowi overlay's file",
+		Short: "Print a flowi overlay's file, or what it changes for one request (--for)",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			s, err := session(cmd, i)
@@ -105,6 +105,9 @@ func newOverlayShowCommand(i do.Injector) *cobra.Command {
 			c, err := s.Workspace.ResolveCollection(collection)
 			if err != nil {
 				return err
+			}
+			if forRequest != "" {
+				return showOverlayEffects(cmd, s, c.ID, args[0], forRequest, collection)
 			}
 			o, err := s.Workspace.Overlay(c.ID, args[0])
 			if err != nil {
@@ -119,7 +122,32 @@ func newOverlayShowCommand(i do.Injector) *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVar(&collection, "collection", "", "the collection to look in (name or id)")
+	cmd.Flags().StringVar(&forRequest, "for", "", "instead of the file, say what the overlay changes for this request (path or id)")
 	return cmd
+}
+
+// showOverlayEffects prints the changes an overlay makes to one request, and says when they set who it is made as.
+func showOverlayEffects(cmd *cobra.Command, s *Session, collection model.ID, name, request, collectionRef string) error {
+	target, err := s.Workspace.FindRequest(request, collectionRef)
+	if err != nil {
+		return err
+	}
+	if target.Collection != collection {
+		return &UsageError{Err: fmt.Errorf("request %s is not in the collection the overlay is in", request)}
+	}
+	fx, err := s.Workspace.OverlayEffects(target, name)
+	if err != nil {
+		return err
+	}
+	out := cmd.OutOrStdout()
+	fmt.Fprintf(out, "%s changes %d thing(s) for %s:\n", name, len(fx.Changes), request)
+	for _, c := range fx.Changes {
+		fmt.Fprintf(out, "  %s\n", c)
+	}
+	if fx.Identity {
+		fmt.Fprintln(out, "It sets who the request is made as (a credential), so it works as an identity.")
+	}
+	return nil
 }
 
 func newOverlayRmCommand(i do.Injector) *cobra.Command {

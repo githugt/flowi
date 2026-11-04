@@ -49,7 +49,7 @@
 {#if app.paletteOpen}
   <div class="scrim" role="presentation" onpointerdown={close}>
     <div class="palette" role="dialog" aria-label="Command palette" tabindex="-1" onpointerdown={(e) => e.stopPropagation()}>
-      <SearchField bind:value={query} bind:el={field} placeholder="Type a command…" label="Command" onkeydown={keys} />
+      <SearchField bind:value={query} bind:el={field} placeholder="Type a command… (@ for a step, > for actions)" label="Command" onkeydown={keys} />
       <div class="list" role="listbox" bind:this={list}>
         {#each shown as c, i (c.id)}
           <button class="row" class:on={i === index} role="option" aria-selected={i === index} onpointermove={() => (index = i)} onclick={() => runAt(i)}>

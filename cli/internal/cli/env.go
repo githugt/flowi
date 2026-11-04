@@ -3,11 +3,16 @@
 package cli
 
 import (
+	"encoding/json"
 	"fmt"
+	"io"
+	"strings"
 	"text/tabwriter"
 
 	"github.com/samber/do/v2"
 	"github.com/spf13/cobra"
+
+	flowi "github.com/githugt/flowi/lib"
 )
 
 func newEnvCommand(i do.Injector) *cobra.Command {
@@ -23,8 +28,62 @@ func newEnvCommand(i do.Injector) *cobra.Command {
 		Args:  cobra.NoArgs,
 		RunE:  func(cmd *cobra.Command, _ []string) error { return runEnvLs(cmd, i) },
 	}
-	cmd.AddCommand(ls)
+	diff := &cobra.Command{
+		Use:   "diff <a> <b>",
+		Short: "Show how two environments differ",
+		Long: "Compare two environments as a run would see them (what one extends counts as its own): the variables\n" +
+			"only a has (-), only b has (+) and those both have with different values (~). A secret's value is never\n" +
+			"shown. Exits 1 when they differ, so a script can check that staging and production stay alike.",
+		Args: cobra.ExactArgs(2),
+		RunE: func(cmd *cobra.Command, args []string) error { return runEnvDiff(cmd, i, args[0], args[1]) },
+	}
+	cmd.AddCommand(ls, diff)
 	return cmd
+}
+
+func runEnvDiff(cmd *cobra.Command, i do.Injector, a, b string) error {
+	s, err := session(cmd, i)
+	if err != nil {
+		return err
+	}
+	cmp, err := s.Workspace.CompareEnvironments(a, b)
+	if err != nil {
+		return err
+	}
+	if do.MustInvoke[*GlobalOptions](i).Output == OutputJSON {
+		data, err := json.MarshalIndent(cmp, "", "  ")
+		if err != nil {
+			return fmt.Errorf("encoding the comparison: %w", err)
+		}
+		fmt.Fprintln(cmd.OutOrStdout(), string(data))
+	} else {
+		writeEnvComparison(cmd.OutOrStdout(), cmp)
+	}
+	if len(cmp.OnlyA)+len(cmp.OnlyB)+len(cmp.Changed) > 0 {
+		return Exit(ExitFailed)
+	}
+	return nil
+}
+
+func writeEnvComparison(out io.Writer, c flowi.EnvComparison) {
+	for _, name := range c.OnlyA {
+		fmt.Fprintf(out, "- %s  (only in %s)\n", name, c.A)
+	}
+	for _, name := range c.OnlyB {
+		fmt.Fprintf(out, "+ %s  (only in %s)\n", name, c.B)
+	}
+	for _, ch := range c.Changed {
+		fmt.Fprintf(out, "~ %s: %s -> %s\n", ch.Name, ch.A, ch.B)
+	}
+	if len(c.OnlyA)+len(c.OnlyB)+len(c.Changed) == 0 {
+		fmt.Fprintf(out, "%s and %s are the same (%d variables).\n", c.A, c.B, c.Same)
+		return
+	}
+	fmt.Fprintf(out, "%d the same", c.Same)
+	if len(c.Secrets) > 0 {
+		fmt.Fprintf(out, "; secrets, values not shown: %s", strings.Join(c.Secrets, ", "))
+	}
+	fmt.Fprintln(out)
 }
 
 func runEnvLs(cmd *cobra.Command, i do.Injector) error {

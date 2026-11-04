@@ -14,6 +14,7 @@
   import PairsEditor from './PairsEditor.svelte'
   import OutcomesEditor from './OutcomesEditor.svelte'
   import { ui } from './lib/ui.svelte'
+  import { tracing } from './lib/trace.svelte'
   import { lostText, modesOf } from './lib/modes'
 
   // editing: the flow editor is in Edit, where steps can be deleted.
@@ -252,10 +253,16 @@
     {#if step.uses.length || step.usedBy.length}
       <h4>Values<Hint>Where this step takes values from, and who takes values from it. The canvas draws these as dotted lines under the cards.</Hint></h4>
       {#each step.uses as u}
-        <button class="lane named" onclick={() => FlowService.Select(node, u.from)}><span>← <code>{u.name}</code>{#if u.type} <span class="type" title="What the value is">{u.type}</span>{/if}</span><span class="muted">from {u.from}</span></button>
+        <div class="line">
+          <button class="lane named" onclick={() => FlowService.Select(node, u.from)}><span>← <code>{u.name}</code>{#if u.type} <span class="type" title="What the value is">{u.type}</span>{/if}</span><span class="muted">from {u.from}</span></button>
+          <button class="add trace" title="Trace {u.name}: dim every step but the ones that make and read it" onclick={() => tracing.start(node, u.name)}>Trace</button>
+        </div>
       {/each}
       {#each step.usedBy as u}
-        <button class="lane named" onclick={() => FlowService.Select(node, u.to)}><span>→ <code>{u.name}</code>{#if u.type} <span class="type" title="What the value is">{u.type}</span>{/if}</span><span class="muted">used by {u.to}</span></button>
+        <div class="line">
+          <button class="lane named" onclick={() => FlowService.Select(node, u.to)}><span>→ <code>{u.name}</code>{#if u.type} <span class="type" title="What the value is">{u.type}</span>{/if}</span><span class="muted">used by {u.to}</span></button>
+          <button class="add trace" title="Trace {u.name}: dim every step but the ones that make and read it" onclick={() => tracing.start(node, u.name)}>Trace</button>
+        </div>
       {/each}
     {/if}
 

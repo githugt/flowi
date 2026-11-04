@@ -53,6 +53,9 @@ type RunOptions struct {
 	// Secrets gives values for the environment's secrets by name, in place of the vault and of
 	// FLOWI_SECRET_* variables. A replay passes the mask for each, so no vault is opened.
 	Secrets map[string]string
+	// answers, when set, are the records a replay answers from, in place of the ones it was recorded with: a fork
+	// that gives a step another response.
+	answers []engine.Record
 }
 
 // FindFlow resolves a flow reference as users type it: an id, or a path

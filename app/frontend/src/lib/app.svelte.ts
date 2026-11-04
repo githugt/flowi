@@ -5,11 +5,14 @@ import { ui } from './ui.svelte'
 import { live } from './live'
 import { moved } from './reorder'
 import { screens } from './screens'
+import { closeNode, closePane, decodeLayout, encodeLayout, leaf, nodesOf, panesOf, resizeSplit, splitForDrop, splitPane, withNode, type Layout, type Side } from './layout'
+import { readLast, readNamed, writeLast, writeNamed } from './layoutstore'
 import type { PastedKind } from './paste'
 import { EnvironmentService, FlowService, HooksService, PanelsService, PassphraseService, RequestService, SessionService, SettingsService, SystemService, TrashService, WorkspaceService } from '../../bindings/github.com/githugt/flowi/app/internal/bridge'
 import type { HooksView, SettingsView, Panels, EnvView, FlowView, HistoryRow, RequestView, RunView, Tree, TreeNode } from './types'
 import { themeMode } from './theme'
 import type { PaletteContext } from './commands'
+import { tracing } from './trace.svelte'
 
 export interface Tab {
   node: string
@@ -20,7 +23,33 @@ export interface Tab {
 class AppState {
   tree = $state<Tree | null>(null)
   tabs = $state<Tab[]>([])
-  active = $state('')
+  /** How the editor is divided: each pane shows one tab. One pane is the usual case. */
+  layout = $state<Layout>(leaf('p1', ''))
+  /** The pane last pressed: the tab strip, Save and Send act on the tab it shows. */
+  focus = $state('p1')
+  private paneSeq = 1
+  /** The flow whose selected request step a pane follows ("" for none), and the pane that does. */
+  follow = $state('')
+  followPane = $state('')
+  /** The layouts the person named for this workspace, by name. */
+  named = $state<Record<string, unknown>>({})
+
+  /** The tab in the pane in front. Setting it shows that tab: in the pane that already shows it, else in the focused pane. */
+  get active(): string {
+    return panesOf(this.layout).find((p) => p.id === this.focus)?.node ?? ''
+  }
+  set active(node: string) {
+    const showing = panesOf(this.layout).find((p) => p.node === node && node !== '')
+    if (showing) this.focus = showing.id
+    else this.layout = withNode(this.layout, this.focus, node)
+  }
+
+  private newPaneId(): string {
+    return `p${++this.paneSeq}`
+  }
+
+  /** Tabs the split opened by itself, which it closes again when it moves on, unless they were edited. */
+  private beside = new Set<string>()
   flows = $state<Record<string, FlowView>>({})
   history = $state<Record<string, HistoryRow[]>>({})
   requests = $state<Record<string, RequestView>>({})
@@ -148,6 +177,7 @@ class AppState {
     if (action === 'palette') return void (this.paletteOpen = !this.paletteOpen)
     if (action === 'new-request') return void WorkspaceService.NewScratchRequest()
     if (action === 'new-flow') return void WorkspaceService.NewScratchFlow()
+    if (action === 'discover') return void (ui.discover = { collection: '' })
     const i = this.tabs.findIndex((t) => t.node === this.active)
     if (action === 'close-tab' && i >= 0) this.requestClose(this.active)
     if (action === 'next-tab' && this.tabs.length) this.active = this.tabs[(i + 1) % this.tabs.length].node
@@ -271,20 +301,25 @@ class AppState {
   }
 
   async open(n: TreeNode) {
+    if (await this.ensureOpen(n)) this.active = n.id
+  }
+
+  /** Loads the document of a tree row and gives it a tab, without showing it. False when it cannot be opened. */
+  async ensureOpen(n: TreeNode): Promise<boolean> {
     this.error = ''
     if (n.kind === 'flow') {
       try {
         this.flows[n.id] = (await FlowService.Open(n.id)) as unknown as FlowView
       } catch (e) {
         this.error = String(e)
-        return
+        return false
       }
     } else if (n.kind === 'request') {
       try {
         this.requests[n.id] = (await RequestService.Open(n.id)) as unknown as RequestView
       } catch (e) {
         this.error = String(e)
-        return
+        return false
       }
     } else if (n.kind === 'environment') {
       try {
@@ -292,13 +327,160 @@ class AppState {
         this.envs[n.id] = (await EnvironmentService.Open(n.id)) as unknown as EnvView
       } catch (e) {
         this.error = String(e)
-        return
+        return false
       }
     } else {
-      return // groups and collections only expand
+      return false // groups and collections only expand
     }
     if (!this.tabs.some((t) => t.node === n.id)) this.tabs.push({ node: n.id, label: n.label, kind: n.kind })
-    this.active = n.id
+    return true
+  }
+
+  /** Opens a tree row beside the tab in front, as a pane to its right. */
+  async openBeside(id: string) {
+    const n = this.find(id)
+    if (!n || !this.active || this.active === id) return
+    if (!(await this.ensureOpen(n))) return
+    this.splitFocused(id, 'right')
+  }
+
+  /** Splits the focused pane on a side so that the new pane shows `node`, and focuses it. */
+  private splitFocused(node: string, side: Side) {
+    const id = this.newPaneId()
+    this.layout = splitPane(this.layout, this.focus, node, side, id)
+    this.focus = id
+    this.follow = ''
+  }
+
+  /** Shows the request a step of an open flow calls beside the flow, and keeps following the flow's selection. */
+  async showStepBeside(flow: string, step: string) {
+    let id: string
+    try {
+      id = await FlowService.RequestNode(flow, step)
+    } catch {
+      return // a step that calls no request has nothing to show beside it
+    }
+    const n = this.find(id)
+    if (!n || id === flow) return
+    const wasOpen = this.tabs.some((t) => t.node === id)
+    if (!(await this.ensureOpen(n))) return
+    if (!wasOpen) this.beside.add(id)
+    const flowPane = panesOf(this.layout).find((p) => p.node === flow)
+    if (!flowPane) return // the flow is no longer in front anywhere: there is nothing to follow it from
+    const followed = panesOf(this.layout).find((p) => p.id === this.followPane)
+    const previous = followed?.node
+    if (followed) this.layout = withNode(this.layout, followed.id, id)
+    else {
+      this.followPane = this.newPaneId()
+      this.layout = splitPane(this.layout, flowPane.id, id, 'right', this.followPane)
+    }
+    this.follow = flow
+    this.focus = flowPane.id
+    if (previous && previous !== id && this.beside.delete(previous) && !this.isDirty(previous) && !this.shown(previous)) await this.close(previous)
+  }
+
+  /** Whether a pane shows the tab. */
+  private shown(node: string): boolean {
+    return panesOf(this.layout).some((p) => p.node === node)
+  }
+
+  /** Splits the pane `paneId` with an open tab dropped on one of its edges (see splitForDrop); focuses the new pane. */
+  splitWith(node: string, paneId: string, side: Side) {
+    const made = splitForDrop(this.layout, this.tabs.map((t) => t.node), paneId, node, side, this.newPaneId())
+    if (!made) return
+    this.layout = made.layout
+    this.focus = made.pane
+    this.follow = ''
+    this.followPane = ''
+  }
+
+  /** Closes a pane: its tab stays open, and the panes beside it share its room. */
+  closePaneById(id: string) {
+    this.layout = closePane(this.layout, id)
+    this.settleFocus()
+  }
+
+  /** Moves a divider of the layout: see resizeSplit. */
+  resizeDivider(path: number[], boundary: number, position: number) {
+    this.layout = resizeSplit(this.layout, path, boundary, position)
+  }
+
+  /** Ends every split: the tab in front stays, the others stay open in the strip. */
+  closeSplit() {
+    this.layout = leaf(this.newPaneId(), this.active)
+    this.focus = panesOf(this.layout)[0].id
+    this.follow = ''
+    this.followPane = ''
+  }
+
+  /** After panes went away: the focus and the follower must be panes that are still there. */
+  private settleFocus() {
+    const panes = panesOf(this.layout)
+    if (!panes.some((p) => p.id === this.focus)) this.focus = panes[0].id
+    if (!panes.some((p) => p.id === this.followPane)) {
+      this.followPane = ''
+      this.follow = ''
+    }
+  }
+
+  /** Remembers the arrangement of the panes as a named layout, replacing one of that name. */
+  saveLayout(name: string) {
+    const workspace = this.tree?.name ?? ''
+    this.named = { ...this.named, [name]: encodeLayout(this.layout) }
+    writeNamed(workspace, this.named)
+  }
+
+  /** Puts a named layout back: its tabs are opened if they are not, and a tab that cannot be opened is left out. */
+  async applyLayout(name: string) {
+    const raw = decodeLayout(this.named[name], () => true, () => '')
+    if (!raw) return ui.toast(`The layout ${name} is empty.`, 'error')
+    for (const node of nodesOf(raw)) await this.openForLayout(node)
+    const layout = decodeLayout(this.named[name], (node) => this.tabs.some((t) => t.node === node), () => this.newPaneId())
+    if (!layout) return ui.toast(`None of the tabs of ${name} could be opened.`, 'error')
+    this.layout = layout
+    this.focus = panesOf(layout)[0].id
+    this.follow = ''
+    this.followPane = ''
+  }
+
+  /** Makes sure the tab of a saved pane exists: a row of the tree is opened, a screen too. */
+  private async openForLayout(node: string) {
+    if (this.tabs.some((t) => t.node === node)) return
+    if (node.startsWith('screen:')) {
+      this.tabs.push({ node, label: screens.find((s) => s.id === node)?.title ?? node, kind: 'screen' })
+      return
+    }
+    const n = this.find(node)
+    if (n) await this.ensureOpen(n)
+  }
+
+  deleteLayout(name: string) {
+    const { [name]: _gone, ...rest } = this.named
+    this.named = rest
+    writeNamed(this.tree?.name ?? '', this.named)
+  }
+
+  private lastRead = $state(false)
+
+  /** Reads the layout the window was left in, and the named layouts, once the tabs of the last session are back. */
+  readLayouts() {
+    if (this.lastRead || !this.restored || !this.tree) return
+    this.lastRead = true
+    const workspace = this.tree.name
+    this.named = readNamed(workspace)
+    const saved = decodeLayout(readLast(workspace), (node) => this.tabs.some((t) => t.node === node), () => this.newPaneId())
+    if (!saved || panesOf(saved).length < 2) return
+    this.layout = saved
+    this.focus = panesOf(saved)[0].id
+  }
+
+  /** Keeps the layout the window is in, for the next session; one pane needs no remembering. Not before it was read. */
+  keepLayout() {
+    // The layout is read before the guard: an effect that returns early depends on nothing it did not read, and would
+    // never run again when the layout changes.
+    const encoded = panesOf(this.layout).length > 1 ? encodeLayout(this.layout) : null
+    if (!this.lastRead || !this.tree) return
+    writeLast(this.tree.name, encoded)
   }
 
   /** Opens the hooks editor of an open request as a tab of its own. */
@@ -370,11 +552,23 @@ class AppState {
       await RequestService.Close(node)
       delete this.requests[node]
     }
-    if (this.active === node) this.active = this.tabs[Math.max(0, i - 1)]?.node ?? ''
+    if (node === this.follow) this.follow = ''
+    this.beside.delete(node)
+    // The panes that showed it close; the last one shows the tab next to it in the strip, or nothing.
+    this.layout = closeNode(this.layout, node, this.tabs[Math.max(0, i - 1)]?.node ?? '')
+    this.settleFocus()
   }
 
   selectEnvironment(name: string) {
     return WorkspaceService.SelectEnvironment(name)
+  }
+
+  /** The steps of the flow in the active tab, as the palette lists them: id and what the card says it is. */
+  private openFlowSteps(): { id: string; label: string }[] {
+    const view = this.flows[this.active]
+    if (!view) return []
+    // The diagram's units are in flow order; the cards are keyed by id, which a map does not keep in order.
+    return view.diagram.units.flatMap((u) => u.nodes).filter((id) => view.cards[id]).map((id) => ({ id, label: view.cards[id].title }))
   }
 
   /** What the palette needs to know to offer environments, themes and Send. */
@@ -386,6 +580,11 @@ class AppState {
       themes: themeField?.enum ?? [],
       theme: String(themeField?.value ?? ''),
       canSend: !!this.requests[this.active],
+      steps: this.openFlowSteps(),
+      variables: this.flows[this.active]?.vars.set ?? [],
+      selectStep: (id) => void FlowService.Select(this.active, id),
+      traceValue: (name) => void tracing.start(this.active, name),
+      compareEnvironments: (a, b) => (ui.envCompare = { a, b }),
       selectEnvironment: (n) => void this.selectEnvironment(n),
       setTheme: (n) => void SettingsService.Set('appearance.theme', n),
     }

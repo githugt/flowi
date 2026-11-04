@@ -17,6 +17,7 @@ import (
 	flowi "github.com/githugt/flowi/lib"
 	"github.com/githugt/flowi/lib/engine"
 	"github.com/githugt/flowi/lib/model"
+	"github.com/githugt/flowi/lib/watch"
 
 	"github.com/githugt/flowi/app/internal/bridge"
 	"github.com/githugt/flowi/app/internal/canvas"
@@ -672,6 +673,29 @@ func TestSchedulesService_State_should_say_a_schedule_in_words_and_when_it_fires
 	}
 	if paused.NextAt != "" || len(paused.Fires) != 0 || paused.Fires == nil {
 		t.Fatalf("a disabled schedule is never due, and its firings are an empty list, not null: %+v", paused)
+	}
+}
+
+func TestSchedulesService_State_Given_a_watching_schedule_Then_it_carries_its_passes(t *testing.T) {
+	c := vmtest.SampleCollection()
+	at := time.Date(2026, 11, 3, 10, 0, 0, 0, time.UTC)
+	b := &vmtest.Backend{Cols: []model.Collection{c}}
+	b.Check.History = []watch.Pass{{At: at, Status: "passed", TotalMS: 120}, {At: at.Add(time.Hour), Status: "passed", Changes: 2, TotalMS: 480}}
+	app := bridge.NewApp(b, bridge.NewInlineActor(), (&published{}).emit)
+	app.Start(t.Context())
+	svc := app.Schedules()
+	svc.State()
+	svc.Save("", bridge.ScheduleView{Name: "contract", Flow: "signup", Cron: "@hourly", Watch: true})
+	svc.Save("", bridge.ScheduleView{Name: "plain", Flow: "signup", Cron: "@daily"})
+
+	v := svc.State()
+
+	contract, plain := v.Schedules[0], v.Schedules[1]
+	if !contract.Watch || len(contract.History) != 2 || contract.History[1].Changes != 2 || contract.History[1].MS != 480 {
+		t.Fatalf("contract %+v", contract)
+	}
+	if plain.Watch || plain.History == nil || len(plain.History) != 0 {
+		t.Fatalf("a schedule that does not watch has an empty history list, not null: %+v", plain)
 	}
 }
 
@@ -2260,5 +2284,40 @@ func TestRequestService_Send_should_say_which_checks_the_response_judged(t *test
 
 	if got.Response == nil || len(got.Response.Checks) != 1 || got.Response.Checks[0] != "status == 200" {
 		t.Fatalf("checks judged %+v", got.Response)
+	}
+}
+
+func TestRequestService_OverlayEffects_should_list_what_an_overlay_changes_for_the_open_request(t *testing.T) {
+	c := vmtest.SampleCollection()
+	b := &vmtest.Backend{Cols: []model.Collection{c}}
+	b.Check.Effects = flowi.OverlayEffects{Name: "ann", Changes: []string{`Set header Authorization to "Bearer ann"`}, Identity: true}
+	app := bridge.NewApp(b, bridge.NewInlineActor(), (&published{}).emit)
+	app.Start(t.Context())
+	req, _ := findNode(app.Workspace().Tree().Roots, "request")
+	if _, err := app.Requests().Open(req.ID); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := app.Requests().OverlayEffects(req.ID, "ann")
+	_, closed := app.Requests().OverlayEffects("r:nowhere:none", "ann")
+
+	if err != nil || len(got.Changes) != 1 || !got.Identity {
+		t.Fatalf("effects %+v err %v", got, err)
+	}
+	if closed == nil {
+		t.Fatal("a request that is not open has no overlay to describe")
+	}
+}
+
+func TestRequestService_Schemas_should_say_which_are_shallow_and_PromoteSchemas_should_keep_them(t *testing.T) {
+	reqs, v, _, b := openLogin(t)
+	b.SchemaStore = vmtest.Schemas{{Kind: "response", Status: 200}: {"type": "array", "x-flowi-shallow": true}}
+
+	before := reqs.Schemas(v.Node)
+	reqs.PromoteSchemas(v.Node)
+	after := reqs.Schemas(v.Node)
+
+	if len(before) != 1 || !before[0].Shallow || !b.Called("PromoteBaseline 1") || after[0].Shallow || after[0].Source != "user" {
+		t.Fatalf("before %+v after %+v calls %v", before, after, b.Calls)
 	}
 }

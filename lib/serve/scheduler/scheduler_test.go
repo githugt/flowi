@@ -221,6 +221,28 @@ func TestScheduler_should_start_a_run_at_each_tick_with_the_schedules_settings(t
 	}
 }
 
+func TestScheduler_Given_a_watch_schedule_Then_the_run_is_a_watch_pass(t *testing.T) {
+	watched := every("contract", "*/5 * * * *")
+	watched.Watch = true
+	r := start(t, "2026-10-09 12:00", watched)
+
+	got := r.tick(5*time.Minute, 1)
+
+	if !got[0].Watch {
+		t.Fatalf("request %+v: want a watch pass", got[0])
+	}
+}
+
+func TestScheduler_Given_a_plain_schedule_Then_the_run_is_not_a_watch_pass(t *testing.T) {
+	r := start(t, "2026-10-09 12:00", every("often", "*/5 * * * *"))
+
+	got := r.tick(5*time.Minute, 1)
+
+	if got[0].Watch {
+		t.Fatalf("request %+v: want an ordinary run", got[0])
+	}
+}
+
 func TestScheduler_should_not_replay_ticks_it_slept_through(t *testing.T) {
 	r := start(t, "2026-10-09 12:00", every("often", "*/5 * * * *"))
 

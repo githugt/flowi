@@ -9,6 +9,7 @@ import (
 
 	"github.com/githugt/flowi/lib/engine"
 	"github.com/githugt/flowi/lib/model"
+	"github.com/githugt/flowi/lib/report"
 
 	"github.com/githugt/flowi/app/internal/vm"
 	"github.com/githugt/flowi/app/internal/vm/vmtest"
@@ -178,5 +179,32 @@ func TestEventLine_should_say_what_the_person_is_asked_to_do(t *testing.T) {
 
 	if !strings.Contains(device, "ABCD") || !strings.Contains(device, "https://idp.example/verify") || !strings.Contains(open, "sign in") {
 		t.Fatalf("device %q open %q", device, open)
+	}
+}
+
+// A run recorded elsewhere (a bundle) shows on the canvas as if it had just run.
+func TestFlowRun_LoadResult_should_show_a_recorded_run_like_a_live_one(t *testing.T) {
+	r, _, _, seen := runFixture(t, nil)
+	res := engine.RunResult{Status: engine.StatusFailed, Seed: 7}
+	res.Report.Vars = map[string]any{"token": "t-1"}
+	res.Report.Nodes = []report.Node{
+		{ID: "a", Path: "a", Status: "passed", Duration: 20 * time.Millisecond, Outputs: map[string]any{"x": "1"}},
+		{ID: "p", Path: "p", Type: "parallel", Status: "failed", Lanes: []report.Lane{
+			{Label: "b1", Nodes: []report.Node{{ID: "x", Path: "p/b1/x", Status: "failed", Diagnostics: []report.Diagnostic{{Code: "FLW-RUN-001", Message: "assertion failed"}}}}},
+		}},
+	}
+
+	r.LoadResult(res)
+
+	a, _ := r.Detail("a")
+	x, _ := r.Detail("x")
+	if a.Status != "passed" || a.Duration != 20*time.Millisecond || a.Outputs["x"] != "1" {
+		t.Errorf("a %+v", a)
+	}
+	if x.Status != "failed" || len(x.Diags) != 1 || !strings.Contains(x.Diags[0], "assertion failed") {
+		t.Errorf("x %+v", x)
+	}
+	if r.Vars()["token"] != "t-1" || r.Result().Seed != 7 || seen["a"] != "passed" {
+		t.Errorf("vars %v seed %d seen %v", r.Vars(), r.Result().Seed, seen)
 	}
 }

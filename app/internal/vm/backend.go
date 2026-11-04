@@ -10,6 +10,7 @@ import (
 	"github.com/githugt/flowi/lib/analysis"
 	"github.com/githugt/flowi/lib/announce"
 	"github.com/githugt/flowi/lib/diag"
+	"github.com/githugt/flowi/lib/discover"
 	"github.com/githugt/flowi/lib/engine"
 	"github.com/githugt/flowi/lib/flowioverlay"
 	"github.com/githugt/flowi/lib/grpcx"
@@ -18,6 +19,7 @@ import (
 	"github.com/githugt/flowi/lib/serve/replay"
 	"github.com/githugt/flowi/lib/serve/scheduler"
 	"github.com/githugt/flowi/lib/settings"
+	"github.com/githugt/flowi/lib/watch"
 )
 
 // Backend is the part of the flowi-lib workspace the view-models use. Its
@@ -67,6 +69,7 @@ type Backend interface {
 	DeleteEnvironment(file string) error
 	// Environments are the workspace's own: the same in every collection.
 	Environments() []model.Environment
+	CompareEnvironments(a, b string) (flowi.EnvComparison, error)
 	// ExportMermaid is the saved flow as a Mermaid flowchart.
 	ExportMermaid(t flowi.FlowTarget) (string, error)
 	ExportArazzo(t flowi.FlowTarget) ([]byte, diag.List, error)
@@ -96,6 +99,8 @@ type Backend interface {
 	ListSchemas(t flowi.RequestTarget, version string) []flowi.SchemaPart
 	SchemaFor(t flowi.RequestTarget, version string, part flowi.SchemaPart) (schemainfer.Schema, flowi.SchemaSource, bool)
 	DeleteSchema(t flowi.RequestTarget, version string, part flowi.SchemaPart) error
+	// PromoteBaseline keeps the inferred schemas of a version as they are, so later sends are checked against them.
+	PromoteBaseline(t flowi.RequestTarget, version string) (int, error)
 	PinExample(rec engine.Record, name string) (string, error)
 	// TrashStaleDrafts moves old, unused try-out requests and flows of Scratch to the trash;
 	// ListTrash, RestoreFromTrash, DeleteFromTrash and EmptyTrash are the rest of the trash.
@@ -108,6 +113,8 @@ type Backend interface {
 	// as a send would; DiffForOverlay and SaveAsOverlay store an edit as one; OverlayText and
 	// WriteOverlayText read and write an overlay's file for the overlay editor.
 	Overlays(collection model.ID) ([]model.Overlay, error)
+	// OverlayEffects says what the flowi overlay name changes for request t, and whether it works as an identity.
+	OverlayEffects(t flowi.RequestTarget, name string) (flowi.OverlayEffects, error)
 	ApplyOverlay(t flowi.RequestTarget, name string, v model.RequestVersion) (model.RequestVersion, []flowioverlay.Problem, error)
 	DiffForOverlay(t flowi.RequestTarget, base string, edited model.RequestVersion) (flowi.OverlayDiff, error)
 	SaveAsOverlay(t flowi.RequestTarget, in flowi.SaveOverlayInput, dropComments bool) error
@@ -135,6 +142,8 @@ type Backend interface {
 	// OpenBundle opens a run bundle file as a collection whose runs play the recording back. It lasts until
 	// the app quits.
 	OpenBundle(path string) error
+	// ReplayOriginal is the run a bundle recorded, for a collection opened from a bundle; ok is false for any other.
+	ReplayOriginal(collection model.ID) (engine.RunResult, bool)
 	// OpenArazzo opens an Arazzo document (a file or URL) as a collection whose flows run against its own server.
 	OpenArazzo(ctx context.Context, ref string) error
 	// Coverage measures how much of the imported API descriptions the flows use ("" measures every collection).
@@ -146,6 +155,23 @@ type Backend interface {
 	SpecNames(collection model.ID) []string
 	CheckAccess(ctx context.Context, t flowi.FlowTarget, o flowi.AccessOptions) (flowi.AccessReport, error)
 	CheckDrift(ctx context.Context, t flowi.FlowTarget, o flowi.DriftOptions) (flowi.DriftReport, error)
+	// WatchProblems says why a flow may not be watched; WatchFlow runs it and reports what changed since the last pass.
+	WatchProblems(t flowi.FlowTarget) ([]string, error)
+	// ScheduleWatchHistory lists the passes of the flow a watching schedule runs, oldest first.
+	ScheduleWatchHistory(s model.Schedule) ([]watch.Pass, error)
+	// ForkReplay runs flow t of a bundle's collection again from a step with edited variables, answered from the
+	// recording; ForkVariables are the variables it would start with.
+	ForkReplay(ctx context.Context, t flowi.FlowTarget, o flowi.ForkOptions) (flowi.ForkResult, error)
+	ForkVariables(t flowi.FlowTarget, from string) (map[string]any, error)
+	// DiscoverPlan lists the requests a discovery of base starts with, sending nothing; Discover sends them (only
+	// paths when it is not nil) and SaveDiscovery drafts requests from what answered.
+	DiscoverPlan(base string) ([]discover.Probe, error)
+	Discover(ctx context.Context, base string, auth discover.Auth, perSecond int, paths []string) (discover.Report, error)
+	SaveDiscovery(collection model.ID, base string, rep discover.Report) (flowi.DiscoveredRequests, error)
+	// DiscoverGRPC asks a gRPC server which methods it offers, by reflection; SaveGRPCDiscovery drafts a request for each.
+	DiscoverGRPC(ctx context.Context, target string) ([]grpcx.Method, error)
+	SaveGRPCDiscovery(collection model.ID, server string, methods []grpcx.Method) (flowi.DiscoveredRequests, error)
+	WatchFlow(ctx context.Context, t flowi.FlowTarget, o flowi.RunOptions) (flowi.WatchResult, error)
 	Unmount(id model.ID) error
 	Relocate(id model.ID, dir string) error
 	InitCollection(dir, name string) (model.Manifest, error)
@@ -161,6 +187,12 @@ type Backend interface {
 	SaveFlow(t flowi.FlowTarget, f model.Flow, dropComments bool) error
 	NewFlow(collection model.ID, path string) (flowi.FlowTarget, error)
 	NewUntitledFlow(collection model.ID) (flowi.FlowTarget, error)
+	SuggestFlows(collection model.ID) ([]flowi.FlowSuggestion, error)
+	AcceptSuggestion(collection model.ID, s flowi.FlowSuggestion) (flowi.FlowTarget, error)
+	// SuggestNegatives drafts the ways a request version can be sent wrong, as overlays; AcceptNegatives saves the
+	// ones whose names are free.
+	SuggestNegatives(t flowi.RequestTarget, version string) ([]model.Overlay, error)
+	AcceptNegatives(collection model.ID, overlays []model.Overlay) (saved, skipped []string, err error)
 	NewFlowFromBlueprint(bp flowi.BlueprintTarget, collection model.ID, path string, values map[string]string) (flowi.FlowTarget, error)
 	CreateBlueprint(flow flowi.FlowTarget, path, name string) (flowi.BlueprintTarget, error)
 	DeleteBlueprint(t flowi.BlueprintTarget) error

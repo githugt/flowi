@@ -24,6 +24,33 @@ export function Close() {
 }
 
 /**
+ * Discover sends the ticked paths of base, and the same-host paths their answers point to, and says what answered.
+ * header and token are sent to base only and are not kept; a token alone goes as a Bearer token in Authorization.
+ * @param {string} base
+ * @param {string} header
+ * @param {string} token
+ * @param {string[]} paths
+ * @returns {$CancellablePromise<$models.DiscoveryView>}
+ */
+export function Discover(base, header, token, paths) {
+    return $Call.ByID(2050655609, base, header, token, paths).then(/** @type {($result: any) => any} */(($result) => {
+        return $$createType0($result);
+    }));
+}
+
+/**
+ * DiscoverPlan lists the requests a discovery of base starts with. Nothing is sent: the person ticks the ones
+ * to make before Discover runs.
+ * @param {string} base
+ * @returns {$CancellablePromise<$models.ProbeView[]>}
+ */
+export function DiscoverPlan(base) {
+    return $Call.ByID(3270096838, base).then(/** @type {($result: any) => any} */(($result) => {
+        return $$createType2($result);
+    }));
+}
+
+/**
  * Import writes the previewed files. existing is refuse, overwrite or skip;
  * partial imports the rest when some items cannot be imported.
  * @param {string} existing
@@ -66,6 +93,17 @@ export function Preview() {
  */
 export function PreviewPasted(kind, text, node) {
     return $Call.ByID(3552282619, kind, text, node);
+}
+
+/**
+ * SaveDiscovery drafts requests in a collection from the last discovery, under discovered/.
+ * @param {string} collection
+ * @returns {$CancellablePromise<$models.DiscoveryView>}
+ */
+export function SaveDiscovery(collection) {
+    return $Call.ByID(3607316555, collection).then(/** @type {($result: any) => any} */(($result) => {
+        return $$createType0($result);
+    }));
 }
 
 /**
@@ -119,9 +157,12 @@ export function SetPaste(text) {
  */
 export function State() {
     return $Call.ByID(2555709435).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType0($result);
+        return $$createType3($result);
     }));
 }
 
 // Private type creation functions
-const $$createType0 = $models.ImportView.createFrom;
+const $$createType0 = $models.DiscoveryView.createFrom;
+const $$createType1 = $models.ProbeView.createFrom;
+const $$createType2 = $Create.Array($$createType1);
+const $$createType3 = $models.ImportView.createFrom;

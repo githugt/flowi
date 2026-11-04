@@ -120,7 +120,7 @@ func runCell(ctx context.Context, b Backend, t flowi.FlowTarget, o flowi.RunOpti
 	res := running.Wait()
 	cell.Status = cellStatus(res.Status)
 	if cell.Status != "passed" {
-		cell.Why = firstProblem(res)
+		cell.Why = FirstProblem(res)
 	}
 	return cell
 }
@@ -137,8 +137,8 @@ func cellStatus(s engine.Status) string {
 	return "error"
 }
 
-// firstProblem is the first error of a run, as a sentence with its code, or the run's own status.
-func firstProblem(res engine.RunResult) string {
+// FirstProblem is the first error of a run, as a sentence with its code, or the run's own status.
+func FirstProblem(res engine.RunResult) string {
 	for _, d := range res.Diags {
 		if d.Severity == diag.SeverityError {
 			msg, _ := diag.English().Message(d)

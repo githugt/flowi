@@ -227,3 +227,24 @@ func readEntry(t *testing.T, data []byte, name string) []byte {
 	t.Fatalf("no entry %s", name)
 	return nil
 }
+
+func TestReplayOriginal_should_give_the_recorded_run_of_a_kept_bundle_with_what_each_step_wrote(t *testing.T) {
+	data, original := recordedBundle(t)
+	other := newEnv(t).open(t)
+	opened, err := other.KeepBundle(data)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	got, ok := other.ReplayOriginal(opened.Target.Collection)
+
+	if !ok || got.Seed != original.Seed || len(got.Report.Nodes) != len(original.Report.Nodes) {
+		t.Fatalf("ok %v, %d nodes (want %d)", ok, len(got.Report.Nodes), len(original.Report.Nodes))
+	}
+	if got.RunID == "" || got.Status != original.Status {
+		t.Errorf("the recorded run keeps its id and status: %q %q (want %q)", got.RunID, got.Status, original.Status)
+	}
+	if _, ok := other.ReplayOriginal("not-a-replay"); ok {
+		t.Error("a collection that is not a replay has no original")
+	}
+}

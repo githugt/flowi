@@ -195,7 +195,7 @@ func (w *Workspace) OpenBundle(data []byte) (*BundleRun, error) {
 		_ = os.RemoveAll(dir)
 		return nil, err
 	}
-	br := &BundleRun{Manifest: b.Manifest, w: w, id: id, dir: dir, Original: engine.RunResult{Report: b.Report, Captured: b.Records, Seed: b.Manifest.Seed}}
+	br := &BundleRun{Manifest: b.Manifest, w: w, id: id, dir: dir, Original: engine.RunResult{RunID: b.Report.ID, Status: engine.Status(b.Report.Status), Report: b.Report, Captured: b.Records, Seed: b.Manifest.Seed}}
 	if err := w.prepareReplay(br, b); err != nil {
 		br.Close()
 		return nil, err
@@ -329,7 +329,7 @@ func (w *Workspace) KeepBundle(data []byte) (*BundleRun, error) {
 	if w.replays == nil {
 		w.replays = map[model.ID]replayOf{}
 	}
-	w.replays[br.Target.Collection] = replayOf{options: br.Options, records: br.Original.Captured}
+	w.replays[br.Target.Collection] = replayOf{options: br.Options, records: br.Original.Captured, original: br.Original}
 	if i := slices.IndexFunc(w.collections, func(c model.Collection) bool { return c.Manifest.ID == br.Target.Collection }); i >= 0 {
 		// A copy that carries the original's name would be mistaken for it in the tree.
 		w.collections[i].Manifest.Name = fmt.Sprintf("%s (replay of %s)", br.Manifest.Collection, br.Manifest.At.Local().Format("2006-01-02 15:04"))
@@ -340,8 +340,18 @@ func (w *Workspace) KeepBundle(data []byte) (*BundleRun, error) {
 // replayOf is what makes a run a replay: the recorded options, and the records to answer from. Each run gets
 // its own player, since a player remembers which records it has given.
 type replayOf struct {
-	options RunOptions
-	records []engine.Record
+	options  RunOptions
+	records  []engine.Record
+	original engine.RunResult // the run as it was recorded: its report (times, values written) and its calls
+}
+
+// ReplayOriginal is the run a bundle holds, as it was recorded, for a collection opened from a bundle: what the
+// original run did, not what a replay of it does. ok is false for any other collection.
+func (w *Workspace) ReplayOriginal(collection model.ID) (engine.RunResult, bool) {
+	w.mu.RLock()
+	defer w.mu.RUnlock()
+	r, ok := w.replays[collection]
+	return r.original, ok
 }
 
 // IsReplayCollection says whether the collection was opened from a run bundle.
@@ -361,7 +371,11 @@ func (w *Workspace) asReplay(collection model.ID, o RunOptions) RunOptions {
 	if !ok {
 		return o
 	}
-	o.Env, o.Transport, o.Secrets = base.options.Env, tapeplayer.New(base.records), base.options.Secrets
+	records := base.records
+	if o.answers != nil {
+		records = o.answers
+	}
+	o.Env, o.Transport, o.Secrets = base.options.Env, tapeplayer.New(records), base.options.Secrets
 	if o.Seed == 0 {
 		o.Seed = base.options.Seed
 	}
@@ -369,4 +383,13 @@ func (w *Workspace) asReplay(collection model.ID, o RunOptions) RunOptions {
 		o.Inputs = base.options.Inputs
 	}
 	return o
+}
+
+// BundleReport is the report of the run a bundle holds, with what each step wrote, for tracing a value in it.
+func BundleReport(data []byte) (report.Run, error) {
+	b, err := bundle.Read(data)
+	if err != nil {
+		return report.Run{}, err
+	}
+	return b.Report, nil
 }

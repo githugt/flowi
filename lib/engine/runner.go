@@ -67,6 +67,8 @@ type runner struct {
 
 	// rootVars are the flow's variables (the top-level layer), kept so the report can say what they ended as.
 	rootVars *nodes.Vars
+	// writes are the variables each node instance has set so far, by instance path, until its NodeFinished takes them.
+	writes map[string][]report.VarWrite
 	// outputs are the flow's declared outputs as the run ended (see keepOutputs).
 	outputs []report.OutputValue
 

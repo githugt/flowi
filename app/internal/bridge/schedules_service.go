@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/githugt/flowi/lib/model"
+	"github.com/githugt/flowi/lib/watch"
 
 	"github.com/githugt/flowi/app/internal/vm"
 )
@@ -24,6 +25,17 @@ type ScheduleView struct {
 	When       string `json:"when"`      // the cron in words ("Every day at 03:00"), "" when it is not a common pattern
 	NextAt     string `json:"nextAt"`    // when it fires next, RFC 3339; "" when disabled or invalid
 	Fires      []int  `json:"fires"`     // minutes from now of each firing in the next 24 hours
+	Watch      bool   `json:"watch"`     // each run is a watch pass over a read-only flow
+	// History is the passes of a watching schedule, oldest first: the sparkline and the last result.
+	History []PassView `json:"history"`
+}
+
+// PassView is one watch pass.
+type PassView struct {
+	At      string `json:"at"`      // RFC 3339
+	Status  string `json:"status"`  // how the run ended
+	Changes int    `json:"changes"` // how many things had moved since the pass before
+	MS      int64  `json:"ms"`      // the calls' latencies added up
 }
 
 // FlowChoice is a flow a schedule can run.
@@ -122,7 +134,7 @@ func (s *SchedulesService) Save(old string, sch ScheduleView) string {
 	}
 	return s.await(func(done func(error)) {
 		s.vm.Save(old, model.Schedule{
-			Name: sch.Name, Flow: sch.Flow, Collection: sch.Collection, Cron: sch.Cron, Env: sch.Env, Inputs: inputs, TZ: sch.TZ, Disabled: sch.Disabled,
+			Name: sch.Name, Flow: sch.Flow, Collection: sch.Collection, Cron: sch.Cron, Env: sch.Env, Inputs: inputs, TZ: sch.TZ, Disabled: sch.Disabled, Watch: sch.Watch,
 		}, done)
 	})
 }
@@ -162,7 +174,7 @@ func (s *SchedulesService) view() SchedulesView {
 		v.Flows = append(v.Flows, FlowChoice{Label: f.Label(), Collection: string(f.CollectionID), Flow: string(f.ID)})
 	}
 	for _, x := range s.vm.List() {
-		sv := ScheduleView{Name: x.Name, Flow: x.Flow, Collection: x.Collection, Cron: x.Cron, Env: x.Env, Inputs: vm.FormatInputs(x.Inputs), TZ: x.TZ, Disabled: x.Disabled, When: vm.DescribeCron(x.Cron), Fires: []int{}}
+		sv := ScheduleView{Name: x.Name, Flow: x.Flow, Collection: x.Collection, Cron: x.Cron, Env: x.Env, Inputs: vm.FormatInputs(x.Inputs), TZ: x.TZ, Disabled: x.Disabled, When: vm.DescribeCron(x.Cron), Fires: []int{}, Watch: x.Watch, History: passViews(s.vm.History(x.Name))}
 		if next, fires := vm.ScheduleOutlook(x, time.Now()); !next.IsZero() {
 			sv.NextAt, sv.Fires = next.Format(time.RFC3339), fires
 		}
@@ -172,4 +184,12 @@ func (s *SchedulesService) view() SchedulesView {
 		v.Schedules = append(v.Schedules, sv)
 	}
 	return v
+}
+
+func passViews(passes []watch.Pass) []PassView {
+	out := make([]PassView, 0, len(passes))
+	for _, p := range passes {
+		out = append(out, PassView{At: p.At.Format(time.RFC3339), Status: p.Status, Changes: p.Changes, MS: p.TotalMS})
+	}
+	return out
 }

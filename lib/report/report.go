@@ -57,6 +57,14 @@ type Node struct {
 	Attempts    []Attempt      `json:"attempts,omitempty"`
 	Hooks       []Hook         `json:"hooks,omitempty"`
 	Lanes       []Lane         `json:"lanes,omitempty"`
+	// Wrote are the variables the step set, in order, with the values (masked): what a trace shows at each hop.
+	Wrote []VarWrite `json:"wrote,omitempty"`
+}
+
+// VarWrite is one variable a step wrote and the value it wrote (masked).
+type VarWrite struct {
+	Name  string `json:"name"`
+	Value any    `json:"value"`
 }
 
 // Hook is one API hook step of a request node.

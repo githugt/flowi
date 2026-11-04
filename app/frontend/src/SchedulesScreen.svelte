@@ -9,6 +9,7 @@
   import { axisClock, untilText } from './lib/until'
   import Icon from './Icon.svelte'
   import type { ScheduleView, SchedulesView } from './lib/types'
+  import { lastPassText, sparkPoints } from './lib/watchpasses'
 
   let view = $state<SchedulesView>({ runner: { state: 'stopped', notes: [], upcoming: [], triggerAddr: '' }, schedules: [], flows: [], environments: [], triggerAddr: '', hasToken: false })
   let editing = $state<{ old: string; s: ScheduleView } | null>(null)
@@ -33,7 +34,7 @@
     return fires.map((m) => ((m - elapsed) / SPAN_MINUTES) * 100).filter((p) => p >= 0 && p <= 100)
   }
 
-  const blank = (): ScheduleView => ({ name: '', flow: '', collection: '', cron: '@daily', env: '', inputs: '', tz: '', disabled: false, flowLabel: '', when: '', nextAt: '', fires: [] })
+  const blank = (): ScheduleView => ({ name: '', flow: '', collection: '', cron: '@daily', env: '', inputs: '', tz: '', disabled: false, flowLabel: '', when: '', nextAt: '', fires: [], watch: false, history: [] })
   const edit = (s: ScheduleView) => ((editing = { old: s.name, s: { ...s } }), (problem = ''))
 
   // Picking a flow stores its id and the collection that makes it unambiguous.
@@ -90,6 +91,18 @@
           <div class="when">{s.when || s.cron}{#if s.when}<code>{s.cron}</code>{/if}{#if s.tz}<code>{s.tz}</code>{/if}</div>
           <div class="muted">{s.flowLabel || s.flow}{#if s.env}{' · env '}<b>{s.env}</b>{/if}</div>
         </div>
+        {#if s.watch}
+          {@const last = lastPassText(s.history)}
+          {@const points = sparkPoints(s.history, 84, 20)}
+          <span class="watch" title="Each run compares the flow's answers with the pass before">
+            <span class="badge">Watch</span>
+            <svg class="spark" width="84" height="24" viewBox="-2 -2 88 24" role="img" aria-label={points.length ? 'Total latency of the last ' + points.length + ' passes' : 'No passes yet'}>
+              {#if points.length > 1}<polyline points={points.map((p) => p.x + ',' + p.y).join(' ')} fill="none" stroke="var(--muted)" stroke-width="1.5" />{/if}
+              {#each points as p}<circle cx={p.x} cy={p.y} r={p.changed ? 3 : 1.5} fill={p.changed ? 'var(--warn)' : 'var(--muted)'} />{/each}
+            </svg>
+            <span class="last {last.tone}">{last.text}</span>
+          </span>
+        {/if}
         <span class="next" class:dim={!s.nextAt}>
           <i style:background={s.nextAt ? hues[view.schedules.indexOf(s) % hues.length] : undefined}></i>{s.disabled ? 'Disabled' : s.nextAt ? 'Next run ' + untilText(s.nextAt, now) : 'Never fires'}
         </span>
@@ -134,6 +147,8 @@
       </label>
       <label><span>Time zone (IANA name; empty: this machine's)</span><TextInput bind:value={editing.s.tz} placeholder="Europe/Berlin" /></label>
       <label><span>Inputs (name=value, one per line)</span><textarea bind:value={editing.s.inputs} spellcheck="false"></textarea></label>
+      <Toggle checked={editing.s.watch} onchange={(on) => (editing!.s.watch = on)}>Watch for changes (the flow must only read)</Toggle>
+      {#if editing.s.watch}<p class="muted">Each run is compared with the one before: another status, a response whose shape moved, a call much slower. A run that finds a change ends as “changed” in the run records. Saving is refused for a flow with a step that could change something.</p>{/if}
       <Toggle checked={editing.s.disabled} onchange={(on) => (editing!.s.disabled = on)}>Disabled</Toggle>
       {#if problem}<p class="err">{problem}</p>{/if}
       <div class="actions">
@@ -147,7 +162,7 @@
     <summary>Run them without the window</summary>
     <p class="muted">Closing this window stops the schedules above. To keep them running (on a server, or at login), start the same thing from a terminal:</p>
     <pre>flowi serve --no-replay</pre>
-    <p class="muted">With a trigger token it also listens for <code>POST /flows/&lt;flow&gt;/run</code>. <code>flowi schedule ls</code> lists the schedules and when each fires next; <code>flowi schedule add</code> and <code>rm</code> change them. Restart <code>flowi serve</code> after changing the schedules.</p>
+    <p class="muted">With a trigger token it also listens for <code>POST /flows/&lt;flow&gt;/run</code>. <code>flowi schedule ls</code> lists the schedules and when each fires next; <code>flowi schedule add</code> and <code>rm</code> change them. <code>flowi watch add</code>, <code>ls</code> and <code>rm</code> do the same for the watches. Restart <code>flowi serve</code> after changing the schedules.</p>
   </details>
 
   <h3>HTTP trigger</h3>
@@ -175,6 +190,13 @@
   .what strong { font-size: var(--fs-md); }
   .when { display: flex; align-items: baseline; gap: 8px; font-size: var(--fs-sm); }
   .when code { color: var(--muted); }
+  .watch { display: flex; align-items: center; gap: 8px; margin-right: 8px; white-space: nowrap; }
+  .badge { padding: 1px 7px; border-radius: 999px; background: var(--raised); color: var(--accent); font-size: var(--fs-xs); font-weight: 600; }
+  .spark { flex: none; overflow: visible; }
+  .last { font-size: var(--fs-sm); color: var(--muted); min-width: 74px; }
+  .last.ok { color: var(--ok); }
+  .last.changed { color: var(--warn); font-weight: 600; }
+  .last.bad { color: var(--fail); }
   .next { display: flex; align-items: center; gap: 7px; margin-right: 8px; font-size: var(--fs-sm); color: var(--muted); white-space: nowrap; }
   .next i { width: 7px; height: 7px; border-radius: 50%; background: var(--muted); }
   .next.dim { opacity: 0.7; }

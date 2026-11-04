@@ -90,3 +90,40 @@ func TestSuggestFeatures_should_say_why_and_where_to_go(t *testing.T) {
 		}
 	}
 }
+
+func TestSetup_NoteSuggestions_should_remember_the_first_collection_that_has_flows_to_suggest(t *testing.T) {
+	cols := []model.Collection{
+		{Manifest: model.Manifest{ID: "scratch"}},
+		{Manifest: model.Manifest{ID: "a"}},
+		{Manifest: model.Manifest{ID: "b"}},
+	}
+	counts := map[model.ID]int{"scratch": 9, "a": 0, "b": 2}
+	var s vm.Setup
+
+	s.NoteSuggestions(cols, func(c model.Collection) bool { return c.Manifest.ID == "scratch" }, func(id model.ID) int { return counts[id] })
+
+	if s.Suggestable != 2 || s.SuggestIn != "b" {
+		t.Fatalf("got %d in %q", s.Suggestable, s.SuggestIn)
+	}
+}
+
+func TestSuggestFeatures_Given_flows_to_suggest_and_none_made_Then_it_offers_them_in_that_collection(t *testing.T) {
+	setup := vm.Setup{Collections: 1, Requests: 5, HTTP: 5, Environments: 1, Suggestable: 2, SuggestIn: "b"}
+
+	got := vm.SuggestFeatures(setup)
+
+	if got[0].ID != "suggested-flows" || got[0].Action != "suggest-flows:b" {
+		t.Fatalf("first idea %+v", got[0])
+	}
+	if slices.Contains(suggestionIDs(got), "flows") {
+		t.Errorf("the plain flows idea repeats the suggestion: %v", suggestionIDs(got))
+	}
+}
+
+func TestSuggestFeatures_Given_flows_already_made_Then_the_suggestion_card_is_gone(t *testing.T) {
+	setup := vm.Setup{Collections: 1, Requests: 5, HTTP: 5, Flows: 1, Suggestable: 2, SuggestIn: "b"}
+
+	if got := suggestionIDs(vm.SuggestFeatures(setup)); slices.Contains(got, "suggested-flows") {
+		t.Fatalf("got %v", got)
+	}
+}

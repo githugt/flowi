@@ -22,7 +22,7 @@ func runValues(n model.Node, s *State) Outcome {
 			diags = append(diags, d...)
 			continue
 		}
-		s.Vars.Set(v.Name, got)
+		s.SetVar(v.Name, got)
 		written[v.Name] = got
 	}
 	return Outcome{Outputs: written, Diags: diags}

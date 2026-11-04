@@ -42,6 +42,15 @@ flowi secret get staging password --reveal   # prints it again (without --reveal
 flowi send auth/login --env staging --with email=a@example.com
 flowi run user-creation --env staging        # run a flow
 flowi impact auth/login                      # who uses this request, and do they still fit it?
+flowi env diff local staging                # how two environments differ (exit 1 if they do; secret values never shown)
+flowi explain user-creation                 # the flow in words, one sentence per step (--problems: exit 1 if any)
+flowi synth --collection Pets              # suggest create/read flows from what the responses return (--write saves them)
+flowi watch health-check --env prod         # run a read-only flow and report status, shape, or latency changes since last time (exit 1 on change)
+flowi discover https://api.example.com      # list what would be asked of an API with no description (--yes sends; --collection drafts requests from the answers)
+flowi run run.flowi-run --from verify --set city=Paris   # fork a recorded run: re-run from a step with edited variables, answered from the recording
+flowi trace user-creation token              # which step makes this value and which read it? (exit 1 if nothing makes it)
+flowi run user-creation --timeline          # when each step started and how long it took
+flowi diff last-green.flowi-run ci.flowi-run  # what did the failed run do differently? (exit 1 if they differ)
 ```
 
 `flowi send` prints the response body on standard output and everything else on standard error, so

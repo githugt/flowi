@@ -1,7 +1,8 @@
 <script lang="ts">
   import type { VarsView } from './lib/types'
+  import { tracing } from './lib/trace.svelte'
 
-  let { vars }: { vars: VarsView } = $props()
+  let { vars, node }: { vars: VarsView; node: string } = $props()
   let open = $state<string | null>(null)
 
   const valueOf = $derived(new Map((vars.values ?? []).map((v) => [v.name, v.value])))
@@ -26,7 +27,8 @@
         {#if open === g.title}
           <div class="pop" role="dialog" tabindex="-1" onpointerdown={(e) => e.stopPropagation()}>
             {#each g.names as n}
-              <div>{n}{#if g.title === 'Variables' && valueOf.has(n)}<span class="val" title="What it held when the last run ended"> = {valueOf.get(n)}</span>{/if}</div>
+              <div>
+                {#if g.title === 'Variables'}<button class="name" title="Trace {n}: dim every step but the ones that make and read it" onclick={() => { open = null; void tracing.start(node, n) }}>{n}</button>{:else}{n}{/if}{#if g.title === 'Variables' && valueOf.has(n)}<span class="val" title="What it held when the last run ended"> = {valueOf.get(n)}</span>{/if}</div>
             {/each}
             {#if g.title === 'Variables'}
               {@const known = new Set(vars.set)}
@@ -54,6 +56,8 @@
     font-size: var(--fs-sm);
   }
   button:hover { border-color: var(--accent); color: var(--text); }
+  button.name { border: 0; padding: 0; border-radius: 0; font: inherit; color: var(--text); text-decoration: underline dotted; cursor: pointer; }
+  button.name:hover { color: var(--accent); }
   .warn { color: var(--warn); border-color: color-mix(in srgb, var(--warn) 50%, var(--line)); }
   .val { color: var(--muted); word-break: break-all; }
   .pop {

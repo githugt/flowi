@@ -9,6 +9,7 @@
   import { live } from './lib/live'
   import { promptNewEnvironment } from './lib/menus'
   import { screens } from './lib/screens'
+  import { ui } from './lib/ui.svelte'
   import { breakdownText, hiddenCount, visibleIdeas, type Home } from './lib/home'
   import type { TreeNode } from './lib/types'
 
@@ -55,6 +56,7 @@
 
   function runIdea(action: string) {
     if (action.startsWith('screen:')) return app.openScreen(action, screens.find((s) => s.id === action)?.title ?? '')
+    if (action.startsWith('suggest-flows:')) return void (ui.suggest = { collection: action.slice('suggest-flows:'.length) })
     if (action === 'new-environment') return promptNewEnvironment()
     if (action === 'open-request') return void (firstRequest && app.open(firstRequest))
     app.onMenu(action) // new-request, new-flow

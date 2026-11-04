@@ -402,3 +402,23 @@ func TestEnvironment_Given_a_typed_value_that_does_not_fit_Then_it_is_written_as
 		t.Fatalf("%v\n%s", err, out)
 	}
 }
+
+func TestDecodeWorkspace_should_round_trip_the_watch_flag_of_a_schedule(t *testing.T) {
+	data := []byte("id: 01JA003M4N5P6Q7R8S9T0VWXYZ\nschedules:\n  - name: contract\n    flow: f\n    cron: '@daily'\n    watch: true\n  - name: plain\n    flow: f\n    cron: '@daily'\n")
+	c := newCodec()
+
+	ws, diags := c.DecodeWorkspace("workspace.yaml", data)
+	requireNoDiagnostics(t, diags)
+	out, err := c.EncodeWorkspace(ws)
+	again, _ := c.DecodeWorkspace("workspace.yaml", out)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !ws.Schedules[0].Watch || ws.Schedules[1].Watch || !again.Schedules[0].Watch || again.Schedules[1].Watch {
+		t.Fatalf("read %+v, read again %+v", ws.Schedules, again.Schedules)
+	}
+	if strings.Count(string(out), "watch:") != 1 {
+		t.Fatalf("only the watching schedule should say so:\n%s", out)
+	}
+}

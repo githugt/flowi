@@ -143,6 +143,29 @@ func (s *RequestService) collectionOf(node string) (model.ID, error) {
 	return id, err
 }
 
+// OverlayEffectsView is what a flowi overlay changes for the open request, for the chip in the footer.
+type OverlayEffectsView struct {
+	Changes  []string `json:"changes"`
+	Identity bool     `json:"identity"` // it sets who the request is made as
+}
+
+// OverlayEffects says what the flowi overlay name changes for the request node, one sentence each.
+func (s *RequestService) OverlayEffects(node, name string) (OverlayEffectsView, error) {
+	var t flowi.RequestTarget
+	var open bool
+	s.with(node, func(o *openRequest) { t, open = o.req.Target(), true })
+	if !open {
+		return OverlayEffectsView{}, fmt.Errorf("%q is not open", node)
+	}
+	var fx flowi.OverlayEffects
+	var err error
+	s.app.actor.Do(func() { fx, err = s.app.backend.OverlayEffects(t, name) })
+	if err != nil {
+		return OverlayEffectsView{}, err
+	}
+	return OverlayEffectsView{Changes: nonNil(fx.Changes), Identity: fx.Identity}, nil
+}
+
 // FlowiOverlayText is the file of the flowi overlay name in the collection of
 // the request node, for the overlay editor. An empty name gives the text a
 // new overlay starts with.

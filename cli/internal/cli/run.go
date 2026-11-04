@@ -3,14 +3,18 @@
 package cli
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"os"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/samber/do/v2"
 	"github.com/spf13/cobra"
@@ -25,12 +29,13 @@ import (
 )
 
 type runFlags struct {
-	collection, env, prefer, tag, bundle, overlay string
-	matrix                                        []string
-	inputs, reports                               []string
-	seed                                          uint64
-	grace                                         time.Duration
-	quiet                                         bool
+	collection, env, prefer, tag, bundle, overlay, from string
+	set, respond                                        []string
+	matrix                                              []string
+	inputs, reports                                     []string
+	seed                                                uint64
+	grace                                               time.Duration
+	quiet, timeline, only                               bool
 }
 
 func newRunCommand(i do.Injector) *cobra.Command {
@@ -62,6 +67,11 @@ func newRunCommand(i do.Injector) *cobra.Command {
 	fl.Uint64Var(&f.seed, "seed", 0, "seed for generated values (default: random, printed)")
 	fl.DurationVar(&f.grace, "grace", 0, "how long a cancelled run may take to stop (default: the run.grace setting)")
 	fl.StringArrayVar(&f.reports, "report", nil, "also write the report, as format=path: junit, json, markdown, text, mermaid (a sequence diagram) or har (repeatable)")
+	fl.StringVar(&f.from, "from", "", "with a bundle: run again from this top-level step, answered from the recording (no request is sent)")
+	fl.StringArrayVar(&f.set, "set", nil, "with --from: change a variable before that step, as name=value (a number, true/false or null is read as JSON; repeatable)")
+	fl.BoolVar(&f.only, "only", false, "with --from: run just that step again, not the ones after it")
+	fl.StringArrayVar(&f.respond, "respond", nil, "with --from: answer a step's request with another response than the recording, as step=[status][@file] (a status, a body file, or both; a .json file is a JSON body, any other text file is the body as text; repeatable)")
+	fl.BoolVar(&f.timeline, "timeline", false, "after the run, draw when each step started and how long it took, one lane per step that ran alongside another")
 	fl.BoolVar(&f.quiet, "quiet", false, "print only the final status line")
 	return cmd
 }
@@ -81,6 +91,12 @@ func runRun(cmd *cobra.Command, i do.Injector, args []string, f runFlags) error 
 	if f.tag != "" {
 		return runTagged(cmd, i, s, opts, reports, f)
 	}
+	if f.forks() && !flowi.IsBundleRef(args[0]) {
+		return &UsageError{Err: errors.New("--from, --set, --only and --respond fork a recorded run: name a bundle (.flowi-run)")}
+	}
+	if f.from == "" && (len(f.set) > 0 || f.only || len(f.respond) > 0) {
+		return &UsageError{Err: errors.New("--set, --only and --respond change the step --from names: give --from")}
+	}
 	if flowi.IsBundleRef(args[0]) {
 		return runBundle(cmd, i, s, args[0], reports, f)
 	}
@@ -95,6 +111,11 @@ func runRun(cmd *cobra.Command, i do.Injector, args []string, f runFlags) error 
 		return runMatrix(cmd, s, target, opts, reports, f)
 	}
 	return runOne(cmd, i, s, target, opts, reports, f.bundle, f)
+}
+
+// forks reports that any flag that forks a recorded run is given.
+func (f runFlags) forks() bool {
+	return f.from != "" || len(f.set) > 0 || f.only || len(f.respond) > 0
 }
 
 // checkTarget wants a flow or a tag, not both and not neither, and a matrix only for one flow of its own.
@@ -114,6 +135,139 @@ func (f runFlags) checkTarget(args []string) error {
 
 // runBundle plays a bundled run back from its recording. It decides the environment, seed and inputs itself,
 // so options that would change them are refused rather than ignored.
+// forkBundle runs a bundled flow again from a step with edited variables and says how it went differently.
+func forkBundle(cmd *cobra.Command, i do.Injector, br *flowi.BundleRun, f runFlags) error {
+	set, err := parseSets(f.set)
+	if err != nil {
+		return &UsageError{Err: err}
+	}
+	respond, err := parseResponses(f.respond)
+	if err != nil {
+		return &UsageError{Err: err}
+	}
+	cmd.PrintErrf("Forking %s from %s, answered from the recording. No request is sent.\n", br.Manifest.FlowPath, f.from)
+	frozen, err := br.ForkVariables(f.from)
+	if err != nil {
+		return &UsageError{Err: err}
+	}
+	for _, note := range staleNotes(frozen, set, time.Now()) {
+		cmd.PrintErrf("Replayed, not live: %s\n", note)
+	}
+	run, err := br.StartFork(cmd.Context(), flowi.ForkOptions{From: f.from, Set: set, Only: f.only, Respond: respond})
+	if err != nil {
+		return &UsageError{Err: err}
+	}
+	res := renderRun(cmd, i, run, f)
+	if do.MustInvoke[*GlobalOptions](i).Output != OutputJSON {
+		fmt.Fprintln(cmd.OutOrStdout(), "Against the recording:")
+		report.WriteComparison(cmd.OutOrStdout(), br.CompareFork(res))
+	}
+	return finishRun(cmd, i, res, nil)
+}
+
+// staleNotes says which values frozen by the recording a fork would reuse although they have gone stale since (an
+// expired token), one line each by name. A value the fork changes is not frozen, so it is not listed.
+func staleNotes(frozen, changed map[string]any, now time.Time) []string {
+	var notes []string
+	for _, name := range slices.Sorted(maps.Keys(frozen)) {
+		if _, edited := changed[name]; edited {
+			continue
+		}
+		if why := flowi.StaleReason(name, frozen[name], now); why != "" {
+			notes = append(notes, name+" is stale: "+why)
+		}
+	}
+	return notes
+}
+
+// parseResponses reads --respond values, step=[status][@file]: a status, the body in a file (JSON or text), or both.
+func parseResponses(pairs []string) (map[string]flowi.ForkResponse, error) {
+	out := map[string]flowi.ForkResponse{}
+	for _, p := range pairs {
+		step, rest, ok := strings.Cut(p, "=")
+		if !ok || step == "" {
+			return nil, fmt.Errorf("--respond %q is not step=[status][@file]", p)
+		}
+		r, err := parseResponse(rest)
+		if err != nil {
+			return nil, fmt.Errorf("--respond %s: %w", step, err)
+		}
+		out[step] = r
+	}
+	return out, nil
+}
+
+func parseResponse(text string) (flowi.ForkResponse, error) {
+	if text == "" {
+		return flowi.ForkResponse{}, errors.New("give a status, a @file with the body, or both")
+	}
+	status, file, hasFile := strings.Cut(text, "@")
+	var r flowi.ForkResponse
+	if status != "" {
+		code, err := strconv.Atoi(status)
+		if err != nil || code < 100 || code > 599 {
+			return r, fmt.Errorf("%q is not an HTTP status (100 to 599)", status)
+		}
+		r.Status = code
+	}
+	if !hasFile {
+		return r, nil
+	}
+	data, err := os.ReadFile(file) //nolint:gosec // the person names the body to answer with
+	if err != nil {
+		return r, fmt.Errorf("reading the body: %w", err)
+	}
+	return withBodyFile(r, file, data)
+}
+
+// withBodyFile gives r the body in file. A .json file is a JSON body and must parse: a file that says it is JSON and
+// is not has a typo in it, and answering with its text would hide that. Any other file is the text of the response
+// (XML, HTML, CSV, plain text), with a content type from its extension; a file that is not text is refused.
+func withBodyFile(r flowi.ForkResponse, file string, data []byte) (flowi.ForkResponse, error) {
+	if strings.EqualFold(filepath.Ext(file), ".json") {
+		if err := json.Unmarshal(data, &r.Body); err != nil {
+			return r, fmt.Errorf("%s is not valid JSON: %w", file, err)
+		}
+		r.HasBody = true
+		return r, nil
+	}
+	if !utf8.Valid(data) {
+		return r, fmt.Errorf("%s is not text: only a JSON file or a text file can be the body", file)
+	}
+	r.Text, r.HasText, r.ContentType = string(data), true, contentTypeOfFile(file)
+	return r, nil
+}
+
+// contentTypeOfFile is the content type a body file's extension suggests; plain text when it suggests none.
+func contentTypeOfFile(file string) string {
+	switch strings.ToLower(filepath.Ext(file)) {
+	case ".xml":
+		return "application/xml"
+	case ".html", ".htm":
+		return "text/html; charset=utf-8"
+	case ".csv":
+		return "text/csv"
+	}
+	return "text/plain; charset=utf-8"
+}
+
+// parseSets reads name=value pairs; a value that is JSON (a number, true, false, null) keeps that type, anything else is text.
+func parseSets(pairs []string) (map[string]any, error) {
+	out := map[string]any{}
+	for _, p := range pairs {
+		name, raw, ok := strings.Cut(p, "=")
+		if !ok || name == "" {
+			return nil, fmt.Errorf("--set %q is not name=value", p)
+		}
+		var v any
+		if err := json.Unmarshal([]byte(raw), &v); err != nil {
+			v = raw // not JSON: plain text
+		}
+		out[name] = v
+	}
+	return out, nil
+}
+
 func runBundle(cmd *cobra.Command, i do.Injector, s *Session, file string, reports []reportSpec, f runFlags) error {
 	for flag, set := range map[string]bool{"--env": f.env != "", "--seed": f.seed != 0, "--input": len(f.inputs) > 0, "--prefer-version": f.prefer != "", "--bundle": f.bundle != "", "--overlay": f.overlay != "", "--matrix": len(f.matrix) > 0} {
 		if set {
@@ -129,6 +283,9 @@ func runBundle(cmd *cobra.Command, i do.Injector, s *Session, file string, repor
 		return &UsageError{Err: err}
 	}
 	defer br.Close()
+	if f.from != "" {
+		return forkBundle(cmd, i, br, f)
+	}
 	m := br.Manifest
 	cmd.PrintErrf("Replaying %s (%s) as recorded %s: environment %s, seed %d. No request is sent.\n", m.FlowName, m.FlowPath, m.At.Format("2006-01-02 15:04"), m.Env, m.Seed)
 	return runOne(cmd, i, s, br.Target, br.Options, reports, "", f)
@@ -195,6 +352,9 @@ func runOne(cmd *cobra.Command, i do.Injector, s *Session, target flowi.FlowTarg
 		return err
 	}
 	res := renderRun(cmd, i, run, f)
+	if f.timeline {
+		report.WriteTimeline(cmd.OutOrStdout(), res.Report, timelineWidth)
+	}
 	logRun(i, target, res)
 	return finishRun(cmd, i, res, errors.Join(writeReports(reports, res), writeBundle(s, bundlePath, target, opts, res)))
 }
@@ -281,6 +441,9 @@ func parsePairs(flag string, pairs []string) (map[string]string, error) {
 	}
 	return out, nil
 }
+
+// timelineWidth is how many columns --timeline gives the whole run.
+const timelineWidth = 60
 
 // reportSpec is one --report format=path.
 type reportSpec struct{ format, path string }

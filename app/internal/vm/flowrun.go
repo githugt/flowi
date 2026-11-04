@@ -14,6 +14,7 @@ import (
 	"github.com/githugt/flowi/lib/diag"
 	"github.com/githugt/flowi/lib/engine"
 	"github.com/githugt/flowi/lib/model"
+	"github.com/githugt/flowi/lib/report"
 )
 
 // refreshEvery coalesces run events into at most ~30 canvas updates a
@@ -396,4 +397,56 @@ func nodeOfPath(path string) string {
 	last := path[strings.LastIndex(path, "/")+1:]
 	id, _, _ := strings.Cut(last, "[")
 	return id
+}
+
+// LoadResult shows a run that was recorded elsewhere (a bundle) as if it had just run here: each step's status,
+// time, outputs and problems, the variables it ended with, and the calls it made. It replaces what the last run
+// showed.
+func (r *FlowRun) LoadResult(res engine.RunResult) {
+	r.ClearResults()
+	r.result, r.vars = res, res.Report.Vars
+	r.loadNodes(res.Report.Nodes)
+	for node, rec := range recordsByNode(res) {
+		r.detail(node).Record = rec
+	}
+	r.changed()
+}
+
+// loadNodes adds each reported step, and the steps inside it, to the details like a finished instance.
+func (r *FlowRun) loadNodes(list []report.Node) {
+	for _, n := range list {
+		d := r.detail(n.ID)
+		d.Instances++
+		d.Duration += n.Duration
+		d.Outputs = n.Outputs
+		for _, diagnostic := range n.Diagnostics {
+			d.Diags = append(d.Diags, diagnostic.Code+": "+diagnostic.Message)
+		}
+		status := n.Status
+		if statusRank(d.Status) > statusRank(status) {
+			status = d.Status
+		}
+		r.setStatus(n.ID, status)
+		for _, l := range n.Lanes {
+			r.loadNodes(l.Nodes)
+		}
+	}
+}
+
+// recordsByNode pairs each request step of a recorded run with the call it made. The report says which request each
+// step used; the calls are in the order the steps finished, so a step takes the next unclaimed call to its request.
+func recordsByNode(res engine.RunResult) map[string]*engine.Record {
+	out := map[string]*engine.Record{}
+	claimed := make([]bool, len(res.Captured))
+	for _, use := range res.Report.Versions {
+		for i := range res.Captured {
+			if claimed[i] || string(res.Captured[i].RequestID) != use.RequestID {
+				continue
+			}
+			claimed[i] = true
+			out[nodeOfPath(use.Path)] = &res.Captured[i]
+			break
+		}
+	}
+	return out
 }

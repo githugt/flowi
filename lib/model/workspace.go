@@ -20,6 +20,9 @@ type Schedule struct {
 	Inputs     []KeyValue
 	TZ         string // IANA zone name; "" is the machine's zone
 	Disabled   bool
+	// Watch makes each tick a watch pass: the flow runs and what its calls answered is compared with the last pass,
+	// and a changed contract ends the run as "changed". The flow must be read-only.
+	Watch bool
 }
 
 // Workspace is the content of workspace.yaml.

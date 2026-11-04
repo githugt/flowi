@@ -1,9 +1,14 @@
 <script lang="ts">
   import Button from './Button.svelte'
-  import { tick } from 'svelte'
+  import { tick, untrack } from 'svelte'
+  import { tracing } from './lib/trace.svelte'
+  import { hopText, traceSummary } from './lib/trace'
+  import { playback } from './lib/playback.svelte'
+  import { statusesAt, varsAt } from './lib/timeline'
+  import Timeline from './Timeline.svelte'
   import { confirmDeleteSteps } from './lib/flowDelete'
   import { FlowService } from '../bindings/github.com/githugt/flowi/app/internal/bridge'
-  import type { FlowView, Slot, StepChoice, WireChoices } from './lib/types'
+  import type { FlowView, GhostView, Slot, StepChoice, WireChoices } from './lib/types'
   import Canvas, { type DragInfo } from './Canvas.svelte'
   import SidePanel from './SidePanel.svelte'
   import RunMenu from './RunMenu.svelte'
@@ -24,16 +29,45 @@
   import CaseEditor from './CaseEditor.svelte'
   import RowEditor from './RowEditor.svelte'
   import WirePanel from './WirePanel.svelte'
+  import StoryView from './StoryView.svelte'
   import OutputDock from './OutputDock.svelte'
   import { errorText } from './lib/errors'
 
   let { view, embedded = false }: { view: FlowView; embedded?: boolean } = $props()
   let canvas = $state<Canvas>()
   let code = $state<CodeView>()
-  let mode = $state<'canvas' | 'code'>('canvas')
+  let mode = $state<'canvas' | 'code' | 'story'>('canvas')
   let slot = $state<Slot | null>(null)
 
   const node = $derived(view.node)
+
+  // The playhead on the finished run: the canvas shows each step as it was then, not as the run ended.
+  const playhead = $derived(playback.at[node] ?? null)
+  // An earlier saved run laid behind the timeline; cleared when a new run replaces the one shown.
+  let ghosts = $state<GhostView[]>([])
+  let ghostsFor = ''
+  $effect(() => {
+    const shown = view.run.summary ?? ''
+    if (shown !== ghostsFor) ghosts = []
+    ghostsFor = shown
+  })
+  async function compareWithRun(runId: string) {
+    try {
+      ghosts = (await FlowService.GhostBars(node, runId)) as unknown as GhostView[]
+    } catch (e) {
+      ui.toast(String(e), 'error')
+    }
+  }
+  const shownStatuses = $derived(playhead === null ? view.run.statuses : statusesAt(view.run.timeline.bars, playhead))
+  const varsNow = $derived(playhead === null ? null : varsAt(view.run.timeline.bars, playhead))
+
+  // A value trace dims every step but the ones that make and read the value. It follows the flow as it is edited.
+  const trace = $derived(tracing.byNode[node] ?? null)
+  $effect(() => {
+    void view.rev
+    const open = untrack(() => tracing.byNode[node])
+    if (open) void tracing.start(node, open.name)
+  })
 
   // A value wire dropped from one step onto another: the choices of what to take and where to put it, or why not.
   let wire = $state<{ from: string; to: string; x: number; y: number; choices: WireChoices } | null>(null)
@@ -175,7 +209,7 @@
     editMode = !editMode
   }
 
-  async function show(next: 'canvas' | 'code') {
+  async function show(next: 'canvas' | 'code' | 'story') {
     if (next === mode) return
     // Typed code is applied first; with problems the user stays to fix them.
     if (mode === 'code' && !(await code!.settle())) return
@@ -298,6 +332,7 @@
     {#if !embedded}
       <div class="views" role="radiogroup" aria-label="View">
         <button class:on={mode === 'canvas'} onclick={() => show('canvas')}>Canvas</button>
+        <button class:on={mode === 'story'} onclick={() => show('story')}>Storyboard</button>
         <button class:on={mode === 'code'} onclick={() => show('code')}>Code</button>
       </div>
     {/if}
@@ -330,9 +365,22 @@
   {/if}
   {#if mode === 'code'}
     <div class="work"><div class="center"><CodeView bind:this={code} {view} editable={editing} /></div></div>
+  {:else if mode === 'story'}
+    <div class="work"><div class="center"><StoryView {view} /></div></div>
   {/if}
   <FileBanner onDisk={view.onDisk} needsDrop={view.needsDrop} revert={() => FlowService.Revert(node)} saveDropping={() => FlowService.SaveDroppingComments(node)} declineDrop={() => FlowService.DeclineDrop(node)} />
-  <div class="work" hidden={mode === 'code'}>
+  {#if trace}
+    <div class="tracebar" role="status">
+      <span class="msg">
+        <strong>Tracing <code>{trace.name}</code></strong> <span class="muted">{traceSummary(trace)}</span>
+        {#if trace.hops.length}
+          <span class="hops" title="The value at each step in the last run (secrets masked)">{#each trace.hops as h}<span class="hop" class:unknown={!h.known}>{hopText(h)}</span>{/each}</span>
+        {/if}
+      </span>
+      <Button small onclick={() => tracing.clear(node)}>Clear</Button>
+    </div>
+  {/if}
+  <div class="work" hidden={mode !== 'canvas'}>
     <div class="center">
     <div class="canvas">
       <Canvas
@@ -341,9 +389,10 @@
         cards={view.cards}
         data={view.data}
         selection={view.selection}
-        statuses={view.run.statuses}
+        statuses={shownStatuses}
         results={view.run.results}
         {slot}
+        lit={trace?.lit ?? null}
         editable={editing}
         onselect={(step, additive) => (additive ? FlowService.ToggleSelect(node, step) : FlowService.Select(node, step))}
         onconnect={(from, to) => FlowService.Connect(node, from, to)}
@@ -353,6 +402,7 @@
         onarrow={(from, to, outcomes) => FlowService.SetArrow(node, from, to, outcomes).catch((e) => ui.toast(errorText(e)))}
         onlocked={tellLocked}
         oncollapse={(unit, on) => FlowService.Collapse(node, unit, on)}
+        onstepopen={(step) => void app.showStepBeside(node, step)}
         onaddcase={(id) => FlowService.AddCaseTo(node, id)}
         onadd={editing ? openPopup : undefined}
         ontoolbar={editing ? onTool : undefined}
@@ -374,7 +424,11 @@
         dock={outputDock}
       />
     </div>
-    <VarsBar vars={view.vars} />
+    {#if varsNow}
+      <div class="atplayhead" role="status"><strong>Variables at {playhead} ms</strong> {#each Object.entries(varsNow) as [k, v]}<span class="hop">{k} = {v}</span>{:else}<span class="muted">none set yet</span>{/each}</div>
+    {/if}
+    <Timeline timeline={view.run.timeline} {playhead} runs={app.history[node] ?? []} ghosts={ghosts} oncompare={compareWithRun} onseek={(ms) => (ms === null ? playback.live(node) : playback.seek(node, ms))} onselect={(step) => FlowService.Select(node, step)} />
+    <VarsBar vars={view.vars} {node} />
     </div>
     <SidePanel {view} {editing} />
   </div>
@@ -412,6 +466,12 @@
   .runerr { flex: none; display: flex; align-items: center; gap: var(--sp-2); padding: 6px 12px; font-size: var(--fs-sm); color: var(--fail); background: color-mix(in srgb, var(--fail) 10%, transparent); border-bottom: 1px solid var(--line); }
   .runerr .msg { flex: 1; min-width: 0; }
   .runerr button { padding: 1px 10px; }
+  .tracebar { flex: none; display: flex; align-items: center; gap: var(--sp-2); padding: 6px 12px; font-size: var(--fs-sm); background: color-mix(in srgb, var(--data) 10%, transparent); border-bottom: 1px solid var(--line); }
+  .tracebar .msg { flex: 1; min-width: 0; }
+  .atplayhead { flex: none; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; padding: 4px 10px; font-size: var(--fs-sm); border-top: 1px solid var(--line); background: var(--panel); }
+  .hops { display: flex; flex-wrap: wrap; gap: 4px 6px; margin-top: 4px; }
+  .hop { font-family: var(--mono); font-size: var(--fs-xs); padding: 1px 6px; border-radius: 4px; background: color-mix(in srgb, var(--data) 14%, transparent); overflow-wrap: anywhere; }
+  .hop.unknown { color: var(--muted); }
   .runerr .x { border: 0; color: var(--muted); padding: 0 4px; }
   header strong { flex: 0 1 auto; min-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   header :global(button) { white-space: nowrap; }

@@ -188,3 +188,17 @@ func TestSchedules_MatchFlow_should_find_the_flow_as_the_library_does(t *testing
 		}
 	}
 }
+
+func TestSchedules_Load_Given_a_history_that_cannot_be_read_Then_the_list_still_shows_and_the_error_is_reported(t *testing.T) {
+	b := sampleBackend()
+	watching := nightlySchedule()
+	watching.Watch = true
+	b.ScheduleList = []model.Schedule{watching}
+	b.Check.Err = errors.New("disk full")
+
+	s, _ := newSchedules(t, b)
+
+	if len(s.List()) != 1 || !strings.Contains(s.Err(), "disk full") || len(s.History("nightly")) != 0 {
+		t.Fatalf("list %+v, err %q, history %+v", s.List(), s.Err(), s.History("nightly"))
+	}
+}

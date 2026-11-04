@@ -2,7 +2,10 @@
 
 package engine
 
-import "github.com/githugt/flowi/lib/internal/nodes"
+import (
+	"github.com/githugt/flowi/lib/internal/nodes"
+	"github.com/githugt/flowi/lib/report"
+)
 
 // keepVars remembers the flow's top-level variables for the report and gives
 // them the values an earlier run ended with (see RunInput.PriorVars).
@@ -30,4 +33,27 @@ func (r *runner) finalVars() map[string]any {
 		out[name] = maskValue(value, m)
 	}
 	return out
+}
+
+// noteWrite remembers that the node at path set a variable, until its NodeFinished takes the list.
+func (r *runner) noteWrite(path, name string, value any) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.writes == nil {
+		r.writes = map[string][]report.VarWrite{}
+	}
+	r.writes[path] = append(r.writes[path], report.VarWrite{Name: name, Value: value})
+}
+
+// takeWrites is what the node at path wrote, masked like every value a run reports, and forgets it.
+func (r *runner) takeWrites(path string) []report.VarWrite {
+	r.mu.Lock()
+	wrote := r.writes[path]
+	delete(r.writes, path)
+	r.mu.Unlock()
+	m := r.secrets.current()
+	for i := range wrote {
+		wrote[i].Value = maskValue(wrote[i].Value, m)
+	}
+	return wrote
 }

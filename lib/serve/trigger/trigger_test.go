@@ -150,6 +150,20 @@ func TestTrigger_should_pass_flow_paths_collection_and_body_options_to_the_run(t
 	}
 }
 
+func TestTrigger_Given_watch_in_the_body_Then_the_run_is_a_watch_pass(t *testing.T) {
+	r := newRig(t)
+
+	watched := r.do("POST", "/flows/signup/run", `{"watch": true}`)
+	plain := r.do("POST", "/flows/signup/run", `{}`)
+
+	if watched.status != 202 || plain.status != 202 {
+		t.Fatalf("watched %d %s, plain %d %s", watched.status, watched.body, plain.status, plain.body)
+	}
+	if !r.started[0].Watch || r.started[1].Watch {
+		t.Fatalf("started %+v", r.started)
+	}
+}
+
 func TestTrigger_should_reject_bad_bodies(t *testing.T) {
 	r := newRig(t)
 	cases := map[string]string{

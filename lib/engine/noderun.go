@@ -56,6 +56,7 @@ func (r *runner) runNode(ctx context.Context, f *frame, n model.Node) nodeResult
 		RunID: r.runID, Path: path, Parent: f.parentPath, Lane: f.lane, Node: n.ID, Type: string(n.Type),
 		Status: res.status, Handled: res.handled, Duration: elapsed(r.deps.Clock, start), Depth: f.depth,
 		Outputs: r.shownOutputs(n.Type, res.outputs), Diags: maskDiags(res.diags, r.secrets.current()), Reason: res.reason,
+		Wrote: r.takeWrites(path),
 	})
 	return res
 }
@@ -172,6 +173,7 @@ func (f *frame) state(r *runner, n model.Node, path string) *nodes.State {
 		Phase: f.fs.phase, Path: path, Vars: f.vars, Scope: func() template.Scope { return f.scope(r) },
 		Emit: nodeEmitter{r: r, path: path, node: n.ID}, Masker: r.secrets, Secret: r.secrets.derived,
 		Runtime: &nodeRuntime{r: r, f: f, node: n, path: path},
+		OnWrite: func(name string, value any) { r.noteWrite(path, name, value) },
 	}
 	if jar := f.cookieJar(); jar != nil {
 		s.Cookies = jar.All()

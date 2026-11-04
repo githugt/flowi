@@ -708,7 +708,8 @@
   .overlaynote { margin: 0 0 6px; font-size: var(--fs-xs); }
   .err { color: var(--fail); background: color-mix(in srgb, var(--fail) 12%, transparent); }
   .panels { flex: 1; min-height: 0; display: flex; }
-  .left { flex: none; border-right: 1px solid var(--line); display: flex; flex-direction: column; min-height: 0; }
+  /* max-width: in a narrow pane (a split editor) the saved width would leave the response no room. */
+  .left { flex: none; max-width: 60%; border-right: 1px solid var(--line); display: flex; flex-direction: column; min-height: 0; }
   .right { flex: 1; min-height: 0; min-width: 0; }
   .secnav { display: flex; align-items: flex-end; height: var(--tabbar-h); box-sizing: border-box; padding: 0 8px; border-bottom: 1px solid var(--line); flex: none; }
   .sectabs { display: flex; align-items: flex-end; gap: 2px; min-width: 0; overflow-x: auto; scrollbar-width: none; }

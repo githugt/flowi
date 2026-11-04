@@ -66,7 +66,7 @@ type EventSpec struct {
 func CommandNames() []string {
 	return []string{
 		"send", "run", "ls", "validate", "fmt", "serve", "import", "export", "new", "config", "secret", "env",
-		"workspace", "init", "schedule", "news", "changelog", "telemetry", "version", "impact", "cookies",
+		"workspace", "init", "schedule", "news", "changelog", "telemetry", "version", "impact", "trace", "diff", "synth", "explain", "watch", "discover", "baseline", "cookies",
 		"blueprint", "overlay", "access", "coverage", "drift", "other",
 	}
 }

@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"slices"
+	"strings"
 
 	"github.com/githugt/flowi/lib/diag"
 	"github.com/githugt/flowi/lib/engine"
@@ -300,4 +301,40 @@ func (w *Workspace) WriteOverlayText(collection model.ID, name, text string) err
 // NewOverlayText is the text the overlay editor starts a new overlay with.
 func NewOverlayText() string {
 	return "flowi_overlay: 1\ndescription: \nshared:\n  - set: headers.X-Example\n    value: example\n"
+}
+
+// OverlayEffects is what an overlay changes for one request.
+type OverlayEffects struct {
+	Name    string
+	Changes []string // one sentence each: the overlay's shared changes, then those of this request
+	// Identity is set when a change sets who the request is made as: an Authorization or Cookie header, or an
+	// API key.
+	Identity bool
+}
+
+// OverlayEffects says what the flowi overlay name changes for request t: the shared changes and those that are this
+// request's own. An unknown overlay is FLW-OVL-002.
+func (w *Workspace) OverlayEffects(t RequestTarget, name string) (OverlayEffects, error) {
+	ov, err := w.Overlay(t.Collection, name)
+	if err != nil {
+		return OverlayEffects{}, err
+	}
+	out := OverlayEffects{Name: name, Changes: []string{}}
+	for _, op := range flowioverlay.ForRequest(ov, t.Request) {
+		out.Changes = append(out.Changes, flowioverlay.Describe(op))
+		out.Identity = out.Identity || setsIdentity(op)
+	}
+	return out, nil
+}
+
+// setsIdentity reports that an operation sets a credential: a header or query parameter that says who is calling.
+func setsIdentity(op model.OverlayOp) bool {
+	if op.Verb != model.OverlaySet {
+		return false
+	}
+	field, key, _ := strings.Cut(strings.ToLower(op.Path), ".")
+	if field != "headers" && field != "query" {
+		return false
+	}
+	return key == "authorization" || key == "cookie" || key == "x-api-key" || key == "api_key" || key == "apikey" || key == "access_token"
 }

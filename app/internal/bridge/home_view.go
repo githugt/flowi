@@ -2,7 +2,11 @@
 
 package bridge
 
-import "github.com/githugt/flowi/app/internal/vm"
+import (
+	"github.com/githugt/flowi/lib/model"
+
+	"github.com/githugt/flowi/app/internal/vm"
+)
 
 // IdeaView is a feature the person has not used yet.
 type IdeaView struct {
@@ -40,6 +44,10 @@ func (s *WelcomeService) Home() HomeView {
 		a := s.app
 		setup := vm.SetupOf(a.backend.Collections(), a.workspace.IsScratch, a.workspace.Environment(), a.backend.Schedules())
 		setup.TracingOn = a.tracing.vm.View().Running
+		setup.NoteSuggestions(a.backend.Collections(), a.workspace.IsScratch, func(id model.ID) int {
+			list, _ := a.backend.SuggestFlows(id) // a collection that cannot be read has nothing to offer here
+			return len(list)
+		})
 		v = homeViewOf(setup)
 	})
 	return v

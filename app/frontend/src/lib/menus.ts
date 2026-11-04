@@ -11,11 +11,20 @@ export async function rowMenu(id: string): Promise<MenuItem[]> {
   if (!app.marked.includes(id)) app.marked = []
   const entries = (await WorkspaceService.Menu(ids)) as unknown as MenuEntry[]
   const items: MenuItem[] = entries.map((e) => ({ label: e.label, run: () => run(e, ids) }))
+  // A request or a flow can be opened beside the tab in front.
+  const node = ids.length === 1 ? app.find(ids[0]) : undefined
+  if (node && (node.kind === 'request' || node.kind === 'flow') && app.active && app.active !== node.id) {
+    items.push({ label: 'Open to the side', run: () => void app.openBeside(node.id) })
+  }
+  if (node && node.kind === 'request' && ids.length === 1) {
+    items.push({ label: 'Negative variants…', run: () => (ui.negatives = { node: node.id }) })
+  }
   // Wherever a flow can be made, it can also be made from a blueprint, there.
-  const at = items.findIndex((_, i) => entries[i].action === 'newFlow')
+  const at = entries.findIndex((e) => e.action === 'newFlow')
   if (at >= 0 && ids.length === 1) {
     const where = (await BlueprintsService.Where(ids[0])) as unknown as { collection: string; folder: string }
     items.splice(at + 1, 0, { label: 'New flow from blueprint…', run: () => (ui.blueprint = where) })
+    if (where.collection) items.splice(at + 2, 0, { label: 'Suggest flows…', run: () => (ui.suggest = { collection: where.collection }) }, { label: 'Discover an API…', run: () => (ui.discover = { collection: where.collection }) })
   }
   return items
 }

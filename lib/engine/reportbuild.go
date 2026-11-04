@@ -102,6 +102,7 @@ func (b *reportBuilder) nodeFinished(e NodeFinished) {
 	n := &bn.node
 	n.Status, n.Handled, n.Duration, n.Outputs, n.Diagnostics = string(e.Status), e.Handled, e.Duration, e.Outputs, reportDiags(e.Diags)
 	n.Reason = e.Reason
+	n.Wrote = e.Wrote
 	if e.Type == "note" && e.Status == StatusPassed {
 		text, _ := e.Outputs["text"].(string)
 		b.run.Notes = append(b.run.Notes, report.Note{Path: e.Path, Text: text})

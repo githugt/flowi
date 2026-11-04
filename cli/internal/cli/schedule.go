@@ -30,7 +30,7 @@ func newScheduleCommand(i do.Injector) *cobra.Command {
 type scheduleFlags struct {
 	flow, collection, cron, env, tz string
 	inputs                          []string
-	disabled                        bool
+	disabled, watch                 bool
 }
 
 func newScheduleAddCommand(i do.Injector) *cobra.Command {
@@ -44,6 +44,13 @@ func newScheduleAddCommand(i do.Injector) *cobra.Command {
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error { return runScheduleAdd(cmd, i, args[0], f) },
 	}
+	bindScheduleFlags(cmd, &f)
+	cmd.Flags().BoolVar(&f.watch, "watch", false, "make each run a watch pass: compare the answers with the last pass and end as \"changed\" when the contract moved (the flow must only read)")
+	return cmd
+}
+
+// bindScheduleFlags adds the flags `schedule add` and `watch add` share.
+func bindScheduleFlags(cmd *cobra.Command, f *scheduleFlags) {
 	fl := cmd.Flags()
 	fl.StringVar(&f.flow, "flow", "", "flow to run (path or id)")
 	fl.StringVar(&f.cron, "cron", "", "when to run, as a cron expression")
@@ -52,7 +59,6 @@ func newScheduleAddCommand(i do.Injector) *cobra.Command {
 	fl.StringArrayVar(&f.inputs, "input", nil, "value for a flow input, as name=value (a template; repeatable)")
 	fl.StringVar(&f.tz, "tz", "", "time zone of the cron expression, such as Europe/Berlin (default: this machine's)")
 	fl.BoolVar(&f.disabled, "disabled", false, "save the schedule switched off")
-	return cmd
 }
 
 func runScheduleAdd(cmd *cobra.Command, i do.Injector, name string, f scheduleFlags) error {
@@ -65,7 +71,7 @@ func runScheduleAdd(cmd *cobra.Command, i do.Injector, name string, f scheduleFl
 		return err
 	}
 	err = s.Workspace.AddSchedule(model.Schedule{Name: name, Flow: f.flow, Collection: f.collection, Cron: f.cron,
-		Env: f.env, Inputs: inputs, TZ: f.tz, Disabled: f.disabled})
+		Env: f.env, Inputs: inputs, TZ: f.tz, Disabled: f.disabled, Watch: f.watch})
 	if err != nil {
 		return err
 	}
@@ -96,6 +102,8 @@ type scheduleRow struct {
 	Inputs     map[string]string `json:"inputs,omitempty"`
 	TZ         string            `json:"tz,omitempty"`
 	Disabled   bool              `json:"disabled"`
+	Watch      bool              `json:"watch,omitempty"`
+	Last       string            `json:"last,omitempty"` // `watch ls` only: how the latest pass went
 	Next       string            `json:"next,omitempty"`
 }
 
@@ -121,7 +129,7 @@ func newScheduleLsCommand(i do.Injector) *cobra.Command {
 func scheduleRows(list []model.Schedule, now time.Time) []scheduleRow {
 	rows := make([]scheduleRow, 0, len(list))
 	for _, s := range list {
-		row := scheduleRow{Name: s.Name, Flow: s.Flow, Collection: s.Collection, Cron: s.Cron, Env: s.Env, TZ: s.TZ, Disabled: s.Disabled}
+		row := scheduleRow{Name: s.Name, Flow: s.Flow, Collection: s.Collection, Cron: s.Cron, Env: s.Env, TZ: s.TZ, Disabled: s.Disabled, Watch: s.Watch}
 		if len(s.Inputs) > 0 {
 			row.Inputs = map[string]string{}
 			for _, kv := range s.Inputs {
@@ -138,13 +146,17 @@ func scheduleRows(list []model.Schedule, now time.Time) []scheduleRow {
 
 func writeScheduleTable(w io.Writer, rows []scheduleRow) error {
 	tw := tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
-	_, _ = fmt.Fprintln(tw, "NAME\tCRON\tNEXT\tFLOW\tENV")
+	_, _ = fmt.Fprintln(tw, "NAME\tCRON\tNEXT\tFLOW\tENV\tWATCH")
 	for _, r := range rows {
 		next := r.Next
 		if r.Disabled {
 			next = "(disabled)"
 		}
-		_, _ = fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\n", r.Name, r.Cron, next, r.Flow, r.Env)
+		watch := ""
+		if r.Watch {
+			watch = "watch"
+		}
+		_, _ = fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\t%s\n", r.Name, r.Cron, next, r.Flow, r.Env, watch)
 	}
 	return tw.Flush()
 }

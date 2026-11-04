@@ -46,6 +46,7 @@
     onarrow,
     onlocked,
     oncollapse,
+    onstepopen,
     onaddcase,
     onadd,
     ontoolbar,
@@ -65,6 +66,7 @@
     onmoveinput,
     onaddinput,
     onaddoutput,
+    lit = null,
   }: {
     diagram: Diagram
     cards: Record<string, Card>
@@ -87,6 +89,8 @@
     /** The person tried to change the flow (move a step, open a row) while Edit is off. */
     onlocked?: () => void
     oncollapse: (unit: string, collapsed: boolean) => void
+    /** A step card was double-clicked: the window may show what the step calls beside the canvas. */
+    onstepopen?: (step: string) => void
     onaddcase?: (condition: string) => void // the "+ else if" under a condition (editing only)
     /** A + was clicked: a new step goes right before or after `near.step`; near is null for the + of an empty flow. */
     onadd?: (clientX: number, clientY: number, near: { step: string; before: boolean } | null) => void
@@ -111,6 +115,8 @@
     onmoveinput?: (from: number, to: number) => void
     onaddinput?: () => void
     onaddoutput?: () => void
+    /** A value trace is on: only these steps stay bright and the rest are dimmed; null shows every step alike. */
+    lit?: string[] | null
   } = $props()
 
   const MIN_K = 0.15
@@ -552,6 +558,15 @@
     return units.find((u) => x >= u.x && x <= u.x + u.w && y >= u.y && y <= u.y + u.h)
   }
 
+  // The pointer is captured by the canvas while a card is pressed, so a double-click lands on the canvas, not on the
+  // card: the card is found by where it happened.
+  function ondoubleclick(e: MouseEvent) {
+    const c = toCanvas(e.clientX, e.clientY)
+    const u = c && unitAt(c.x, c.y)
+    if (!u || !u.card || (u.kind === 'strip' && (u.nodes.length > 1 || u.collapsed))) return
+    onstepopen?.(u.nodes[u.core ?? 0])
+  }
+
   function onmovePointer(e: PointerEvent) {
     if (link) {
       const c = toCanvas(e.clientX, e.clientY)
@@ -715,6 +730,7 @@
     e.stopPropagation()
   }
 
+  const litUnits = $derived(lit ? new Set(units.filter((u) => u.nodes.some((n) => lit.includes(n))).map((u) => u.id)) : null)
   const selectedUnits = $derived(new Set(units.filter((u) => u.nodes.some((n) => selection.includes(n))).map((u) => u.id)))
   // A + on each side of a card: on the selected one, else the right + after the last card (the one
   // reaching furthest right) and the left + before the first. There was only the right one, so a step
@@ -763,6 +779,7 @@
   role="application"
   aria-label="Flow canvas"
   onwheel={onwheel}
+  ondblclick={ondoubleclick}
   onpointerdown={onbackground}
   onpointermove={onmovePointer}
   onpointerup={onrelease}
@@ -849,7 +866,7 @@
       {@const p = at(u)}
       {@const card = cards[u.id]}
       {@const status = statusOf(u)}
-      <g class="unit {u.kind} {status}" class:selected={selectedUnits.has(u.id)} class:pulse={pulse === u.id} class:dragging={moving?.id === u.id}
+      <g class="unit {u.kind} {status}" class:selected={selectedUnits.has(u.id)} class:pulse={pulse === u.id} class:dragging={moving?.id === u.id} class:dim={!!litUnits && !litUnits.has(u.id)}
         transform={`translate(${p.x} ${p.y})`} onpointerdown={(e) => onunit(e, u)} ondblclick={() => u.kind === 'strip' && (u.nodes.length > 1 || u.collapsed) && oncollapse(u.id, !u.collapsed)} role="button" tabindex="-1">
         {#if u.card && card?.face}
           <StepCard {u} face={card.face} title={card.title} selected={selectedUnits.has(u.id)} {status} result={resultOf(u)} skipped={card.skipped} breakpoint={card.break} note={card.skipNote} colour={card.color || undefined}
@@ -1130,6 +1147,8 @@
   .unit.strip rect { fill: var(--strip); }
   .unit.action rect { fill: var(--action); }
   .unit.container rect { fill: var(--container); }
+  .unit { transition: opacity var(--t-base) var(--ease-out); }
+  .unit.dim { opacity: 0.22; }
   .unit.selected rect { stroke: var(--accent); stroke-width: 2.5; filter: drop-shadow(0 0 10px var(--accent)); }
   .unit.dragging rect { stroke: var(--accent); }
   .unit text { pointer-events: none; }

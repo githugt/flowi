@@ -235,6 +235,52 @@ func (s *FlowService) CheckDrift(node, env string, failOn []string) (DriftView, 
 	return v, nil
 }
 
+// WatchChangeView is one thing that moved since the last watch pass.
+type WatchChangeView struct {
+	Request string `json:"request"`
+	Kind    string `json:"kind"` // status, shape or latency
+	Detail  string `json:"detail"`
+}
+
+// WatchView is one watch pass, or the reasons the flow cannot be watched.
+type WatchView struct {
+	Status  string            `json:"status,omitempty"`
+	First   bool              `json:"first"` // nothing to compare with: this pass became the baseline
+	Steps   int               `json:"steps"`
+	Changes []WatchChangeView `json:"changes"`
+	Refused []string          `json:"refused"` // why the flow may not be watched; the flow was not run
+}
+
+// Watch runs the saved flow once in env (the selected one when empty) and says what its calls answered differently
+// from the last pass. A flow with a step that may change something on the server is refused, not run.
+func (s *FlowService) Watch(node, env string) (WatchView, error) {
+	out := WatchView{Changes: []WatchChangeView{}}
+	t, _, err := s.flowTarget(node)
+	if err != nil {
+		return out, err
+	}
+	problems, err := s.app.backend.WatchProblems(t)
+	if err != nil {
+		return out, err
+	}
+	if len(problems) > 0 {
+		out.Refused = problems
+		return out, nil
+	}
+	if env == "" {
+		env = s.app.workspace.SelectedEnv()
+	}
+	res, err := s.app.backend.WatchFlow(context.Background(), t, flowi.RunOptions{Env: env})
+	if err != nil {
+		return out, err
+	}
+	out.Status, out.First, out.Steps, out.Refused = string(res.Status), res.First, res.Steps, []string{}
+	for _, c := range res.Change {
+		out.Changes = append(out.Changes, WatchChangeView{Request: c.Request, Kind: string(c.Kind), Detail: c.Detail})
+	}
+	return out, nil
+}
+
 // Sequence draws the last run of the open flow as a sequence diagram: the hosts it called, each attempt with its
 // status and time, and a note for a step that failed. Mermaid is the same picture as text.
 func (s *FlowService) Sequence(node string) (SequenceView, error) {

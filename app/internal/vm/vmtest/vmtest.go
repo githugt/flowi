@@ -18,6 +18,7 @@ import (
 	"github.com/githugt/flowi/lib/analysis"
 	"github.com/githugt/flowi/lib/announce"
 	"github.com/githugt/flowi/lib/diag"
+	"github.com/githugt/flowi/lib/discover"
 	"github.com/githugt/flowi/lib/engine"
 	"github.com/githugt/flowi/lib/flowioverlay"
 	"github.com/githugt/flowi/lib/grpcx"
@@ -26,6 +27,7 @@ import (
 	"github.com/githugt/flowi/lib/serve/replay"
 	"github.com/githugt/flowi/lib/serve/scheduler"
 	"github.com/githugt/flowi/lib/settings"
+	"github.com/githugt/flowi/lib/watch"
 
 	"github.com/githugt/flowi/app/internal/vm"
 )
@@ -42,10 +44,18 @@ type StoredEdit struct {
 // recorded in Calls. mu guards every field: the worker Calls it from other
 // goroutines.
 type Backend struct {
-	Mu          sync.Mutex         // guards every field; tests lock it to change state mid-test
-	FieldList   []flowi.Completion // what ResponseFields returns
-	Name        string             // the workspace name; "default-workspace" when empty
-	Cols        []model.Collection
+	Mu        sync.Mutex         // guards every field; tests lock it to change state mid-test
+	FieldList []flowi.Completion // what ResponseFields returns
+	Name      string             // the workspace name; "default-workspace" when empty
+	Cols      []model.Collection
+	// Originals are the recorded runs of the collections that stand for opened bundles, by collection.
+	// Comparison is what CompareEnvironments answers.
+	Comparison flowi.EnvComparison
+	// Suggestions are what SuggestFlows answers for a collection.
+	Suggestions map[model.ID][]flowi.FlowSuggestion
+	// Negatives are what SuggestNegatives answers for any request.
+	Negatives   []model.Overlay
+	Originals   map[model.ID]engine.RunResult
 	MissingIDs  []model.ID
 	Paths       map[model.ID]string
 	Diags       diag.List
@@ -164,6 +174,19 @@ func (f *Backend) Called(call string) bool {
 	f.Mu.Lock()
 	defer f.Mu.Unlock()
 	return slices.Contains(f.Calls, call)
+}
+
+// CallsStarting lists the calls made whose text starts with prefix, safe to read while the app's goroutines record.
+func (f *Backend) CallsStarting(prefix string) []string {
+	f.Mu.Lock()
+	defer f.Mu.Unlock()
+	var out []string
+	for _, c := range f.Calls {
+		if strings.HasPrefix(c, prefix) {
+			out = append(out, c)
+		}
+	}
+	return out
 }
 
 // SessionDir is empty unless a test sets Session.
@@ -550,7 +573,27 @@ func (f *Backend) SchemaFor(_ flowi.RequestTarget, _ string, part flowi.SchemaPa
 	f.Mu.Lock()
 	defer f.Mu.Unlock()
 	s, ok := f.SchemaStore[part]
+	if src, _ := s["x-flowi-source"].(string); src == string(flowi.SchemaUser) {
+		return s, flowi.SchemaUser, ok
+	}
 	return s, flowi.SchemaInferred, ok
+}
+
+// PromoteBaseline records the call and marks every schema of SchemaStore as the owner's, no longer shallow.
+func (f *Backend) PromoteBaseline(_ flowi.RequestTarget, version string) (int, error) {
+	f.record("PromoteBaseline " + version)
+	f.Mu.Lock()
+	defer f.Mu.Unlock()
+	for part, s := range f.SchemaStore {
+		promoted := schemainfer.Schema{}
+		for k, v := range s {
+			promoted[k] = v
+		}
+		delete(promoted, "x-flowi-shallow")
+		promoted["x-flowi-source"] = string(flowi.SchemaUser)
+		f.SchemaStore[part] = promoted
+	}
+	return len(f.SchemaStore), f.NewErr
 }
 
 // DeleteSchema records the call and removes the part.
@@ -692,6 +735,14 @@ func (f *Backend) DeleteEnvironment(file string) error {
 		f.Cols[ci].Environments = slices.DeleteFunc(slices.Clone(f.Cols[ci].Environments), func(e model.Environment) bool { return e.File == file })
 	}
 	return nil
+}
+
+// CompareEnvironments gives the comparison set in Comparison, with the names asked for filled in.
+func (f *Backend) CompareEnvironments(a, b string) (flowi.EnvComparison, error) {
+	f.record("CompareEnvironments " + a + " " + b)
+	c := f.Comparison
+	c.A, c.B = a, b
+	return c, nil
 }
 
 // Environments are the environments of the fake's collections, each file
@@ -892,6 +943,12 @@ func (f *Backend) DeleteOverlay(_ model.ID, name string) error {
 	return nil
 }
 
+// OverlayEffects gives the effects set in Check.Effects, whatever the overlay is called.
+func (f *Backend) OverlayEffects(_ flowi.RequestTarget, name string) (flowi.OverlayEffects, error) {
+	f.record("OverlayEffects " + name)
+	return f.Check.Effects, f.Check.Err
+}
+
 // OverlayText returns the overlay's file as OverlayFiles holds it.
 func (f *Backend) OverlayText(_ model.ID, name string) (string, error) {
 	f.record("OverlayText " + name)
@@ -1072,7 +1129,23 @@ type Checks struct {
 	Specs    []string
 	Access   flowi.AccessReport
 	Drift    flowi.DriftReport
-	Err      error
+	// WatchProblems and Watch are what the watch calls answer.
+	WatchProblems []string
+	Watch         flowi.WatchResult
+	// Effects is what OverlayEffects answers.
+	Effects flowi.OverlayEffects
+	// History is what ScheduleWatchHistory answers for every schedule.
+	History []watch.Pass
+	// Fork and ForkVars are what the fork calls answer.
+	Fork     flowi.ForkResult
+	ForkVars map[string]any
+	// Probes, Discovery and Drafted are what the discovery calls answer.
+	Probes    []discover.Probe
+	Discovery discover.Report
+	Drafted   flowi.DiscoveredRequests
+	// Methods are what DiscoverGRPC answers.
+	Methods []grpcx.Method
+	Err     error
 }
 
 func (f *Backend) OpenArazzo(_ context.Context, ref string) error {
@@ -1102,9 +1175,88 @@ func (f *Backend) CheckDrift(_ context.Context, _ flowi.FlowTarget, o flowi.Drif
 	return f.Check.Drift, f.Check.Err
 }
 
+// WatchProblems gives the reasons set in Check.WatchProblems.
+func (f *Backend) WatchProblems(_ flowi.FlowTarget) ([]string, error) {
+	f.record("WatchProblems")
+	return f.Check.WatchProblems, f.Check.Err
+}
+
+// ScheduleWatchHistory gives the passes set in Check.History.
+func (f *Backend) ScheduleWatchHistory(s model.Schedule) ([]watch.Pass, error) {
+	f.record("ScheduleWatchHistory " + s.Name)
+	return f.Check.History, f.Check.Err
+}
+
+// ForkReplay gives the fork set in Check.Fork, recording the step and the edits.
+func (f *Backend) ForkReplay(_ context.Context, _ flowi.FlowTarget, o flowi.ForkOptions) (flowi.ForkResult, error) {
+	call := fmt.Sprintf("ForkReplay %s %v only=%v", o.From, o.Set, o.Only)
+	for _, step := range slices.Sorted(maps.Keys(o.Respond)) {
+		r := o.Respond[step]
+		if r.Status != 0 {
+			call += fmt.Sprintf(" status=%d", r.Status)
+		}
+		if r.HasBody {
+			call += fmt.Sprintf(" body=%v", r.Body)
+		}
+		if r.HasText {
+			call += fmt.Sprintf(" text=%s type=%s", r.Text, r.ContentType)
+		}
+	}
+	f.record(call)
+	return f.Check.Fork, f.Check.Err
+}
+
+// ForkVariables gives the variables set in Check.ForkVars.
+func (f *Backend) ForkVariables(_ flowi.FlowTarget, from string) (map[string]any, error) {
+	f.record("ForkVariables " + from)
+	return f.Check.ForkVars, f.Check.Err
+}
+
+// DiscoverPlan gives the probes set in Check.Probes.
+func (f *Backend) DiscoverPlan(base string) ([]discover.Probe, error) {
+	f.record("DiscoverPlan " + base)
+	return f.Check.Probes, f.Check.Err
+}
+
+// Discover gives the report set in Check.Discovery, recording the paths asked for.
+func (f *Backend) Discover(_ context.Context, base string, auth discover.Auth, _ int, paths []string) (discover.Report, error) {
+	f.record("Discover " + base + " " + auth.Header + " " + strings.Join(paths, ","))
+	return f.Check.Discovery, f.Check.Err
+}
+
+// DiscoverGRPC gives the methods set in Check.Methods, recording the server asked.
+func (f *Backend) DiscoverGRPC(_ context.Context, target string) ([]grpcx.Method, error) {
+	f.record("DiscoverGRPC " + target)
+	return f.Check.Methods, f.Check.Err
+}
+
+// SaveGRPCDiscovery gives the drafts set in Check.Drafted.
+func (f *Backend) SaveGRPCDiscovery(collection model.ID, server string, methods []grpcx.Method) (flowi.DiscoveredRequests, error) {
+	f.record("SaveGRPCDiscovery " + string(collection) + " " + server + " " + strconv.Itoa(len(methods)))
+	return f.Check.Drafted, f.Check.Err
+}
+
+// SaveDiscovery gives the drafts set in Check.Drafted.
+func (f *Backend) SaveDiscovery(collection model.ID, base string, _ discover.Report) (flowi.DiscoveredRequests, error) {
+	f.record("SaveDiscovery " + string(collection) + " " + base)
+	return f.Check.Drafted, f.Check.Err
+}
+
+// WatchFlow gives the pass set in Check.Watch.
+func (f *Backend) WatchFlow(_ context.Context, _ flowi.FlowTarget, o flowi.RunOptions) (flowi.WatchResult, error) {
+	f.record("WatchFlow " + o.Env)
+	return f.Check.Watch, f.Check.Err
+}
+
 func (f *Backend) OpenBundle(path string) error {
 	f.record("OpenBundle " + path)
 	return nil
+}
+
+// ReplayOriginal gives the recorded run set in Originals for the collection.
+func (f *Backend) ReplayOriginal(collection model.ID) (engine.RunResult, bool) {
+	res, ok := f.Originals[collection]
+	return res, ok
 }
 
 func (f *Backend) Unmount(id model.ID) error {
@@ -1217,6 +1369,35 @@ func (f *Backend) NewFlow(collection model.ID, path string) (flowi.FlowTarget, e
 
 func (f *Backend) NewUntitledFlow(collection model.ID) (flowi.FlowTarget, error) {
 	f.record("NewUntitledFlow " + string(collection))
+	if f.NewErr != nil {
+		return flowi.FlowTarget{}, f.NewErr
+	}
+	return flowi.FlowTarget{Collection: collection, Flow: "new"}, nil
+}
+
+// SuggestFlows gives the suggestions set in Suggestions for the collection.
+func (f *Backend) SuggestFlows(collection model.ID) ([]flowi.FlowSuggestion, error) {
+	f.record("SuggestFlows " + string(collection))
+	return f.Suggestions[collection], nil
+}
+
+// SuggestNegatives gives Negatives, recording the request asked about.
+func (f *Backend) SuggestNegatives(t flowi.RequestTarget, _ string) ([]model.Overlay, error) {
+	f.record("SuggestNegatives " + string(t.Request))
+	return f.Negatives, nil
+}
+
+// AcceptNegatives records the names saved and answers that all were.
+func (f *Backend) AcceptNegatives(collection model.ID, overlays []model.Overlay) (saved, skipped []string, err error) {
+	for _, ov := range overlays {
+		saved = append(saved, ov.Name)
+	}
+	f.record("AcceptNegatives " + string(collection) + " " + strings.Join(saved, ","))
+	return saved, nil, f.NewErr
+}
+
+func (f *Backend) AcceptSuggestion(collection model.ID, s flowi.FlowSuggestion) (flowi.FlowTarget, error) {
+	f.record("AcceptSuggestion " + s.Path)
 	if f.NewErr != nil {
 		return flowi.FlowTarget{}, f.NewErr
 	}

@@ -309,6 +309,18 @@ export function Open(node) {
 }
 
 /**
+ * OverlayEffects says what the flowi overlay name changes for the request node, one sentence each.
+ * @param {string} node
+ * @param {string} name
+ * @returns {$CancellablePromise<$models.OverlayEffectsView>}
+ */
+export function OverlayEffects(node, name) {
+    return $Call.ByID(1359433900, node, name).then(/** @type {($result: any) => any} */(($result) => {
+        return $$createType8($result);
+    }));
+}
+
+/**
  * OverlayYAML is the overlay as it would be written with the chosen
  * changes (indexes into PreviewOverlay's).
  * @param {string} node
@@ -403,8 +415,18 @@ export function PrettyJSON(text) {
  */
 export function PreviewOverlay(node) {
     return $Call.ByID(538770798, node).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType8($result);
+        return $$createType9($result);
     }));
+}
+
+/**
+ * PromoteSchemas keeps the inferred schemas of the version as the drift baseline: later sends are checked against
+ * them instead of widening them.
+ * @param {string} node
+ * @returns {$CancellablePromise<void>}
+ */
+export function PromoteSchemas(node) {
+    return $Call.ByID(3290238574, node);
 }
 
 /**
@@ -530,7 +552,7 @@ export function SaveToOverlay(node, chosen) {
  */
 export function Schemas(node) {
     return $Call.ByID(208416882, node).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType10($result);
+        return $$createType11($result);
     }));
 }
 
@@ -837,7 +859,7 @@ export function SetSchemasInfer(node, on) {
  */
 export function SetSettings(node, rows) {
     return $Call.ByID(2276053871, node, rows).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType11($result);
+        return $$createType12($result);
     }));
 }
 
@@ -891,7 +913,7 @@ export function SetVersionDetails(node, name, docs) {
  */
 export function Settings(node) {
     return $Call.ByID(2559697551, node).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType12($result);
+        return $$createType13($result);
     }));
 }
 
@@ -935,7 +957,7 @@ export function ShowStored(node, version, name) {
  */
 export function SpecOrigin(node) {
     return $Call.ByID(255391863, node).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType13($result);
+        return $$createType14($result);
     }));
 }
 
@@ -947,7 +969,7 @@ export function SpecOrigin(node) {
  */
 export function StoredResponses(node) {
     return $Call.ByID(137001887, node).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType15($result);
+        return $$createType16($result);
     }));
 }
 
@@ -962,7 +984,7 @@ export function StoredResponses(node) {
  */
 export function Suggest(node, text, caret) {
     return $Call.ByID(3675986336, node, text, caret).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType16($result);
+        return $$createType17($result);
     }));
 }
 
@@ -994,7 +1016,7 @@ export function SuggestSavePath(node) {
  */
 export function URLSpans(node, text) {
     return $Call.ByID(4003298604, node, text).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType18($result);
+        return $$createType19($result);
     }));
 }
 
@@ -1005,7 +1027,7 @@ export function URLSpans(node, text) {
  */
 export function UsedBy(node) {
     return $Call.ByID(3438422550, node).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType19($result);
+        return $$createType20($result);
     }));
 }
 
@@ -1018,15 +1040,16 @@ const $$createType4 = $models.FlowiOverlayDiffView.createFrom;
 const $$createType5 = $models.GeneratedView.createFrom;
 const $$createType6 = $models.MissingView.createFrom;
 const $$createType7 = $models.RequestView.createFrom;
-const $$createType8 = $models.OverlayPreviewView.createFrom;
-const $$createType9 = $models.SchemaView.createFrom;
-const $$createType10 = $Create.Array($$createType9);
-const $$createType11 = $Create.Array($Create.Any);
-const $$createType12 = $models.RequestSettingsView.createFrom;
-const $$createType13 = $models.SpecOriginView.createFrom;
-const $$createType14 = $models.StoredView.createFrom;
-const $$createType15 = $Create.Array($$createType14);
-const $$createType16 = $models.SuggestView.createFrom;
-const $$createType17 = $models.SpanView.createFrom;
-const $$createType18 = $Create.Array($$createType17);
-const $$createType19 = $models.UsedByView.createFrom;
+const $$createType8 = $models.OverlayEffectsView.createFrom;
+const $$createType9 = $models.OverlayPreviewView.createFrom;
+const $$createType10 = $models.SchemaView.createFrom;
+const $$createType11 = $Create.Array($$createType10);
+const $$createType12 = $Create.Array($Create.Any);
+const $$createType13 = $models.RequestSettingsView.createFrom;
+const $$createType14 = $models.SpecOriginView.createFrom;
+const $$createType15 = $models.StoredView.createFrom;
+const $$createType16 = $Create.Array($$createType15);
+const $$createType17 = $models.SuggestView.createFrom;
+const $$createType18 = $models.SpanView.createFrom;
+const $$createType19 = $Create.Array($$createType18);
+const $$createType20 = $models.UsedByView.createFrom;

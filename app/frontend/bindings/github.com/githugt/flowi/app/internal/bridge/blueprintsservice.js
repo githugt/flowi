@@ -16,6 +16,29 @@ import { Call as $Call, CancellablePromise as $CancellablePromise, Create as $Cr
 import * as $models from "./models.js";
 
 /**
+ * AcceptNegatives saves the ticked variants as flowi overlays of the request's collection.
+ * @param {string} node
+ * @param {string[]} names
+ * @returns {$CancellablePromise<$models.AcceptedNegativesView>}
+ */
+export function AcceptNegatives(node, names) {
+    return $Call.ByID(2461439293, node, names).then(/** @type {($result: any) => any} */(($result) => {
+        return $$createType0($result);
+    }));
+}
+
+/**
+ * AcceptSuggestion saves the suggestion with this path as a flow of the collection and asks the window to open it
+ * ("open" event).
+ * @param {string} collection
+ * @param {string} path
+ * @returns {$CancellablePromise<void>}
+ */
+export function AcceptSuggestion(collection, path) {
+    return $Call.ByID(2396540955, collection, path);
+}
+
+/**
  * CreateFlow makes a flow at path in collection from a blueprint and asks
  * the window to open it ("open" event).
  * @param {string} key
@@ -38,13 +61,36 @@ export function Delete(key) {
 }
 
 /**
+ * Negatives lists the ways the request on a tree row can be sent wrong: each required field dropped, each field of
+ * the wrong type, an expired token. Nothing is saved.
+ * @param {string} node
+ * @returns {$CancellablePromise<$models.NegativesView>}
+ */
+export function Negatives(node) {
+    return $Call.ByID(4260308033, node).then(/** @type {($result: any) => any} */(($result) => {
+        return $$createType1($result);
+    }));
+}
+
+/**
  * State is the blueprints of every mounted collection; they follow the
  * workspace, and arrive again as the "blueprints" event when it reloads.
  * @returns {$CancellablePromise<$models.BlueprintsView>}
  */
 export function State() {
     return $Call.ByID(739502432).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType0($result);
+        return $$createType2($result);
+    }));
+}
+
+/**
+ * Suggestions lists the flows proposed for a collection from what its requests return. Nothing is saved.
+ * @param {string} collection
+ * @returns {$CancellablePromise<$models.FlowSuggestionView[]>}
+ */
+export function Suggestions(collection) {
+    return $Call.ByID(4136170580, collection).then(/** @type {($result: any) => any} */(($result) => {
+        return $$createType4($result);
     }));
 }
 
@@ -64,10 +110,14 @@ export function UseAsDefault(key) {
  */
 export function Where(node) {
     return $Call.ByID(3453744534, node).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType1($result);
+        return $$createType5($result);
     }));
 }
 
 // Private type creation functions
-const $$createType0 = $models.BlueprintsView.createFrom;
-const $$createType1 = $models.WhereView.createFrom;
+const $$createType0 = $models.AcceptedNegativesView.createFrom;
+const $$createType1 = $models.NegativesView.createFrom;
+const $$createType2 = $models.BlueprintsView.createFrom;
+const $$createType3 = $models.FlowSuggestionView.createFrom;
+const $$createType4 = $Create.Array($$createType3);
+const $$createType5 = $models.WhereView.createFrom;

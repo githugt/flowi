@@ -77,6 +77,9 @@
       {#each choices as [label, scope, force]}
         <button role="menuitem" disabled={(scope === 'only' || scope === 'until' || scope === 'from') && !view.selected} onclick={() => launch(scope, force)}>{label}</button>
       {/each}
+      {#if view.replay}
+        <button role="menuitem" disabled={!view.selected} onclick={() => { open = false; ui.fork = { node, step: view.selected } }}>Fork the recording from the selected step…</button>
+      {/if}
       <hr />
       <button role="menuitem" onclick={() => { open = false; FlowService.ClearResults(node) }}>Clear results</button>
     </div>
