@@ -32,7 +32,7 @@ require (
 	github.com/oklog/ulid/v2 v2.1.2
 	github.com/pb33f/libopenapi v0.41.5
 	github.com/quic-go/quic-go v0.63.0
-	github.com/rabbitmq/amqp091-go v1.15.0
+	github.com/rabbitmq/amqp091-go v1.16.0
 	github.com/redis/go-redis/v9 v9.23.0
 	github.com/santhosh-tekuri/jsonschema/v6 v6.0.3
 	github.com/theory/jsonpath v0.12.1
