@@ -30,7 +30,7 @@ require (
 	github.com/nats-io/nats-server/v2 v2.15.1
 	github.com/nats-io/nats.go v1.54.0
 	github.com/oklog/ulid/v2 v2.1.2
-	github.com/pb33f/libopenapi v0.41.5
+	github.com/pb33f/libopenapi v0.42.3
 	github.com/quic-go/quic-go v0.63.0
 	github.com/rabbitmq/amqp091-go v1.15.0
 	github.com/redis/go-redis/v9 v9.23.0
