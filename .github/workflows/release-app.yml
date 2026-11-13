@@ -140,7 +140,7 @@ jobs:
         with:
           path: packages
           merge-multiple: true
-      - uses: softprops/action-gh-release@v2
+      - uses: softprops/action-gh-release@v3
         with:
           files: packages/*
           prerelease: ${{ contains(github.ref_name, '-') }}

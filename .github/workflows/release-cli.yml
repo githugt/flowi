@@ -32,7 +32,7 @@ jobs:
       # The tag is cli/v1.2.3; the archives are named and stamped with 1.2.3.
       - name: build the archives
         run: scripts/dist.sh "${GITHUB_REF_NAME#cli/v}"
-      - uses: softprops/action-gh-release@v2
+      - uses: softprops/action-gh-release@v3
         with:
           files: |
             cli/dist/*.tar.gz
