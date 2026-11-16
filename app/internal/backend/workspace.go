@@ -304,6 +304,23 @@ func (b *Workspace) NewTriggerToken() (string, error) {
 	return b.ws.NewTriggerToken()
 }
 
+func (b *Workspace) NewNamedAuth(collection model.ID, name, description string, auth model.Auth) (flowi.AuthTarget, error) {
+	b.guard.Check("NewNamedAuth")
+	return b.ws.NewNamedAuth(collection, name, description, auth)
+}
+
+// SaveNamedAuth writes a named authentication. The app's form holds every
+// field of the file, so comments in it are dropped rather than asked about.
+func (b *Workspace) SaveNamedAuth(t flowi.AuthTarget, a model.NamedAuth) error {
+	b.guard.Check("SaveNamedAuth")
+	return b.ws.SaveNamedAuth(t, a, flowi.SaveOptions{DropComments: true})
+}
+
+func (b *Workspace) DeleteNamedAuth(t flowi.AuthTarget) error {
+	b.guard.Check("DeleteNamedAuth")
+	return b.ws.DeleteNamedAuth(t)
+}
+
 func (b *Workspace) DeleteBlueprint(t flowi.BlueprintTarget) error {
 	b.guard.Check("DeleteBlueprint")
 	return b.ws.DeleteBlueprint(t)

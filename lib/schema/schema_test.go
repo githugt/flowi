@@ -81,6 +81,8 @@ func schemaFor(file string) string {
 		return "request"
 	case strings.HasSuffix(base, ".flow.yaml"):
 		return "flow"
+	case strings.HasSuffix(base, ".auth.yaml"):
+		return "auth"
 	case strings.HasSuffix(base, ".blueprint.yaml"):
 		return "blueprint"
 	case strings.Contains(filepath.ToSlash(file), "/environments/") || base == "staging.yaml":

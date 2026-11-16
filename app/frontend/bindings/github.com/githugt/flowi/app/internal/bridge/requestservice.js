@@ -620,6 +620,17 @@ export function SetAuthScheme(node, scheme) {
 }
 
 /**
+ * SetAuthUse makes the version use the named authentication `name` of its
+ * collection instead of an auth block of its own ("" removes the auth).
+ * @param {string} node
+ * @param {string} name
+ * @returns {$CancellablePromise<void>}
+ */
+export function SetAuthUse(node, name) {
+    return $Call.ByID(2574832931, node, name);
+}
+
+/**
  * SetBodyFile sets the file sent as the body.
  * @param {string} node
  * @param {string} path

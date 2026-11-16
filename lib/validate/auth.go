@@ -13,23 +13,60 @@ import (
 )
 
 // checkAuth reports auth blocks that can never work: an unknown scheme, a
-// parameter the scheme does not have, or an auth block on a request that is not
-// HTTP (messages and gRPC calls carry their credentials in their bindings and
-// metadata). Missing parameters are reported when the request is sent, because
-// a value may come from a template.
+// parameter the scheme does not have, a named authentication the collection
+// does not have, or an auth block on a request that is not HTTP (messages and
+// gRPC calls carry their credentials in their bindings and metadata). The
+// collection's named authentications are checked the same way. Missing
+// parameters are reported when the request is sent, because a value may come
+// from a template.
 func checkAuth(ix *index) diag.List {
 	var out diag.List
 	for _, c := range ix.collections {
+		out = append(out, namedAuthProblems(c)...)
 		for _, r := range c.Requests {
 			for _, v := range r.Versions {
 				if v.Auth == nil {
 					continue
 				}
-				path := yamlpath.Key(yamlpath.Key(yamlpath.Key("$", "versions"), v.Label), "auth")
+				loc := diag.Location{File: r.File, Path: yamlpath.Key(yamlpath.Key(yamlpath.Key("$", "versions"), v.Label), "auth")}
+				if v.Auth.Use != "" {
+					if v.Auth.Type != "" || len(v.Auth.Params) > 0 {
+						out = append(out, diag.New(diag.CodeAuthInvalid, loc, map[string]string{"detail": "an auth block that uses a named authentication has no type or parameters of its own"}))
+						continue
+					}
+					named, ok := c.NamedAuth(v.Auth.Use)
+					if !ok {
+						out = append(out, diag.New(diag.CodeAuthUnknown, loc, map[string]string{"name": v.Auth.Use}))
+						continue
+					}
+					v.Auth = &named.Auth
+				}
 				for _, detail := range authProblems(v) {
-					out = append(out, diag.New(diag.CodeAuthInvalid, diag.Location{File: r.File, Path: path}, map[string]string{"detail": detail}))
+					out = append(out, diag.New(diag.CodeAuthInvalid, loc, map[string]string{"detail": detail}))
 				}
 			}
+		}
+	}
+	return out
+}
+
+// namedAuthProblems checks each named authentication of c as an auth block of
+// an HTTP request, and that no two share a name: requests use them by name.
+func namedAuthProblems(c model.Collection) diag.List {
+	var out diag.List
+	seen := map[string]bool{}
+	for _, a := range c.Auths {
+		loc := diag.Location{File: a.File, Path: yamlpath.Key("$", "auth")}
+		problems := authProblems(model.RequestVersion{Auth: &a.Auth})
+		if a.Auth.Use != "" {
+			problems = []string{"a named authentication cannot use another one"}
+		}
+		if seen[a.Name] {
+			problems = append(problems, fmt.Sprintf("another authentication is also named %q", a.Name))
+		}
+		seen[a.Name] = true
+		for _, detail := range problems {
+			out = append(out, diag.New(diag.CodeAuthInvalid, loc, map[string]string{"detail": detail}))
 		}
 	}
 	return out

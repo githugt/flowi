@@ -54,6 +54,7 @@ func buildMenu(wails *application.App, emit func(name string, data any)) *applic
 		menuAction{"Schedules…", "", "schedules"},
 		menuAction{"Replayer…", "", "replayer"},
 		menuAction{"Checks…", "", "checks"},
+		menuAction{"Authentications…", "", "auths"},
 		menuAction{"Blueprints…", "", "blueprints"},
 		menuAction{"Tracing…", "", "tracing"},
 		menuAction{"", "", ""},

@@ -71,6 +71,7 @@
   import SchedulesScreen from './SchedulesScreen.svelte'
   import ReplayerScreen from './ReplayerScreen.svelte'
   import BlueprintsScreen from './BlueprintsScreen.svelte'
+  import AuthsScreen from './AuthsScreen.svelte'
   import TrashScreen from './TrashScreen.svelte'
   import ChecksScreen from './ChecksScreen.svelte'
   import { envSwatch } from './lib/envcolours'
@@ -265,6 +266,8 @@
         <SettingsScreen />
       {:else if tab && tab.node === 'screen:secrets'}
         <SecretsScreen />
+      {:else if tab && tab.node === 'screen:auths'}
+        <AuthsScreen />
       {:else if tab && tab.node === 'screen:blueprints'}
         <BlueprintsScreen />
       {:else if tab && tab.node === 'screen:trash'}

@@ -513,6 +513,27 @@ func (r *Request) AuthScheme() (string, []model.KeyValue) {
 	return a.Type, a.Params
 }
 
+// AuthUse is the named authentication the version uses, "" when it writes
+// its own auth (or has none).
+func (r *Request) AuthUse() string {
+	if a := r.Current().Auth; a != nil {
+		return a.Use
+	}
+	return ""
+}
+
+// SetAuthUse makes the version use the collection's named authentication
+// instead of an auth block of its own; "" removes the auth.
+func (r *Request) SetAuthUse(name string) {
+	r.Edit(func(v *model.RequestVersion) {
+		if name == "" {
+			v.Auth = nil
+			return
+		}
+		v.Auth = &model.Auth{Use: name}
+	})
+}
+
 // SetAuthScheme chooses the auth block's scheme; "" removes the block. A
 // different scheme starts with no parameters, since they do not carry over.
 func (r *Request) SetAuthScheme(scheme string) {
@@ -520,7 +541,7 @@ func (r *Request) SetAuthScheme(scheme string) {
 		switch {
 		case scheme == "":
 			v.Auth = nil
-		case v.Auth == nil || v.Auth.Type != scheme:
+		case v.Auth == nil || v.Auth.Use != "" || v.Auth.Type != scheme:
 			v.Auth = &model.Auth{Type: scheme}
 		}
 	})
@@ -529,7 +550,7 @@ func (r *Request) SetAuthScheme(scheme string) {
 // SetAuthParam sets a parameter of the auth block; an empty value removes it.
 func (r *Request) SetAuthParam(name, value string) {
 	r.Edit(func(v *model.RequestVersion) {
-		if v.Auth == nil {
+		if v.Auth == nil || v.Auth.Use != "" {
 			return
 		}
 		params := slices.DeleteFunc(slices.Clone(v.Auth.Params), func(kv model.KeyValue) bool { return kv.Key == name })

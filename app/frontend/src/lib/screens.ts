@@ -21,6 +21,7 @@ export const screens: Screen[] = [
   { id: 'screen:replayer', title: 'Replayer', icon: 'replay', menu: 'replayer', rail: true },
   { id: 'screen:checks', title: 'Checks', icon: 'checks', menu: 'checks', rail: true },
   { id: 'screen:tracing', title: 'Tracing', icon: 'trace', menu: 'tracing', rail: true },
+  { id: 'screen:auths', title: 'Authentications', icon: 'auth', menu: 'auths', rail: true },
   { id: 'screen:blueprints', title: 'Blueprints', icon: 'blueprint', menu: 'blueprints', rail: true },
   { id: 'screen:trash', title: 'Trash', icon: 'trash', menu: 'trash', rail: true },
   { id: 'screen:settings', title: 'Settings', icon: 'settings', menu: 'settings', rail: true },

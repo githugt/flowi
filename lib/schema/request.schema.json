@@ -98,6 +98,9 @@
             }
           }
         },
+        "auth": {
+          "$ref": "common.schema.json#/$defs/auth"
+        },
         "extract": {
           "type": "object",
           "additionalProperties": {

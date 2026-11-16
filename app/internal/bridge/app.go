@@ -56,6 +56,7 @@ type App struct {
 	schedules  *SchedulesService
 	replayer   *ReplayerService
 	blueprints *BlueprintsService
+	auths      *AuthsService
 	trash      *TrashService
 	checks     *ChecksService
 	hooks      *HooksService
@@ -138,6 +139,7 @@ func (a *App) buildServices(logger *slog.Logger, tracer vm.Tracer) {
 	a.schedules = newSchedulesService(a)
 	a.replayer = newReplayerService(a)
 	a.blueprints = newBlueprintsService(a)
+	a.auths = newAuthsService(a)
 	a.trash = &TrashService{app: a}
 	a.checks = &ChecksService{app: a}
 	a.hooks = newHooksService(a)
@@ -202,6 +204,9 @@ func (a *App) Replayer() *ReplayerService { return a.replayer }
 
 // Blueprints is the service for the blueprints library.
 func (a *App) Blueprints() *BlueprintsService { return a.blueprints }
+
+// Auths is the service for the Authentications screen.
+func (a *App) Auths() *AuthsService { return a.auths }
 
 // Trash is the service for the trash.
 func (a *App) Trash() *TrashService { return a.trash }

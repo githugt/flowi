@@ -164,6 +164,9 @@ type Backend interface {
 	NewFlowFromBlueprint(bp flowi.BlueprintTarget, collection model.ID, path string, values map[string]string) (flowi.FlowTarget, error)
 	CreateBlueprint(flow flowi.FlowTarget, path, name string) (flowi.BlueprintTarget, error)
 	DeleteBlueprint(t flowi.BlueprintTarget) error
+	NewNamedAuth(collection model.ID, name, description string, auth model.Auth) (flowi.AuthTarget, error)
+	SaveNamedAuth(t flowi.AuthTarget, a model.NamedAuth) error
+	DeleteNamedAuth(t flowi.AuthTarget) error
 	CreateHookBlueprint(collection model.ID, path, name, phase string, nodes []model.Node) (flowi.BlueprintTarget, error)
 	FlowLayout(t flowi.FlowTarget) (model.Layout, diag.List, error)
 	SaveFlowLayout(t flowi.FlowTarget, l model.Layout) error

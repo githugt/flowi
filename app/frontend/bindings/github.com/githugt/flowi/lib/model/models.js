@@ -191,6 +191,10 @@ export class AsyncSend {
  * Auth is a version's authentication scheme and its parameters, in file
  * order. Every value is a template, so credentials come from the vault
  * ({{secret.client_secret}}) and never sit in the file.
+ * 
+ * Use names a named authentication of the collection instead: the version
+ * then carries no scheme or parameters of its own, and the named one is
+ * applied when the request is sent.
  */
 export class Auth {
     /**
@@ -211,6 +215,13 @@ export class Auth {
              * @type {KeyValue[]}
              */
             this["Params"] = [];
+        }
+        if (!("Use" in $$source)) {
+            /**
+             * @member
+             * @type {string}
+             */
+            this["Use"] = "";
         }
 
         Object.assign(this, $$source);

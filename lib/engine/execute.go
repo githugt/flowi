@@ -138,6 +138,10 @@ func (r *runner) prepare(c call) (*execution, diag.List) {
 		return nil, diags
 	}
 	v, overlayNotes := laidOver(c, v)
+	v, diags = withNamedAuth(c.collection, v)
+	if diags.HasErrors() {
+		return nil, diags
+	}
 	cfg := newConfig(r.deps.Lookup.Settings(c.collection.Manifest.ID, folderOf(c.request), v.Settings))
 	env, diags := selectEnvironment(c.collection, r.env, cfg.defaultEnv)
 	if diags.HasErrors() {

@@ -100,6 +100,7 @@ func run() error {
 			application.NewService(app.Schedules()),
 			application.NewService(app.Replayer()),
 			application.NewService(app.Blueprints()),
+			application.NewService(app.Auths()),
 			application.NewService(app.Trash()),
 			application.NewService(app.Checks()),
 			application.NewService(app.Hooks()),

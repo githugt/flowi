@@ -29,12 +29,14 @@ type Codec interface {
 	DecodeRequest(file, path string, data []byte) (model.Request, diag.List)
 	DecodeFlow(file, path string, data []byte) (model.Flow, diag.List)
 	DecodeBlueprint(file, path string, data []byte) (model.Blueprint, diag.List)
+	DecodeAuth(file string, data []byte) (model.NamedAuth, diag.List)
 	EncodeManifest(model.Manifest) ([]byte, error)
 	EncodeFolder(model.Folder) ([]byte, error)
 	EncodeEnvironment(model.Environment) ([]byte, error)
 	EncodeRequest(model.Request) ([]byte, error)
 	EncodeFlow(model.Flow) ([]byte, error)
 	EncodeBlueprint(model.Blueprint) ([]byte, error)
+	EncodeAuth(model.NamedAuth) ([]byte, error)
 	Locate(data []byte, yamlPath string) (diag.Position, bool)
 	HasComments(data []byte) bool
 }

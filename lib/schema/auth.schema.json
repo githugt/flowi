@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/githugt/flowi/lib/schema/auth.schema.json",
+  "title": "Flowi named authentication (auths/*.auth.yaml)",
+  "description": "An authentication defined once in a collection. A request version uses it with auth: {use: <name>} instead of repeating the scheme and its parameters. The name defaults to the file name without .auth.yaml.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "auth"
+  ],
+  "properties": {
+    "id": {
+      "$ref": "common.schema.json#/$defs/ulid"
+    },
+    "name": {
+      "type": "string"
+    },
+    "description": {
+      "type": "string"
+    },
+    "auth": {
+      "$ref": "common.schema.json#/$defs/authScheme"
+    }
+  }
+}

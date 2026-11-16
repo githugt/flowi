@@ -36,6 +36,7 @@
   import EmptyState from './EmptyState.svelte'
   import { protocolVerb } from './lib/verbs'
   import { recognise } from './lib/paste'
+  import AuthFields from './AuthFields.svelte'
   import type { DropOption } from './lib/types'
   import { WorkspaceService, ManagerService } from '../bindings/github.com/githugt/flowi/app/internal/bridge'
   import { Events } from '@wailsio/runtime'
@@ -209,10 +210,17 @@
   }
   const bodyKindOptions: DropOption[] = [['none', 'None'], ['text', 'Text'], ['form', 'Form'], ['file', 'File']].map(([value, label]) => ({ value, label }))
   const formatOptions: DropOption[] = formats.map((f) => ({ value: f, label: f.toUpperCase() }))
-  const authOptions = $derived<DropOption[]>([...authKinds.map(([value, label]) => ({ value, label })), ...view.auth.schemes.map((s) => ({ value: s.id, label: s.label }))])
+  const authOptions = $derived<DropOption[]>([...authKinds.map(([value, label]) => ({ value, label })), { value: 'use', label: 'Named authentication' }, ...view.auth.schemes.map((s) => ({ value: s.id, label: s.label }))])
+  // The collection's named authentications, and the one in use even when it is gone, so the picker can say so.
+  const namedOptions = $derived<DropOption[]>([...(view.auth.useMissing ? [{ value: view.auth.use, label: view.auth.use + ' (missing)' }] : []), ...view.auth.named.map((a) => ({ value: a.id, label: a.label }))])
+  const openAuths = () => app.openScreen('screen:auths', 'Authentications')
   const isScheme = $derived(view.auth.kind.startsWith('scheme:'))
   function pickAuth(k: string) {
-    if (k.startsWith('scheme:')) RequestService.SetAuthScheme(node, k.slice('scheme:'.length))
+    if (k === 'use') {
+      // With none defined there is nothing to pick: the screen that makes one opens instead.
+      if (view.auth.named.length) RequestService.SetAuthUse(node, view.auth.use || view.auth.named[0].id)
+      else openAuths()
+    } else if (k.startsWith('scheme:')) RequestService.SetAuthScheme(node, k.slice('scheme:'.length))
     else RequestService.SetAuth(node, k, view.auth.value)
   }
   const protocolOptions = $derived<DropOption[]>((view.async?.protocols ?? []).map((p) => ({ value: p.id, label: p.label, tone: protocolVerb(p.id) })))
@@ -574,11 +582,15 @@
               <EmptyState icon="auth" title="No auth" hint={'Pick a type above. Keep credentials out of the file: use {{secret.name}}.'} compact>
                 <button onclick={() => pickAuth('bearer')}>Bearer token</button><button onclick={() => pickAuth('basic')}>Basic</button>
               </EmptyState>
+            {:else if view.auth.kind === 'use'}
+              <div class="pickrow"><Dropdown title="Named authentication" options={namedOptions} value={view.auth.use} onpick={(n) => RequestService.SetAuthUse(node, n)} /><button onclick={openAuths}>Edit authentications…</button></div>
+              {#if view.auth.useMissing}
+                <p class="muted">This collection has no authentication named {view.auth.use}. The request cannot be sent until you pick another or add it again.</p>
+              {:else}
+                <p class="muted">The request is sent with the collection's authentication {view.auth.use}. Its values are kept in one place: change them under Authentications.</p>
+              {/if}
             {:else if isScheme}
-              {#each view.auth.fields as f (f.name)}
-                <TextField label={f.name + (f.known ? '' : ' (not a parameter of this scheme)')} mono placeholder={f.secret ? '{{secret.' + f.name + '}}' : ''} value={f.value} oninput={(t) => RequestService.SetAuthParam(node, f.name, t)} />
-              {/each}
-              <p class="muted">Every value is a template. Keep credentials out of the file: {'{{secret.name}}'} reads the vault. The request is signed or authenticated as it is sent.</p>
+              <AuthFields fields={view.auth.fields} onparam={(name, t) => RequestService.SetAuthParam(node, name, t)} />
             {:else}
               <TextField label={view.auth.kind === 'bearer' ? 'Token' : view.auth.kind === 'basic' ? 'Base64 credentials or a template' : 'Authorization header value'} mono
                 value={view.auth.value} oninput={(t) => RequestService.SetAuth(node, view.auth.kind, t)} />
@@ -729,6 +741,7 @@
   .docsbar button:disabled { opacity: 0.5; }
   .docsview { flex: 1; min-height: 0; overflow: auto; padding: 4px 2px; }
   .typebar { flex: none; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; padding: 6px 10px; border-bottom: 1px solid var(--line); }
+  .pickrow { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
   /* Every main action is a gradient with a soft glow: Send in the colour chosen in Settings, listening and the
      two-way modes in their own, so the mode still reads at a glance. */
   .send { --act-fill: linear-gradient(135deg, color-mix(in srgb, var(--act) 78%, white), var(--act)); --act-glow: color-mix(in srgb, var(--act) 34%, transparent); --act-ink: var(--on-act); }

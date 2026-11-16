@@ -134,7 +134,7 @@ func versionFacts(v model.RequestVersion) card.Facts {
 	}
 	headers, auth := withoutAuthorization(v.Headers)
 	if v.Auth != nil {
-		auth = v.Auth.Type
+		auth = authLabel(v.Auth)
 	}
 	return card.Facts{
 		Kind: "http", Method: v.Method, Target: pathOf(v.URL), Auth: auth,
@@ -150,7 +150,7 @@ func grpcFacts(v model.RequestVersion) card.Facts {
 	}
 	_, auth := withoutAuthorization(v.Headers)
 	if v.Auth != nil {
-		auth = v.Auth.Type
+		auth = authLabel(v.Auth)
 	}
 	return card.Facts{Kind: "grpc", Method: method, Target: g.Method, Auth: auth, Body: bodyKind(g.Body), Props: len(v.Headers)}
 }
@@ -173,7 +173,7 @@ func asyncFacts(v model.RequestVersion) card.Facts {
 	}
 	_, f.Auth = withoutAuthorization(v.Headers)
 	if v.Auth != nil {
-		f.Auth = v.Auth.Type
+		f.Auth = authLabel(v.Auth)
 	}
 	if a.Send != nil && a.Receive != nil && a.Protocol == "nats" {
 		f.Method = "request"
