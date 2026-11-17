@@ -4931,6 +4931,14 @@ export class MatrixCellView {
              */
             this["why"] = undefined;
         }
+        if (/** @type {any} */(false)) {
+            /**
+             * shown beside the mark of a passed cell: a request's response status
+             * @member
+             * @type {string | undefined}
+             */
+            this["detail"] = undefined;
+        }
 
         Object.assign(this, $$source);
     }
@@ -6764,6 +6772,66 @@ export class RequestDriftView {
             $$parsedSource["differences"] = $$createField4_0($$parsedSource["differences"]);
         }
         return new RequestDriftView(/** @type {Partial<RequestDriftView>} */($$parsedSource));
+    }
+}
+
+/**
+ * RequestMatrixChoices are what the request's matrix dialog offers to pick from.
+ */
+export class RequestMatrixChoices {
+    /**
+     * Creates a new RequestMatrixChoices instance.
+     * @param {Partial<RequestMatrixChoices>} [$$source = {}] - The source object to create the RequestMatrixChoices.
+     */
+    constructor($$source = {}) {
+        if (!("envs" in $$source)) {
+            /**
+             * environments of the workspace
+             * @member
+             * @type {string[]}
+             */
+            this["envs"] = [];
+        }
+        if (!("overlays" in $$source)) {
+            /**
+             * flowi overlays of the request's collection
+             * @member
+             * @type {string[]}
+             */
+            this["overlays"] = [];
+        }
+        if (!("names" in $$source)) {
+            /**
+             * the bare names the request uses ({{email}}), which a matrix can give values to
+             * @member
+             * @type {string[]}
+             */
+            this["names"] = [];
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new RequestMatrixChoices instance from a string or object.
+     * @param {any} [$$source = {}]
+     * @returns {RequestMatrixChoices}
+     */
+    static createFrom($$source = {}) {
+        const $$createField0_0 = $$createType8;
+        const $$createField1_0 = $$createType8;
+        const $$createField2_0 = $$createType8;
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        if ("envs" in $$parsedSource) {
+            $$parsedSource["envs"] = $$createField0_0($$parsedSource["envs"]);
+        }
+        if ("overlays" in $$parsedSource) {
+            $$parsedSource["overlays"] = $$createField1_0($$parsedSource["overlays"]);
+        }
+        if ("names" in $$parsedSource) {
+            $$parsedSource["names"] = $$createField2_0($$parsedSource["names"]);
+        }
+        return new RequestMatrixChoices(/** @type {Partial<RequestMatrixChoices>} */($$parsedSource));
     }
 }
 

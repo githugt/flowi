@@ -23,6 +23,7 @@
   import { sectionCounts } from './lib/tabcounts'
   import Dropdown from './Dropdown.svelte'
   import ExprHelp from './ExprHelp.svelte'
+  import RequestMatrix from './RequestMatrix.svelte'
   import ReplayBar from './ReplayBar.svelte'
   import MissingBar from './MissingBar.svelte'
   import Problem from './Problem.svelte'
@@ -188,6 +189,7 @@
     }
   }
   let replayOpen = $state(false)
+  let matrixOpen = $state(false)
   let hooks = $state('all')
 
   const bodyKinds = ['none', 'text', 'form', 'file']
@@ -498,6 +500,7 @@
           {/each}
           <hr />
           <button role="menuitem" onclick={() => menuAction(() => (replayOpen = !replayOpen))}><span class="tick">{replayOpen ? '✓' : ''}</span>Replay saved responses…</button>
+          <button role="menuitem" disabled={view.inScratch || view.dirty} title={view.inScratch || view.dirty ? 'Save the request first: a matrix sends the file on disk' : 'Send it once for every combination of environments, overlays and values'} onclick={() => menuAction(() => (matrixOpen = true))}><span class="tick"></span>Run a matrix…</button>
         </div>
       {/if}
     </div>
@@ -579,6 +582,7 @@
       · <button class="link" onclick={openUpdate}>Update from spec…</button>
     </p>
   {/if}
+  {#if matrixOpen}<RequestMatrix {node} onclose={() => (matrixOpen = false)} />{/if}
   {#if view.kind === 'http'}<ReplayBar path={view.replayPath} method={v.Method || 'GET'} open={replayOpen} onclose={() => (replayOpen = false)} />{/if}
 
   <div class="panels">

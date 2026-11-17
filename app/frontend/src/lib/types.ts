@@ -1028,6 +1028,12 @@ export interface ChecksChoices {
   steps: string[]
 }
 
+export interface RequestMatrixChoices {
+  envs: string[]
+  overlays: string[]
+  names: string[]
+}
+
 export interface MatrixDimView {
   name: string
   values: string[]
@@ -1035,7 +1041,7 @@ export interface MatrixDimView {
 
 export interface MatrixView {
   dims: MatrixDimView[]
-  cells: { labels: string[]; status: 'passed' | 'failed' | 'error' | 'cancelled'; why?: string }[]
+  cells: { labels: string[]; status: 'passed' | 'failed' | 'error' | 'cancelled'; why?: string; detail?: string }[]
   passed: number
 }
 

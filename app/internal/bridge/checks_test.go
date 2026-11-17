@@ -210,3 +210,53 @@ func TestFlowChecks_Sequence_Given_no_run_yet_Then_it_says_to_run_the_flow_first
 		t.Fatalf("err %v", err)
 	}
 }
+
+func openChecksRequest(t *testing.T) (*bridge.RequestService, string, *vmtest.Backend) {
+	t.Helper()
+	app, b := checksApp(t)
+	node, ok := findNode(app.Workspace().Tree().Roots, "request")
+	if !ok {
+		t.Fatal("no request in the sample collection")
+	}
+	if _, err := app.Requests().Open(node.ID); err != nil {
+		t.Fatal(err)
+	}
+	return app.Requests(), node.ID, b
+}
+
+func TestRequestMatrix_Then_a_cell_for_each_combination_comes_back_with_its_status_and_nothing_is_saved(t *testing.T) {
+	// Arrange
+	reqs, node, b := openChecksRequest(t)
+	b.NextSend = &vmtest.Sending{Result: engine.SendResult{Status: engine.StatusPassed, Record: &engine.Record{Status: 200}}}
+
+	// Act
+	got, err := reqs.RunMatrix(node, []bridge.MatrixDimView{{Name: "env", Values: []string{"local", "staging"}}, {Name: "with.id", Values: []string{"1"}}})
+
+	// Assert
+	if err != nil || len(got.Cells) != 2 || got.Cells[1].Labels[0] != "staging" || got.Cells[1].Detail != "200" || got.Passed != 2 {
+		t.Fatalf("matrix %+v err %v", got, err)
+	}
+	if len(b.SendOpts) != 2 || b.SendOpts[1].With["id"] != "1" || b.SendOpts[1].Save != "none" {
+		t.Fatalf("sends %+v", b.SendOpts)
+	}
+}
+
+func TestRequestMatrix_Given_a_flow_style_dimension_Then_it_is_refused_before_anything_is_sent(t *testing.T) {
+	reqs, node, b := openChecksRequest(t)
+
+	_, err := reqs.RunMatrix(node, []bridge.MatrixDimView{{Name: "input.id", Values: []string{"1"}}})
+
+	if err == nil || len(b.SendOpts) != 0 {
+		t.Fatalf("err %v sends %d", err, len(b.SendOpts))
+	}
+}
+
+func TestRequestMatrix_Choices_Then_environments_and_overlays_are_listed(t *testing.T) {
+	reqs, node, _ := openChecksRequest(t)
+
+	got, err := reqs.MatrixChoices(node)
+
+	if err != nil || len(got.Envs) == 0 || got.Names == nil {
+		t.Fatalf("choices %+v err %v", got, err)
+	}
+}

@@ -42,20 +42,22 @@ type StoredEdit struct {
 // recorded in Calls. mu guards every field: the worker Calls it from other
 // goroutines.
 type Backend struct {
-	Mu          sync.Mutex         // guards every field; tests lock it to change state mid-test
-	FieldList   []flowi.Completion // what ResponseFields returns
-	Name        string             // the workspace name; "default-workspace" when empty
-	Cols        []model.Collection
-	MissingIDs  []model.ID
-	Paths       map[model.ID]string
-	Diags       diag.List
-	Values      map[string]any // user settings layer
-	ResetErr    error          // ResetUserSetting fails with it
-	SetErr      error          // SetUserSetting fails with it
-	Session     string         // SessionDir
-	SecretList  []flowi.SecretInfo
-	SaveErr     error
-	NextSend    *Sending
+	Mu         sync.Mutex         // guards every field; tests lock it to change state mid-test
+	FieldList  []flowi.Completion // what ResponseFields returns
+	Name       string             // the workspace name; "default-workspace" when empty
+	Cols       []model.Collection
+	MissingIDs []model.ID
+	Paths      map[model.ID]string
+	Diags      diag.List
+	Values     map[string]any // user settings layer
+	ResetErr   error          // ResetUserSetting fails with it
+	SetErr     error          // SetUserSetting fails with it
+	Session    string         // SessionDir
+	SecretList []flowi.SecretInfo
+	SaveErr    error
+	NextSend   *Sending
+	// SendFor, when set, answers each Send from its options (a request matrix needs a different outcome per cell).
+	SendFor     func(flowi.SendOptions) (*Sending, error)
 	SendErr     error
 	Changes     chan flowi.Change
 	Calls       []string
@@ -839,6 +841,13 @@ func (f *Backend) Send(_ context.Context, _ flowi.RequestTarget, o flowi.SendOpt
 	f.Mu.Lock()
 	defer f.Mu.Unlock()
 	f.SendOpts = append(f.SendOpts, o)
+	if f.SendFor != nil {
+		s, err := f.SendFor(o)
+		if err != nil {
+			return nil, err
+		}
+		return s, nil
+	}
 	if f.SendErr != nil {
 		return nil, f.SendErr
 	}

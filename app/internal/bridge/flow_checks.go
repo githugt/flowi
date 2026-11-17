@@ -39,6 +39,7 @@ type MatrixCellView struct {
 	Labels []string `json:"labels"`
 	Status string   `json:"status"` // passed, failed, error or cancelled
 	Why    string   `json:"why,omitempty"`
+	Detail string   `json:"detail,omitempty"` // shown beside the mark of a passed cell: a request's response status
 }
 
 // MatrixView is the grid of a matrix run.
@@ -166,7 +167,7 @@ func (s *FlowService) RunMatrix(node string, dims []MatrixDimView, inputs map[st
 	}
 	v := MatrixView{Dims: dims, Cells: []MatrixCellView{}}
 	for _, c := range cells {
-		v.Cells = append(v.Cells, MatrixCellView{Labels: c.Labels, Status: c.Status, Why: c.Why})
+		v.Cells = append(v.Cells, MatrixCellView{Labels: c.Labels, Status: c.Status, Why: c.Why, Detail: c.Detail})
 		if c.Status == "passed" {
 			v.Passed++
 		}

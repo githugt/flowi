@@ -286,6 +286,18 @@ export function MakeJSONRPC(node) {
 }
 
 /**
+ * MatrixChoices lists what the request's matrix dialog offers: environments, the collection's overlays and the names
+ * the request uses.
+ * @param {string} node
+ * @returns {$CancellablePromise<$models.RequestMatrixChoices>}
+ */
+export function MatrixChoices(node) {
+    return $Call.ByID(1769827061, node).then(/** @type {($result: any) => any} */(($result) => {
+        return $$createType7($result);
+    }));
+}
+
+/**
  * Missing lists the variables the selected version of request node uses
  * that nothing defines yet. A secret counts as defined only once it has a
  * value (in the vault, or overridden from the process environment): a
@@ -295,7 +307,7 @@ export function MakeJSONRPC(node) {
  */
 export function Missing(node) {
     return $Call.ByID(3886754734, node).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType7($result);
+        return $$createType8($result);
     }));
 }
 
@@ -317,7 +329,7 @@ export function NewVersion(node, label) {
  */
 export function Open(node) {
     return $Call.ByID(4108184050, node).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType8($result);
+        return $$createType9($result);
     }));
 }
 
@@ -416,7 +428,7 @@ export function PrettyJSON(text) {
  */
 export function PreviewOverlay(node) {
     return $Call.ByID(538770798, node).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType9($result);
+        return $$createType10($result);
     }));
 }
 
@@ -427,6 +439,19 @@ export function PreviewOverlay(node) {
  */
 export function Revert(node) {
     return $Call.ByID(297596780, node);
+}
+
+/**
+ * RunMatrix sends the saved request once for every combination of the dimensions' values (env, overlay or
+ * with.<name>) and returns the grid. The responses are not saved.
+ * @param {string} node
+ * @param {$models.MatrixDimView[]} dims
+ * @returns {$CancellablePromise<$models.MatrixView>}
+ */
+export function RunMatrix(node, dims) {
+    return $Call.ByID(4177743998, node, dims).then(/** @type {($result: any) => any} */(($result) => {
+        return $$createType11($result);
+    }));
 }
 
 /**
@@ -543,7 +568,7 @@ export function SaveToOverlay(node, chosen) {
  */
 export function Schemas(node) {
     return $Call.ByID(208416882, node).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType11($result);
+        return $$createType13($result);
     }));
 }
 
@@ -915,7 +940,7 @@ export function SetVersionDetails(node, name, docs) {
  */
 export function Settings(node) {
     return $Call.ByID(2559697551, node).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType12($result);
+        return $$createType14($result);
     }));
 }
 
@@ -959,7 +984,7 @@ export function ShowStored(node, version, name) {
  */
 export function SpecOrigin(node) {
     return $Call.ByID(255391863, node).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType13($result);
+        return $$createType15($result);
     }));
 }
 
@@ -971,7 +996,7 @@ export function SpecOrigin(node) {
  */
 export function StoredResponses(node) {
     return $Call.ByID(137001887, node).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType15($result);
+        return $$createType17($result);
     }));
 }
 
@@ -986,7 +1011,7 @@ export function StoredResponses(node) {
  */
 export function Suggest(node, text, caret) {
     return $Call.ByID(3675986336, node, text, caret).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType16($result);
+        return $$createType18($result);
     }));
 }
 
@@ -1018,7 +1043,7 @@ export function SuggestSavePath(node) {
  */
 export function URLSpans(node, text) {
     return $Call.ByID(4003298604, node, text).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType18($result);
+        return $$createType20($result);
     }));
 }
 
@@ -1029,7 +1054,7 @@ export function URLSpans(node, text) {
  */
 export function UsedBy(node) {
     return $Call.ByID(3438422550, node).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType19($result);
+        return $$createType21($result);
     }));
 }
 
@@ -1041,16 +1066,18 @@ const $$createType3 = $models.SuggestionView.createFrom;
 const $$createType4 = $Create.Array($$createType3);
 const $$createType5 = $models.FlowiOverlayDiffView.createFrom;
 const $$createType6 = $models.GeneratedView.createFrom;
-const $$createType7 = $models.MissingView.createFrom;
-const $$createType8 = $models.RequestView.createFrom;
-const $$createType9 = $models.OverlayPreviewView.createFrom;
-const $$createType10 = $models.SchemaView.createFrom;
-const $$createType11 = $Create.Array($$createType10);
-const $$createType12 = $models.RequestSettingsView.createFrom;
-const $$createType13 = $models.SpecOriginView.createFrom;
-const $$createType14 = $models.StoredView.createFrom;
-const $$createType15 = $Create.Array($$createType14);
-const $$createType16 = $models.SuggestView.createFrom;
-const $$createType17 = $models.SpanView.createFrom;
-const $$createType18 = $Create.Array($$createType17);
-const $$createType19 = $models.UsedByView.createFrom;
+const $$createType7 = $models.RequestMatrixChoices.createFrom;
+const $$createType8 = $models.MissingView.createFrom;
+const $$createType9 = $models.RequestView.createFrom;
+const $$createType10 = $models.OverlayPreviewView.createFrom;
+const $$createType11 = $models.MatrixView.createFrom;
+const $$createType12 = $models.SchemaView.createFrom;
+const $$createType13 = $Create.Array($$createType12);
+const $$createType14 = $models.RequestSettingsView.createFrom;
+const $$createType15 = $models.SpecOriginView.createFrom;
+const $$createType16 = $models.StoredView.createFrom;
+const $$createType17 = $Create.Array($$createType16);
+const $$createType18 = $models.SuggestView.createFrom;
+const $$createType19 = $models.SpanView.createFrom;
+const $$createType20 = $Create.Array($$createType19);
+const $$createType21 = $models.UsedByView.createFrom;

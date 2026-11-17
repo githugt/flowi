@@ -151,6 +151,7 @@ export {
     ReplayerForm,
     ReplayerView,
     RequestDriftView,
+    RequestMatrixChoices,
     RequestSettingsView,
     RequestView,
     ResponseView,
