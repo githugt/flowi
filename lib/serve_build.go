@@ -123,7 +123,7 @@ func (b *serveBuild) assembleReplay() error {
 		if err != nil {
 			return err
 		}
-		if upstream.Host == b.s.replayAddr {
+		if replay.SameHost(upstream.Host, b.s.replayAddr) {
 			return fmt.Errorf("%w: the record upstream is the replayer itself; give the real API's URL", ErrInvalidServeOptions)
 		}
 		rec := &replay.Recorder{Upstream: upstream}

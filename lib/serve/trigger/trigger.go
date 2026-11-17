@@ -9,7 +9,9 @@
 // Every route but /healthz needs "Authorization: Bearer <token>". The
 // token is checked before the path is looked at, so a caller without it
 // learns nothing about which flows exist. An address that sends ten bad
-// tokens in a minute is answered 429 until the minute ends.
+// tokens in a minute is answered 429 until the minute ends; a request with
+// the right token is never refused for it, since callers behind a proxy
+// share one address.
 //
 // The endpoint speaks plain HTTP, so the token crosses the network in the
 // clear: keep it on loopback, or put a TLS-terminating proxy in front.
@@ -78,18 +80,21 @@ func New(o Options) (http.Handler, error) {
 }
 
 func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	if r.URL.Path == "/healthz" && r.Method == http.MethodGet {
+	if r.URL.Path == "/healthz" && (r.Method == http.MethodGet || r.Method == http.MethodHead) {
 		writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 		return
 	}
-	remote := remoteHost(r)
-	if h.denied.locked(remote) {
-		h.log.Warn("trigger call refused", "Event", "TriggerLockedOut", "Remote", r.RemoteAddr)
-		w.Header().Set("Retry-After", strconv.Itoa(int(failureWindow/time.Second)))
-		writeError(w, http.StatusTooManyRequests, "too many failed attempts; try again later")
-		return
-	}
 	if !h.authorised(r) {
+		// A valid token is never locked out: behind a proxy every caller shares one address, so a lockout that
+		// also refused the right token would let anyone shut every caller out. The lockout only stops a
+		// caller that keeps sending wrong ones.
+		remote := remoteHost(r)
+		if h.denied.locked(remote) {
+			h.log.Warn("trigger call refused", "Event", "TriggerLockedOut", "Remote", r.RemoteAddr)
+			w.Header().Set("Retry-After", strconv.Itoa(int(failureWindow/time.Second)))
+			writeError(w, http.StatusTooManyRequests, "too many failed attempts; try again later")
+			return
+		}
 		h.denied.recordFailure(remote)
 		h.log.Warn("trigger call denied", "Event", "TriggerDenied", "Remote", r.RemoteAddr, "Method", r.Method)
 		w.Header().Set("WWW-Authenticate", "Bearer")

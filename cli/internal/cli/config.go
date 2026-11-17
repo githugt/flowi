@@ -244,6 +244,9 @@ func layerFile(i do.Injector, s *Session, l settings.Layer) (string, error) {
 	}
 	file := flowi.UserSettingsFile(paths)
 	if _, err := os.Stat(file); errors.Is(err, fs.ErrNotExist) {
+		if err := os.MkdirAll(filepath.Dir(file), 0o700); err != nil {
+			return "", fmt.Errorf("creating %s: %w", filepath.Dir(file), err)
+		}
 		if err := os.WriteFile(file, nil, 0o600); err != nil {
 			return "", fmt.Errorf("creating %s: %w", file, err)
 		}
@@ -252,7 +255,10 @@ func layerFile(i do.Injector, s *Session, l settings.Layer) (string, error) {
 }
 
 func runEditor(cmd *cobra.Command, env Env, file string) error {
-	parts := strings.Fields(settings.Editor(env.Environ))
+	parts, err := splitCommand(settings.Editor(env.Environ))
+	if err != nil {
+		return &UsageError{Err: err}
+	}
 	if len(parts) == 0 {
 		return &UsageError{Err: errors.New("no editor configured (set VISUAL or EDITOR)")}
 	}

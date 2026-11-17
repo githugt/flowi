@@ -4,8 +4,10 @@ package flowi
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
+	"mime"
 	"net/http"
 	"net/url"
 	"path"
@@ -20,6 +22,20 @@ const (
 	fetchMaxSize = 16 << 20
 )
 
+// newFetchClient follows redirects like the default client but never from https to http: a spec fetched over TLS
+// must not be handed to a plaintext hop on the way.
+func newFetchClient() *http.Client {
+	return &http.Client{CheckRedirect: func(req *http.Request, via []*http.Request) error {
+		if len(via) >= 10 {
+			return errors.New("stopped after 10 redirects")
+		}
+		if via[len(via)-1].URL.Scheme == "https" && req.URL.Scheme != "https" {
+			return fmt.Errorf("redirected from https to %s, which is not encrypted", req.URL.Redacted())
+		}
+		return nil
+	}}
+}
+
 // IsImportURL reports whether ref is an http or https URL to fetch rather than
 // a file to read.
 func IsImportURL(ref string) bool {
@@ -29,7 +45,8 @@ func IsImportURL(ref string) bool {
 // FetchImportSource downloads the document at rawURL (an OpenAPI or AsyncAPI
 // description served by an API, say) and returns it with a name for reports,
 // the last segment of the URL path ("openapi.json"). It sends no credentials
-// and follows redirects; a status other than 200 is an error.
+// and follows redirects (never from https to http); a web page (text/html) is refused, since a description is
+// never one; a status other than 200 is an error.
 func FetchImportSource(ctx context.Context, rawURL string) (data []byte, name string, err error) {
 	u, err := url.Parse(rawURL)
 	if err != nil || !IsImportURL(rawURL) || u.Host == "" {
@@ -42,13 +59,16 @@ func FetchImportSource(ctx context.Context, rawURL string) (data []byte, name st
 		return nil, "", fmt.Errorf("fetching %s: %w", u.Redacted(), err)
 	}
 	req.Header.Set("Accept", "application/json, application/yaml, text/yaml, */*;q=0.5")
-	resp, err := http.DefaultClient.Do(req) //nolint:gosec // the URL is the one the user asked to import from
+	resp, err := newFetchClient().Do(req) //nolint:gosec // the URL is the one the user asked to import from
 	if err != nil {
 		return nil, "", fmt.Errorf("fetching %s: %w", u.Redacted(), err)
 	}
 	defer resp.Body.Close() //nolint:errcheck // a body already read
 	if resp.StatusCode != http.StatusOK {
 		return nil, "", fmt.Errorf("fetching %s: the server answered %s", u.Redacted(), resp.Status)
+	}
+	if mt, _, perr := mime.ParseMediaType(resp.Header.Get("Content-Type")); perr == nil && mt == "text/html" {
+		return nil, "", fmt.Errorf("fetching %s: the server answered with a web page, not an API description", u.Redacted())
 	}
 	data, err = io.ReadAll(io.LimitReader(resp.Body, fetchMaxSize+1))
 	if err != nil {

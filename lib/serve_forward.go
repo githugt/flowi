@@ -42,7 +42,7 @@ func (b *serveBuild) forward() (*replay.Forward, error) {
 		if err != nil {
 			return nil, err
 		}
-		if up.Host == b.s.replayAddr {
+		if replay.SameHost(up.Host, b.s.replayAddr) {
 			return nil, fmt.Errorf("%w: the API to forward to is the replayer itself; give the real API's URL", ErrInvalidServeOptions)
 		}
 		f.Upstream = up

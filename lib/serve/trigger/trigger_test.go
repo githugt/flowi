@@ -346,6 +346,16 @@ func TestTrigger_should_answer_health_checks_without_a_token(t *testing.T) {
 	}
 }
 
+func TestTrigger_should_answer_HEAD_health_checks_without_a_token(t *testing.T) {
+	r := newRig(t)
+
+	got := r.do("HEAD", "/healthz", "", "Authorization", "")
+
+	if got.status != 200 {
+		t.Fatalf("%d", got.status)
+	}
+}
+
 func TestTrigger_should_use_the_right_methods(t *testing.T) {
 	r := newRig(t)
 
@@ -391,8 +401,8 @@ func TestTrigger_Given_repeated_bad_tokens_When_the_limit_is_hit_Then_429_until_
 		if locked.status != 429 || locked.header.Get("Retry-After") == "" {
 			t.Fatalf("locked: %d %v", locked.status, locked.header)
 		}
-		if lockedGood.status != 429 {
-			t.Fatalf("a valid token during the lockout got %d", lockedGood.status)
+		if lockedGood.status == 429 || lockedGood.status == 401 {
+			t.Fatalf("a valid token during the lockout got %d, want it served", lockedGood.status)
 		}
 		if after.status != 200 || recovered.status != 401 {
 			t.Fatalf("after the window: healthz %d, bad token %d", after.status, recovered.status)
