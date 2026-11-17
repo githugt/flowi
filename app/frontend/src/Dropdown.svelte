@@ -1,7 +1,6 @@
 <script lang="ts">
   import Icon from './Icon.svelte'
   import Verb from './Verb.svelte'
-  import { verbKey } from './lib/verbs'
 
   import type { DropOption as Option } from './lib/types'
 
@@ -13,11 +12,10 @@
     onpick,
     label = '',
     pill = false,
-    tinted = false,
     icon = false,
     width,
     title,
-  }: { options: Option[]; value: string; onpick: (v: string) => void; label?: string; pill?: boolean; tinted?: boolean; icon?: boolean; width?: string; title?: string } = $props()
+  }: { options: Option[]; value: string; onpick: (v: string) => void; label?: string; pill?: boolean; icon?: boolean; width?: string; title?: string } = $props()
 
   let open = $state(false)
   let root = $state<HTMLElement>()
@@ -56,7 +54,7 @@
 <svelte:window onpointerdown={away} onresize={() => (open = false)} onkeydown={(e) => open && e.key === 'Escape' && (open = false)} />
 
 <div class="dd" bind:this={root} style:width {title}>
-  <button type="button" class="btn" class:pill class:tinted style:--v={tinted && current?.tone ? `var(--v-${verbKey(current.tone)})` : undefined} aria-haspopup="menu" aria-expanded={open} bind:this={button} onclick={toggle}>
+  <button type="button" class="btn" class:pill aria-haspopup="menu" aria-expanded={open} bind:this={button} onclick={toggle}>
     {#if icon && current?.icon}<Icon name={current.icon} size={14} />{/if}
     <!-- The button shows the bare verb (AMQP), which fits its pill; the menu names it in full (AMQP (RabbitMQ)). -->
     {#if current?.tone}<Verb verb={current.tone} {pill} />{:else}<span class="t">{current?.label ?? label}</span>{/if}
@@ -88,9 +86,6 @@
     display: inline-flex; align-items: center; gap: 6px; width: 100%; box-sizing: border-box;
     background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); font: inherit; padding: 5px 8px;
   }
-  /* tinted: no pill; the button itself carries the verb's colour and glow, and the verb is bare, larger text. */
-  .btn.tinted { background: color-mix(in srgb, var(--v) 14%, transparent); box-shadow: inset 0 0 14px color-mix(in srgb, var(--v) 26%, transparent); border-color: color-mix(in srgb, var(--v) 55%, transparent); }
-  .btn.tinted :global(.verb) { font-size: var(--fs-md); }
   .btn:hover { background: var(--raised-3); }
   .t { flex: 1; text-align: left; white-space: nowrap; }
   .chev { color: var(--muted); margin-left: auto; flex: none; }
