@@ -188,6 +188,10 @@ type Backend interface {
 	ServeDefaults() flowi.ServeOptions
 	// ForwardTargets lists the APIs the saved requests call in environment env, for the replayer's preview.
 	ForwardTargets(env string) []flowi.ForwardTarget
+	// RequestActivity and FlowActivity say where a request or flow came from and how its runs went, as this client
+	// knows it (started on first look for what arrived with the files).
+	RequestActivity(t flowi.RequestTarget) (flowi.Activity, error)
+	FlowActivity(t flowi.FlowTarget) (flowi.Activity, error)
 	Schedules() []model.Schedule
 	AddSchedule(s model.Schedule) error
 	SaveSchedule(old string, s model.Schedule) error

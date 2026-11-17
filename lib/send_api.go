@@ -147,7 +147,9 @@ func (w *Workspace) SendRequest(ctx context.Context, t RequestTarget, o SendOpti
 	if err != nil {
 		return nil, err
 	}
-	return engine.StartSend(ctx, w.engineDeps(), in), nil
+	deps := w.engineDeps()
+	deps.OnSend = w.onSend(t, r.File)
+	return engine.StartSend(ctx, deps, in), nil
 }
 
 // sendInput builds the engine input for sending r with o. An unknown

@@ -2,7 +2,13 @@
 
 package bridge_test
 
-import "testing"
+import (
+	"strings"
+	"testing"
+	"time"
+
+	flowi "github.com/githugt/flowi/lib"
+)
 
 func TestDetails_Given_a_request_tab_Then_the_view_lists_its_resolved_values(t *testing.T) {
 	// Arrange
@@ -54,5 +60,20 @@ func TestDetails_Given_a_node_that_is_not_open_Then_the_view_is_empty(t *testing
 
 	if d.Kind != "" || len(d.Rows) != 0 {
 		t.Fatalf("%+v", d)
+	}
+}
+
+func TestDetails_Given_activity_Then_the_origin_and_the_last_run_are_listed(t *testing.T) {
+	_, v, _, app, b := openLoginWith(t)
+	b.ActivityResult = flowi.Activity{Origin: flowi.OriginFound, Created: time.Now(), Runs: 2, LastRun: time.Now(), LastStatus: "passed", LastSuccess: time.Now()}
+
+	d := app.Panels().Details(v.Node)
+
+	got := map[string]string{}
+	for _, r := range d.Rows {
+		got[r.Label] = r.Value
+	}
+	if !strings.Contains(got["Origin"], "came with the files") || got["First seen here"] == "" || got["Runs (this client)"] != "2" || got["Last failure"] != "never" {
+		t.Fatalf("rows %v", got)
 	}
 }

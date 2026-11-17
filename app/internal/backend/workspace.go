@@ -694,6 +694,18 @@ func (b *Workspace) RunFlow(ctx context.Context, t flowi.FlowTarget, o flowi.Run
 	return r, nil
 }
 
+// RequestActivity is where request t came from and how its sends went.
+func (b *Workspace) RequestActivity(t flowi.RequestTarget) (flowi.Activity, error) {
+	b.guard.Check("RequestActivity")
+	return b.ws.RequestActivity(t)
+}
+
+// FlowActivity is where flow t came from and how its runs went.
+func (b *Workspace) FlowActivity(t flowi.FlowTarget) (flowi.Activity, error) {
+	b.guard.Check("FlowActivity")
+	return b.ws.FlowActivity(t)
+}
+
 // ForwardTargets lists the APIs the saved requests call in environment env.
 func (b *Workspace) ForwardTargets(env string) []flowi.ForwardTarget {
 	b.guard.Check("ForwardTargets")

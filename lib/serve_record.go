@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"net/url"
 	"slices"
 	"strings"
 
@@ -76,7 +77,11 @@ func (w *Workspace) captureTo(collection model.ID, folder string) replay.Capture
 		if err := w.ApplyImport(plan, ApplyOptions{SkipExisting: true}); err != nil {
 			return replay.Captured{}, fmt.Errorf("saving the request: %w", err)
 		}
-		return w.capturedAt(collection, path)
+		got, err := w.capturedAt(collection, path)
+		if err == nil {
+			w.noteOrigin(collection, activityRequest, got.Request.ID, OriginRecorded, "replayer: "+call.Method+" "+callPathOf(call.URL))
+		}
+		return got, err
 	}
 }
 
@@ -153,4 +158,12 @@ func harOf(call replay.Call) ([]byte, error) {
 		req.PostData = &post{MimeType: http.Header(call.Header).Get("Content-Type"), Text: string(call.Body)}
 	}
 	return json.Marshal(map[string]any{"log": map[string]any{"entries": []any{map[string]any{"request": req}}}})
+}
+
+// callPathOf is the path of a call's URL, without its query: what a note may say without leaking a token.
+func callPathOf(raw string) string {
+	if u, err := url.Parse(raw); err == nil && u.Path != "" {
+		return u.Path
+	}
+	return "/"
 }

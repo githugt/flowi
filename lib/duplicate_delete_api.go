@@ -48,6 +48,7 @@ func (w *Workspace) DuplicateRequestTo(t RequestTarget, to model.ID, path string
 	if err := w.writeAndReload(to, file, data, SaveOptions{}); err != nil {
 		return RequestTarget{}, err
 	}
+	w.noteOrigin(to, activityRequest, copied.ID, OriginDuplicated, "copy of "+r.Path)
 	return RequestTarget{Collection: to, Request: copied.ID}, nil
 }
 
@@ -58,6 +59,7 @@ func (w *Workspace) DeleteRequest(t RequestTarget) error {
 	if err != nil {
 		return err
 	}
+	w.forgetActivity(t.Collection, activityRequest, r.ID)
 	return w.removeFile(t.Collection, r.File)
 }
 
@@ -88,6 +90,7 @@ func (w *Workspace) DuplicateFlow(t FlowTarget, path string) (FlowTarget, error)
 	if err := w.writeAndReload(t.Collection, file, data, SaveOptions{}); err != nil {
 		return FlowTarget{}, err
 	}
+	w.noteOrigin(t.Collection, activityFlow, copied.ID, OriginDuplicated, "copy of "+f.Path)
 	return FlowTarget{Collection: t.Collection, Flow: copied.ID}, nil
 }
 
@@ -103,6 +106,7 @@ func (w *Workspace) DeleteFlow(t FlowTarget) error {
 	if err := w.removeFile(t.Collection, layoutFile(f.File)); err != nil {
 		return err
 	}
+	w.forgetActivity(t.Collection, activityFlow, f.ID)
 	return w.removeFile(t.Collection, f.File)
 }
 

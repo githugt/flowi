@@ -272,8 +272,38 @@ func (w *Workspace) ApplyImport(p ImportPlan, o ApplyOptions) error {
 			return err
 		}
 	}
-	_, err = w.Reload(Change{Root: c.Root, File: c.Root, Op: store.ChangeRescan})
-	return err
+	if _, err = w.Reload(Change{Root: c.Root, File: c.Root, Op: store.ChangeRescan}); err != nil {
+		return err
+	}
+	w.noteImported(p, changes)
+	return nil
+}
+
+// noteImported records, for each request and flow an import wrote as a new file, that it came from an import. One
+// that already has activity (an overwrite) keeps it.
+func (w *Workspace) noteImported(p ImportPlan, changes []store.FileChange) {
+	fresh := map[string]bool{}
+	for _, ch := range changes {
+		if ch.Old == nil && ch.New != nil {
+			fresh[ch.File] = true
+		}
+	}
+	w.mu.RLock()
+	c, ok := w.collection(p.Collection)
+	w.mu.RUnlock()
+	if !ok {
+		return
+	}
+	for _, r := range c.Requests {
+		if _, has := w.readActivityLocked(p.Collection, activityRequest, r.ID); fresh[r.File] && !has {
+			w.noteOrigin(p.Collection, activityRequest, r.ID, OriginImported, "")
+		}
+	}
+	for _, f := range c.Flows {
+		if _, has := w.readActivityLocked(p.Collection, activityFlow, f.ID); fresh[f.File] && !has {
+			w.noteOrigin(p.Collection, activityFlow, f.ID, OriginImported, "")
+		}
+	}
 }
 
 // splitRemovals separates files to write from files to remove (New nil).

@@ -165,6 +165,7 @@ func (w *Workspace) NewFlow(collection model.ID, path string) (FlowTarget, error
 	if err := w.writeAndReload(collection, file, data, SaveOptions{}); err != nil {
 		return FlowTarget{}, err
 	}
+	w.noteOrigin(collection, activityFlow, f.ID, OriginCreated, "")
 	return FlowTarget{Collection: collection, Flow: f.ID}, nil
 }
 

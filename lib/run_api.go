@@ -154,6 +154,7 @@ func (w *Workspace) RunFlow(ctx context.Context, t FlowTarget, o RunOptions) (*e
 		// A vault of its own, without a file: the secrets the options give win, and nothing else is read.
 		deps.Vault = vault.New(vault.Options{WorkspaceID: w.Model().ID, Environ: environ})
 	}
+	deps.OnRun = w.onRun(t, f.File)
 	return engine.StartRun(ctx, deps, in), nil
 }
 

@@ -181,6 +181,7 @@ func (w *Workspace) NewFlowFromBlueprint(t BlueprintTarget, collection model.ID,
 	if err := w.writeAndReload(collection, file, data, SaveOptions{}); err != nil {
 		return FlowTarget{}, err
 	}
+	w.noteOrigin(collection, activityFlow, f.ID, OriginCreated, "from the blueprint "+bp.Name)
 	return FlowTarget{Collection: collection, Flow: f.ID}, nil
 }
 

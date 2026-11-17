@@ -56,6 +56,7 @@ type Backend struct {
 	SecretList        []flowi.SecretInfo
 	SaveErr           error
 	ForwardTargetList []flowi.ForwardTarget
+	ActivityResult    flowi.Activity // what RequestActivity and FlowActivity return
 	NextSend          *Sending
 	// SendFor, when set, answers each Send from its options (a request matrix needs a different outcome per cell).
 	SendFor     func(flowi.SendOptions) (*Sending, error)
@@ -1400,6 +1401,20 @@ func (f *Backend) Announcements(context.Context, bool) (announce.Result, error) 
 	f.Mu.Lock()
 	defer f.Mu.Unlock()
 	return f.News, f.NewsErr
+}
+
+// RequestActivity returns ActivityResult.
+func (f *Backend) RequestActivity(_ flowi.RequestTarget) (flowi.Activity, error) {
+	f.Mu.Lock()
+	defer f.Mu.Unlock()
+	return f.ActivityResult, nil
+}
+
+// FlowActivity returns ActivityResult.
+func (f *Backend) FlowActivity(_ flowi.FlowTarget) (flowi.Activity, error) {
+	f.Mu.Lock()
+	defer f.Mu.Unlock()
+	return f.ActivityResult, nil
 }
 
 // ForwardTargets returns the targets the test set up (ForwardTargetList).

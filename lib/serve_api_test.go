@@ -582,6 +582,15 @@ func TestServe_Record_Given_a_folder_Then_new_requests_are_saved_there(t *testin
 	if len(files) != 1 {
 		t.Fatalf("requests in the folder: %v", files)
 	}
+	var recorded []Activity
+	for _, r := range w.Collections()[0].Requests {
+		if a, _ := w.RequestActivity(RequestTarget{Collection: w.Collections()[0].Manifest.ID, Request: r.ID}); a.Origin == OriginRecorded {
+			recorded = append(recorded, a)
+		}
+	}
+	if len(recorded) != 1 || recorded[0].OriginDetail != "replayer: GET /v1/widgets/3" {
+		t.Fatalf("recorded activity %+v", recorded)
+	}
 }
 
 func TestRecordFolder_Then_it_is_a_path_of_plain_names(t *testing.T) {

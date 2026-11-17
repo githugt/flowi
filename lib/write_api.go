@@ -196,6 +196,7 @@ func (w *Workspace) newRequestWith(collection model.ID, path string, version mod
 	if err := w.writeAndReload(collection, file, data, SaveOptions{}); err != nil {
 		return RequestTarget{}, err
 	}
+	w.noteOrigin(collection, activityRequest, r.ID, OriginCreated, "")
 	return RequestTarget{Collection: collection, Request: r.ID}, nil
 }
 
