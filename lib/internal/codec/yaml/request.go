@@ -182,7 +182,7 @@ func (m *mapping) dataFile() *model.DataFile {
 	if !ok {
 		return nil
 	}
-	f := &model.DataFile{Format: fm.str("format"), Path: fm.str("path"), Query: fm.str("query"), Limit: int(fm.integer("limit"))}
+	f := &model.DataFile{Format: fm.str("format"), Path: fm.str("path"), Query: fm.str("query"), Limit: int(fm.integer("limit")), Writes: fm.boolean("writes")}
 	if e, ok := fm.take("params"); ok {
 		f.Params = fm.d.lenientStrings(e)
 	}
@@ -536,6 +536,9 @@ func encodeDataFile(f *model.DataFile) yaml.MapSlice {
 	o.put("params", stringsToYAML(f.Params))
 	if f.Limit != 0 {
 		o.put("limit", f.Limit)
+	}
+	if f.Writes {
+		o.put("writes", true)
 	}
 	return presentMap(o.items)
 }

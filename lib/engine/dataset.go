@@ -122,7 +122,7 @@ func (x *execution) failDataset(err error) {
 	case errors.Is(err, dataset.ErrTimeout):
 		x.fail(StatusError, diag.List{diag.New(diag.CodeDatasetTimeout, diag.Location{}, map[string]string{"timeout": timeoutOf(err)})})
 	case isRequestMistake(err):
-		x.fail(StatusError, diag.List{diag.New(diag.CodeDatasetRequest, diag.Location{}, map[string]string{"detail": x.r.secrets.String(err.Error() + writeHint(err))})})
+		x.fail(StatusError, diag.List{diag.New(diag.CodeDatasetRequest, diag.Location{}, map[string]string{"detail": x.r.secrets.String(err.Error() + writeHint(err, x.cfg.datasetReadOnly))})})
 	default:
 		x.fail(StatusError, diag.List{diag.New(diag.CodeDatasetQuery, diag.Location{}, map[string]string{"detail": x.r.secrets.String(driverHint(explainArguments(err.Error())))})})
 	}
@@ -182,9 +182,12 @@ func driverHint(detail string) string {
 }
 
 // writeHint tells where to allow a statement that writes, for the errors that say the query is not read-only.
-func writeHint(err error) string {
+func writeHint(err error, readOnly bool) string {
 	if !errors.Is(err, readonly.ErrNotReadOnly) {
 		return ""
+	}
+	if readOnly {
+		return ". The setting datasets.read_only is on: no dataset query may change data until it is turned off"
 	}
 	return ". To run statements that change data, turn on 'Allow this query to change data' on the request, or the setting datasets.allow_writes for all (Settings > Requests); both are off by default"
 }
@@ -221,8 +224,9 @@ func (x *execution) renderDataset(lenient bool) (builtDataset, diag.List) {
 		secret: x.r.secrets.derived, verbatim: lenient,
 	})
 	b.query.Timeout = x.cfg.timeout
-	// A file query never writes: its files are only read, whatever datasets.allow_writes says.
-	b.query.AllowWrites = x.version.File == nil && (x.cfg.datasetWrites || (x.version.Dataset != nil && x.version.Dataset.Writes))
+	d := x.version.SQL()
+	// datasets.read_only wins over everything that allows a write.
+	b.query.AllowWrites = !x.cfg.datasetReadOnly && (x.cfg.datasetWrites || (d != nil && d.Writes))
 	return b, diags
 }
 

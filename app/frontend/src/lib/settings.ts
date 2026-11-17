@@ -50,6 +50,7 @@ const LABELS: Record<string, string> = {
   'ui.suggestions_max': 'Suggestions shown while typing',
   'ui.snippet_exclude_secrets': 'Leave secrets out of code snippets',
   'datasets.allow_writes': 'Allow SQL that changes data',
+  'datasets.read_only': 'Never allow SQL that changes data',
   'auth.default': 'Authentication used by default',
   telemetry: 'Usage reporting',
   telemetry_endpoint: 'Usage reporting address',

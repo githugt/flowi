@@ -297,16 +297,34 @@ func TestSend_File_should_run_the_query_over_the_file_as_a_dataset_record(t *tes
 	}
 }
 
-func TestSend_File_Given_datasets_allow_writes_Then_a_file_query_still_may_not_write(t *testing.T) {
+func allowsWrites(t *testing.T, v model.RequestVersion, set model.Settings) bool {
+	t.Helper()
 	runner := &scriptedDataset{res: twoCustomers()}
 	f := newFixture(t)
 	f.dataset = runner
-	f.update(func(c *model.Collection) { c.Manifest.Settings = model.Settings{"datasets.allow_writes": true} })
-	r := f.addRequest("sales/list", fileVersion(model.DataFile{}))
-
+	f.update(func(c *model.Collection) { c.Manifest.Settings = set })
+	r := f.addRequest("sales/list", v)
 	f.send(f.input(r))
+	return runner.got.AllowWrites
+}
 
-	if runner.got.AllowWrites {
-		t.Fatal("a file query was allowed to write")
+func TestSend_File_Then_a_write_needs_writes_on_the_request(t *testing.T) {
+	if allowsWrites(t, fileVersion(model.DataFile{}), model.Settings{}) {
+		t.Fatal("a file query may write by default")
+	}
+	if !allowsWrites(t, fileVersion(model.DataFile{Writes: true}), model.Settings{}) {
+		t.Fatal("writes: true on the request did not allow it")
+	}
+}
+
+func TestSend_Given_datasets_read_only_Then_no_dataset_or_file_query_may_write(t *testing.T) {
+	readOnly := model.Settings{"datasets.read_only": true, "datasets.allow_writes": true}
+	for name, v := range map[string]model.RequestVersion{
+		"file":     fileVersion(model.DataFile{Writes: true}),
+		"database": datasetVersion(model.Dataset{Writes: true}),
+	} {
+		if allowsWrites(t, v, readOnly) {
+			t.Errorf("%s: a query wrote though datasets.read_only is on", name)
+		}
 	}
 }

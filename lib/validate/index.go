@@ -17,6 +17,8 @@ type index struct {
 	flows       map[entityKey]model.Flow
 	// allowWrites is Target.AllowDatasetWrites.
 	allowWrites bool
+	// readOnly is Target.DatasetReadOnly.
+	readOnly bool
 }
 
 func buildIndex(cs []model.Collection) *index {

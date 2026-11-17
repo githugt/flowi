@@ -283,7 +283,7 @@
         "file": {
           "type": "object",
           "additionalProperties": false,
-          "description": "A SQL query over data files (CSV, Excel, Parquet) instead of an HTTP call. The files are only read.",
+          "description": "A SQL query over data files (CSV, Excel, Parquet) instead of an HTTP call. Read-only unless writes is on.",
           "properties": {
             "format": {
               "enum": [
@@ -313,6 +313,10 @@
             "limit": {
               "type": "integer",
               "minimum": 0
+            },
+            "writes": {
+              "type": "boolean",
+              "description": "Let this query change the data: the changed tables are written back to the file. Off by default."
             }
           }
         }

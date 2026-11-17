@@ -53,8 +53,7 @@ func DatasetDrivers() []string {
 func DataFileFormats() []string { return []string{FormatCSV, FormatXLSX, FormatParquet} }
 
 // DataFile is what a data file request version does: it runs one read-only query over a file, or a folder of files,
-// of the collection and keeps the rows it returns. It has no server, no login and nothing to change: the files are
-// only read. A database is a Dataset.
+// of the collection and keeps the rows it returns. It has no server and no login; a database is a Dataset.
 type DataFile struct {
 	// Format is csv, xlsx or parquet.
 	Format string
@@ -67,16 +66,20 @@ type DataFile struct {
 	Params []string
 	// Limit is the most rows kept; 0 means DefaultDatasetLimit.
 	Limit int
+	// Writes lets this query change the data: a statement that does is run on the loaded copy and the changed tables
+	// are written back to the file. Off is the default; the setting datasets.allow_writes does the same for every
+	// query, and datasets.read_only forbids it for every query.
+	Writes bool
 }
 
 // AsDataset is the query as the SQL runner takes it: the format is the driver and the path is the server.
 func (f DataFile) AsDataset() Dataset {
-	return Dataset{Driver: f.Format, Server: f.Path, Query: f.Query, Params: f.Params, Limit: f.Limit}
+	return Dataset{Driver: f.Format, Server: f.Path, Query: f.Query, Params: f.Params, Limit: f.Limit, Writes: f.Writes}
 }
 
 // DataFileOf is the data file a SQL query of a file format stands for.
 func DataFileOf(d Dataset) DataFile {
-	return DataFile{Format: d.Driver, Path: d.Server, Query: d.Query, Params: d.Params, Limit: d.Limit}
+	return DataFile{Format: d.Driver, Path: d.Server, Query: d.Query, Params: d.Params, Limit: d.Limit, Writes: d.Writes}
 }
 
 // IsDataFormat reports whether driver names a data file format.

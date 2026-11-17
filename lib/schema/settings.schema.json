@@ -535,6 +535,10 @@
         "allow_writes": {
           "type": "boolean",
           "default": false
+        },
+        "read_only": {
+          "type": "boolean",
+          "default": false
         }
       }
     },

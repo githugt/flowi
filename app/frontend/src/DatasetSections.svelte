@@ -36,12 +36,14 @@
     oninput={(t) => put((b) => (b.Query = t))}
     empty={{ icon: 'body', title: 'No query', hint: 'Click to write the query: one SELECT, WITH, VALUES, SHOW, EXPLAIN or DESCRIBE.' }}
   />
-  {#if block.Writes && !isFile}
-    <p class="writes" role="alert">⚠ This query may change data. The read-only guards are off for it: connect as a user that can only do what you mean it to.</p>
+  {#if block.Writes}
+    <p class="writes" role="alert">{isFile
+      ? '⚠ This query may change the files: the tables it changes are written back (a CSV or Parquet file is rewritten, an Excel workbook has its changed cells updated). Keep a copy of data you cannot recreate.'
+      : '⚠ This query may change data. The read-only guards are off for it: connect as a user that can only do what you mean it to.'}</p>
   {/if}
-  {#if !isFile}<label class="limit"><input type="checkbox" checked={!!block.Writes} onchange={(e) => put((b) => (b.Writes = e.currentTarget.checked))} /> Allow this query to change data (INSERT, UPDATE, DELETE …)</label>{/if}
+  <label class="limit"><input type="checkbox" checked={!!block.Writes} onchange={(e) => put((b) => (b.Writes = e.currentTarget.checked))} /> Allow this query to change {isFile ? 'the files' : 'data'} (INSERT, UPDATE, DELETE …)</label>
   <p class="muted note">
-    {isFile ? 'The files are only read: a copy is loaded for the query, and the files themselves are never changed.' : block.Writes ? 'Writes are allowed for this request.' : 'Read-only: the query is sent in a read-only transaction, and a statement that changes data is refused.'} Put values in <strong>Values</strong> and write
+    {isFile ? (block.Writes ? 'Writes are allowed for this request: the changed tables are written back to their files.' : 'Read-only: a statement that changes data is refused, and the files are never changed.') : block.Writes ? 'Writes are allowed for this request.' : 'Read-only: the query is sent in a read-only transaction, and a statement that changes data is refused.'} Put values in <strong>Values</strong> and write
     them as <code>{placeholder}</code>: they travel apart from the statement, so a value can never change what it means.
     {#if !isFile}For the strongest guarantee, connect as a database user that can only read.{/if}
   </p>

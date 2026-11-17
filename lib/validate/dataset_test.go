@@ -80,6 +80,7 @@ func TestFile_should_report_what_is_wrong_with_a_file_version(t *testing.T) {
 		{name: "database_is_not_a_format", v: with(func(f *model.DataFile) { f.Format = "postgres" }), want: diag.CodeDatasetRequest, path: "$.versions.1.file.format"},
 		{name: "no_path", v: with(func(f *model.DataFile) { f.Path = "" }), want: diag.CodeDatasetRequest, path: "$.versions.1.file.path"},
 		{name: "writing_query", v: with(func(f *model.DataFile) { f.Query = "DELETE FROM sales" }), want: diag.CodeDatasetRequest, path: "$.versions.1.file.query"},
+		{name: "writing_query_with_writes_on", v: with(func(f *model.DataFile) { f.Query, f.Writes = "DELETE FROM sales", true })},
 		{name: "negative_limit", v: with(func(f *model.DataFile) { f.Limit = -1 }), want: diag.CodeDatasetRequest, path: "$.versions.1.file.limit"},
 		{name: "bad_template_in_a_param", v: with(func(f *model.DataFile) { f.Params = []string{"{{"} }), want: diag.CodeTemplateSyntax, path: "$.versions.1.file.params[0]"},
 		{name: "also_a_database", v: func() model.RequestVersion {
@@ -123,5 +124,21 @@ func TestDataset_Given_a_data_file_driver_Then_it_is_refused_because_files_are_a
 
 	if d := only(t, got, diag.CodeDatasetRequest); d.Path != "$.versions.1.dataset.driver" {
 		t.Fatalf("path %q", d.Path)
+	}
+}
+
+func TestDataset_Given_read_only_Then_a_writing_query_is_a_problem_even_with_writes_on(t *testing.T) {
+	for name, v := range map[string]model.RequestVersion{
+		"database": {Label: "1", Dataset: &model.Dataset{Driver: "sqlite", Server: "a.db", Query: "DELETE FROM t", Writes: true}},
+		"file":     {Label: "1", File: &model.DataFile{Format: "csv", Path: "a.csv", Query: "DELETE FROM t", Writes: true}},
+	} {
+		f := newFixture(t)
+		c := f.collection("c")
+		c.Requests = append(c.Requests, model.Request{Meta: model.Meta{ID: "01J9ZA3M4N5P6Q7R8S9T0VAAAA", Name: "r"}, Path: "r", File: "r.req.yaml", Versions: []model.RequestVersion{v}})
+
+		got := Validate(Target{Collections: []model.Collection{c}, DatasetReadOnly: true, AllowDatasetWrites: true})
+
+		only(t, got, diag.CodeDatasetRequest)
+		_ = name
 	}
 }

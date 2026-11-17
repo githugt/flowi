@@ -3,6 +3,7 @@
 package dataset
 
 import (
+	"context"
 	"database/sql"
 	"encoding/csv"
 	"encoding/json"
@@ -20,28 +21,46 @@ import (
 )
 
 // fileSource answers SQL over data files. The server is one file or a folder (one table for each file of the driver's
-// kind in it). The files are loaded into a private in-memory SQLite database for the one query, so they are never
-// changed and nothing is kept. A column whose every value is a whole number or a number is stored as one, otherwise
-// as text; an empty cell is NULL.
-func fileSource(ext string, read func(path string) ([]table, error)) Source {
-	return sqlSource{open: func(q Query) (*sql.DB, error) { return openFiles(q, ext, read) }}
+// kind in it). The files are loaded into a private in-memory SQLite database for the one query. A read-only query
+// changes nothing and keeps nothing. A query that may write runs on that copy, and then the tables it changed are
+// written back to their files (see writeBack). A column whose every value is a whole number or a number is stored as
+// one, otherwise as text; an empty cell is NULL.
+func fileSource(ext string, read func(path string) ([]table, error), write func(path string, changes []tableChange) error) Source {
+	return fileSrc{ext: ext, read: read, write: write}
 }
 
-func csvSource() Source     { return fileSource(".csv", readCSV) }
-func xlsxSource() Source    { return fileSource(".xlsx", readXLSX) }
-func parquetSource() Source { return fileSource(".parquet", readParquet) }
+func csvSource() Source     { return fileSource(".csv", readCSV, writeCSV) }
+func xlsxSource() Source    { return fileSource(".xlsx", readXLSX, writeXLSX) }
+func parquetSource() Source { return fileSource(".parquet", readParquet, writeParquet) }
+
+// fileSrc is the Source of one kind of data file.
+type fileSrc struct {
+	ext   string
+	read  func(path string) ([]table, error)
+	write func(path string, changes []tableChange) error
+}
+
+func (s fileSrc) Query(ctx context.Context, q Query) (Result, error) {
+	var files []loadedFile
+	inner := sqlSource{
+		open:  func(q Query) (*sql.DB, error) { return openFiles(q, s.ext, s.read, &files) },
+		after: func(db *sql.DB) error { return writeBack(db, files, s.write) },
+	}
+	return inner.Query(ctx, q)
+}
 
 // table is one table to load: the first row of a CSV file or sheet names its columns.
 type table struct {
-	name string
-	cols []string
-	rows [][]any // strings (typed by what they look like) or Go numbers, bools and times from typed formats
+	name  string
+	sheet string // the sheet an Excel table came from
+	cols  []string
+	rows  [][]any // strings (typed by what they look like) or Go numbers, bools and times from typed formats
 }
 
 // maxFileBytes is the most a query loads: a larger file is a job for a database.
 const maxFileBytes = 256 << 20
 
-func openFiles(q Query, ext string, read func(string) ([]table, error)) (*sql.DB, error) {
+func openFiles(q Query, ext string, read func(string) ([]table, error), loaded *[]loadedFile) (*sql.DB, error) {
 	files, err := dataFiles(q, ext)
 	if err != nil {
 		return nil, err
@@ -61,12 +80,16 @@ func openFiles(q Query, ext string, read func(string) ([]table, error)) (*sql.DB
 			_ = db.Close()
 			return nil, err
 		}
+		lf := loadedFile{path: file}
 		for _, t := range tables {
-			if err := loadTable(db, t, filepath.Base(file)); err != nil {
+			lt, err := loadTable(db, t, filepath.Base(file))
+			if err != nil {
 				_ = db.Close()
 				return nil, err
 			}
+			lf.tables = append(lf.tables, lt)
 		}
+		*loaded = append(*loaded, lf)
 	}
 	return db, nil
 }
@@ -172,6 +195,7 @@ func readXLSX(file string) ([]table, error) {
 		if err != nil {
 			return nil, err
 		}
+		t.sheet = sheet
 		out = append(out, t)
 	}
 	if len(out) == 0 {
@@ -234,7 +258,7 @@ func scalar(v any) any {
 	return fmt.Sprint(v)
 }
 
-func loadTable(db *sql.DB, t table, file string) error {
+func loadTable(db *sql.DB, t table, file string) (loadedTable, error) {
 	cols := make([]string, len(t.cols))
 	for i, n := range t.cols {
 		cols[i] = strings.TrimSpace(n)
@@ -257,17 +281,17 @@ func loadTable(db *sql.DB, t table, file string) error {
 	}
 	ddl.WriteString(")")
 	if _, err := db.Exec(ddl.String()); err != nil {
-		return fmt.Errorf("making the table %q of %s: %w", t.name, file, err)
+		return loadedTable{}, fmt.Errorf("making the table %q of %s: %w", t.name, file, err)
 	}
 	tx, err := db.Begin()
 	if err != nil {
-		return fmt.Errorf("loading %s: %w", file, err)
+		return loadedTable{}, fmt.Errorf("loading %s: %w", file, err)
 	}
 	marks := strings.TrimSuffix(strings.Repeat("?,", len(cols)), ",")
 	stmt, err := tx.Prepare("INSERT INTO " + quoteIdent(t.name) + " VALUES (" + marks + ")")
 	if err != nil {
 		_ = tx.Rollback()
-		return fmt.Errorf("loading %s: %w", file, err)
+		return loadedTable{}, fmt.Errorf("loading %s: %w", file, err)
 	}
 	defer func() { _ = stmt.Close() }()
 	for _, row := range t.rows {
@@ -277,10 +301,13 @@ func loadTable(db *sql.DB, t table, file string) error {
 		}
 		if _, err := stmt.Exec(args...); err != nil {
 			_ = tx.Rollback()
-			return fmt.Errorf("loading %s: %w", file, err)
+			return loadedTable{}, fmt.Errorf("loading %s: %w", file, err)
 		}
 	}
-	return tx.Commit()
+	if err := tx.Commit(); err != nil {
+		return loadedTable{}, fmt.Errorf("loading %s: %w", file, err)
+	}
+	return loadedTable{table: t, cols: cols, kinds: kinds}, nil
 }
 
 // isEmpty is a cell that holds nothing: nil or blank text.

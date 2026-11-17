@@ -220,6 +220,8 @@ func Schema() []Key {
 			Description: "The named authentication (auths/<name>.auth.yaml) every request uses unless it sets its own auth. Set it in the collection's settings for the whole collection, or in a folder's for the requests under it; empty uses none."},
 		{Name: "datasets.allow_writes", Kind: KindBool, Default: false, FileLayers: personal,
 			Description: "Let dataset (SQL) requests run statements that change data (INSERT, UPDATE, DELETE, DDL). Off keeps every query read-only; a collection file cannot turn this on."},
+		{Name: "datasets.read_only", Kind: KindBool, Default: false, FileLayers: all,
+			Description: "Enforce read-only for every dataset (database and data file) request: no query may change data, whatever the request or datasets.allow_writes says. A collection or folder file may turn this on to protect what its requests touch."},
 		{Name: "logging.level", Kind: KindEnum, Default: "info", Enum: []string{"debug", "info", "warn", "error"}, FileLayers: personal,
 			Description: "Minimum log level."},
 		{Name: "logging.format", Kind: KindEnum, Default: "text", Enum: []string{"text", "json"}, FileLayers: personal,

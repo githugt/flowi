@@ -20,10 +20,10 @@ func checkDataset(ix *index) diag.List {
 			for _, v := range r.Versions {
 				base := yamlpath.Key(yamlpath.Key("$", "versions"), v.Label)
 				if v.Dataset != nil {
-					out = append(out, datasetDiags(r.File, yamlpath.Key(base, "dataset"), v, ix.allowWrites)...)
+					out = append(out, datasetDiags(r.File, yamlpath.Key(base, "dataset"), v, ix.allowWrites, ix.readOnly)...)
 				}
 				if v.File != nil {
-					out = append(out, fileDiags(r.File, yamlpath.Key(base, "file"), v)...)
+					out = append(out, fileDiags(r.File, yamlpath.Key(base, "file"), v, ix.allowWrites, ix.readOnly)...)
 				}
 			}
 		}
@@ -32,7 +32,7 @@ func checkDataset(ix *index) diag.List {
 }
 
 // datasetDiags checks one dataset block. path is the path of the block itself.
-func datasetDiags(file, path string, v model.RequestVersion, allowWrites bool) diag.List {
+func datasetDiags(file, path string, v model.RequestVersion, allowWrites, readOnly bool) diag.List {
 	var out diag.List
 	problem := func(p, detail string) {
 		out = append(out, diag.New(diag.CodeDatasetRequest, diag.Location{File: file, Path: p}, map[string]string{"detail": detail}))
@@ -47,7 +47,7 @@ func datasetDiags(file, path string, v model.RequestVersion, allowWrites bool) d
 	if strings.TrimSpace(d.Server) == "" {
 		problem(yamlpath.Key(path, "server"), "the server is empty: give a connection URL, or for sqlite the path of the file")
 	}
-	if detail := queryProblem(d.Query, allowWrites || d.Writes); detail != "" {
+	if detail := queryProblem(d.Query, (allowWrites || d.Writes) && !readOnly); detail != "" {
 		problem(yamlpath.Key(path, "query"), detail)
 	}
 	if d.Limit < 0 {
@@ -56,8 +56,8 @@ func datasetDiags(file, path string, v model.RequestVersion, allowWrites bool) d
 	return out
 }
 
-// fileDiags checks one file block. path is the path of the block itself. The files are only read, so no query may write.
-func fileDiags(file, path string, v model.RequestVersion) diag.List {
+// fileDiags checks one file block. path is the path of the block itself.
+func fileDiags(file, path string, v model.RequestVersion, allowWrites, readOnly bool) diag.List {
 	var out diag.List
 	problem := func(p, detail string) {
 		out = append(out, diag.New(diag.CodeDatasetRequest, diag.Location{File: file, Path: p}, map[string]string{"detail": detail}))
@@ -72,7 +72,7 @@ func fileDiags(file, path string, v model.RequestVersion) diag.List {
 	if strings.TrimSpace(f.Path) == "" {
 		problem(yamlpath.Key(path, "path"), "the path is empty: give a file or a folder of the collection")
 	}
-	if detail := queryProblem(f.Query, false); detail != "" {
+	if detail := queryProblem(f.Query, (allowWrites || f.Writes) && !readOnly); detail != "" {
 		problem(yamlpath.Key(path, "query"), detail)
 	}
 	if f.Limit < 0 {

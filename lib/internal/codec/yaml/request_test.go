@@ -588,10 +588,10 @@ func TestDataset_Given_writes_true_Then_it_is_written_and_left_out_when_false(t 
 	}
 }
 
-func TestFile_Given_a_file_version_Then_it_round_trips_as_its_own_block_with_no_driver_or_writes(t *testing.T) {
+func TestFile_Given_a_file_version_Then_it_round_trips_as_its_own_block_with_writes(t *testing.T) {
 	c := newCodec()
 	r := model.Request{Meta: model.Meta{ID: "01J9ZA3M4N5P6Q7R8S9T0VAAAA", Name: "r"}, Path: "r", File: "r.req.yaml",
-		Versions: []model.RequestVersion{{Label: "1", File: &model.DataFile{Format: "parquet", Path: "data", Query: "SELECT * FROM t WHERE a = ?", Params: []string{"{{x}}"}, Limit: 3}}}}
+		Versions: []model.RequestVersion{{Label: "1", File: &model.DataFile{Format: "parquet", Path: "data", Query: "SELECT * FROM t WHERE a = ?", Params: []string{"{{x}}"}, Limit: 3, Writes: true}}}}
 
 	out, err := c.EncodeRequest(r)
 	if err != nil {
@@ -604,7 +604,7 @@ func TestFile_Given_a_file_version_Then_it_round_trips_as_its_own_block_with_no_
 	if f == nil || back.Versions[0].Dataset != nil || f.Format != "parquet" || f.Path != "data" || f.Limit != 3 || len(f.Params) != 1 {
 		t.Fatalf("file %+v, output:\n%s", f, out)
 	}
-	if !strings.Contains(string(out), "file:") || strings.Contains(string(out), "dataset:") || strings.Contains(string(out), "writes") {
+	if !strings.Contains(string(out), "file:") || strings.Contains(string(out), "dataset:") || !strings.Contains(string(out), "writes: true") || !f.Writes {
 		t.Fatalf("output:\n%s", out)
 	}
 }

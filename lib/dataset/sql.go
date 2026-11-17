@@ -19,6 +19,8 @@ type sqlSource struct {
 	open func(q Query) (*sql.DB, error)
 	// readOnly asks the store for a read-only transaction. SQLite has none and is opened read-only instead.
 	readOnly bool
+	// after runs once a query that may write has committed, on the same pool: a file source writes the changes back.
+	after func(db *sql.DB) error
 }
 
 func (s sqlSource) Query(ctx context.Context, q Query) (Result, error) {
@@ -52,6 +54,11 @@ func (s sqlSource) Query(ctx context.Context, q Query) (Result, error) {
 	}
 	if err := tx.Commit(); err != nil {
 		return res, fmt.Errorf("committing the changes: %w", redactServer(err, q.Server))
+	}
+	if s.after != nil {
+		if err := s.after(db); err != nil {
+			return res, err
+		}
 	}
 	return res, nil
 }

@@ -259,6 +259,6 @@ func (w *Workspace) CheckFlowDraft(t FlowTarget, f model.Flow) diag.List {
 	}
 	w.mu.RLock()
 	defer w.mu.RUnlock()
-	all := validate.Validate(validate.Target{Collections: withCollection(w.collections, c), AllowDatasetWrites: w.allowDatasetWrites()})
+	all := validate.Validate(validate.Target{Collections: withCollection(w.collections, c), AllowDatasetWrites: w.allowDatasetWrites(), DatasetReadOnly: w.datasetReadOnly()})
 	return w.positioned(slices.DeleteFunc(all, func(d diag.Diagnostic) bool { return d.File != f.File }))
 }
