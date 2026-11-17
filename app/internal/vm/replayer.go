@@ -37,15 +37,22 @@ type ReplayerForm struct {
 	Latency  string // a duration such as 250ms; blank uses the serve.latency setting
 	Sequence bool
 	CORS     bool
-	Record   string // an upstream base URL: forward calls to it and save its responses; blank replays
-	// RecordTo is the collection (name or id) that calls matching no saved
-	// request are saved in as new requests; blank is the Scratch draft.
+	// Forward is what happens to a call no saved response can answer: "" answers it as not found, "pass" sends it to
+	// a real API and relays the answer, "save" also saves the answer so the next such call is replayed.
+	Forward string
+	// ForwardTo is one API (base URL) that takes every forwarded call; blank sends a call to the API of the saved
+	// request it matches.
+	ForwardTo string
+	// ForwardOnly is, without ForwardTo, the APIs (base URLs, comma separated) a call may be forwarded to; blank
+	// allows the API of any saved request.
+	ForwardOnly string
+	// Env is the environment the saved requests' base URLs are worked out in (the selected one).
+	Env string
+	// RecordTo is the collection (name or id) that a forwarded call matching no saved request is saved in as a
+	// new request (with Forward "save" and ForwardTo); blank is the Scratch draft.
 	RecordTo string
-	// RecordHAR is a file the recorded calls are also written to, in order (needs Record).
+	// RecordHAR is a file the forwarded calls are also written to, in order (needs Forward).
 	RecordHAR string
-	// PassThrough is an upstream base URL for calls no saved response answers: they are forwarded there and
-	// nothing is saved. Blank answers them with a 404.
-	PassThrough string
 	// Faults make a share of the replayed calls fail on purpose. Percent fields are 0 to 100; blank is none.
 	FaultErrorPercent string
 	FaultStatus       string // the status of an injected error; blank is 503
@@ -148,8 +155,7 @@ func (r *Replayer) Start(form ReplayerForm) {
 		r.changed()
 		return
 	}
-	form.Record = strings.TrimSpace(form.Record)
-	if err := checkUpstream(form); err != nil {
+	if err := checkForward(form); err != nil {
 		r.err = err.Error()
 		r.changed()
 		return
@@ -175,8 +181,9 @@ func (r *Replayer) Start(form ReplayerForm) {
 		if latency > 0 || strings.TrimSpace(form.Latency) != "" {
 			o.Latency = latency
 		}
-		o.Sequence, o.CORS, o.Record, o.RecordTo, o.NoTriggers, o.NoSchedules = form.Sequence, form.CORS, form.Record, form.RecordTo, true, true
-		o.RecordHAR, o.Faults, o.PassThrough = strings.TrimSpace(form.RecordHAR), faults, strings.TrimSpace(form.PassThrough)
+		o.Sequence, o.CORS, o.RecordTo, o.NoTriggers, o.NoSchedules = form.Sequence, form.CORS, form.RecordTo, true, true
+		o.RecordHAR, o.Faults = strings.TrimSpace(form.RecordHAR), faults
+		o.Forward, o.ForwardTo, o.ForwardOnly, o.ForwardEnv = form.Forward, strings.TrimSpace(form.ForwardTo), splitList(form.ForwardOnly), form.Env
 		o.CaptureCalls = true // the screen opens a call to show what it carried
 		srv, err := r.b.Serve(ctx, o)
 		return started{srv, err}
@@ -191,36 +198,51 @@ func (r *Replayer) Start(form ReplayerForm) {
 	})
 }
 
-// checkUpstream refuses a record upstream that is not an http(s) address, and
-// CORS together with recording: any web page could then read the real API
-// through the user's network position (the library refuses it too; saying so
-// before starting gives a plainer message).
-func checkUpstream(form ReplayerForm) error {
-	if form.Record == "" && strings.TrimSpace(form.RecordHAR) != "" {
-		return errors.New("a HAR file needs an address to record from: there is nothing to put in it")
-	}
-	if p := strings.TrimSpace(form.PassThrough); p != "" {
-		if form.Record != "" {
-			return errors.New("record and pass-through both forward calls: fill in one")
+// checkForward refuses what forwarding cannot do, with a plainer message than the library's.
+func checkForward(form ReplayerForm) error {
+	har := strings.TrimSpace(form.RecordHAR) != ""
+	switch form.Forward {
+	case "":
+		if har {
+			return errors.New("a HAR file needs forwarding: choose pass through or pass through and save, then there are calls to put in it")
 		}
-		if u, err := url.Parse(p); err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
-			return fmt.Errorf("the address to pass calls to must start with http:// or https://, not %q", p)
+		if strings.TrimSpace(form.ForwardTo) != "" || strings.TrimSpace(form.ForwardOnly) != "" {
+			return errors.New("an API to forward to is filled in, but forwarding is off: choose pass through or pass through and save")
 		}
-		if form.CORS {
-			return errors.New("allowing browsers (CORS) together with passing calls through would let any web page read the real API")
-		}
-	}
-	if form.Record == "" {
 		return nil
-	}
-	u, err := url.Parse(form.Record)
-	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
-		return fmt.Errorf("the address to record from must start with http:// or https://, not %q", form.Record)
+	case "pass", "save":
+	default:
+		return fmt.Errorf("forwarding is pass or save, not %q", form.Forward)
 	}
 	if form.CORS {
-		return errors.New("recording cannot be combined with Allow browsers (CORS): any web page could read the real API through your network")
+		return errors.New("allowing browsers (CORS) together with forwarding would let any web page read the real API through your network")
+	}
+	check := func(label, raw string) error {
+		if u, err := url.Parse(raw); err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
+			return fmt.Errorf("%s must start with http:// or https://, not %q", label, raw)
+		}
+		return nil
+	}
+	if to := strings.TrimSpace(form.ForwardTo); to != "" {
+		return check("the API to forward everything to", to)
+	}
+	for _, only := range splitList(form.ForwardOnly) {
+		if err := check("an API to forward to", only); err != nil {
+			return err
+		}
 	}
 	return nil
+}
+
+// splitList splits a comma separated list, without blanks.
+func splitList(text string) []string {
+	var out []string
+	for _, part := range strings.Split(text, ",") {
+		if part = strings.TrimSpace(part); part != "" {
+			out = append(out, part)
+		}
+	}
+	return out
 }
 
 func parseLatency(text string) (time.Duration, error) {

@@ -27,3 +27,17 @@ func TestServeFlags_Given_fault_flags_Then_they_reach_the_serve_options(t *testi
 		t.Fatalf("faults %+v", got.Faults)
 	}
 }
+
+func TestServeFlags_Given_forward_flags_Then_they_reach_the_serve_options(t *testing.T) {
+	cmd := newServeCommand(nil)
+	if err := cmd.ParseFlags([]string{"--forward", "save", "--forward-only", "https://a.test,https://b.test/v1", "--forward-env", "staging", "--record-to", "shop"}); err != nil {
+		t.Fatal(err)
+	}
+	f := serveFlags{forward: "save", forwardOnly: []string{"https://a.test", "https://b.test/v1"}, forwardEnv: "staging", recordTo: "shop"}
+
+	got := f.options(cmd, flowi.ServeOptions{})
+
+	if got.Forward != flowi.ForwardSave || len(got.ForwardOnly) != 2 || got.ForwardOnly[1] != "https://b.test/v1" || got.ForwardEnv != "staging" || got.RecordTo != "shop" || got.ForwardTo != "" {
+		t.Fatalf("options %+v", got)
+	}
+}

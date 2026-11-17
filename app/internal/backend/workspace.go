@@ -694,6 +694,13 @@ func (b *Workspace) RunFlow(ctx context.Context, t flowi.FlowTarget, o flowi.Run
 	return r, nil
 }
 
+// ForwardTargets lists the APIs the saved requests call in environment env.
+func (b *Workspace) ForwardTargets(env string) []flowi.ForwardTarget {
+	b.guard.Check("ForwardTargets")
+	return b.ws.ForwardTargets(env)
+}
+
+// ServeDefaults returns the serve options the settings call for.
 func (b *Workspace) ServeDefaults() flowi.ServeOptions {
 	b.guard.Check("ServeDefaults")
 	return b.ws.ServeDefaults()

@@ -6,6 +6,7 @@
   import { ReplayerService } from '../bindings/github.com/githugt/flowi/app/internal/bridge'
   import { ui } from './lib/ui.svelte'
   import type { ReplayerView } from './lib/types'
+  import { forwardLabel } from './lib/replayer'
 
   // Hidden unless asked for (open) or the replayer is running: most sends never need it.
   let { path, method, open = false, onclose }: { path: string; method: string; open?: boolean; onclose?: () => void } = $props()
@@ -52,7 +53,7 @@
     <span class="muted">{method}</span>
     <input class="url" readonly value={url} aria-label="Address of the replayer for this request" onfocus={(e) => e.currentTarget.select()} />
     <button onclick={copy} title="Copy the address">Copy</button>
-    {#if running}<span class="state">● {view.form.record ? 'recording from ' + view.form.record : view.form.passThrough ? 'listening, passing unanswered calls to ' + view.form.passThrough : 'listening'}</span>{:else}<span class="muted">stopped</span>{/if}
+    {#if running}<span class="state">● {forwardLabel(view.form)}</span>{:else}<span class="muted">stopped</span>{/if}
     {#if view.error}<span class="err">{view.error}</span>{/if}
     {#if !running && !busy && onclose}<button class="close" aria-label="Hide the replay bar" onclick={onclose}>×</button>{/if}
   </div>

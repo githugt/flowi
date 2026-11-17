@@ -22,6 +22,8 @@ import (
 type serveFlags struct {
 	replayAddr, triggerAddr, record   string
 	recordTo, recordHAR, passThrough  string
+	forward, forwardTo, forwardEnv    string
+	forwardOnly                       []string
 	valkeyAddr                        string
 	latency, shutdown                 time.Duration
 	faultError, faultDrop             float64
@@ -61,7 +63,11 @@ func newServeCommand(i do.Injector) *cobra.Command {
 	fl.BoolVar(&f.cors, "cors", false, "let browsers call the replayer from any origin")
 	fl.StringVar(&f.record, "record", "", "forward calls to this real API and save its responses; a call no request matches becomes a new request")
 	fl.StringVar(&f.passThrough, "pass-through", "", "answer calls from saved responses, and forward the calls no saved response can answer to this real API (nothing is saved)")
-	fl.StringVar(&f.recordTo, "record-to", "", "with --record: the collection (name or id) new requests are saved in (default: the Scratch draft)")
+	fl.StringVar(&f.forward, "forward", "", "what to do with a call no saved response can answer: pass (send it to a real API and relay the answer) or save (also save the answer, so the next such call is replayed); calls a saved response can answer are always replayed")
+	fl.StringVar(&f.forwardTo, "forward-to", "", "with --forward: one real API (base URL) that takes every such call; without it a call goes to the API of the saved request it matches")
+	fl.StringSliceVar(&f.forwardOnly, "forward-only", nil, "with --forward and no --forward-to: forward only to these APIs (base URLs, comma separated); the default is the API of any saved request")
+	fl.StringVar(&f.forwardEnv, "forward-env", "", "with --forward: the environment the saved requests' base URLs are worked out in (default: the defaults.environment setting)")
+	fl.StringVar(&f.recordTo, "record-to", "", "with --record or --forward save: the collection (name or id) new requests are saved in (default: the Scratch draft)")
 	fl.StringVar(&f.recordHAR, "record-har", "", "with --record: also write the calls to this HAR file, in order (credentials masked); `flowi import har` turns it into a flow whose steps read the values earlier responses gave")
 	fl.BoolVar(&f.noReplay, "no-replay", false, "do not start the replayer")
 	fl.BoolVar(&f.noTriggers, "no-triggers", false, "do not start the HTTP triggers")
@@ -94,6 +100,7 @@ func (f serveFlags) options(cmd *cobra.Command, base flowi.ServeOptions) flowi.S
 	base.Faults = replay.Faults{ErrorRate: f.faultError, ErrorStatus: f.faultStatus, DropRate: f.faultDrop, Jitter: f.faultJitter}
 	base.Sequence, base.CORS, base.Record, base.RecordTo, base.RecordHAR = f.sequence, f.cors, f.record, f.recordTo, f.recordHAR
 	base.PassThrough = f.passThrough
+	base.Forward, base.ForwardTo, base.ForwardOnly, base.ForwardEnv = f.forward, f.forwardTo, f.forwardOnly, f.forwardEnv
 	base.NoReplay, base.NoTriggers, base.NoSchedules = f.noReplay, f.noTriggers, f.noSchedules
 	return base
 }

@@ -58,17 +58,16 @@ type Options struct {
 	// answers (see record.go).
 	Record *Recorder
 
-	// PassThrough, when set, forwards a call that has nothing saved to answer it (no request fits, or the one that
-	// does has no such response) to its Upstream and relays the answer, without saving anything. Calls a saved
-	// response can answer are still replayed. Only Upstream, Client, MaxBody and Now of it are used.
-	PassThrough *Recorder
+	// Forward, when set, sends a call that has nothing saved to answer it to a real API (see Forward). Calls a
+	// saved response can answer are still replayed.
+	Forward *Forward
 }
 
 // Handler is the replayer. It is safe for concurrent use.
 type Handler struct {
 	opts Options
 	rec  *Recorder // opts.Record with defaults filled in; nil when not recording
-	pass *Recorder // opts.PassThrough with defaults filled in; nil when not passing through
+	fwd  *Forward  // opts.Forward with defaults filled in; nil when not forwarding
 	idx  atomic.Pointer[index]
 
 	seqMu sync.Mutex // guards seq
@@ -94,9 +93,10 @@ func New(opts Options) *Handler {
 		rec := opts.Record.withDefaults()
 		h.rec = &rec
 	}
-	if opts.PassThrough != nil {
-		pass := opts.PassThrough.withDefaults()
-		h.pass = &pass
+	if opts.Forward != nil {
+		fwd := *opts.Forward
+		fwd.Recorder = fwd.Recorder.withDefaults()
+		h.fwd = &fwd
 	}
 	h.Refresh()
 	return h
@@ -194,9 +194,13 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		w = cw
 	}
 	decided := h.decide(r)
-	if h.pass != nil && (decided.match == MatchNone || decided.match == MatchNoResponse) {
-		h.servePassThrough(w, r, start)
-		return
+	if h.fwd != nil && (decided.match == MatchNone || decided.match == MatchNoResponse) {
+		up, why := h.fwd.upstreamFor(decided)
+		if up != nil {
+			h.serveForward(w, r, start, up)
+			return
+		}
+		decided = withReason(decided, why)
 	}
 	a, dropped := h.applyFaults(r, decided)
 	if a.wait > 0 {

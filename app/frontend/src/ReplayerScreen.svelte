@@ -8,9 +8,11 @@
   import type { ReplayerView } from './lib/types'
   import { errorText } from './lib/errors'
   import TrafficLog from './TrafficLog.svelte'
+  import { forwardPreview } from './lib/replayer'
+  import type { ForwardPreview } from './lib/types'
 
   let view = $state<ReplayerView | null>(null)
-  let form = $state({ addr: '', latency: '', sequence: false, cors: false, record: '', recordTo: '', recordHar: '', passThrough: '', faultErrorPercent: '', faultStatus: '', faultDropPercent: '', faultJitter: '' })
+  let form = $state<ReplayerView['form']>({ addr: '', latency: '', sequence: false, cors: false, forward: '', forwardTo: '', forwardOnly: '', env: '', recordTo: '', recordHar: '', faultErrorPercent: '', faultStatus: '', faultDropPercent: '', faultJitter: '' })
   let seeded = false
 
   // The form starts from the defaults Go read; after that it is the user's.
@@ -36,6 +38,18 @@
     return () => stop()
   })
 
+  // Where each API of the saved requests is, for the preview; looked up again when the saved requests may have changed.
+  let targets = $state<ForwardPreview | null>(null)
+  $effect(() => {
+    if (view && !running) ReplayerService.Preview().then((p) => (targets = p)).catch(() => (targets = null))
+  })
+  const preview = $derived(forwardPreview(form, targets, (id) => view?.targets.find((t) => t.id === id)?.label ?? ''))
+  const modes = [
+    { value: '', label: 'Replay only', hint: 'Saved responses only; calls with no saved answer are not found.' },
+    { value: 'pass', label: 'Pass through', hint: 'Calls with no saved answer go to the real API; nothing is saved.' },
+    { value: 'save', label: 'Pass through and save', hint: 'As pass through, and the answers are saved so the next call is replayed.' }
+  ] as const
+
   const running = $derived(view?.state === 'running' || view?.state === 'stopping')
 </script>
 
@@ -54,33 +68,42 @@
     <div class="grid">
       <label class="f"><span>Listen on (host:port)</span><TextInput mono bind:value={form.addr} disabled={running} /></label>
       <label class="f"><span>Latency (e.g. 250ms)</span><TextInput mono bind:value={form.latency} disabled={running} /></label>
-      <label class="f wide"><span>Record from a real API (leave empty to replay saved responses instead)</span><TextInput mono bind:value={form.record} disabled={running} placeholder="https://api.example.test" /></label>
-      {#if !form.record.trim()}
-        <label class="f wide"><span>Pass calls with no saved answer on to (optional)</span><TextInput mono bind:value={form.passThrough} disabled={running} placeholder="https://api.example.test" /></label>
-        {#if form.passThrough.trim()}
-          <p class="note wide">Calls a saved response can answer are replayed. Any other call is forwarded to the API above and its answer relayed; nothing from those calls is saved. To capture new responses instead, fill in the "Record from a real API" box.</p>
-        {:else}
-          <p class="note wide">Replay mode: calls are answered from saved responses and never reach a real API. To let calls with no saved answer reach a real API, fill in the box above; to capture new responses, type the real API's address in "Record from a real API".</p>
-        {/if}
+      <fieldset class="modes wide" disabled={running}>
+        <legend>Calls no saved response can answer</legend>
+        {#each modes as m}
+          <label class="mode" title={m.hint}><input type="radio" name="forward" value={m.value} bind:group={form.forward} />{m.label}</label>
+        {/each}
+      </fieldset>
+      {#if form.forward}
+        <details class="wide where">
+          <summary>Limit or redirect where calls go (optional)</summary>
+          <div class="grid">
+            <label class="f wide"><span>Send everything to this one API (leave empty to use each request's own API)</span><TextInput mono bind:value={form.forwardTo} disabled={running} placeholder="https://api.example.test" /></label>
+            <label class="f wide"><span>Only forward to these APIs (comma separated base URLs; leave empty to allow any)</span><TextInput mono bind:value={form.forwardOnly} disabled={running || !!form.forwardTo.trim()} placeholder="https://api.example.test, https://other.example.test" /></label>
+            {#if form.forward === 'save'}
+              <label class="f wide"><span>Save requests of new calls in (when one API is set above)</span>
+                <select bind:value={form.recordTo} disabled={running}>{#each view.targets as t}<option value={t.id}>{t.label}</option>{/each}</select>
+              </label>
+            {/if}
+            <label class="f wide"><span>Also write the forwarded calls to a HAR file (in order, credentials masked; Import → HAR turns it into a flow)</span>
+              <TextInput mono bind:value={form.recordHar} disabled={running} placeholder="/path/to/session.har" />
+            </label>
+          </div>
+        </details>
       {/if}
-      {#if form.record.trim()}
-        <label class="f wide"><span>Save requests of new calls in</span>
-          <select bind:value={form.recordTo} disabled={running}>{#each view.targets as t}<option value={t.id}>{t.label}</option>{/each}</select>
-        </label>
-        <label class="f wide"><span>Also write the calls to a HAR file (in order, credentials masked; Import → HAR turns it into a flow)</span>
-          <TextInput mono bind:value={form.recordHar} disabled={running} placeholder="/path/to/session.har" />
-        </label>
-        <p class="note wide">Point your app or client at the listen address instead of the real API. Each call is forwarded to the upstream API and its answer returned. A call that matches no request yet becomes one (ids in the path become <code>{'{{id}}'}</code>, credentials become <code>{'{{secret.…}}'}</code> placeholders), and every response is saved so the replayer can answer it later.</p>
-      {/if}
+      <div class="preview wide" aria-label="What the replayer will do">
+        <strong>What it will do</strong>
+        <ul>{#each preview as l}<li class={l.tone}>{l.text}</li>{/each}</ul>
+      </div>
     </div>
-    {#if !form.record.trim()}
+    {#if !form.forward}
       <fieldset class="faults" disabled={running}>
         <legend>Make it misbehave on purpose (to try retries, timeouts and error handling)</legend>
         <label class="f"><span>Answer with an error (% of calls)</span><TextInput mono bind:value={form.faultErrorPercent} placeholder="0" inputmode="decimal" /></label>
         <label class="f"><span>Error status (default 503)</span><TextInput mono bind:value={form.faultStatus} placeholder="503" inputmode="numeric" /></label>
         <label class="f"><span>Drop the connection (% of calls)</span><TextInput mono bind:value={form.faultDropPercent} placeholder="0" inputmode="decimal" /></label>
         <label class="f"><span>Extra random delay up to</span><TextInput mono bind:value={form.faultJitter} placeholder="e.g. 300ms" /></label>
-        <p class="note wide">A request can override this for one call with the header <code>X-Flowi-Fault</code>: <code>none</code>, <code>drop</code>, <code>error</code> or <code>error:418</code>. Answers made this way show <code>fault</code> in the Matched column. Faults apply only to calls that match a saved request, and not while recording.</p>
+        <p class="note wide">A request can override this for one call with the header <code>X-Flowi-Fault</code>: <code>none</code>, <code>drop</code>, <code>error</code> or <code>error:418</code>. Answers made this way show <code>fault</code> in the Matched column. Faults apply only to calls that match a saved request, and not while forwarding.</p>
       </fieldset>
     {/if}
     <div class="checks">
@@ -113,6 +136,15 @@
   .faults { border: 1px solid var(--line); border-radius: var(--r-lg); padding: var(--sp-2) var(--sp-3); margin: var(--sp-2) 0; display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-2) var(--sp-3); }
   .faults legend { color: var(--muted); font-size: var(--fs-sm); padding: 0 6px; }
   .faults .wide { grid-column: 1 / -1; }
+  .modes { border: 1px solid var(--line); border-radius: var(--r-lg); padding: var(--sp-2) var(--sp-3); display: flex; gap: 20px; flex-wrap: wrap; }
+  .modes legend { color: var(--muted); font-size: var(--fs-sm); padding: 0 6px; }
+  .mode { display: flex; gap: 6px; align-items: center; }
+  .where summary { cursor: pointer; color: var(--muted); font-size: var(--fs-sm); margin-bottom: 8px; }
+  .preview { border: 1px solid var(--line); border-radius: var(--r-lg); padding: var(--sp-2) var(--sp-3); font-size: var(--fs-sm); }
+  .preview ul { margin: 4px 0 0; padding-left: 18px; display: flex; flex-direction: column; gap: 3px; }
+  .preview .ok { color: var(--ok); }
+  .preview .warn { color: var(--muted); }
+  .preview .bad { color: var(--fail); }
   .checks { display: flex; gap: 20px; }
   .actions { display: flex; gap: 10px; align-items: center; }
   .spacer { flex: 1; }

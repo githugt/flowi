@@ -42,20 +42,21 @@ type StoredEdit struct {
 // recorded in Calls. mu guards every field: the worker Calls it from other
 // goroutines.
 type Backend struct {
-	Mu         sync.Mutex         // guards every field; tests lock it to change state mid-test
-	FieldList  []flowi.Completion // what ResponseFields returns
-	Name       string             // the workspace name; "default-workspace" when empty
-	Cols       []model.Collection
-	MissingIDs []model.ID
-	Paths      map[model.ID]string
-	Diags      diag.List
-	Values     map[string]any // user settings layer
-	ResetErr   error          // ResetUserSetting fails with it
-	SetErr     error          // SetUserSetting fails with it
-	Session    string         // SessionDir
-	SecretList []flowi.SecretInfo
-	SaveErr    error
-	NextSend   *Sending
+	Mu                sync.Mutex         // guards every field; tests lock it to change state mid-test
+	FieldList         []flowi.Completion // what ResponseFields returns
+	Name              string             // the workspace name; "default-workspace" when empty
+	Cols              []model.Collection
+	MissingIDs        []model.ID
+	Paths             map[model.ID]string
+	Diags             diag.List
+	Values            map[string]any // user settings layer
+	ResetErr          error          // ResetUserSetting fails with it
+	SetErr            error          // SetUserSetting fails with it
+	Session           string         // SessionDir
+	SecretList        []flowi.SecretInfo
+	SaveErr           error
+	ForwardTargetList []flowi.ForwardTarget
+	NextSend          *Sending
 	// SendFor, when set, answers each Send from its options (a request matrix needs a different outcome per cell).
 	SendFor     func(flowi.SendOptions) (*Sending, error)
 	SendErr     error
@@ -1399,6 +1400,14 @@ func (f *Backend) Announcements(context.Context, bool) (announce.Result, error) 
 	f.Mu.Lock()
 	defer f.Mu.Unlock()
 	return f.News, f.NewsErr
+}
+
+// ForwardTargets returns the targets the test set up (ForwardTargetList).
+func (f *Backend) ForwardTargets(env string) []flowi.ForwardTarget {
+	f.record("ForwardTargets " + env)
+	f.Mu.Lock()
+	defer f.Mu.Unlock()
+	return slices.Clone(f.ForwardTargetList)
 }
 
 func (f *Backend) ServeDefaults() flowi.ServeOptions {

@@ -12,7 +12,6 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"path"
 	"path/filepath"
 	"slices"
 	"strconv"
@@ -58,6 +57,8 @@ type Recorder struct {
 	Capture Capture
 	// Tape, when set, keeps every forwarded call in a HAR file (see Tape).
 	Tape *Tape
+
+	derived bool // Upstream came from a saved request, so a call may already carry its path prefix
 }
 
 // Call is a call the replayer forwarded that no saved request matches.
@@ -137,7 +138,7 @@ func (r Recorder) target(req *http.Request) *url.URL {
 	u := *r.Upstream
 	// Clean the call's path on its own first, so ".." cannot climb out of
 	// the upstream's path prefix.
-	u.Path = path.Join("/", r.Upstream.Path, path.Clean("/"+req.URL.Path))
+	u.Path = callPath(r.Upstream, req.URL.Path, r.derived)
 	if strings.HasSuffix(req.URL.Path, "/") && !strings.HasSuffix(u.Path, "/") {
 		u.Path += "/"
 	}
@@ -180,34 +181,34 @@ func (h *Handler) serveRecording(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	a := answer{status: res.status, match: MatchForwarded}
-	if rt, ok := h.routeForRecording(r, body); ok {
+	if rt, ok := h.routeFor(*h.rec, r, body); ok {
 		a.route = &rt
-		if err := h.saveRecorded(rt, r, res); err != nil {
+		if err := h.saveRecorded(*h.rec, rt, r, res); err != nil {
 			h.opts.Logger.Warn("recorded response not saved", "Event", "ReplayRecordFailed", "Request", rt.req.Path, "Error", err)
 		} else {
 			a.match = MatchRecorded
 		}
 	}
 	h.relay(w, r, a, res)
-	h.keepOnTape(r, body, res, time.Since(start))
+	h.keepOnTape(*h.rec, r, body, res, time.Since(start))
 	h.record(r, a, time.Since(start), nil)
 }
 
 // keepOnTape adds the call to the tape; a tape that cannot be written is a warning, never a failed call.
-func (h *Handler) keepOnTape(r *http.Request, body []byte, res upstreamResponse, took time.Duration) {
-	if h.rec.Tape == nil {
+func (h *Handler) keepOnTape(via Recorder, r *http.Request, body []byte, res upstreamResponse, took time.Duration) {
+	if via.Tape == nil {
 		return
 	}
-	if err := h.rec.Tape.add(h.tapeRecord(r, body, res, took)); err != nil {
+	if err := via.Tape.add(h.tapeRecord(via, r, body, res, took)); err != nil {
 		h.opts.Logger.Warn("call not kept on the tape", "Event", "ReplayTapeFailed", "Error", err)
 	}
 }
 
-// routeForRecording is the saved request a call is recorded under: the one it
-// matches, or, when Capture is set, a new one made of the call. Capturing is
+// routeFor is the saved request a call is recorded under: the one it
+// matches, or, when rec.Capture is set, a new one made of the call. Capturing is
 // serialised and looks again first, so two calls for one new path make one
 // request.
-func (h *Handler) routeForRecording(r *http.Request, body []byte) (route, bool) {
+func (h *Handler) routeFor(rec Recorder, r *http.Request, body []byte) (route, bool) {
 	find := func() (route, bool) {
 		look := h.idx.Load().find(r.Method, splitPath(r.URL.Path), r.URL.Query())
 		if len(look.candidates) == 0 {
@@ -215,7 +216,7 @@ func (h *Handler) routeForRecording(r *http.Request, body []byte) (route, bool) 
 		}
 		return look.candidates[0].route, true
 	}
-	if rt, ok := find(); ok || h.rec.Capture == nil {
+	if rt, ok := find(); ok || rec.Capture == nil {
 		return rt, ok
 	}
 	h.captureMu.Lock()
@@ -223,7 +224,7 @@ func (h *Handler) routeForRecording(r *http.Request, body []byte) (route, bool) 
 	if rt, ok := find(); ok {
 		return rt, true
 	}
-	got, err := h.rec.Capture(Call{Method: r.Method, URL: h.rec.target(r).String(), Header: r.Header, Body: body})
+	got, err := rec.Capture(Call{Method: r.Method, URL: rec.target(r).String(), Header: r.Header, Body: body})
 	if err != nil {
 		h.opts.Logger.Warn("call not saved as a request", "Event", "ReplayCaptureFailed", "Method", r.Method, "Path", r.URL.Path, "Error", err)
 		return route{}, false
@@ -258,11 +259,11 @@ func (h *Handler) relay(w http.ResponseWriter, r *http.Request, a answer, res up
 }
 
 // saveRecorded writes the response as <status>.json and last.json.
-func (h *Handler) saveRecorded(rt route, r *http.Request, res upstreamResponse) error {
+func (h *Handler) saveRecorded(rec Recorder, rt route, r *http.Request, res upstreamResponse) error {
 	if h.opts.DataDir == nil {
 		return errors.New("no data directory to save into")
 	}
-	data, err := json.MarshalIndent(h.rec.recordOf(rt, r, res), "", "  ")
+	data, err := json.MarshalIndent(rec.recordOf(rt, r, res), "", "  ")
 	if err != nil {
 		return fmt.Errorf("encoding the record: %w", err)
 	}
@@ -360,25 +361,4 @@ func writeAtomic(file string, data []byte) error {
 		return fmt.Errorf("writing %s: %w", file, err)
 	}
 	return nil
-}
-
-// servePassThrough forwards a call nothing saved can answer and relays the answer. Nothing is saved.
-func (h *Handler) servePassThrough(w http.ResponseWriter, r *http.Request, start time.Time) {
-	body, err := io.ReadAll(io.LimitReader(r.Body, h.pass.MaxBody+1))
-	if err == nil && int64(len(body)) > h.pass.MaxBody {
-		err = errTooLarge
-	}
-	var res upstreamResponse
-	if err == nil {
-		res, err = h.pass.forward(r, body)
-	}
-	if err != nil {
-		a := problem(r, http.StatusBadGateway, MatchUpstreamError, "upstream: "+err.Error())
-		h.deliver(w, r, a)
-		h.record(r, a, time.Since(start), nil)
-		return
-	}
-	a := answer{status: res.status, match: MatchPassed}
-	h.relay(w, r, a, res)
-	h.record(r, a, time.Since(start), nil)
 }

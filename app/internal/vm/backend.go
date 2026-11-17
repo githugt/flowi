@@ -186,6 +186,8 @@ type Backend interface {
 	RunFlow(ctx context.Context, t flowi.FlowTarget, o flowi.RunOptions) (Running, error)
 
 	ServeDefaults() flowi.ServeOptions
+	// ForwardTargets lists the APIs the saved requests call in environment env, for the replayer's preview.
+	ForwardTargets(env string) []flowi.ForwardTarget
 	Schedules() []model.Schedule
 	AddSchedule(s model.Schedule) error
 	SaveSchedule(old string, s model.Schedule) error

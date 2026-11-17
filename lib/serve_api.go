@@ -15,6 +15,12 @@ import (
 	"github.com/githugt/flowi/lib/serve/scheduler"
 )
 
+// The values of ServeOptions.Forward.
+const (
+	ForwardPass = "pass" // forward the calls nothing saved can answer, and save nothing
+	ForwardSave = "save" // forward them and save the real answers
+)
+
 // ErrInvalidServeOptions is returned by Serve for options that cannot work
 // (as opposed to a system failure such as a port in use).
 var ErrInvalidServeOptions = errors.New("invalid serve options")
@@ -37,12 +43,24 @@ type ServeOptions struct {
 	// PassThrough is an upstream base URL for the calls nothing saved can answer: they are forwarded there and the
 	// answer relayed, without saving anything. Calls a saved response can answer are still replayed.
 	PassThrough string
-	Record      string // upstream base URL: forward calls and save the real responses
+	// Forward is what the replayer does with a call no saved response can answer: "" nothing (it is answered as not
+	// found), ForwardPass sends it to a real API and relays the answer, ForwardSave also saves the answer so the next
+	// such call is replayed. Calls a saved response can answer are always replayed. Not with Record.
+	Forward string
+	// ForwardTo is one API base URL that takes every call Forward applies to. Empty: a call goes to the base URL of
+	// the saved request it matches (a call that matches no request is then answered as not found).
+	ForwardTo string
+	// ForwardOnly, when ForwardTo is empty, are the base URLs a call may be forwarded to (scheme, host, optional path
+	// prefix). Empty allows the base URL of any saved request. Ignored with ForwardTo.
+	ForwardOnly []string
+	// ForwardEnv is the environment the saved requests' base URLs are worked out in; "" uses defaults.environment.
+	ForwardEnv string
+	Record     string // upstream base URL: forward calls and save the real responses
 	// RecordTo is the collection (name or id) that calls matching no saved
 	// request are saved in, as new requests; "" is the Scratch draft. Only
 	// used with Record.
 	RecordTo string
-	// RecordHAR is a file the recorded calls are also written to, as a HAR file in the order they were made
+	// RecordHAR is a file the recorded (or, with Forward, the forwarded) calls are also written to, as a HAR file in the order they were made
 	// (credentials masked). `flowi import har` turns it into a flow whose steps read the values earlier
 	// responses gave. Only used with Record.
 	RecordHAR string
@@ -119,12 +137,14 @@ func (w *Workspace) resolveServe(o ServeOptions) (ServeOptions, error) {
 		return o, fmt.Errorf("%w: CORS with pass-through would let any web page read the real API through your network position", ErrInvalidServeOptions)
 	case o.CORS && o.Record != "":
 		return o, fmt.Errorf("%w: --cors with --record would let any web page read the real API through your network position", ErrInvalidServeOptions)
+	case o.CORS && (o.Forward != "" || o.PassThrough != ""):
+		return o, fmt.Errorf("%w: browsers (CORS) together with forwarding would let any web page read the real API through your network position", ErrInvalidServeOptions)
 	case o.Faults.Validate() != nil:
 		return o, fmt.Errorf("%w: %w", ErrInvalidServeOptions, o.Faults.Validate())
 	case o.Faults.Active() && o.Record != "":
 		return o, fmt.Errorf("%w: faults are for replayed answers; with --record the calls go to the real API", ErrInvalidServeOptions)
-	case o.RecordHAR != "" && o.Record == "":
-		return o, fmt.Errorf("%w: --record-har needs --record: there is nothing to put on the tape", ErrInvalidServeOptions)
+	case o.RecordHAR != "" && o.Record == "" && o.Forward == "" && o.PassThrough == "":
+		return o, fmt.Errorf("%w: --record-har needs --record or --forward: there is nothing to put on the tape", ErrInvalidServeOptions)
 	case o.Latency < 0:
 		return o, fmt.Errorf("%w: the latency cannot be negative", ErrInvalidServeOptions)
 	case o.ShutdownTimeout < 0:

@@ -83,10 +83,10 @@ func maskedBody(b engine.Body) engine.Body {
 
 // tapeRecord builds the record of one forwarded call: the upstream URL it went to, the request as the
 // caller sent it, and the response as it came back.
-func (h *Handler) tapeRecord(r *http.Request, body []byte, res upstreamResponse, took time.Duration) engine.Record {
+func (h *Handler) tapeRecord(via Recorder, r *http.Request, body []byte, res upstreamResponse, took time.Duration) engine.Record {
 	rec := engine.Record{
-		At: h.rec.Now(), Proto: res.proto, Status: res.status,
-		Request: engine.SentRequest{Method: r.Method, URL: h.rec.target(r).String(), Header: sentHeaders(r.Header)},
+		At: via.Now(), Proto: res.proto, Status: res.status,
+		Request: engine.SentRequest{Method: r.Method, URL: via.target(r).String(), Header: sentHeaders(r.Header)},
 		Header:  nil, Body: bodyOf(res), Timings: engine.Timings{Total: took},
 	}
 	if len(body) > 0 {

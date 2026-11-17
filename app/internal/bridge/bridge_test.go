@@ -689,6 +689,20 @@ func TestReplayerService_Start_should_report_a_bad_latency_without_starting(t *t
 	}
 }
 
+func TestReplayerService_Preview_should_list_the_apis_the_saved_requests_call(t *testing.T) {
+	c := vmtest.SampleCollection()
+	app := bridge.NewApp(&vmtest.Backend{Cols: []model.Collection{c},
+		ForwardTargetList: []flowi.ForwardTarget{{Base: "https://a.test", Requests: 2}, {Base: "{{host}}", Problem: "no value", Requests: 1}}},
+		bridge.NewInlineActor(), (&published{}).emit)
+	app.Start(t.Context())
+
+	v := app.Replayer().Preview()
+
+	if len(v.Targets) != 2 || v.Targets[0].Base != "https://a.test" || v.Targets[0].Requests != 2 || v.Targets[1].Problem != "no value" {
+		t.Fatalf("preview %+v", v)
+	}
+}
+
 func TestBlueprintsService_State_should_list_blueprints_of_the_collections(t *testing.T) {
 	c := vmtest.SampleCollection()
 	c.Blueprints = []model.Blueprint{{Meta: model.Meta{ID: "B1", Name: "Login journey"}, Path: "login-journey", Params: []model.Param{{Name: "user", Default: "ann"}}}}

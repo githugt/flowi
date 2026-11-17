@@ -711,12 +711,18 @@ export interface SchedulesView {
   error?: string
 }
 
+export type ForwardMode = '' | 'pass' | 'save'
+
+export interface ForwardTarget { base: string; problem?: string; requests: number }
+
+export interface ForwardPreview { env: string; targets: ForwardTarget[] }
+
 export interface ReplayerView {
   state: 'stopped' | 'starting' | 'running' | 'stopping'
   addr: string
   error?: string
   notes: string[]
-  form: { addr: string; latency: string; sequence: boolean; cors: boolean; record: string; recordTo: string; recordHar: string; passThrough: string; faultErrorPercent: string; faultStatus: string; faultDropPercent: string; faultJitter: string }
+  form: { addr: string; latency: string; sequence: boolean; cors: boolean; forward: ForwardMode; forwardTo: string; forwardOnly: string; env: string; recordTo: string; recordHar: string; faultErrorPercent: string; faultStatus: string; faultDropPercent: string; faultJitter: string }
   targets: { id: string; label: string; path?: string }[]
   traffic: { seq: number; at: string; method: string; path: string; status: number; match: string; request: string; duration: string; remote: string; version: string; example: string; source: string; delay: string }[]
 }

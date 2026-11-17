@@ -204,14 +204,17 @@ func TestReplayer_Start_twice_should_start_once(t *testing.T) {
 	}
 }
 
-func TestReplayer_Start_should_record_from_the_upstream_in_the_form(t *testing.T) {
+func TestReplayer_Start_should_forward_as_the_form_says(t *testing.T) {
 	b := &vmtest.Backend{}
 	r, q := startReplayer(t, b)
 
-	r.Start(vm.ReplayerForm{Addr: "127.0.0.1:9000", Record: "  https://api.example.com/v1 "})
+	r.Start(vm.ReplayerForm{Addr: "127.0.0.1:9000", Forward: "save", ForwardTo: "  https://api.example.com/v1 ",
+		ForwardOnly: "https://a.test, https://b.test ,", Env: "dev"})
 	q.run(1)
 
-	if r.State() != vm.ReplayerRunning || b.ServedWith[0].Record != "https://api.example.com/v1" {
+	o := b.ServedWith[0]
+	if r.State() != vm.ReplayerRunning || o.Forward != "save" || o.ForwardTo != "https://api.example.com/v1" ||
+		len(o.ForwardOnly) != 2 || o.ForwardOnly[1] != "https://b.test" || o.ForwardEnv != "dev" {
 		t.Fatalf("state %v, served with %+v", r.State(), b.ServedWith)
 	}
 }
@@ -221,7 +224,7 @@ func TestReplayer_Start_Given_an_upstream_that_is_not_a_web_address_Then_says_so
 		b := &vmtest.Backend{}
 		r, _ := startReplayer(t, b)
 
-		r.Start(vm.ReplayerForm{Record: bad})
+		r.Start(vm.ReplayerForm{Forward: "pass", ForwardTo: bad})
 
 		if r.State() != vm.ReplayerStopped || r.Err() == "" || len(b.ServedWith) != 0 {
 			t.Fatalf("%q: state %v err %q served %d", bad, r.State(), r.Err(), len(b.ServedWith))
@@ -233,7 +236,7 @@ func TestReplayer_Start_Given_CORS_and_an_upstream_Then_refuses_before_starting(
 	b := &vmtest.Backend{}
 	r, _ := startReplayer(t, b)
 
-	r.Start(vm.ReplayerForm{CORS: true, Record: "https://api.example.com"})
+	r.Start(vm.ReplayerForm{CORS: true, Forward: "pass", ForwardTo: "https://api.example.com"})
 
 	if r.State() != vm.ReplayerStopped || r.Err() == "" || len(b.ServedWith) != 0 {
 		t.Fatalf("state %v err %q", r.State(), r.Err())
@@ -278,6 +281,17 @@ func TestReplayer_Start_Given_a_bad_fault_value_Then_it_says_which_field_and_doe
 	}
 }
 
+func TestReplayer_Start_Given_an_api_but_forwarding_off_Then_refuses(t *testing.T) {
+	b := &vmtest.Backend{}
+	r, _ := startReplayer(t, b)
+
+	r.Start(vm.ReplayerForm{ForwardOnly: "https://a.test"})
+
+	if r.State() != vm.ReplayerStopped || r.Err() == "" || len(b.ServedWith) != 0 {
+		t.Fatalf("state %v err %q", r.State(), r.Err())
+	}
+}
+
 func TestReplayer_Start_Given_a_har_file_Then_it_goes_with_the_recording_and_is_refused_without_one(t *testing.T) {
 	// Arrange
 	b := &vmtest.Backend{}
@@ -286,7 +300,7 @@ func TestReplayer_Start_Given_a_har_file_Then_it_goes_with_the_recording_and_is_
 	// Act
 	r.Start(vm.ReplayerForm{RecordHAR: "/tmp/s.har"})
 	refused := r.Err()
-	r.Start(vm.ReplayerForm{Record: "https://api.example.test", RecordHAR: "/tmp/s.har"})
+	r.Start(vm.ReplayerForm{Forward: "save", RecordHAR: "/tmp/s.har"})
 	q.run(1)
 
 	// Assert

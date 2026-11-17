@@ -15,6 +15,7 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/githugt/flowi/lib/model"
 	"github.com/githugt/flowi/lib/serve/replay"
 )
 
@@ -353,13 +354,13 @@ func TestRecord_Given_Capture_fails_Then_the_call_is_still_forwarded_and_nothing
 	}
 }
 
-func TestPassThrough_should_forward_only_the_calls_nothing_saved_answers_and_save_nothing(t *testing.T) {
+func TestForward_Given_a_fixed_upstream_Then_only_the_calls_nothing_saved_answers_are_forwarded_and_nothing_is_saved(t *testing.T) {
 	up := newUpstream(t, func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusAccepted)
 		_, _ = io.WriteString(w, `{"from": "upstream"}`)
 	})
 	f := newFixture(t, spec{path: "users/get", versions: get("{{env.base_url}}/v1/users/{{id}}")}).materialise()
-	f.options.PassThrough = recorderFor(t, up)
+	f.options.Forward = &replay.Forward{Upstream: recorderFor(t, up).Upstream}
 	f.options.Log = replay.NewLog(50)
 	f.start()
 
@@ -372,6 +373,109 @@ func TestPassThrough_should_forward_only_the_calls_nothing_saved_answers_and_sav
 		entries, _ := os.ReadDir(filepath.Join(f.dir, "data"))
 		for _, e := range entries {
 			t.Fatalf("pass-through saved something: %s", e.Name())
+		}
+	}
+}
+
+func baseOf(u *upstream, prefix string) func(model.Collection, model.Request, model.RequestVersion) (*url.URL, error) {
+	return func(model.Collection, model.Request, model.RequestVersion) (*url.URL, error) {
+		base, err := url.Parse(u.srv.URL + prefix)
+		return base, err
+	}
+}
+
+func TestForward_Given_a_request_with_no_response_and_no_fixed_upstream_Then_the_call_goes_to_that_requests_own_api(t *testing.T) {
+	up := newUpstream(t, func(w http.ResponseWriter, _ *http.Request) { _, _ = io.WriteString(w, "real") })
+	f := newFixture(t, spec{path: "users/get", versions: get("{{env.base_url}}/v1/users/{{id}}")}).materialise()
+	f.options.Forward = &replay.Forward{BaseURL: baseOf(up, "")}
+	f.start()
+
+	matched := f.do("GET", "/v1/users/7")
+	unknown := f.do("GET", "/v1/elsewhere")
+
+	if matched.status != 200 || matched.body != "real" || matched.header.Get(replay.HeaderMatch) != replay.MatchPassed || len(up.seen) != 1 {
+		t.Fatalf("matched call: %d %q %v, upstream calls %d", matched.status, matched.body, matched.header, len(up.seen))
+	}
+	if unknown.status != 404 || !strings.Contains(unknown.body, "Not forwarded") || len(up.seen) != 1 {
+		t.Fatalf("unknown call: %d %q, upstream calls %d", unknown.status, unknown.body, len(up.seen))
+	}
+}
+
+func TestForward_Given_an_only_list_Then_a_call_to_another_api_is_not_forwarded(t *testing.T) {
+	up := newUpstream(t, func(w http.ResponseWriter, _ *http.Request) { _, _ = io.WriteString(w, "real") })
+	f := newFixture(t, spec{path: "users/get", versions: get("{{env.base_url}}/v1/users/{{id}}")}).materialise()
+	other, _ := url.Parse("https://other.example.test")
+	f.options.Forward = &replay.Forward{BaseURL: baseOf(up, ""), Only: []*url.URL{other}}
+	f.start()
+
+	got := f.do("GET", "/v1/users/7")
+
+	if got.status != 404 || !strings.Contains(got.body, "not one of the APIs") || len(up.seen) != 0 {
+		t.Fatalf("%d %q, upstream calls %d", got.status, got.body, len(up.seen))
+	}
+}
+
+func TestForward_Given_an_only_list_with_the_apis_base_Then_it_is_forwarded(t *testing.T) {
+	up := newUpstream(t, func(w http.ResponseWriter, _ *http.Request) { _, _ = io.WriteString(w, "real") })
+	f := newFixture(t, spec{path: "users/get", versions: get("{{env.base_url}}/v1/users/{{id}}")}).materialise()
+	allowed, _ := url.Parse(up.srv.URL)
+	f.options.Forward = &replay.Forward{BaseURL: baseOf(up, ""), Only: []*url.URL{allowed}}
+	f.start()
+
+	got := f.do("GET", "/v1/users/7")
+
+	if got.status != 200 || len(up.seen) != 1 {
+		t.Fatalf("%d %q, upstream calls %d", got.status, got.body, len(up.seen))
+	}
+}
+
+func TestForward_Given_save_Then_the_real_answer_is_saved_and_replayed_next_time(t *testing.T) {
+	up := newUpstream(t, func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = io.WriteString(w, `{"n": 1}`)
+	})
+	f := newFixture(t, spec{path: "users/get", versions: get("{{env.base_url}}/v1/users/{{id}}")}).materialise()
+	f.options.Forward = &replay.Forward{Save: true, BaseURL: baseOf(up, "")}
+	f.options.Log = replay.NewLog(10)
+	f.start()
+
+	first := f.do("GET", "/v1/users/7")
+	second := f.do("GET", "/v1/users/7")
+
+	if first.header.Get(replay.HeaderMatch) != replay.MatchRecorded || len(up.seen) != 1 {
+		t.Fatalf("first: %v, upstream calls %d", first.header, len(up.seen))
+	}
+	if second.status != 200 || second.header.Get(replay.HeaderMatch) != replay.MatchOK || len(up.seen) != 1 || !strings.Contains(second.body, `"n"`) {
+		t.Fatalf("second: %d %q %v, upstream calls %d", second.status, second.body, second.header, len(up.seen))
+	}
+}
+
+func TestForward_Given_a_base_with_a_path_prefix_the_call_already_carries_Then_it_is_not_added_twice(t *testing.T) {
+	up := newUpstream(t, func(w http.ResponseWriter, _ *http.Request) { _, _ = io.WriteString(w, "real") })
+	f := newFixture(t, spec{path: "users/get", versions: get("{{env.base_url}}/users/{{id}}")}).materialise()
+	f.options.Forward = &replay.Forward{BaseURL: baseOf(up, "/v1")}
+	f.start()
+
+	f.do("GET", "/v1/users/7")
+	f.do("GET", "/users/8")
+
+	if len(up.seen) != 2 || up.seen[0].URL.Path != "/v1/users/7" || up.seen[1].URL.Path != "/v1/users/8" {
+		t.Fatalf("paths %v", func() []string {
+			var p []string
+			for _, r := range up.seen {
+				p = append(p, r.URL.Path)
+			}
+			return p
+		}())
+	}
+}
+
+func TestBaseOf_should_cut_a_url_before_its_path(t *testing.T) {
+	for in, want := range map[string]string{
+		"{{env.base_url}}/v1/users": "{{env.base_url}}", "https://api.test/v1/x?a=1": "https://api.test", "http://h:8080": "http://h:8080", "/v1/x": "", "": "",
+	} {
+		if got := replay.BaseOf(in); got != want {
+			t.Errorf("BaseOf(%q) = %q, want %q", in, got, want)
 		}
 	}
 }

@@ -45,6 +45,17 @@ export function Close() {
 }
 
 /**
+ * Preview lists the APIs the saved requests call in the selected environment, so the screen can say where forwarded
+ * calls would go.
+ * @returns {$CancellablePromise<$models.ForwardPreview>}
+ */
+export function Preview() {
+    return $Call.ByID(1379704717).then(/** @type {($result: any) => any} */(($result) => {
+        return $$createType1($result);
+    }));
+}
+
+/**
  * Start starts the replayer with the form's values.
  * @param {$models.ReplayerForm} f
  * @returns {$CancellablePromise<void>}
@@ -59,7 +70,7 @@ export function Start(f) {
  */
 export function State() {
     return $Call.ByID(219120924).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType1($result);
+        return $$createType2($result);
     }));
 }
 
@@ -73,4 +84,5 @@ export function Stop() {
 
 // Private type creation functions
 const $$createType0 = $models.CallView.createFrom;
-const $$createType1 = $models.ReplayerView.createFrom;
+const $$createType1 = $models.ForwardPreview.createFrom;
+const $$createType2 = $models.ReplayerView.createFrom;
