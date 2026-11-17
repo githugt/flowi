@@ -126,7 +126,7 @@ func (s *RequestService) open(node string) (RequestView, error) {
 	}
 	req := vm.NewRequest(s.app.backend, s.app.worker, c, c.Requests[i])
 	req.SetScheduler(s.app.scheduler)
-	o := &openRequest{req: req, format: vm.ViewJSON, snip: vm.NewSnippet(s.app.backend, s.app.worker, s.app.workspace, req, true)}
+	o := &openRequest{req: req, format: vm.ViewJSON, snip: vm.NewSnippet(s.app.backend, s.app.worker, s.app.workspace, req, s.snippetExcludesSecrets())}
 	req.OnChange(func() {
 		s.app.workspace.SetLabel(node, untitledName(s.app.workspace, node, req))
 		s.app.emit("request", s.view(node, o))
@@ -257,7 +257,7 @@ func (s *RequestService) view(node string, o *openRequest) RequestView {
 	}
 	v := RequestView{
 		Node: node, Name: d.Name, Path: d.Path, Kind: kind, Verb: vm.Verb(r.Current()), Versions: r.Labels(), VersionNames: versionNamesOf(d), Selected: r.SelectedLabel(), Default: d.Default,
-		BodyKind: string(r.BodyKind()), BodyFormat: string(r.BodyFormat()), Multipart: r.Multipart(), Auth: authViewOf(r),
+		BodyKind: string(r.BodyKind()), BodyFormat: string(r.BodyFormat()), Multipart: r.Multipart(), Auth: authViewOf(r, s.app.workspace.NamedAuths()),
 		Dirty: r.Dirty(), OnDisk: r.ChangedOnDisk(), NeedsDrop: r.NeedsDropConfirm(), Error: r.Err(), Current: r.Current(), FullURL: vm.URLWithQuery(r.Current().URL, r.Current().Query), HookChain: nonNil(r.HookChain()),
 		InScratch: s.app.workspace.InScratch(node), Snippet: snippetViewOf(o.snip), Pipeline: pipelineOf(r, s.app.send.TraceFor(t)), Live: liveOf(s.app.send.TraceFor(t)), Async: asyncInfoOf(r), GRPC: grpcInfoOf(r), Dataset: datasetInfoOf(r), Sending: s.app.send.RunningFor(t), SendError: s.app.send.ErrFor(t),
 	}
@@ -386,6 +386,14 @@ func (s *RequestService) ShowLatest(node string) {
 	})
 }
 
+// snippetExcludesSecrets is ui.snippet_exclude_secrets: what the "Leave secrets out" toggle of a request's code
+// snippet starts as. It was always on, whatever the setting said.
+func (s *RequestService) snippetExcludesSecrets() bool {
+	v, ok := s.app.backend.Settings("").Get("ui.snippet_exclude_secrets")
+	exclude, _ := v.Value.(bool)
+	return ok && exclude
+}
+
 // SuggestSavePath is the path offered when a try-out request is kept: its
 // name, or for an untitled one its URL as a single dashed name.
 func (s *RequestService) SuggestSavePath(node string) string {
@@ -414,6 +422,11 @@ func (s *RequestService) SaveTo(node, placeRow, text string) {
 				return // saved where it was
 			}
 			s.app.workspace.MoveRequest(target, to, dest, func(newRow string) {
+				if newRow == node {
+					// Kept in its own collection under a new name: the row, and so the tab, are the same one. Opening
+					// and closing it raced, and left a tab with nothing in it ("not ported to the new window yet").
+					return
+				}
 				s.app.emit("open", newRow)
 				s.app.emit("close", node)
 			}, func(err error) { s.app.emit("notice", Notice{Level: "error", Text: vm.ErrorText(err)}) })

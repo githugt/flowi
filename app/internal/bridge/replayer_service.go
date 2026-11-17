@@ -16,9 +16,17 @@ type ReplayerForm struct {
 	Latency  string `json:"latency"`
 	Sequence bool   `json:"sequence"`
 	CORS     bool   `json:"cors"`
-	Record   string `json:"record"`
-	RecordTo string `json:"recordTo"` // collection id; "" is the Scratch draft
-	// RecordHAR is a file the recorded calls are also written to, in order.
+	// Forward is what happens to a call no saved response can answer: "" not found, "pass" send it to a real API,
+	// "save" also save the real answer.
+	Forward string `json:"forward"`
+	// ForwardTo is one API every forwarded call goes to; ForwardOnly (comma separated) limits which APIs of the saved
+	// requests may be forwarded to when ForwardTo is empty.
+	ForwardTo    string `json:"forwardTo"`
+	ForwardOnly  string `json:"forwardOnly"`
+	Env          string `json:"env"`          // the environment the base URLs are worked out in; filled in by the app
+	RecordTo     string `json:"recordTo"`     // collection id; "" is the Scratch draft
+	RecordFolder string `json:"recordFolder"` // folder inside it; "" is "recorded"
+	// RecordHAR is a file the forwarded calls are also written to, in order.
 	RecordHAR string `json:"recordHar"`
 	// Faults: percentages 0 to 100, the status of an injected error, and up to how much extra delay.
 	FaultErrorPercent string `json:"faultErrorPercent"`
@@ -94,8 +102,35 @@ func (s *ReplayerService) State() ReplayerView {
 // Start starts the replayer with the form's values.
 func (s *ReplayerService) Start(f ReplayerForm) {
 	s.app.actor.Do(func() {
+		f.Env = s.app.workspace.SelectedEnv()
 		s.vm.Start(vm.ReplayerForm(f))
 	})
+}
+
+// ForwardTargetView is one API the saved requests call.
+type ForwardTargetView struct {
+	Base     string `json:"base"`
+	Problem  string `json:"problem,omitempty"`
+	Requests int    `json:"requests"`
+}
+
+// ForwardPreview is what the preview of the replayer's forwarding needs besides the form: where each API of the saved
+// requests is, in the selected environment.
+type ForwardPreview struct {
+	Env     string              `json:"env"`
+	Targets []ForwardTargetView `json:"targets"`
+}
+
+// Preview lists the APIs the saved requests call in the selected environment, so the screen can say where forwarded
+// calls would go.
+func (s *ReplayerService) Preview() ForwardPreview {
+	env := ""
+	s.app.actor.Do(func() { env = s.app.workspace.SelectedEnv() })
+	v := ForwardPreview{Env: env, Targets: []ForwardTargetView{}}
+	for _, t := range s.app.backend.ForwardTargets(env) {
+		v.Targets = append(v.Targets, ForwardTargetView{Base: t.Base, Problem: t.Problem, Requests: t.Requests})
+	}
+	return v
 }
 
 // Stop asks the replayer to stop; calls in progress finish first.
@@ -137,10 +172,14 @@ func trafficRowOf(e replay.Entry) TrafficRow {
 func (s *ReplayerService) targets() []Choice {
 	out := []Choice{{ID: "", Label: "Scratch (drafts, not saved to a folder yet)"}}
 	for _, c := range s.app.workspace.Collections() {
+		label := c.Manifest.Name
 		if s.app.workspace.IsDraftCollection(c.Manifest.ID) {
-			continue
+			if c.Manifest.Name == "Scratch" {
+				continue // the first choice
+			}
+			label += " (draft)"
 		}
-		out = append(out, Choice{ID: string(c.Manifest.ID), Label: c.Manifest.Name, Path: c.Manifest.Name})
+		out = append(out, Choice{ID: string(c.Manifest.ID), Label: label, Path: c.Manifest.Name})
 	}
 	return out
 }

@@ -3,6 +3,7 @@
 package bridge
 
 import (
+	"fmt"
 	"path"
 
 	"github.com/githugt/flowi/app/internal/vm"
@@ -81,6 +82,22 @@ func (s *WorkspaceService) Location(node string) LocationView {
 		}
 	})
 	return loc
+}
+
+// RevealLocation shows the folder of the collection that holds tree node `node` in the system's file manager (Finder,
+// Explorer, or the file manager the desktop has chosen). A draft in Scratch has no folder to show.
+func (s *WorkspaceService) RevealLocation(node string) error {
+	loc := s.Location(node)
+	if loc.Path == "" || loc.Scratch {
+		return errNoFolderToShow
+	}
+	if s.app.pickers.Reveal == nil {
+		return errNoReveal
+	}
+	if err := s.app.pickers.Reveal(loc.Path); err != nil {
+		return fmt.Errorf("showing the folder: %w", err)
+	}
+	return nil
 }
 
 // entryName is what a folder's order calls a row: the last part of its path. Only

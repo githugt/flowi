@@ -164,6 +164,12 @@ func (b *Workspace) NewGRPCRequest(collection model.ID, path string) (flowi.Requ
 	return b.ws.NewGRPCRequest(collection, path)
 }
 
+// NewFileRequest creates a data file request of the given format.
+func (b *Workspace) NewFileRequest(collection model.ID, path, format string) (flowi.RequestTarget, error) {
+	b.guard.Check("NewFileRequest")
+	return b.ws.NewFileRequest(collection, path, format)
+}
+
 // NewDatasetRequest creates a dataset request of the given driver.
 func (b *Workspace) NewDatasetRequest(collection model.ID, path, driver string) (flowi.RequestTarget, error) {
 	b.guard.Check("NewDatasetRequest")
@@ -304,6 +310,48 @@ func (b *Workspace) NewTriggerToken() (string, error) {
 	return b.ws.NewTriggerToken()
 }
 
+// CustomizeDefault gives a collection its own copy of a built-in default blueprint.
+func (b *Workspace) CustomizeDefault(collection model.ID, kind, phase string) (flowi.BlueprintTarget, error) {
+	b.guard.Check("CustomizeDefault")
+	return b.ws.CustomizeDefault(collection, kind, phase)
+}
+
+// BlueprintSource is the text of a blueprint, for an editor.
+func (b *Workspace) BlueprintSource(t flowi.BlueprintTarget) (string, error) {
+	b.guard.Check("BlueprintSource")
+	return b.ws.BlueprintSource(t)
+}
+
+// SaveBlueprintSource writes the edited text of a blueprint, or returns its problems.
+func (b *Workspace) SaveBlueprintSource(t flowi.BlueprintTarget, text string) (diag.List, error) {
+	b.guard.Check("SaveBlueprintSource")
+	return b.ws.SaveBlueprintSource(t, text)
+}
+
+func (b *Workspace) NewNamedAuth(collection model.ID, name, description string, auth model.Auth) (flowi.AuthTarget, error) {
+	b.guard.Check("NewNamedAuth")
+	return b.ws.NewNamedAuth(collection, name, description, auth)
+}
+
+// SaveNamedAuth writes a named authentication. The app's form holds every
+// field of the file, so comments in it are dropped rather than asked about.
+func (b *Workspace) SaveNamedAuth(t flowi.AuthTarget, a model.NamedAuth) error {
+	b.guard.Check("SaveNamedAuth")
+	return b.ws.SaveNamedAuth(t, a, flowi.SaveOptions{DropComments: true})
+}
+
+// RenameNamedAuth gives a named authentication another name; the requests that use it follow. The app's screen has
+// said so, so a request file with comments is rewritten.
+func (b *Workspace) RenameNamedAuth(t flowi.AuthTarget, name string) error {
+	b.guard.Check("RenameNamedAuth")
+	return b.ws.RenameNamedAuth(t, name, flowi.SaveOptions{DropComments: true})
+}
+
+func (b *Workspace) DeleteNamedAuth(t flowi.AuthTarget) error {
+	b.guard.Check("DeleteNamedAuth")
+	return b.ws.DeleteNamedAuth(t)
+}
+
 func (b *Workspace) DeleteBlueprint(t flowi.BlueprintTarget) error {
 	b.guard.Check("DeleteBlueprint")
 	return b.ws.DeleteBlueprint(t)
@@ -337,6 +385,16 @@ func (b *Workspace) Impact(t flowi.RequestTarget, version string) (analysis.Repo
 func (b *Workspace) Secrets() ([]flowi.SecretInfo, error) {
 	b.guard.Check("Secrets")
 	return b.ws.Secrets()
+}
+
+func (b *Workspace) DeclareSecret(env, name, value string) error {
+	b.guard.Check("DeclareSecret")
+	return b.ws.DeclareSecret(env, name, value)
+}
+
+func (b *Workspace) ImpactOfDraft(t flowi.RequestTarget, draft model.Request) (analysis.Report, diag.List, error) {
+	b.guard.Check("ImpactOfDraft")
+	return b.ws.ImpactOfDraft(t, draft)
 }
 
 func (b *Workspace) SetSecret(env, name, value string) error {
@@ -636,6 +694,25 @@ func (b *Workspace) RunFlow(ctx context.Context, t flowi.FlowTarget, o flowi.Run
 	return r, nil
 }
 
+// RequestActivity is where request t came from and how its sends went.
+func (b *Workspace) RequestActivity(t flowi.RequestTarget) (flowi.Activity, error) {
+	b.guard.Check("RequestActivity")
+	return b.ws.RequestActivity(t)
+}
+
+// FlowActivity is where flow t came from and how its runs went.
+func (b *Workspace) FlowActivity(t flowi.FlowTarget) (flowi.Activity, error) {
+	b.guard.Check("FlowActivity")
+	return b.ws.FlowActivity(t)
+}
+
+// ForwardTargets lists the APIs the saved requests call in environment env.
+func (b *Workspace) ForwardTargets(env string) []flowi.ForwardTarget {
+	b.guard.Check("ForwardTargets")
+	return b.ws.ForwardTargets(env)
+}
+
+// ServeDefaults returns the serve options the settings call for.
 func (b *Workspace) ServeDefaults() flowi.ServeOptions {
 	b.guard.Check("ServeDefaults")
 	return b.ws.ServeDefaults()

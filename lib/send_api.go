@@ -137,7 +137,7 @@ func (w *Workspace) SendRequest(ctx context.Context, t RequestTarget, o SendOpti
 	if err != nil {
 		return nil, err
 	}
-	if err := w.sendable(c, o.Env, flowFilesNotRun(w.Collections(), c, r)); err != nil {
+	if err := w.sendable(c, o.Env, filesNotRun(w.Collections(), c, r)); err != nil {
 		return nil, err
 	}
 	if err := w.unlockFor(c, o.Env); err != nil {
@@ -147,7 +147,9 @@ func (w *Workspace) SendRequest(ctx context.Context, t RequestTarget, o SendOpti
 	if err != nil {
 		return nil, err
 	}
-	return engine.StartSend(ctx, w.engineDeps(), in), nil
+	deps := w.engineDeps()
+	deps.OnSend = w.onSend(t, r.File)
+	return engine.StartSend(ctx, deps, in), nil
 }
 
 // sendInput builds the engine input for sending r with o. An unknown
@@ -277,7 +279,7 @@ func (w *Workspace) requestFor(t RequestTarget) (model.Collection, model.Request
 // sendable refuses a send whose collection has validation errors (in its
 // own files or its dependencies'), or whose environment does not exist. Flows the
 // send does not run are left out: a broken flow, even one that uses this request, does not stop the request
-// from being sent (see flowFilesNotRun); a run passes none, and every file counts.
+// from being sent (see flowFilesNotRun); a flow run leaves out what the flow does not call or send (filesNotRunByFlow).
 func (w *Workspace) sendable(c model.Collection, env string, skipped map[string]bool) error {
 	if env != "" && !slices.ContainsFunc(c.Environments, func(e model.Environment) bool { return e.Name == env }) {
 		return diagErr(diag.CodeRequestEnvUnknown, map[string]string{"env": env, "collection": c.Manifest.Name})

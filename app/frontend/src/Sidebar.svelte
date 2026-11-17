@@ -8,6 +8,7 @@
   import SearchField from './SearchField.svelte'
   import Menu, { type MenuItem } from './Menu.svelte'
   import Icon from './Icon.svelte'
+  import MainMenuButton from './MainMenuButton.svelte'
   import { screens } from './lib/screens'
   import type { TreeNode } from './lib/types'
   import { rootsForGroup, type RailGroup } from './lib/railgroups'
@@ -93,13 +94,17 @@
     { label: 'Open folder', onselect: revealWorkspace, disabled: !app.tree?.folder, title: app.tree?.folder },
     { label: 'Settings', onselect: openSettings, separated: true },
   ])
+  // Only macOS draws its window buttons over the sidebar's top-left corner (a hidden inset title bar): elsewhere the
+  // room kept for them is just empty space before the workspace selector.
+  const onMac = navigator.platform.toLowerCase().includes('mac')
   const moreItems = $derived<MenuItem[]>(more.map((t) => ({ label: t.title, icon: t.icon, active: app.active === t.id, onselect: () => app.openScreen(t.id, t.title) })))
 </script>
 
 <svelte:window onpointerdown={() => ((wsOpen = false), (moreOpen = false))} />
 
 <aside style:width={`${width}px`}>
-  <div class="head" class:peeking={peek}>
+  <div class="head" class:peeking={peek} class:mac={onMac}>
+    {#if !peek}<MainMenuButton />{/if}
     <button class="ws" aria-haspopup="menu" aria-expanded={wsOpen} title="Workspace" onpointerdown={(e) => e.stopPropagation()} onclick={() => (wsOpen = !wsOpen)}>
       <span class="avatar" aria-hidden="true">{(app.tree?.name ?? '?').slice(0, 1).toUpperCase()}</span><span class="wsname">{app.tree?.name ?? ''}</span><span class="caret" aria-hidden="true">▾</span>
     </button>
@@ -129,6 +134,9 @@
       <button title="Clear the selection (Esc)" onclick={() => (app.marked = [])}>Clear</button>
     </div>
   {/if}
+  <!-- Floating from the folded rail, the tools are already on that rail beside it: a second row of them here only
+       repeated them, and its More menu never opened (the panel closed first). -->
+  {#if !peek}
   <nav class="rail" aria-label="Tools">
     {#each tools as t}
       <button title={t.title} aria-label={t.title} class:on={app.active === t.id} onclick={() => app.openScreen(t.id, t.title)}><Icon name={t.icon} /></button>
@@ -141,6 +149,7 @@
       <Menu class="moremenu" label="More tools" items={moreItems} onclose={() => (moreOpen = false)} />
     {/if}
   </nav>
+  {/if}
 </aside>
 
 <style>
@@ -151,8 +160,9 @@
     background: var(--chrome);
     min-height: 0;
   }
-  .head { position: relative; height: 44px; display: flex; align-items: center; gap: 8px; padding: 0 12px 0 84px; --wails-draggable: drag; }
-  .head.peeking { padding-left: 52px; }
+  .head { position: relative; height: 44px; display: flex; align-items: center; gap: 8px; padding: 0 12px; --wails-draggable: drag; }
+  .head.mac { padding-left: 84px; }
+  .head.mac.peeking { padding-left: 52px; }
   .ws {
     --wails-draggable: no-drag; min-width: 0; display: flex; align-items: center; gap: 4px; padding: 3px 6px; margin-left: -6px;
     background: none; border: 0; border-radius: var(--r-md); color: var(--text); font: inherit; font-weight: 600;
@@ -162,7 +172,8 @@
   .wsname { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .caret { color: var(--muted); font-size: var(--fs-xs); }
   /* Menu.svelte draws the menu; these say where it opens from. */
-  aside :global(.wsmenu) { top: calc(100% - 4px); left: 78px; min-width: 200px; }
+  aside :global(.wsmenu) { top: calc(100% - 4px); left: 12px; min-width: 200px; }
+  aside .head.mac :global(.wsmenu) { left: 78px; }
   .pin { --wails-draggable: no-drag; margin-left: auto; white-space: nowrap; flex: none; background: none; border: 1px solid var(--line); border-radius: var(--r-md); color: var(--muted); font: inherit; font-size: var(--fs-sm); padding: 1px 8px; }
   .pin:hover { color: var(--text); border-color: var(--accent); }
   .jump { margin: 0 8px 6px; }

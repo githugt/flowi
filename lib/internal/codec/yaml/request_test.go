@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/githugt/flowi/lib/diag"
+	"github.com/githugt/flowi/lib/model"
 )
 
 const requestHeader = "id: 01J9ZA3M4N5P6Q7R8S9T0VWXYZ\nname: R\n"
@@ -569,5 +570,41 @@ func TestNode_Given_a_step_with_its_own_outcomes_When_saved_and_loaded_Then_they
 	got := f.Nodes[0].Request.Outcomes
 	if err != nil || len(got) != 2 || got[1].Name != "gone" || got[1].Color != "pink" || !bytes.Equal(out, []byte(src)) {
 		t.Fatalf("err %v outcomes %+v, output:\n%s", err, got, out)
+	}
+}
+
+func TestDataset_Given_writes_true_Then_it_is_written_and_left_out_when_false(t *testing.T) {
+	has := func(d *model.Dataset) bool {
+		for _, it := range encodeDataset(d) {
+			if it.Key == "writes" && it.Value == true {
+				return true
+			}
+		}
+		return false
+	}
+
+	if !has(&model.Dataset{Driver: "sqlite", Writes: true}) || has(&model.Dataset{Driver: "sqlite"}) {
+		t.Fatal("writes must be written only when true")
+	}
+}
+
+func TestFile_Given_a_file_version_Then_it_round_trips_as_its_own_block_with_writes(t *testing.T) {
+	c := newCodec()
+	r := model.Request{Meta: model.Meta{ID: "01J9ZA3M4N5P6Q7R8S9T0VAAAA", Name: "r"}, Path: "r", File: "r.req.yaml",
+		Versions: []model.RequestVersion{{Label: "1", File: &model.DataFile{Format: "parquet", Path: "data", Query: "SELECT * FROM t WHERE a = ?", Params: []string{"{{x}}"}, Limit: 3, Writes: true}}}}
+
+	out, err := c.EncodeRequest(r)
+	if err != nil {
+		t.Fatal(err)
+	}
+	back, diags := c.DecodeRequest("r.req.yaml", "r", out)
+
+	requireNoDiagnostics(t, diags)
+	f := back.Versions[0].File
+	if f == nil || back.Versions[0].Dataset != nil || f.Format != "parquet" || f.Path != "data" || f.Limit != 3 || len(f.Params) != 1 {
+		t.Fatalf("file %+v, output:\n%s", f, out)
+	}
+	if !strings.Contains(string(out), "file:") || strings.Contains(string(out), "dataset:") || !strings.Contains(string(out), "writes: true") || !f.Writes {
+		t.Fatalf("output:\n%s", out)
 	}
 }

@@ -100,8 +100,9 @@
   .at { flex: none; width: 66px; color: var(--muted); font-family: var(--mono); }
   .v { flex: none; width: 56px; display: inline-flex; }
   .path { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--mono); }
-  .status-pill { flex: none; }
-  .match { flex: none; max-width: 30%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); }
+  /* Fixed widths, so the rows of 200 and 404 line up whatever the status and how it was answered say. */
+  .status-pill { flex: none; width: 54px; box-sizing: border-box; text-align: center; justify-content: center; }
+  .match { flex: none; width: 28%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); }
   .took { flex: none; width: 58px; text-align: right; color: var(--muted); font-family: var(--mono); }
   .took.slow { color: var(--warn); }
   .took.verySlow { color: var(--fail); }

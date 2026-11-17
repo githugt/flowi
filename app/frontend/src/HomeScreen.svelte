@@ -91,7 +91,7 @@
   <div class="hero">
     <div class="logo"><Logo size={56} /></div>
     <h1>{app.tree?.name ?? 'Home'}</h1>
-    <p class="muted">Version {version} · your requests and flows stay on this machine</p>
+    <p class="muted"><button class="link" title="About Flowi" onclick={() => open('screen:about')}>Version {version}</button> · your requests and flows stay on this machine</p>
   </div>
 
   {#if home}

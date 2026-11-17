@@ -101,7 +101,9 @@ const (
 	CodeBlueprintNotFound    Code = "FLW-BP-006"
 	CodeBlueprintAmbiguous   Code = "FLW-BP-007"
 
-	CodeAuthInvalid Code = "FLW-AUTH-001"
+	CodeAuthInvalid  Code = "FLW-AUTH-001"
+	CodeAuthUnknown  Code = "FLW-AUTH-002"
+	CodeAuthNotFound Code = "FLW-AUTH-003"
 
 	CodeOverlayInvalid    Code = "FLW-OVL-001"
 	CodeOverlayNotFound   Code = "FLW-OVL-002"
@@ -296,6 +298,8 @@ func codeTable() map[Code]codeInfo {
 		CodeExportValue:       {w, `{what} of "{node}" is {value}, which has no Arazzo equivalent, and was left out`},
 
 		CodeAuthInvalid:       {e, "auth: {detail}"},
+		CodeAuthUnknown:       {e, `auth uses "{name}", but the collection has no authentication with that name` + hintMarker + "add auths/{name}.auth.yaml, or pick another one"},
+		CodeAuthNotFound:      {e, `no authentication named "{name}"`},
 		CodeOverlayInvalid:    {e, "flowi overlay is not valid: {detail}"},
 		CodeOverlayNotFound:   {e, `no flowi overlay named "{name}"` + hintMarker + "list them with: flowi overlay ls"},
 		CodeOverlayNotFitting: {w, `flowi overlay "{overlay}": {detail} was left out: {reason}`},

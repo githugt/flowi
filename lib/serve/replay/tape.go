@@ -6,7 +6,9 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
+	"net/url"
 	"strings"
 	"sync"
 	"time"
@@ -83,10 +85,10 @@ func maskedBody(b engine.Body) engine.Body {
 
 // tapeRecord builds the record of one forwarded call: the upstream URL it went to, the request as the
 // caller sent it, and the response as it came back.
-func (h *Handler) tapeRecord(r *http.Request, body []byte, res upstreamResponse, took time.Duration) engine.Record {
+func (h *Handler) tapeRecord(now func() time.Time, target string, r *http.Request, body []byte, res upstreamResponse, took time.Duration) engine.Record {
 	rec := engine.Record{
-		At: h.rec.Now(), Proto: res.proto, Status: res.status,
-		Request: engine.SentRequest{Method: r.Method, URL: h.rec.target(r).String(), Header: sentHeaders(r.Header)},
+		At: now(), Proto: res.proto, Status: res.status,
+		Request: engine.SentRequest{Method: r.Method, URL: target, Header: sentHeaders(r.Header)},
 		Header:  nil, Body: bodyOf(res), Timings: engine.Timings{Total: took},
 	}
 	if len(body) > 0 {
@@ -113,4 +115,61 @@ func marshalText(v any, fallback string) string {
 		return fallback
 	}
 	return string(data)
+}
+
+// tapeWriter passes an answer through and keeps its status, headers and (up to CaptureLimit) body for the tape.
+type tapeWriter struct {
+	http.ResponseWriter
+	status  int
+	header  http.Header
+	body    bytes.Buffer
+	reqBody []byte
+}
+
+// newTapeWriter also reads the request body (up to CaptureLimit) and puts it back for the handler.
+func newTapeWriter(w http.ResponseWriter, r *http.Request) *tapeWriter {
+	tw := &tapeWriter{ResponseWriter: w}
+	if r.Body != nil && r.Body != http.NoBody {
+		all, _ := io.ReadAll(io.LimitReader(r.Body, CaptureLimit+1))
+		tw.reqBody = all[:min(len(all), CaptureLimit)]
+		r.Body = io.NopCloser(io.MultiReader(bytes.NewReader(all), r.Body))
+	}
+	return tw
+}
+
+func (t *tapeWriter) WriteHeader(status int) {
+	if t.status == 0 {
+		t.status, t.header = status, t.Header().Clone()
+	}
+	t.ResponseWriter.WriteHeader(status)
+}
+
+func (t *tapeWriter) Write(p []byte) (int, error) {
+	if t.status == 0 {
+		t.WriteHeader(http.StatusOK)
+	}
+	if room := CaptureLimit - t.body.Len(); room > 0 {
+		t.body.Write(p[:min(len(p), room)])
+	}
+	return t.ResponseWriter.Write(p)
+}
+
+// Unwrap lets http.ResponseController reach the real writer.
+func (t *tapeWriter) Unwrap() http.ResponseWriter { return t.ResponseWriter }
+
+// keepAnswered adds a call the replayer answered itself to the tape; a tape that cannot be written is a warning.
+func (h *Handler) keepAnswered(tw *tapeWriter, r *http.Request, took time.Duration) {
+	res := upstreamResponse{status: tw.status, proto: r.Proto, header: tw.header, body: tw.body.Bytes()}
+	if res.status == 0 {
+		return
+	}
+	scheme := "http"
+	if r.TLS != nil {
+		scheme = "https"
+	}
+	u := url.URL{Scheme: scheme, Host: r.Host, Path: r.URL.Path, RawQuery: r.URL.RawQuery}
+	rec := h.tapeRecord(time.Now, u.String(), r, tw.reqBody, res, took)
+	if err := h.opts.Tape.add(rec); err != nil {
+		h.opts.Logger.Warn("call not kept on the tape", "Event", "ReplayTapeFailed", "Error", err)
+	}
 }

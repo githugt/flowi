@@ -147,6 +147,7 @@ func (w *Workspace) NewFlow(collection model.ID, path string) (FlowTarget, error
 	if !ok {
 		return FlowTarget{}, diagErr(diag.CodeWSUnknownCollection, map[string]string{"name": string(collection)})
 	}
+	path, name := pathForName(path) // "Sign up journey" is a fine name: its file is Sign-up-journey
 	if detail := requestPathProblem(path); detail != "" {
 		return FlowTarget{}, diagErr(diag.CodeWriteRequestPath, map[string]string{"path": path, "detail": detail})
 	}
@@ -156,7 +157,7 @@ func (w *Workspace) NewFlow(collection model.ID, path string) (FlowTarget, error
 	} else if !errors.Is(err, fs.ErrNotExist) {
 		return FlowTarget{}, fmt.Errorf("checking %s: %w", file, err)
 	}
-	f := model.Flow{Meta: model.Meta{ID: w.newID(), Name: filepath.Base(path)}, Path: path, File: file}
+	f := model.Flow{Meta: model.Meta{ID: w.newID(), Name: name}, Path: path, File: file}
 	data, err := w.store.EncodeFlow(c, f)
 	if err != nil {
 		return FlowTarget{}, fmt.Errorf("encoding %s: %w", file, err)
@@ -164,6 +165,7 @@ func (w *Workspace) NewFlow(collection model.ID, path string) (FlowTarget, error
 	if err := w.writeAndReload(collection, file, data, SaveOptions{}); err != nil {
 		return FlowTarget{}, err
 	}
+	w.noteOrigin(collection, activityFlow, f.ID, OriginCreated, "")
 	return FlowTarget{Collection: collection, Flow: f.ID}, nil
 }
 
@@ -258,6 +260,6 @@ func (w *Workspace) CheckFlowDraft(t FlowTarget, f model.Flow) diag.List {
 	}
 	w.mu.RLock()
 	defer w.mu.RUnlock()
-	all := validate.Validate(validate.Target{Collections: withCollection(w.collections, c)})
+	all := validate.Validate(validate.Target{Collections: withCollection(w.collections, c), AllowDatasetWrites: w.allowDatasetWrites(), DatasetReadOnly: w.datasetReadOnly()})
 	return w.positioned(slices.DeleteFunc(all, func(d diag.Diagnostic) bool { return d.File != f.File }))
 }

@@ -38,8 +38,8 @@ func TestLimits_should_space_attempts_by_rate_with_fake_clock(t *testing.T) {
 	second := gateAsync(context.Background(), l, "a.test")
 	clock.WaitForTimers(t, 1)
 	select {
-	case <-second:
-		t.Fatal("second attempt was not held back by the rate")
+	case err := <-second:
+		t.Fatalf("second attempt was not held back by the rate (it ended with %v)", err)
 	default:
 	}
 	clock.Advance(500 * 1e6)
@@ -61,7 +61,9 @@ func TestLimits_should_limit_only_the_named_host(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	<-gateAsync(context.Background(), l, "slow.test")
+	if err := <-gateAsync(context.Background(), l, "slow.test"); err != nil {
+		t.Fatal(err)
+	}
 	held := gateAsync(context.Background(), l, "slow.test")
 	clock.WaitForTimers(t, 1)
 	clock.Advance(1e9)

@@ -23,8 +23,8 @@ func TestSchema_should_have_unique_names_and_valid_defaults(t *testing.T) {
 		}
 	}
 
-	if len(seen) != 76 {
-		t.Fatalf("got %d keys, want 76", len(seen))
+	if len(seen) != 79 {
+		t.Fatalf("got %d keys, want 79", len(seen))
 	}
 }
 
@@ -43,7 +43,7 @@ func TestSchema_should_include_retry_hooks_and_request_compression_keys_with_def
 		"retry.backoff":            "exponential",
 		"retry.jitter":             true,
 		"retry.on":                 []any{"5xx", "timeout", "connection"},
-		"hooks.nested":             false,
+		"hooks.nested":             true,
 		"hooks.max_depth":          int64(3),
 	}
 

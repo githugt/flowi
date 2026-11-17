@@ -108,3 +108,33 @@ func (c HookChain) Filter(ctl model.HookControl) HookChain {
 	}
 	return out
 }
+
+// hookKey identifies the hook flow a flow scope runs; an inline step has none ("") and is only bounded by
+// hooks.max_depth.
+func hookKey(fs *flowScope) string {
+	if fs.flow == nil {
+		return ""
+	}
+	return string(fs.flow.ID)
+}
+
+// without drops the hook flows that are already running above, which would only run themselves again.
+func (c HookChain) without(active []string) HookChain {
+	if len(active) == 0 {
+		return c
+	}
+	keep := func(refs []HookRef) []HookRef {
+		return slices.DeleteFunc(slices.Clone(refs), func(h HookRef) bool {
+			return h.Step.Flow != nil && slices.Contains(active, string(h.Step.Flow.ID))
+		})
+	}
+	return HookChain{Pre: keep(c.Pre), Post: keep(c.Post), Message: keep(c.Message)}
+}
+
+// activeWith is active and the hook flow key, when there is one.
+func activeWith(active []string, key string) []string {
+	if key == "" {
+		return active
+	}
+	return append(slices.Clone(active), key)
+}

@@ -162,3 +162,28 @@ func equalRows(a, b []any) bool {
 	}
 	return true
 }
+
+// Before: a dataset query could never write; with the setting on it must, and a rolled-back read must stay read-only.
+func TestRegistry_Run_Given_writes_allowed_should_commit_the_change(t *testing.T) {
+	dir := seededDatabase(t)
+
+	_, err := dataset.Default().Run(context.Background(), dataset.Query{
+		Driver: model.DriverSQLite, Server: "shop.db", Root: dir, AllowWrites: true,
+		Statement: "UPDATE customers SET name = 'Ada L.' WHERE id = 1",
+	})
+	res, readErr := runSQLite(t, dir, "SELECT name FROM customers WHERE id = 1")
+
+	if err != nil || readErr != nil || len(res.Rows) != 1 || res.Rows[0][0] != "Ada L." {
+		t.Fatalf("write error %v, read error %v, rows %v", err, readErr, res.Rows)
+	}
+}
+
+func TestRegistry_Run_Given_writes_not_allowed_should_refuse_a_write(t *testing.T) {
+	dir := seededDatabase(t)
+
+	_, err := runSQLite(t, dir, "DELETE FROM customers")
+
+	if !errors.Is(err, readonly.ErrNotReadOnly) {
+		t.Fatalf("got %v, want ErrNotReadOnly", err)
+	}
+}

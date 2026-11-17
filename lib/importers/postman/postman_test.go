@@ -69,3 +69,31 @@ func TestImport_should_redact_urls_queries_variables_and_bodies(t *testing.T) {
 		t.Fatalf("variables stay:\n%s", out)
 	}
 }
+
+func TestImport_Given_auth_set_on_the_collection_and_a_folder_Then_requests_use_named_authentications(t *testing.T) {
+	src := `{"info": {"name": "Shop", "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"},
+	  "auth": {"type": "digest", "digest": [{"key": "username", "value": "ada"}, {"key": "password", "value": "pw"}]},
+	  "item": [
+	    {"name": "A", "request": {"method": "GET", "url": "https://example.com/a"}},
+	    {"name": "B", "request": {"method": "GET", "url": "https://example.com/b"}},
+	    {"name": "Own", "request": {"method": "GET", "url": "https://example.com/o", "auth": {"type": "hawk", "hawk": [{"key": "authId", "value": "i"}, {"key": "authKey", "value": "k"}]}}},
+	    {"name": "Admin", "auth": {"type": "hawk", "hawk": [{"key": "authId", "value": "i"}, {"key": "authKey", "value": "k"}]},
+	     "item": [{"name": "C", "request": {"method": "GET", "url": "https://example.com/c"}}]}
+	  ]}`
+
+	res, _ := Import([]byte(src), "shop.json")
+
+	use := map[string]string{}
+	for _, r := range res.Requests {
+		a := r.Versions[0].Auth
+		if a != nil {
+			use[r.Path] = a.Use + "/" + a.Type
+		}
+	}
+	if use["A"] != "Shop-auth/" || use["B"] != "Shop-auth/" || use["Admin/C"] != "Admin-auth/" || use["Own"] != "/hawk" {
+		t.Fatalf("got %v", use)
+	}
+	if len(res.Auths) != 2 || res.Auths[0].Auth.Type != "digest" {
+		t.Fatalf("auths %+v", res.Auths)
+	}
+}

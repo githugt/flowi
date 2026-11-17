@@ -295,13 +295,14 @@ func TestFlowService_NodeData_should_show_the_outputs_of_a_step_that_ran(t *test
 	}
 }
 
-func TestFlowService_Run_should_refuse_while_the_flow_has_unsaved_edits(t *testing.T) {
+// Before: unsaved edits refused the run with "save the flow first".
+func TestFlowService_Run_should_try_unsaved_edits_without_saving_them(t *testing.T) {
 	flows, v, pub := openRunnable(t, nil)
 	flows.Insert(v.Node, "log", "$.nodes", 0)
 
 	flows.Run(v.Node, nil)
 
-	if got := pub.last["flowrun"].(bridge.FlowRunEvent).Run.Error; !strings.Contains(got, "save the flow first") {
+	if got := pub.last["flowrun"].(bridge.FlowRunEvent).Run.Error; strings.Contains(got, "save the flow first") {
 		t.Fatalf("error %q", got)
 	}
 }
@@ -688,6 +689,37 @@ func TestReplayerService_Start_should_report_a_bad_latency_without_starting(t *t
 	}
 }
 
+func TestReplayerService_Preview_should_list_the_apis_the_saved_requests_call(t *testing.T) {
+	c := vmtest.SampleCollection()
+	app := bridge.NewApp(&vmtest.Backend{Cols: []model.Collection{c},
+		ForwardTargetList: []flowi.ForwardTarget{{Base: "https://a.test", Requests: 2}, {Base: "{{host}}", Problem: "no value", Requests: 1}}},
+		bridge.NewInlineActor(), (&published{}).emit)
+	app.Start(t.Context())
+
+	v := app.Replayer().Preview()
+
+	if len(v.Targets) != 2 || v.Targets[0].Base != "https://a.test" || v.Targets[0].Requests != 2 || v.Targets[1].Problem != "no value" {
+		t.Fatalf("preview %+v", v)
+	}
+}
+
+func TestReplayerService_State_should_offer_drafts_and_collections_to_save_requests_in(t *testing.T) {
+	a, d := vmtest.SampleCollection(), vmtest.SampleCollection()
+	a.Manifest.ID, a.Manifest.Name = "A1", "Shop"
+	d.Manifest.ID, d.Manifest.Name = "D1", "untitled-1"
+	app := bridge.NewApp(&vmtest.Backend{Cols: []model.Collection{a, d}, DraftIDs: map[model.ID]bool{"D1": true}}, bridge.NewInlineActor(), (&published{}).emit)
+	app.Start(t.Context())
+
+	var labels []string
+	for _, c := range app.Replayer().State().Targets {
+		labels = append(labels, c.Label)
+	}
+
+	if len(labels) != 3 || labels[1] != "Shop" || labels[2] != "untitled-1 (draft)" {
+		t.Fatalf("targets %v", labels)
+	}
+}
+
 func TestBlueprintsService_State_should_list_blueprints_of_the_collections(t *testing.T) {
 	c := vmtest.SampleCollection()
 	c.Blueprints = []model.Blueprint{{Meta: model.Meta{ID: "B1", Name: "Login journey"}, Path: "login-journey", Params: []model.Param{{Name: "user", Default: "ann"}}}}
@@ -705,17 +737,18 @@ func TestBlueprintsService_State_should_list_blueprints_of_the_collections(t *te
 
 // The screen was empty for a workspace without blueprints of its own, though
 // new requests start with Flowi's built-in hooks: those are listed too.
+// Before: the dataset hook was missing from the list, and no blueprint said what its steps were.
 func TestBlueprintsService_State_Given_no_blueprints_Then_it_lists_the_built_in_hooks(t *testing.T) {
 	app := bridge.NewApp(&vmtest.Backend{Cols: []model.Collection{vmtest.SampleCollection()}}, bridge.NewInlineActor(), (&published{}).emit)
 	app.Start(t.Context())
 
 	v := app.Blueprints().State()
 
-	want := map[string]string{"built-in/http-post": "post-hooks", "built-in/async-pre": "pre-hooks", "built-in/async-post": "post-hooks", "built-in/grpc-pre": "pre-hooks", "built-in/grpc-post": "post-hooks"}
+	want := map[string]string{"built-in/http-post": "post-hooks", "built-in/async-pre": "pre-hooks", "built-in/async-post": "post-hooks", "built-in/grpc-pre": "pre-hooks", "built-in/grpc-post": "post-hooks", "built-in/dataset-pre": "pre-hooks", "built-in/dataset-post": "post-hooks"}
 	got := map[string]string{}
 	for _, b := range v.Blueprints {
-		if !b.BuiltIn || b.Nodes == 0 || b.Name == "" {
-			t.Fatalf("blueprint %+v, want a named built-in with steps", b)
+		if !b.BuiltIn || b.Name == "" || b.Group == "" || len(b.Steps) != b.Nodes || b.Steps[0].Type == "" || b.Steps[0].Detail == "" {
+			t.Fatalf("blueprint %+v, want a named built-in that says its group and lists its steps", b)
 		}
 		got[b.Key] = b.Kind
 	}
@@ -1053,12 +1086,19 @@ func TestWorkspaceService_NewIn_Given_no_collection_Then_a_message_or_gRPC_draft
 }
 
 func TestRequestService_SaveTo_should_move_the_request_and_ask_to_open_it(t *testing.T) {
-	reqs, v, pub, _ := openLogin(t)
-	_ = v
+	other := model.Collection{Root: "/d", Manifest: model.Manifest{Meta: model.Meta{ID: "C2", Name: "Other"}, File: "/d/flowi.yaml"}}
+	pub := &published{}
+	app := bridge.NewApp(&vmtest.Backend{Cols: []model.Collection{vmtest.SampleCollection(), other}}, bridge.NewInlineActor(), pub.emit)
+	app.Start(t.Context())
+	reqs := app.Requests()
+	if _, err := reqs.Open("r:C1:R1"); err != nil {
+		t.Fatal(err)
+	}
 
-	reqs.SaveTo(v.Node, "c:C1", "kept/login")
+	reqs.SaveTo("r:C1:R1", "c:C2", "kept/login")
 
-	if opened, _ := pub.last["open"].(string); opened == "" || pub.last["close"] != v.Node {
+	// Moved to another collection, it is another row: that one opens and this tab closes.
+	if pub.last["open"] != "r:C2:R1" || pub.last["close"] != "r:C1:R1" {
 		t.Fatalf("open %v, close %v", pub.last["open"], pub.last["close"])
 	}
 }

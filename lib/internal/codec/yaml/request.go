@@ -101,20 +101,21 @@ func (c *Codec) requestVersion(d *decoder, m *mapping, label string) model.Reque
 	v.Async = m.async()
 	v.GRPC = m.grpc()
 	v.Dataset = m.dataset()
+	v.File = m.dataFile()
 	v.Settings = c.settingsChild(d, m, settings.LayerRequest)
 	v.Hooks = m.hooks()
 	m.closeStrict()
 	return v
 }
 
-// auth reads the auth: block of a version, nil when there is none: its type,
-// then its parameters in file order.
+// auth reads the auth: block of a version, nil when there is none: the named
+// authentication it uses, or its type and then its parameters in file order.
 func (m *mapping) auth() *model.Auth {
 	am, ok := m.child("auth")
 	if !ok {
 		return nil
 	}
-	a := &model.Auth{Type: am.str("type")}
+	a := &model.Auth{Use: am.str("use"), Type: am.str("type")}
 	for _, e := range am.rest() {
 		am.used[e.key] = true
 		a.Params = append(a.Params, model.KeyValue{Key: e.key, Value: am.d.scalarString(e.value, e.path, e.key, true)})
@@ -167,12 +168,26 @@ func (m *mapping) dataset() *model.Dataset {
 	if !ok {
 		return nil
 	}
-	d := &model.Dataset{Driver: dm.str("driver"), Server: dm.str("server"), Query: dm.str("query"), Limit: int(dm.integer("limit"))}
+	d := &model.Dataset{Driver: dm.str("driver"), Server: dm.str("server"), Query: dm.str("query"), Limit: int(dm.integer("limit")), Writes: dm.boolean("writes")}
 	if e, ok := dm.take("params"); ok {
 		d.Params = dm.d.lenientStrings(e)
 	}
 	dm.closeStrict()
 	return d
+}
+
+// dataFile reads the file: block of a version, nil when there is none.
+func (m *mapping) dataFile() *model.DataFile {
+	fm, ok := m.child("file")
+	if !ok {
+		return nil
+	}
+	f := &model.DataFile{Format: fm.str("format"), Path: fm.str("path"), Query: fm.str("query"), Limit: int(fm.integer("limit")), Writes: fm.boolean("writes")}
+	if e, ok := fm.take("params"); ok {
+		f.Params = fm.d.lenientStrings(e)
+	}
+	fm.closeStrict()
+	return f
 }
 
 // lenientStrings reads a list of scalars as text, numbers and booleans as written.
@@ -358,6 +373,9 @@ func (c *Codec) encodeVersion(v model.RequestVersion) yaml.MapSlice {
 	if v.GRPC != nil {
 		o.putAlways("grpc", encodeGRPC(v.GRPC))
 	}
+	if v.File != nil {
+		o.putAlways("file", encodeDataFile(v.File))
+	}
 	if v.Dataset != nil {
 		o.putAlways("dataset", encodeDataset(v.Dataset))
 	}
@@ -503,6 +521,25 @@ func encodeDataset(d *model.Dataset) yaml.MapSlice {
 	if d.Limit != 0 {
 		o.put("limit", d.Limit)
 	}
+	if d.Writes {
+		o.put("writes", true)
+	}
+	return presentMap(o.items)
+}
+
+// encodeDataFile is the file mapping of a version.
+func encodeDataFile(f *model.DataFile) yaml.MapSlice {
+	var o omap
+	o.put("format", f.Format)
+	o.put("path", f.Path)
+	o.put("query", f.Query)
+	o.put("params", stringsToYAML(f.Params))
+	if f.Limit != 0 {
+		o.put("limit", f.Limit)
+	}
+	if f.Writes {
+		o.put("writes", true)
+	}
 	return presentMap(o.items)
 }
 
@@ -517,6 +554,9 @@ func presentMap(items yaml.MapSlice) yaml.MapSlice {
 
 // encodeAuth writes the scheme first, then its parameters.
 func encodeAuth(a model.Auth) yaml.MapSlice {
+	if a.Use != "" {
+		return yaml.MapSlice{{Key: "use", Value: a.Use}}
+	}
 	out := yaml.MapSlice{{Key: "type", Value: a.Type}}
 	for _, kv := range a.Params {
 		out = append(out, yaml.MapItem{Key: kv.Key, Value: kv.Value})

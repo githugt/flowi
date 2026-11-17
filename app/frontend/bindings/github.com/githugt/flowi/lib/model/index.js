@@ -10,6 +10,7 @@ export {
     Body,
     Branch,
     Case,
+    DataFile,
     Dataset,
     Extraction,
     Field,

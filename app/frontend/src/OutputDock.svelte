@@ -58,6 +58,12 @@
     </div>
     <div class="foot"><span class="status {data.status}">{data.status}</span><span>{data.duration}</span>{#if data.size}<span>{data.size}</span>{/if}{#if data.instances > 1}<span>{data.instances} runs</span>{/if}</div>
   </div>
+{:else if data}
+  <!-- A pinned box stays while a run starts, instead of vanishing until the step has finished. -->
+  <div class="dock" role="region" aria-label={`What ${step} did`}>
+    <div class="tabs"><span class="grow"></span><button class="pin" class:on={pinned} aria-pressed={pinned} title={pinned ? "Unpin: close this when another step is selected" : "Pin: keep this open"} onclick={onpin}>{pinned ? "Pinned" : "Pin"}</button></div>
+    <div class="body"><p class="muted">{view.run.running ? `${step} is running…` : `${step} has not run yet.`}</p></div>
+  </div>
 {/if}
 
 <style>
@@ -82,5 +88,5 @@
   .muted { color: var(--muted); font-size: var(--fs-sm); margin: 0; }
   pre { margin: 2px 0 0; font: var(--fs-xs) var(--mono); white-space: pre-wrap; -webkit-user-select: text; user-select: text; }
   .diag { color: var(--fail); }
-  select { align-self: flex-end; background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); font: inherit; font-size: var(--fs-xs); }
+  select { align-self: flex-end; font-size: var(--fs-xs); }
 </style>

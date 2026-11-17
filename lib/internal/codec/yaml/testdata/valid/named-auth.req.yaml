@@ -1,0 +1,15 @@
+id: 01J9ZG3M4N5P6Q7R8S9T0VWXYZ
+name: Named auth
+versions:
+  "1":
+    method: GET
+    url: http://x
+    auth:
+      use: api-key
+  "2":
+    method: GET
+    url: http://x
+    auth:
+      type: digest
+      username: ada
+      password: "{{secret.password}}"

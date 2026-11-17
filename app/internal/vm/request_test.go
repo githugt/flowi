@@ -319,3 +319,49 @@ func TestRequestVM_auth_scheme_should_be_chosen_filled_and_replaced_by_a_simple_
 		t.Errorf("a simple Authorization header replaces the auth block, got %q", schemeAfterSimple)
 	}
 }
+
+// Before: renaming a request with unsaved edits showed "changed on disk", as if someone else had edited it.
+func TestRequestVM_Given_a_rename_while_dirty_When_reloaded_Then_no_conflict_and_the_edit_is_kept(t *testing.T) {
+	b := sampleBackend()
+	r, _ := newRequestVM(t, b)
+	disk := b.Cols[0].Requests[0]
+	disk.Name, disk.Path, disk.File = "sign-in", "auth/sign-in", "/c/requests/auth/sign-in.req.yaml"
+	r.Edit(func(v *model.RequestVersion) { v.Method = "PUT" })
+
+	r.Reloaded(b.Cols[0], disk, true)
+
+	if r.ChangedOnDisk() || !r.Dirty() || r.Current().Method != "PUT" || r.Draft().Path != "auth/sign-in" || r.Draft().Name != "sign-in" {
+		t.Fatalf("on disk %v dirty %v draft %+v", r.ChangedOnDisk(), r.Dirty(), r.Draft().Meta)
+	}
+}
+
+// Before: n/a (new): a file that vanishes for a moment during a rename must not leave "removed" on the tab.
+func TestRequestVM_Given_the_file_went_and_came_back_When_reloaded_Then_the_removed_error_is_cleared(t *testing.T) {
+	b := sampleBackend()
+	r, _ := newRequestVM(t, b)
+	disk := b.Cols[0].Requests[0]
+	r.Reloaded(b.Cols[0], model.Request{}, false)
+	gone := r.Err()
+
+	r.Reloaded(b.Cols[0], disk, true)
+
+	if gone == "" || r.Err() != "" {
+		t.Fatalf("gone %q back %q", gone, r.Err())
+	}
+}
+
+// Before: an edit that was undone (or typed back) still counted as unsaved, though the draft equalled the file.
+func TestRequest_Given_an_edit_When_it_is_undone_Then_nothing_is_unsaved(t *testing.T) {
+	b := sampleBackend()
+	r, w := newRequestVM(t, b)
+	original := r.Current().Method
+
+	r.Edit(func(v *model.RequestVersion) { v.Method = "PUT" })
+	dirtyAfterEdit := r.Dirty()
+	r.Edit(func(v *model.RequestVersion) { v.Method = original })
+	w.Wait()
+
+	if !dirtyAfterEdit || r.Dirty() {
+		t.Fatalf("dirty after the edit %v, after undoing it %v", dirtyAfterEdit, r.Dirty())
+	}
+}

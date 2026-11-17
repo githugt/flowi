@@ -142,6 +142,16 @@ func (s *Store) decodeInto(c model.Collection, f discovered, data []byte) (model
 		if bp.ID != "" {
 			c.Blueprints = append(c.Blueprints, bp)
 		}
+	case kindAuth:
+		var a model.NamedAuth
+		a, diags = s.codec.DecodeAuth(f.abs, data)
+		if a.ID == "" {
+			break
+		}
+		if a.Name == "" {
+			a.Name = strings.TrimSuffix(path.Base(f.rel), authSuffix)
+		}
+		c.Auths = append(c.Auths, a)
 	case kindOverlay:
 		var ov model.Overlay
 		ov, diags = flowioverlay.Decode(f.abs, strings.TrimSuffix(path.Base(f.rel), flowioverlay.Suffix), data)
@@ -207,6 +217,7 @@ func withoutFile(c model.Collection, file string) model.Collection {
 	c.Flows = slices.DeleteFunc(slices.Clone(c.Flows), func(f model.Flow) bool { return f.File == file })
 	c.Folders = slices.DeleteFunc(slices.Clone(c.Folders), func(f model.Folder) bool { return f.File == file })
 	c.Blueprints = slices.DeleteFunc(slices.Clone(c.Blueprints), func(b model.Blueprint) bool { return b.File == file })
+	c.Auths = slices.DeleteFunc(slices.Clone(c.Auths), func(a model.NamedAuth) bool { return a.File == file })
 	c.Overlays = slices.DeleteFunc(slices.Clone(c.Overlays), func(o model.Overlay) bool { return o.File == file })
 	return c
 }
@@ -219,6 +230,7 @@ func withoutPrefix(c model.Collection, dir string) model.Collection {
 	c.Flows = slices.DeleteFunc(slices.Clone(c.Flows), func(f model.Flow) bool { return under(f.File) })
 	c.Folders = slices.DeleteFunc(slices.Clone(c.Folders), func(f model.Folder) bool { return under(f.File) })
 	c.Blueprints = slices.DeleteFunc(slices.Clone(c.Blueprints), func(b model.Blueprint) bool { return under(b.File) })
+	c.Auths = slices.DeleteFunc(slices.Clone(c.Auths), func(a model.NamedAuth) bool { return under(a.File) })
 	c.Overlays = slices.DeleteFunc(slices.Clone(c.Overlays), func(o model.Overlay) bool { return under(o.File) })
 	return c
 }
@@ -230,6 +242,7 @@ func sortEntities(c model.Collection) model.Collection {
 	slices.SortFunc(c.Flows, func(a, b model.Flow) int { return strings.Compare(a.File, b.File) })
 	slices.SortFunc(c.Folders, func(a, b model.Folder) int { return strings.Compare(a.File, b.File) })
 	slices.SortFunc(c.Blueprints, func(a, b model.Blueprint) int { return strings.Compare(a.File, b.File) })
+	slices.SortFunc(c.Auths, func(a, b model.NamedAuth) int { return strings.Compare(a.File, b.File) })
 	slices.SortFunc(c.Overlays, func(a, b model.Overlay) int { return strings.Compare(a.File, b.File) })
 	return c
 }

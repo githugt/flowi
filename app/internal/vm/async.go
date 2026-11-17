@@ -22,8 +22,8 @@ const (
 // Verb is what stands where an HTTP request shows its method: the method
 // itself, or the protocol of an async version (MQTT, WS, …).
 func Verb(v model.RequestVersion) string {
-	if v.Dataset != nil {
-		return datasetVerb
+	if d := v.SQL(); d != nil {
+		return datasetVerbOf(*d)
 	}
 	if v.GRPC != nil {
 		return model.ProtocolVerbGRPC
@@ -124,8 +124,8 @@ func asyncConfigured(a model.Async, s Section) bool {
 // asyncTip is the target of a version as a tooltip: its URL, or for an async
 // one the server and channel.
 func asyncTip(v model.RequestVersion) string {
-	if v.Dataset != nil {
-		return datasetTip(*v.Dataset)
+	if d := v.SQL(); d != nil {
+		return datasetTip(*d)
 	}
 	if v.GRPC != nil {
 		return model.GRPCTargetURL(v.GRPC.Server, v.GRPC.Method)

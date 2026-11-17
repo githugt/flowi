@@ -90,6 +90,11 @@ func Import(data []byte, o Options) (Result, diag.List) {
 	if err != nil {
 		return Result{}, invalid(err.Error())
 	}
+	// libopenapi (0.42 on) reads other specifications, an AsyncAPI document among them, without complaint: say plainly
+	// that this one is not OpenAPI.
+	if _, ok := root["openapi"]; !ok {
+		return Result{}, invalid(`not an OpenAPI document: it has no "openapi" field`)
+	}
 	res := newResolver(root, o.Files)
 	res.expandPathItems()
 	groups := groupOperations(operations(root))

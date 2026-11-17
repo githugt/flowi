@@ -74,7 +74,6 @@
   .close { background: none; border: 0; color: var(--muted); font: inherit; font-size: var(--fs-lg); line-height: 1; }
   .field { display: flex; flex-direction: column; gap: 3px; }
   .label { color: var(--muted); font-size: var(--fs-xs); }
-  input, select { background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); padding: 5px 6px; font: inherit; }
   input:focus, select:focus { border-color: var(--accent); outline: none; }
   .err { color: var(--fail); font-size: var(--fs-sm); margin: 0; }
   .actions { display: flex; justify-content: space-between; gap: 8px; }

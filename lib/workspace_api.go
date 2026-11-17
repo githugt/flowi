@@ -82,6 +82,8 @@ type Workspace struct {
 	codec  *yamlcodec.Codec
 	store  *store.Store
 
+	activityMu sync.Mutex // serialises reads and writes of the activity files
+
 	idMu sync.Mutex // guards ids, which is not safe for concurrent use
 	ids  *ids.Source
 

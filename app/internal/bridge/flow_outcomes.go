@@ -18,7 +18,7 @@ func (s *FlowService) outcomesOf(own model.Collection, n model.Node) (outcomes [
 	_, req, ok := s.requestOf(own, n.Request.Request)
 	if v, found := versionOf(req, n.Request.Version); ok && found {
 		switch v.Family() {
-		case model.FamilyDataset:
+		case model.FamilyDataset, model.FamilyFile:
 			kind = "dataset"
 		case model.FamilyHTTP:
 		default:

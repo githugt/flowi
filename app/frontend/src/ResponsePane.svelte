@@ -377,7 +377,8 @@
   .tabs .status-pill { margin-left: 8px; }
   .tone.run { color: var(--accent); }
   .tabs .active { color: var(--text); border-bottom-color: var(--accent); }
-  select { background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); font: inherit; font-size: var(--fs-xs); }
+  /* The format picker is a control of the same row as the mini buttons, so it takes their height and weight. */
+  select { height: var(--ctl-h-sm); padding: 0 10px; background-color: var(--raised); border: 0; box-shadow: inset 0 0 0 1px var(--line); font-size: var(--fs-xs); font-weight: 500; }
   .body { flex: 1; min-height: 0; overflow: auto; }
   .col { display: flex; flex-direction: column; }
   .col .edit { align-self: flex-start; }
@@ -400,7 +401,7 @@
   .grid td.null { color: var(--muted); font-style: italic; }
   .grid .idx { color: var(--muted); text-align: right; width: 1%; }
   .treebar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-  .treebar input { flex: 1; min-width: 120px; background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); padding: 3px 8px; font: inherit; }
+  .treebar input { flex: 1; min-width: 120px; padding: 3px 8px; }
   .path { color: var(--muted); font: var(--fs-xs) var(--mono); }
   .phase { display: grid; grid-template-columns: 80px 1fr 70px; gap: 8px; align-items: center; margin: 6px 0; font-size: var(--fs-sm); }
   .track { background: var(--bg); border-radius: var(--r-sm); height: 10px; }

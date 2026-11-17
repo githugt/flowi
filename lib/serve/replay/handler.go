@@ -57,12 +57,21 @@ type Options struct {
 	// Record, when set, forwards matched calls upstream and saves the
 	// answers (see record.go).
 	Record *Recorder
+
+	// Forward, when set, sends a call that has nothing saved to answer it to a real API (see Forward). Calls a
+	// saved response can answer are still replayed.
+	Forward *Forward
+
+	// Tape, when set, keeps every call in a HAR file, in order: the calls the replayer answers itself (replayed,
+	// or not found) as well as the forwarded ones. Give the Forward's Recorder the same Tape so one file holds both.
+	Tape *Tape
 }
 
 // Handler is the replayer. It is safe for concurrent use.
 type Handler struct {
 	opts Options
 	rec  *Recorder // opts.Record with defaults filled in; nil when not recording
+	fwd  *Forward  // opts.Forward with defaults filled in; nil when not forwarding
 	idx  atomic.Pointer[index]
 
 	seqMu sync.Mutex // guards seq
@@ -87,6 +96,11 @@ func New(opts Options) *Handler {
 	if opts.Record != nil {
 		rec := opts.Record.withDefaults()
 		h.rec = &rec
+	}
+	if opts.Forward != nil {
+		fwd := *opts.Forward
+		fwd.Recorder = fwd.Recorder.withDefaults()
+		h.fwd = &fwd
 	}
 	h.Refresh()
 	return h
@@ -183,7 +197,21 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		cw = &captureWriter{ResponseWriter: w}
 		w = cw
 	}
-	a, dropped := h.applyFaults(r, h.decide(r))
+	var tw *tapeWriter
+	if h.opts.Tape != nil {
+		tw = newTapeWriter(w, r)
+		w = tw
+	}
+	decided := h.decide(r)
+	if h.fwd != nil && (decided.match == MatchNone || decided.match == MatchNoResponse) {
+		up, why := h.fwd.upstreamFor(decided)
+		if up != nil {
+			h.serveForward(w, r, start, up)
+			return
+		}
+		decided = withReason(decided, why)
+	}
+	a, dropped := h.applyFaults(r, decided)
 	if a.wait > 0 {
 		if err := h.opts.Sleep(r.Context(), a.wait); err != nil {
 			return // the caller went away
@@ -196,6 +224,9 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		panic(http.ErrAbortHandler)
 	}
 	h.deliver(w, r, a)
+	if tw != nil {
+		h.keepAnswered(tw, r, time.Since(start))
+	}
 	if cw != nil {
 		kept.Got = cw.message() // before record: the log hands entries to readers, so none is changed after Add
 	}

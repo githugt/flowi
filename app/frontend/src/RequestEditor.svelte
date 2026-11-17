@@ -23,6 +23,7 @@
   import { sectionCounts } from './lib/tabcounts'
   import Dropdown from './Dropdown.svelte'
   import ExprHelp from './ExprHelp.svelte'
+  import RequestMatrix from './RequestMatrix.svelte'
   import ReplayBar from './ReplayBar.svelte'
   import MissingBar from './MissingBar.svelte'
   import Problem from './Problem.svelte'
@@ -35,7 +36,12 @@
   import type { CodeLang } from './lib/highlight'
   import EmptyState from './EmptyState.svelte'
   import { protocolVerb } from './lib/verbs'
+  import { isFileDriver, moveServerPassword, serverHasPassword } from './lib/dataset'
+  import { AuthsService, SecretsService } from '../bindings/github.com/githugt/flowi/app/internal/bridge'
+  const PASSWORD_NOTE = "The password is saved in this request's file, which is often committed. Put it in a secret and write {{secret.name}} in its place."
   import { recognise } from './lib/paste'
+  import AuthFields from './AuthFields.svelte'
+  import { authSummary } from './lib/authsummary'
   import type { DropOption } from './lib/types'
   import { WorkspaceService, ManagerService } from '../bindings/github.com/githugt/flowi/app/internal/bridge'
   import { Events } from '@wailsio/runtime'
@@ -60,8 +66,10 @@
   // What a check or an extract on this kind of request can read, and the example its help gives.
   const checkContext = $derived(view.kind === 'http' ? 'request.check' : view.kind === 'dataset' ? 'dataset.check' : 'message.check')
   const checkExample = $derived(view.kind === 'http' ? 'status == 200' : view.kind === 'dataset' ? 'row_count >= 1' : 'received >= 1')
+  // Databases that take a login in the connection URL; a file or an SQLite path has none.
+  const urlDriver = $derived(['postgres', 'mysql', 'mariadb'].includes(view.dataset?.block.Driver ?? ''))
   const sections = $derived.by(() => {
-    if (view.kind === 'dataset') return ['Query', 'Values', 'Extract', 'Assert', 'Outcomes', 'Variables', 'Settings', 'Hooks', 'Docs', 'Responses', 'Used by']
+    if (view.kind === 'dataset') return ['Query', 'Values', ...(urlDriver ? ['Credentials'] : []), 'Extract', 'Assert', 'Outcomes', 'Variables', 'Settings', 'Hooks', 'Docs', 'Responses', 'Used by']
     if (view.kind === 'grpc') return ['Message', 'Headers', 'Receive', 'Auth', 'Proto', 'Variables', 'Extract', 'Assert', 'Outcomes', 'Settings', 'Hooks', 'Schema', 'Docs', 'Responses', 'Used by']
     if (view.kind === 'async') {
       const p = view.async?.block.Protocol
@@ -74,7 +82,7 @@
   // The sections shown as tabs: what most sends need. The rest are under "More", in their usual order.
   const mainOf = $derived(
     view.kind === 'dataset'
-      ? ['Query', 'Values', 'Extract', 'Assert']
+      ? ['Query', 'Values', ...(urlDriver ? ['Credentials'] : []), 'Extract', 'Assert']
       : view.kind === 'grpc'
         ? ['Message', 'Headers', 'Receive', 'Auth', 'Extract', 'Assert']
         : view.kind === 'async'
@@ -181,6 +189,7 @@
     }
   }
   let replayOpen = $state(false)
+  let matrixOpen = $state(false)
   let hooks = $state('all')
 
   const bodyKinds = ['none', 'text', 'form', 'file']
@@ -209,10 +218,26 @@
   }
   const bodyKindOptions: DropOption[] = [['none', 'None'], ['text', 'Text'], ['form', 'Form'], ['file', 'File']].map(([value, label]) => ({ value, label }))
   const formatOptions: DropOption[] = formats.map((f) => ({ value: f, label: f.toUpperCase() }))
-  const authOptions = $derived<DropOption[]>([...authKinds.map(([value, label]) => ({ value, label })), ...view.auth.schemes.map((s) => ({ value: s.id, label: s.label }))])
+  const authOptions = $derived<DropOption[]>([...authKinds.map(([value, label]) => ({ value, label })), { value: 'use', label: 'Named authentication' }, ...view.auth.schemes.map((s) => ({ value: s.id, label: s.label }))])
+  // The collection's named authentications, and the one in use even when it is gone, so the picker can say so.
+  const namedOptions = $derived<DropOption[]>([...(view.auth.useMissing ? [{ value: view.auth.use, label: view.auth.use + ' (missing)' }] : []), ...view.auth.named.map((a) => ({ value: a.id, label: a.label }))])
+  // Keeps the request's own scheme and values as a named authentication of its collection, and uses it from here.
+  function keepAuth() {
+    ui.prompt({
+      title: 'Save as a named authentication',
+      label: 'Name (other requests pick it by this name; it is kept in the collection\'s auths folder)',
+      initial: '',
+      done: (n) => AuthsService.FromRequest(node, n),
+    })
+  }
+  const openAuths = () => app.openScreen('screen:auths', 'Authentications')
   const isScheme = $derived(view.auth.kind.startsWith('scheme:'))
   function pickAuth(k: string) {
-    if (k.startsWith('scheme:')) RequestService.SetAuthScheme(node, k.slice('scheme:'.length))
+    if (k === 'use') {
+      // With none defined there is nothing to pick: the screen that makes one opens instead.
+      if (view.auth.named.length) RequestService.SetAuthUse(node, view.auth.use || view.auth.named[0].id)
+      else openAuths()
+    } else if (k.startsWith('scheme:')) RequestService.SetAuthScheme(node, k.slice('scheme:'.length))
     else RequestService.SetAuth(node, k, view.auth.value)
   }
   const protocolOptions = $derived<DropOption[]>((view.async?.protocols ?? []).map((p) => ({ value: p.id, label: p.label, tone: protocolVerb(p.id) })))
@@ -229,8 +254,76 @@
   const fail = (e: unknown) => ui.toast(errorText(e), 'error')
   // Writes the working copy over the saved version. With a flowi overlay laid over it, that includes the overlay.
   function saveVersion() {
+    const server = view.dataset?.block.Server ?? ''
+    if (view.kind === 'dataset' && !isFileDriver(view.dataset?.block.Driver ?? '') && serverHasPassword(server)) return askPasswordMove(server)
+    askBreaking()
+  }
+
+  // An edit that breaks what uses the request (a flow that reads a value the request no longer extracts) is said
+  // before it is saved. A request nothing uses, a new one and a check that cannot be made save without asking.
+  async function askBreaking() {
+    let lines: string[] = []
+    if (view.dirty && !view.inScratch) lines = await RequestService.BreakingChanges(node).catch(() => [])
+    if (!lines.length) return writeVersion()
+    const shown = lines.slice(0, 6).join('\n') + (lines.length > 6 ? `\n… and ${lines.length - 6} more` : '')
+    ui.unsaved(
+      'This change breaks something that uses this request',
+      `Saving it makes ${lines.length === 1 ? 'this' : 'these'} stop working:\n${shown}`,
+      writeVersion,
+      () => {},
+      { save: 'Save anyway', discard: 'Do not save' },
+    )
+  }
+  function writeVersion() {
     if (view.inScratch) saveTo()
     else RequestService.Save(node)
+  }
+
+  // A password written in a connection URL would be saved in the request's file, often committed: offer to keep it
+  // in a secret of the selected environment instead. Not forced: "Save as is" saves it as it is.
+  function askPasswordMove(server: string) {
+    const envs = app.tree?.environments ?? []
+    if (!envs.length) {
+      ui.toast('The password is saved in the request file. To keep it in a secret, create an environment first (Environments in the sidebar), then save again.', 'error')
+      return askBreaking()
+    }
+    const selected = envs.includes(app.tree?.selected ?? '') ? (app.tree?.selected ?? '') : envs[0]
+    ui.unsaved(
+      'Password in the connection string',
+      `The password is saved in this request's file, which is often committed. Move it into a secret and write {{secret.name}} in its place?`,
+      () =>
+        ui.prompt({
+          title: 'Keep the password in a secret',
+          label: 'Name of the secret (its value is stored in the vault, never in a file)',
+          initial: 'db_password',
+          select: { label: 'For the environment', options: [selected, ...envs.filter((e) => e !== selected)].map((e) => ({ id: e, label: e })) },
+          done: (name, _protocol, env) => void moveToSecret(env || selected, name.trim(), server),
+        }),
+      askBreaking,
+      { save: 'Move to a secret…', discard: 'Save as is' },
+    )
+  }
+  // The system's dialog picks the file or folder; the request keeps it relative to its collection when it lies inside.
+  async function pickDataPath(folder: boolean) {
+    try {
+      const picked = await RequestService.PickDataPath(node, folder)
+      const db = view.dataset?.block
+      if (picked && db) RequestService.SetDataset(node, { ...db, Server: picked } as never)
+    } catch (e) {
+      fail(e)
+    }
+  }
+
+  async function moveToSecret(env: string, name: string, server: string) {
+    const moved = /^[A-Za-z_][A-Za-z0-9_]*$/.test(name) ? moveServerPassword(server, name) : null
+    if (!moved) return ui.toast('A secret name is letters, digits and _, and starts with a letter or _.', 'error')
+    const problem = await SecretsService.Declare(env, name, moved.password)
+    if (problem) return ui.toast(problem, 'error')
+    const block = structuredClone($state.snapshot(view.dataset!.block))
+    block.Server = moved.server
+    await RequestService.SetDataset(node, block as never)
+    ui.toast(`The password is now the secret "${name}" of "${env}".`)
+    askBreaking()
   }
   // Save (the button, ⌘S): with a flowi overlay open, the edit belongs to the overlay.
   function save() {
@@ -378,12 +471,23 @@
       </div>
     {:else if view.dataset}
       {@const db = view.dataset.block}
-      <Dropdown pill title="Database" options={view.dataset.drivers.map((x) => ({ value: x.id, label: x.label, tone: protocolVerb(x.id) }))} value={db.Driver} width="130px"
+      {@const fileSource = isFileDriver(db.Driver)}
+      <!-- A file source switches only between file types, and a database only between databases: they are different kinds of source. -->
+      <Dropdown pill title={fileSource ? 'File type' : 'Database'} options={view.dataset.drivers.filter((x) => isFileDriver(x.id) === fileSource).map((x) => ({ value: x.id, label: x.label, tone: protocolVerb(x.id) }))} value={db.Driver} width="130px"
         onpick={(id) => RequestService.SetDataset(node, { ...db, Driver: id } as never)} />
       <div class="url">
-        <TextField mono value={db.Server} placeholder={db.Driver === 'sqlite' ? 'shop.db (a file in the collection)' : '{{env.database_url}}'}
+        <TextField mono value={db.Server} placeholder={fileSource ? 'data/sales.csv (a file or a folder in the collection)' : db.Driver === 'sqlite' ? 'shop.db (a file in the collection)' : '{{env.database_url}}'}
           oninput={(t) => RequestService.SetDataset(node, { ...db, Server: t } as never)} onenter={() => RequestService.Send(node, hooks)} />
       </div>
+      {#if fileSource || db.Driver === 'sqlite'}
+        <span class="pick">
+          <button type="button" title={fileSource ? 'Choose a data file' : 'Choose the database file'} onclick={() => pickDataPath(false)}>File…</button>
+          {#if fileSource}<button type="button" title="Choose a folder of data files" onclick={() => pickDataPath(true)}>Folder…</button>{/if}
+        </span>
+      {/if}
+      {#if !fileSource && serverHasPassword(db.Server)}
+        <span class="pwwarn" role="note" title={PASSWORD_NOTE}>⚠ Password in the file</span>
+      {/if}
     {:else if view.grpc}
       {@const gb = view.grpc.block}
       <Verb verb="GRPC" />
@@ -413,6 +517,7 @@
           {/each}
           <hr />
           <button role="menuitem" onclick={() => menuAction(() => (replayOpen = !replayOpen))}><span class="tick">{replayOpen ? '✓' : ''}</span>Replay saved responses…</button>
+          <button role="menuitem" disabled={view.inScratch || view.dirty} title={view.inScratch || view.dirty ? 'Save the request first: a matrix sends the file on disk' : 'Send it once for every combination of environments, overlays and values'} onclick={() => menuAction(() => (matrixOpen = true))}><span class="tick"></span>Run a matrix…</button>
         </div>
       {/if}
     </div>
@@ -494,6 +599,7 @@
       · <button class="link" onclick={openUpdate}>Update from spec…</button>
     </p>
   {/if}
+  {#if matrixOpen}<RequestMatrix {node} onclose={() => (matrixOpen = false)} />{/if}
   {#if view.kind === 'http'}<ReplayBar path={view.replayPath} method={v.Method || 'GET'} open={replayOpen} onclose={() => (replayOpen = false)} />{/if}
 
   <div class="panels">
@@ -540,7 +646,9 @@
           <div class="typebar"><Dropdown title="Auth type" options={authOptions} value={view.auth.kind} onpick={pickAuth} /></div>
         {/if}
         <div class="section">
-          {#if ['Message', 'Receive', 'Credentials', 'Binding', 'Proto'].includes(section)}
+          {#if view.kind === 'dataset' && section === 'Credentials'}
+            <DatasetSections {view} {section} />
+          {:else if ['Message', 'Receive', 'Credentials', 'Binding', 'Proto'].includes(section)}
             <MessageSections {view} {section} />
           {:else if ['Query', 'Values'].includes(section)}
             <DatasetSections {view} {section} />
@@ -574,15 +682,26 @@
               <EmptyState icon="auth" title="No auth" hint={'Pick a type above. Keep credentials out of the file: use {{secret.name}}.'} compact>
                 <button onclick={() => pickAuth('bearer')}>Bearer token</button><button onclick={() => pickAuth('basic')}>Basic</button>
               </EmptyState>
+            {:else if view.auth.kind === 'use'}
+              <div class="pickrow"><Dropdown title="Named authentication" options={namedOptions} value={view.auth.use} onpick={(n) => RequestService.SetAuthUse(node, n)} /><button onclick={openAuths}>Edit authentications…</button></div>
+              {#if view.auth.useMissing}
+                <p class="muted">This collection has no authentication named {view.auth.use}. The request cannot be sent until you pick another or add it again.</p>
+              {:else}
+                <p class="muted">The request is sent with the collection's authentication {view.auth.use}. Its values are kept in one place: change them under Authentications.</p>
+              {/if}
             {:else if isScheme}
-              {#each view.auth.fields as f (f.name)}
-                <TextField label={f.name + (f.known ? '' : ' (not a parameter of this scheme)')} mono placeholder={f.secret ? '{{secret.' + f.name + '}}' : ''} value={f.value} oninput={(t) => RequestService.SetAuthParam(node, f.name, t)} />
-              {/each}
-              <p class="muted">Every value is a template. Keep credentials out of the file: {'{{secret.name}}'} reads the vault. The request is signed or authenticated as it is sent.</p>
+              <AuthFields fields={view.auth.fields} onparam={(name, t) => RequestService.SetAuthParam(node, name, t)} />
+              <div class="keepauth">
+                <button disabled={view.inScratch} title={view.inScratch ? 'Save the request into a collection first' : 'Keep this authentication under a name, so other requests can use it too. This request then uses it by name.'}
+                  onclick={keepAuth}>Save as a named authentication…</button>
+              </div>
             {:else}
               <TextField label={view.auth.kind === 'bearer' ? 'Token' : view.auth.kind === 'basic' ? 'Base64 credentials or a template' : 'Authorization header value'} mono
                 value={view.auth.value} oninput={(t) => RequestService.SetAuth(node, view.auth.kind, t)} />
               <p class="muted">Keep credentials out of the file: use {'{{secret.name}}'}.</p>
+            {/if}
+            {#if authSummary(view.auth.kind, view.auth.value, view.auth.fields)}
+              <p class="sends">When sent, it {authSummary(view.auth.kind, view.auth.value, view.auth.fields).replace(/`([^`]+)`/g, '“$1”')}.</p>
             {/if}
           {:else if section === 'Extract' && !extract.length}
             <EmptyState icon="extract" title="Nothing extracted" hint="Take a value out of the response into a variable, for later requests and steps." compact>
@@ -668,6 +787,9 @@
   .addr :global(.dd .btn) { background: none; border: 0; border-right: 1px solid var(--line); border-radius: var(--r-lg) 0 0 var(--r-lg); min-height: 36px; }
   .addr > .url2 { padding-right: 6px; }
   .url { flex: 1; min-width: 0; }
+  .pick { display: flex; gap: 4px; padding-right: 6px; }
+  .pick button { background: var(--raised); color: var(--text); border: 0; box-shadow: inset 0 0 0 1px var(--line); border-radius: var(--r-md); padding: 0 10px; min-height: var(--ctl-h); font: inherit; font-size: var(--fs-sm); }
+  .pick button:hover { background: var(--raised-3); }
   .url2 { flex: 1; min-width: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
   .url2 :global(input) { width: 100%; box-sizing: border-box; }
   .url :global(input) { width: 100%; box-sizing: border-box; }
@@ -729,6 +851,7 @@
   .docsbar button:disabled { opacity: 0.5; }
   .docsview { flex: 1; min-height: 0; overflow: auto; padding: 4px 2px; }
   .typebar { flex: none; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; padding: 6px 10px; border-bottom: 1px solid var(--line); }
+  .pickrow { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
   /* Every main action is a gradient with a soft glow: Send in the colour chosen in Settings, listening and the
      two-way modes in their own, so the mode still reads at a glance. */
   .send { --act-fill: linear-gradient(135deg, color-mix(in srgb, var(--act) 78%, white), var(--act)); --act-glow: color-mix(in srgb, var(--act) 34%, transparent); --act-ink: var(--on-act); }
@@ -754,6 +877,7 @@
   .menu button { display: flex; align-items: center; white-space: nowrap; }
   .section { flex: 1; overflow: auto; padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; }
   .muted { color: var(--muted); font-size: var(--fs-sm); margin: 0; }
+  .sends { color: var(--muted); font-size: var(--fs-sm); margin: 8px 0 0; }
   .row { display: flex; gap: 4px; }
   .row input {
     flex: 1; min-width: 0; background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); padding: 5px 8px;
@@ -765,4 +889,6 @@
   code { font-family: var(--mono); }
   .builtin { border-top: 1px solid var(--line); padding-top: 8px; }
   .chain { margin: 0; padding-left: 18px; font: var(--fs-sm) var(--mono); }
+  .keepauth { margin-top: 8px; }
+  .pwwarn { flex: none; color: var(--warn); font-size: var(--fs-xs); white-space: nowrap; margin-right: 10px; }
 </style>

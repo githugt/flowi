@@ -318,3 +318,20 @@ func TestExtract_Given_an_xml_path_that_matches_nothing_or_is_wrong_Then_an_erro
 		t.Fatalf("nothing %v bad %v", nothing, bad)
 	}
 }
+
+// Before: the failure read "Expected a 2xx response, got {{response.status}}": the message was shown as written.
+func TestAssert_Given_false_and_a_templated_message_When_run_Then_the_message_has_the_value(t *testing.T) {
+	s, _ := newState(PhasePost)
+	s.Response = sampleResponse()
+	want := "got " + template.String(s.Scope().Values["status"])
+
+	diags := run(t, node("assert", "check", "status == 0", "message", "got {{status}}"), s)
+	unknown := run(t, node("assert", "check", "status == 0", "message", "got {{nope}}"), s)
+
+	if len(diags) != 1 || !strings.HasSuffix(diags[0].Args["message"], want) || want == "got " {
+		t.Fatalf("message %q, want %q", diags[0].Args["message"], want)
+	}
+	if len(unknown) != 1 || unknown[0].Code != diag.CodeRunAssertFailed || !strings.HasSuffix(unknown[0].Args["message"], "got {{nope}}") {
+		t.Fatalf("a message that cannot be rendered hid the failure: %v", unknown)
+	}
+}

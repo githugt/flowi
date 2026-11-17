@@ -44,6 +44,7 @@ func (rt *nodeRuntime) Request(ctx context.Context, c nodes.RequestCall) nodes.O
 		collection: coll, request: req, pinned: c.Version, flowPrefer: rt.f.fs.prefer, withValues: with, hooks: c.Hooks,
 		depth: rt.f.depth, path: rt.path, headers: c.Headers, jar: rt.f.jar, noJar: rt.f.noJar, overlay: overlay,
 		conn: connUse{open: c.Open, over: c.Over, closeAfter: c.Close}, bodyOver: c.Body, outcomes: c.Outcomes,
+		activeHooks: rt.f.activeHooks,
 	})
 	if inner.record != nil {
 		masked := inner.record.Masked(rt.r.secrets.current())
@@ -80,7 +81,7 @@ func (rt *nodeRuntime) Subflow(ctx context.Context, ref model.Ref, inputs map[st
 	}
 	fs := &flowScope{collection: coll, flow: &fl, env: env, prefer: fl.PreferVersion, onBranchError: fl.Execution.OnBranchError}
 	f := &frame{fs: fs, vars: nodes.NewVars(nil), outputs: newOutputs(nil), jar: rt.f.jar, noJar: rt.f.noJar,
-		prefix: rt.path + "/", parentPath: rt.path, depth: rt.f.depth}
+		prefix: rt.path + "/", parentPath: rt.path, depth: rt.f.depth, activeHooks: rt.f.activeHooks}
 	resolved, diags := r.resolveInputs(fl, inputs, f.scope(r))
 	if diags.HasErrors() {
 		return nodes.Outcome{Diags: diags}

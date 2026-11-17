@@ -12,6 +12,7 @@ import (
 
 	"github.com/githugt/flowi/lib/diag"
 	"github.com/githugt/flowi/lib/model"
+	"github.com/githugt/flowi/lib/settings"
 	"github.com/githugt/flowi/lib/store"
 	"github.com/githugt/flowi/lib/validate"
 )
@@ -35,7 +36,7 @@ func (w *Workspace) validateStructure() diag.List {
 // the contract phase: what decides whether a send or run may start.
 // Callers hold mu.
 func (w *Workspace) structuralDiags() diag.List {
-	return slices.Concat(w.loadDiags, validate.Validate(validate.Target{Collections: w.collections}), w.scheduleDiags())
+	return slices.Concat(w.loadDiags, validate.Validate(validate.Target{Collections: w.collections, AllowDatasetWrites: w.allowDatasetWrites(), DatasetReadOnly: w.datasetReadOnly()}), w.scheduleDiags())
 }
 
 // ValidateDir validates the collection in dir, mounted or not, with the
@@ -52,7 +53,7 @@ func (w *Workspace) ValidateDir(dir string) (diag.List, error) {
 	w.mu.RLock()
 	defer w.mu.RUnlock()
 	target := withCollection(w.collections, c)
-	all := slices.Concat(loadDiags, validate.Validate(validate.Target{Collections: target}), w.contractWarnings(target))
+	all := slices.Concat(loadDiags, validate.Validate(validate.Target{Collections: target, AllowDatasetWrites: w.allowDatasetWrites(), DatasetReadOnly: w.datasetReadOnly()}), w.contractWarnings(target))
 	inDir := slices.DeleteFunc(all, func(d diag.Diagnostic) bool { return !within(c.Root, d.File) })
 	return w.positioned(inDir), nil
 }
@@ -93,4 +94,19 @@ func (w *Workspace) locateInFile(d diag.Diagnostic) diag.Diagnostic {
 		d.Pos = pos
 	}
 	return d
+}
+
+// datasetReadOnly is the datasets.read_only setting as the user's own layers have it. Callers hold mu.
+func (w *Workspace) datasetReadOnly() bool {
+	v, _ := settings.Resolve(w.schema, w.settingsLayers(Scope{})...).Get("datasets.read_only")
+	on, _ := v.Value.(bool)
+	return on
+}
+
+// allowDatasetWrites is the datasets.allow_writes setting, which only the user's own settings can turn on.
+// Callers hold mu (Settings would lock it again).
+func (w *Workspace) allowDatasetWrites() bool {
+	v, _ := settings.Resolve(w.schema, w.settingsLayers(Scope{})...).Get("datasets.allow_writes")
+	allowed, _ := v.Value.(bool)
+	return allowed
 }

@@ -5,6 +5,9 @@ package bridge
 import (
 	"fmt"
 	"strings"
+	"time"
+
+	flowi "github.com/githugt/flowi/lib"
 )
 
 // DetailRow is one labelled value of the Details pane.
@@ -29,8 +32,14 @@ func (s *PanelsService) Details(node string) DetailsView {
 	s.app.actor.Do(func() {
 		if o, ok := s.app.requests.reqs[node]; ok {
 			d = requestDetails(s.app.requests.view(node, o), s.app.workspace.SelectedEnv())
+			if a, err := s.app.backend.RequestActivity(o.req.Target()); err == nil {
+				d.Rows = append(d.Rows, activityRows(a, "Last sent")...)
+			}
 		} else if o, ok := s.app.flows.docs[node]; ok {
 			d = flowDetails(s.app.flows.view(node, o))
+			if a, err := s.app.backend.FlowActivity(o.doc.Target()); err == nil {
+				d.Rows = append(d.Rows, activityRows(a, "Last run")...)
+			}
 		}
 	})
 	return d
@@ -65,6 +74,41 @@ func flowDetails(v FlowView) DetailsView {
 		{"Last run", orWord(v.Run.Summary, "not run yet")},
 	}
 	return DetailsView{Kind: "flow", Title: v.Name, Rows: rows}
+}
+
+// activityRows turn what is known of an entity's life into rows. An entity that arrived with the files (cloned,
+// pulled) says so, and dates itself from when it was first seen here.
+func activityRows(a flowi.Activity, ran string) []DetailRow {
+	when := func(t time.Time) string {
+		if t.IsZero() {
+			return "never"
+		}
+		return t.Local().Format("2006-01-02 15:04")
+	}
+	origin := map[string]string{
+		flowi.OriginCreated: "made here", flowi.OriginDuplicated: "duplicated", flowi.OriginImported: "imported",
+		flowi.OriginRecorded: "recorded by the replayer", flowi.OriginFound: "came with the files (cloned or copied in)",
+	}[a.Origin]
+	if origin == "" {
+		origin = a.Origin
+	}
+	if a.OriginDetail != "" {
+		origin += " – " + a.OriginDetail
+	}
+	created := "Created"
+	if a.Origin == flowi.OriginFound {
+		created = "First seen here"
+	}
+	rows := []DetailRow{{"Origin", origin}, {created, when(a.Created)}}
+	if a.Runs == 0 {
+		return append(rows, DetailRow{ran + " (this client)", "never"})
+	}
+	return append(rows,
+		DetailRow{ran + " (this client)", when(a.LastRun) + " · " + a.LastStatus},
+		DetailRow{"Last success", when(a.LastSuccess)},
+		DetailRow{"Last failure", when(a.LastFailure)},
+		DetailRow{"Runs (this client)", fmt.Sprint(a.Runs)},
+	)
 }
 
 func orWord(s, word string) string {

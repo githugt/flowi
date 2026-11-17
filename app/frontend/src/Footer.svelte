@@ -1,10 +1,16 @@
 <script lang="ts">
-  import { PanelsService, RequestService, WorkspaceService } from '../bindings/github.com/githugt/flowi/app/internal/bridge'
+  import { PanelsService, RequestService, WelcomeService, WorkspaceService } from '../bindings/github.com/githugt/flowi/app/internal/bridge'
   import { app } from './lib/app.svelte'
   import { ui } from './lib/ui.svelte'
   import type { LocationView } from './lib/types'
   import { footerLabel } from './lib/footer'
+  import { errorText } from './lib/errors'
   import DetailsPane from './DetailsPane.svelte'
+
+  let appVersion = $state('')
+  $effect(() => {
+    WelcomeService.State().then((v) => (appVersion = (v as { version: string }).version)).catch(() => {})
+  })
 
   type Tab = 'details' | 'log' | 'problems' | 'history'
   let open = $state<Tab | null>(null)
@@ -79,11 +85,16 @@
       <span class="sum"></span>
       <button class="link" onclick={() => PanelsService.ClearHistory()}>Clear</button>
     {/if}
+    {#if appVersion}<button class="where-tab where-link" title="About Flowi" onclick={() => app.openScreen('screen:about', 'About')}>v{appVersion}</button>{/if}
     {#if verLabel}<span class="ver-tab" title="The version of the open request, and the overlays laid over it">{verLabel}</span>{/if}
     {#if where.name}
-      <span class="where-tab" title={where.scratch ? 'Scratch: drafts that are not saved to a folder yet' : where.path}>
-        {#if where.scratch}Scratch{:else}{where.name}{#if where.branch} · <span class="branch">⎇ {where.branch}</span>{/if}{/if}
-      </span>
+      {#if where.scratch}
+        <span class="where-tab" title="Scratch: drafts that are not saved to a folder yet">Scratch</span>
+      {:else}
+        <button class="where-tab where-link" title={`Show ${where.path} in the file manager`} onclick={() => WorkspaceService.RevealLocation(app.active).catch((e) => ui.toast(errorText(e), 'error'))}>
+          {where.name}{#if where.branch} · <span class="branch">⎇ {where.branch}</span>{/if}
+        </button>
+      {/if}
     {/if}
   </div>
   {#if open}
@@ -135,6 +146,8 @@
   .ver-tab { margin-left: auto; color: var(--text); font-size: var(--fs-sm); padding: 4px 12px 2px 10px; margin-right: 2px; border-right: 1px solid var(--line); white-space: nowrap; }
   .ver-tab + .where-tab { margin-left: 8px; }
   .where-tab { margin-left: auto; color: var(--muted); font-size: var(--fs-sm); padding: 4px 4px 2px 0; white-space: nowrap; cursor: default; }
+  .where-link { background: none; border: 0; font: inherit; font-size: var(--fs-sm); cursor: pointer; }
+  .where-link:hover { color: var(--text); text-decoration: underline; }
   .branch { color: var(--text); }
   .sum { color: var(--muted); font-size: var(--fs-sm); margin-left: 12px; }
   .link { color: var(--accent) !important; }

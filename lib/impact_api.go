@@ -31,6 +31,30 @@ func (w *Workspace) Impact(t RequestTarget, version string) (analysis.Report, di
 	return rep, w.positioned(diags), err
 }
 
+// ImpactOfDraft is Impact for request t as it would be once draft, an edited copy of it, is saved: nothing is
+// written. Compare it with Impact to see what the edit would break for the request's consumers (a removed extraction
+// a flow reads, say).
+func (w *Workspace) ImpactOfDraft(t RequestTarget, draft model.Request) (analysis.Report, diag.List, error) {
+	w.mu.RLock()
+	defer w.mu.RUnlock()
+	cs := slices.Clone(w.collections)
+	for i, c := range cs {
+		if c.Manifest.ID != t.Collection {
+			continue
+		}
+		j := slices.IndexFunc(c.Requests, func(r model.Request) bool { return r.ID == t.Request })
+		if j < 0 {
+			return analysis.Report{}, nil, diagErr(diag.CodeRequestNotFound, map[string]string{"ref": string(t.Request)})
+		}
+		draft.ID, draft.File, draft.Path = c.Requests[j].ID, c.Requests[j].File, c.Requests[j].Path
+		c.Requests = slices.Clone(c.Requests)
+		c.Requests[j] = draft
+		cs[i] = c
+	}
+	rep, diags, err := analysis.Impact(cs, analysis.Target{Collection: t.Collection, Request: t.Request}, "", w.contracts())
+	return rep, w.positioned(diags), err
+}
+
 func (w *Workspace) contracts() analysis.FileContracts {
 	return analysis.FileContracts{DataDir: w.DataDir}
 }

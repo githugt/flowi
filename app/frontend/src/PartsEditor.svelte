@@ -62,7 +62,6 @@
   /* Name, kind and remove on one line; the text or path, and a file's content type, each on a line of their own. */
   .row { display: grid; grid-template-columns: minmax(80px, 1fr) auto auto; gap: 6px; align-items: center; padding-bottom: 8px; border-bottom: 1px solid var(--line); }
   .row button { grid-column: 3; grid-row: 1; }
-  input, select { background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); padding: 4px 8px; font: inherit; }
   .name { min-width: 0; }
   .value, .type { grid-column: 1 / -1; min-width: 0; }
   .value { font-family: var(--mono); font-size: var(--fs-sm); }

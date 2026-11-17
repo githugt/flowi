@@ -22,6 +22,7 @@ type SnippetView struct {
 	Format  string   `json:"format"`
 	Formats []string `json:"formats"`
 	Exclude bool     `json:"exclude"` // secrets are left out
+	Secrets bool     `json:"secrets"` // the text contains real secret values
 	Text    string   `json:"text"`
 	Error   string   `json:"error,omitempty"`
 }
@@ -67,7 +68,7 @@ func snippetViewOf(s *vm.Snippet) SnippetView {
 	for _, f := range snippet.Formats() {
 		formats = append(formats, string(f))
 	}
-	return SnippetView{Format: string(s.Format()), Formats: formats, Exclude: s.Exclude(), Text: s.Text(), Error: s.Err()}
+	return SnippetView{Format: string(s.Format()), Formats: formats, Exclude: s.Exclude(), Secrets: s.HasSecrets(), Text: s.Text(), Error: s.Err()}
 }
 
 // SetSnippetFormat picks curl, wget, powershell or xh.
@@ -105,6 +106,27 @@ func (s *RequestService) UsedBy(node string) UsedByView {
 		}
 	})
 	return v
+}
+
+// BreakingChanges says what saving the request as edited would break for the flows, hooks and checks that use it and
+// are fine today, one line each. None (an empty list) means saving breaks nothing, or the check could not be made: it
+// never holds a save up. The window asks before it saves a request that has consumers.
+func (s *RequestService) BreakingChanges(node string) []string {
+	ch := make(chan *vm.SaveImpact, 1)
+	open := false
+	s.with(node, func(o *openRequest) {
+		open = true
+		c := vm.NewSaveImpact(s.app.backend, s.app.worker, o.req.Target(), o.req.Draft())
+		c.OnChange(func() { ch <- c })
+		c.Load()
+	})
+	out := []string{}
+	if !open {
+		return out
+	}
+	c := <-ch
+	s.app.actor.Do(func() { out = append(out, c.Lines()...) })
+	return out
 }
 
 // flowRow finds the tree row of the flow at path in a collection.

@@ -53,6 +53,9 @@ type RunOptions struct {
 	// Secrets gives values for the environment's secrets by name, in place of the vault and of
 	// FLOWI_SECRET_* variables. A replay passes the mask for each, so no vault is opened.
 	Secrets map[string]string
+	// Draft runs this flow in place of the saved one (an editor's unsaved edits): it keeps the saved flow's id and
+	// file, so what the run reports belongs to the same flow. nil runs the file as saved.
+	Draft *model.Flow
 }
 
 // FindFlow resolves a flow reference as users type it: an id, or a path
@@ -121,12 +124,17 @@ func (w *Workspace) RunFlow(ctx context.Context, t FlowTarget, o RunOptions) (*e
 	if err != nil {
 		return nil, err
 	}
+	if o.Draft != nil {
+		draft := *o.Draft
+		draft.ID, draft.File, draft.Path = f.ID, f.File, f.Path
+		f = draft
+	}
 	o = w.asReplay(t.Collection, o)
 	o = w.withDocumentEnv(t.Collection, o)
 	if _, missing := flowioverlay.Resolve(c.Overlays, o.Overlay, ""); o.Overlay != "" && missing != "" {
 		return nil, diagErr(diag.CodeOverlayNotFound, map[string]string{"name": missing})
 	}
-	if err := w.sendable(c, o.Env, nil); err != nil {
+	if err := w.sendable(c, o.Env, filesNotRunByFlow(w.Collections(), f)); err != nil {
 		return nil, err
 	}
 	if err := checkInputs(f, o.Inputs); err != nil {
@@ -146,6 +154,7 @@ func (w *Workspace) RunFlow(ctx context.Context, t FlowTarget, o RunOptions) (*e
 		// A vault of its own, without a file: the secrets the options give win, and nothing else is read.
 		deps.Vault = vault.New(vault.Options{WorkspaceID: w.Model().ID, Environ: environ})
 	}
+	deps.OnRun = w.onRun(t, f.File)
 	return engine.StartRun(ctx, deps, in), nil
 }
 

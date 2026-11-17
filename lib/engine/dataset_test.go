@@ -249,3 +249,82 @@ func TestRecord_Rows_should_be_zero_for_any_other_record(t *testing.T) {
 		t.Fatalf("count %d truncated %v", count, truncated)
 	}
 }
+
+// Before: "the query failed: running the query: expected 0 arguments, got 1" did not say which side was which,
+// or that the starter value left under Values was the one too many.
+func TestExplainArguments_Given_a_driver_count_mismatch_When_explained_Then_it_names_placeholders_and_values(t *testing.T) {
+	detail := "running the query: expected 0 arguments, got 1"
+
+	got := explainArguments(detail)
+
+	if !strings.Contains(got, "0 placeholder(s)") || !strings.Contains(got, "passes 1 value(s)") || !strings.Contains(got, "Values") {
+		t.Fatalf("got %q", got)
+	}
+	if other := explainArguments("relation \"rna\" does not exist"); other != "relation \"rna\" does not exist" {
+		t.Fatalf("another error was rewritten: %q", other)
+	}
+}
+
+func fileVersion(f model.DataFile) model.RequestVersion {
+	if f.Format == "" {
+		f.Format = model.FormatCSV
+	}
+	if f.Path == "" {
+		f.Path = "data/sales.csv"
+	}
+	if f.Query == "" {
+		f.Query = "SELECT id, name FROM sales"
+	}
+	return model.RequestVersion{File: &f}
+}
+
+func TestSend_File_should_run_the_query_over_the_file_as_a_dataset_record(t *testing.T) {
+	runner := &scriptedDataset{res: twoCustomers()}
+	v := fileVersion(model.DataFile{Path: "{{dir}}/sales.csv", Query: "SELECT id, name FROM sales WHERE id > ?", Params: []string{"{{id}}"}, Limit: 5})
+	v.Assert = []string{`row_count == 2`, `body.rows[0].name == "Ada"`}
+
+	res, _ := sendDatasetRequest(t, runner, v, func(in *SendInput) { in.With = map[string]string{"id": "0", "dir": "data"} })
+
+	if res.Status != StatusPassed {
+		t.Fatalf("status %s diags %v", res.Status, res.Diags)
+	}
+	q := runner.got
+	if q.Driver != "csv" || q.Server != "data/sales.csv" || q.Params[0] != "0" || q.Limit != 5 || q.AllowWrites {
+		t.Fatalf("query %+v", q)
+	}
+	if res.Record.Kind != KindDataset || res.Record.Proto != "csv" {
+		t.Fatalf("record kind %q proto %q", res.Record.Kind, res.Record.Proto)
+	}
+}
+
+func allowsWrites(t *testing.T, v model.RequestVersion, set model.Settings) bool {
+	t.Helper()
+	runner := &scriptedDataset{res: twoCustomers()}
+	f := newFixture(t)
+	f.dataset = runner
+	f.update(func(c *model.Collection) { c.Manifest.Settings = set })
+	r := f.addRequest("sales/list", v)
+	f.send(f.input(r))
+	return runner.got.AllowWrites
+}
+
+func TestSend_File_Then_a_write_needs_writes_on_the_request(t *testing.T) {
+	if allowsWrites(t, fileVersion(model.DataFile{}), model.Settings{}) {
+		t.Fatal("a file query may write by default")
+	}
+	if !allowsWrites(t, fileVersion(model.DataFile{Writes: true}), model.Settings{}) {
+		t.Fatal("writes: true on the request did not allow it")
+	}
+}
+
+func TestSend_Given_datasets_read_only_Then_no_dataset_or_file_query_may_write(t *testing.T) {
+	readOnly := model.Settings{"datasets.read_only": true, "datasets.allow_writes": true}
+	for name, v := range map[string]model.RequestVersion{
+		"file":     fileVersion(model.DataFile{Writes: true}),
+		"database": datasetVersion(model.Dataset{Writes: true}),
+	} {
+		if allowsWrites(t, v, readOnly) {
+			t.Errorf("%s: a query wrote though datasets.read_only is on", name)
+		}
+	}
+}

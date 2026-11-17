@@ -310,19 +310,26 @@ func TestServe_should_fail_fast_on_a_port_in_use_and_on_bad_options(t *testing.T
 	spareAddr := spare.Addr().String()
 	_ = spare.Close() // free again: the replayer binds it and a --record URL points back at it
 	invalid := map[string]bool{"bad address": true, "record not a URL": true, "record not http": true, "record to itself": true,
-		"nothing to serve": true, "negative latency": true, "negative shutdown": true, "fault rate over one": true, "faults with record": true, "tape without record": true}
+		"nothing to serve": true, "negative latency": true, "negative shutdown": true, "fault rate over one": true, "faults with record": true, "tape without record": true,
+		"forward unknown mode": true, "forward with record": true, "forward to not http": true, "forward to itself": true, "forward urls without a mode": true, "forward with cors": true, "pass-through and forward": true}
 	cases := map[string]ServeOptions{
-		"port in use":         {ReplayAddr: taken.Addr().String()},
-		"bad address":         {ReplayAddr: "not an address"},
-		"record not a URL":    {ReplayAddr: "127.0.0.1:0", Record: "::"},
-		"record not http":     {ReplayAddr: "127.0.0.1:0", Record: "ftp://example.com"},
-		"record to itself":    {ReplayAddr: spareAddr, Record: "http://" + spareAddr},
-		"nothing to serve":    {NoReplay: true, NoTriggers: true, NoSchedules: true},
-		"negative latency":    {ReplayAddr: "127.0.0.1:0", Latency: -time.Second},
-		"negative shutdown":   {ReplayAddr: "127.0.0.1:0", ShutdownTimeout: -time.Second},
-		"tape without record": {ReplayAddr: "127.0.0.1:0", RecordHAR: "x.har"},
-		"fault rate over one": {ReplayAddr: "127.0.0.1:0", Faults: replay.Faults{ErrorRate: 1.5}},
-		"faults with record":  {ReplayAddr: "127.0.0.1:0", Record: "http://127.0.0.1:1", Faults: replay.Faults{DropRate: 0.5}},
+		"port in use":                 {ReplayAddr: taken.Addr().String()},
+		"bad address":                 {ReplayAddr: "not an address"},
+		"record not a URL":            {ReplayAddr: "127.0.0.1:0", Record: "::"},
+		"record not http":             {ReplayAddr: "127.0.0.1:0", Record: "ftp://example.com"},
+		"record to itself":            {ReplayAddr: spareAddr, Record: "http://" + spareAddr},
+		"nothing to serve":            {NoReplay: true, NoTriggers: true, NoSchedules: true},
+		"negative latency":            {ReplayAddr: "127.0.0.1:0", Latency: -time.Second},
+		"negative shutdown":           {ReplayAddr: "127.0.0.1:0", ShutdownTimeout: -time.Second},
+		"fault rate over one":         {ReplayAddr: "127.0.0.1:0", Faults: replay.Faults{ErrorRate: 1.5}},
+		"faults with record":          {ReplayAddr: "127.0.0.1:0", Record: "http://127.0.0.1:1", Faults: replay.Faults{DropRate: 0.5}},
+		"forward unknown mode":        {ReplayAddr: "127.0.0.1:0", Forward: "everything"},
+		"forward with record":         {ReplayAddr: "127.0.0.1:0", Forward: ForwardPass, Record: "http://127.0.0.1:1"},
+		"forward to not http":         {ReplayAddr: "127.0.0.1:0", Forward: ForwardPass, ForwardTo: "ftp://example.com"},
+		"forward to itself":           {ReplayAddr: spareAddr, Forward: ForwardPass, ForwardTo: "http://" + spareAddr},
+		"forward with cors":           {ReplayAddr: "127.0.0.1:0", Forward: ForwardPass, ForwardTo: "http://127.0.0.1:1", CORS: true},
+		"forward urls without a mode": {ReplayAddr: "127.0.0.1:0", ForwardOnly: []string{"https://api.example.test"}},
+		"pass-through and forward":    {ReplayAddr: "127.0.0.1:0", PassThrough: "http://127.0.0.1:1", Forward: ForwardSave},
 	}
 	for name, o := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -507,5 +514,94 @@ func TestServe_Given_CaptureCalls_When_a_call_is_made_Then_the_log_keeps_what_it
 	e := s.Traffic().Entries()[0]
 	if e.Exchange == nil || e.Exchange.Sent.Body != `{"user":"demo"}` || e.Exchange.Sent.Header.Get("Authorization") != replay.Masked {
 		t.Fatalf("exchange %+v", e.Exchange)
+	}
+}
+
+func TestServe_Forward_Given_one_api_Then_calls_nothing_saved_answers_go_there_and_a_saved_call_does_not(t *testing.T) {
+	w := demoWorkspace(t)
+	seen := 0
+	upstream := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
+		seen++
+		_, _ = io.WriteString(rw, "real "+r.URL.Path)
+	}))
+	t.Cleanup(upstream.Close)
+	s := serveOnFreePorts(t, w, func(o *ServeOptions) {
+		o.NoTriggers, o.NoSchedules, o.Forward, o.ForwardTo = true, true, ForwardPass, upstream.URL
+	})
+
+	status, header, body := call(t, "GET", "http://"+s.ReplayAddr()+"/nothing/saved/here", "", "")
+
+	if status != 200 || header.Get("X-Flowi-Match") != "passed-through" || !strings.Contains(body, "real /nothing/saved/here") || seen != 1 {
+		t.Fatalf("answer %d %v %q, upstream calls %d", status, header, body, seen)
+	}
+}
+
+func TestForwardTargets_Then_the_apis_the_requests_call_are_listed_with_how_many_use_each(t *testing.T) {
+	w := demoWorkspace(t)
+
+	got := w.ForwardTargets("")
+	t.Logf("targets: %+v", got)
+
+	if len(got) == 0 {
+		t.Fatal("the demo collection's requests call at least one API")
+	}
+	total := 0
+	for _, g := range got {
+		total += g.Requests
+		if g.Base == "" {
+			t.Fatalf("a target with no base: %+v", g)
+		}
+	}
+	if total == 0 {
+		t.Fatalf("targets %+v", got)
+	}
+}
+
+func TestForwardTargets_Given_an_environment_that_defines_the_base_Then_it_is_filled_in(t *testing.T) {
+	w := demoWorkspace(t)
+
+	got := w.ForwardTargets("local")
+
+	if len(got) == 0 || got[0].Problem != "" || !strings.HasPrefix(got[0].Base, "http://127.0.0.1:") {
+		t.Fatalf("targets %+v", got)
+	}
+}
+
+func TestServe_Record_Given_a_folder_Then_new_requests_are_saved_there(t *testing.T) {
+	w := demoWorkspace(t)
+	upstream := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, _ *http.Request) { _, _ = io.WriteString(rw, "{}") }))
+	t.Cleanup(upstream.Close)
+	s := serveOnFreePorts(t, w, func(o *ServeOptions) {
+		o.NoTriggers, o.NoSchedules, o.Forward, o.ForwardTo = true, true, ForwardSave, upstream.URL
+		o.RecordTo, o.RecordFolder = string(w.Collections()[0].Manifest.ID), "api/new"
+	})
+
+	call(t, "GET", "http://"+s.ReplayAddr()+"/v1/widgets/3", "", "")
+
+	files, _ := filepath.Glob(filepath.Join(w.Collections()[0].Root, "requests", "api", "new", "*", "*.req.yaml"))
+	if len(files) != 1 {
+		t.Fatalf("requests in the folder: %v", files)
+	}
+	var recorded []Activity
+	for _, r := range w.Collections()[0].Requests {
+		if a, _ := w.RequestActivity(RequestTarget{Collection: w.Collections()[0].Manifest.ID, Request: r.ID}); a.Origin == OriginRecorded {
+			recorded = append(recorded, a)
+		}
+	}
+	if len(recorded) != 1 || recorded[0].OriginDetail != "replayer: GET /v1/widgets/3" {
+		t.Fatalf("recorded activity %+v", recorded)
+	}
+}
+
+func TestRecordFolder_Then_it_is_a_path_of_plain_names(t *testing.T) {
+	for in, want := range map[string]string{"": "recorded", "\tapi/x/": "api/x", `a\b`: "a/b"} {
+		if got, err := recordFolder(in); err != nil || got != want {
+			t.Errorf("%q: %q %v", in, got, err)
+		}
+	}
+	for _, bad := range []string{"../x", "a/../b", "a b", ".hidden"} {
+		if _, err := recordFolder(bad); err == nil {
+			t.Errorf("%q accepted", bad)
+		}
 	}
 }

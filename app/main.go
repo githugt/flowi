@@ -100,6 +100,7 @@ func run() error {
 			application.NewService(app.Schedules()),
 			application.NewService(app.Replayer()),
 			application.NewService(app.Blueprints()),
+			application.NewService(app.Auths()),
 			application.NewService(app.Trash()),
 			application.NewService(app.Checks()),
 			application.NewService(app.Hooks()),
@@ -111,7 +112,11 @@ func run() error {
 		Assets: application.AssetOptions{Handler: application.AssetFileServerFS(assets)},
 		Mac:    application.MacOptions{ApplicationShouldTerminateAfterLastWindowClosed: true},
 	})
-	wails.Menu.Set(buildMenu(wails, emit))
+	// On Linux the window has no native menu: its button sits beside the window buttons and cannot be moved. The page
+	// draws its own menu button at the left (MainMenuButton) and handles the shortcuts (lib/mainmenu.ts).
+	if runtime.GOOS != "linux" {
+		wails.Menu.Set(buildMenu(wails, emit))
+	}
 	app.SetPickers(bridge.Pickers{
 		Folder: func(title string) (string, error) {
 			return wails.Dialog.OpenFile().SetTitle(title).CanChooseDirectories(true).CanChooseFiles(false).CanCreateDirectories(true).PromptForSingleSelection()
@@ -135,8 +140,7 @@ func run() error {
 		Mac: application.MacWindow{
 			TitleBar: application.MacTitleBarHiddenInset,
 		},
-		// On Linux the menus sit behind a button in the title bar instead of taking a row of their own.
-		Linux:            application.LinuxWindow{MenuStyle: application.LinuxMenuStylePrimaryMenu, Icon: appIcon},
+		Linux:            application.LinuxWindow{Icon: appIcon},
 		BackgroundColour: application.NewRGB(15, 17, 22),
 		URL:              "/",
 	})

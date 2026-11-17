@@ -59,6 +59,7 @@
   import HomeScreen from './HomeScreen.svelte'
   import Logo from './Logo.svelte'
   import WelcomeScreen from './WelcomeScreen.svelte'
+  import AboutScreen from './AboutScreen.svelte'
   import TelemetryScreen from './TelemetryScreen.svelte'
   import TracingScreen from './TracingScreen.svelte'
   import Announcements from './Announcements.svelte'
@@ -71,13 +72,28 @@
   import SchedulesScreen from './SchedulesScreen.svelte'
   import ReplayerScreen from './ReplayerScreen.svelte'
   import BlueprintsScreen from './BlueprintsScreen.svelte'
+  import AuthsScreen from './AuthsScreen.svelte'
   import TrashScreen from './TrashScreen.svelte'
   import ChecksScreen from './ChecksScreen.svelte'
   import { envSwatch } from './lib/envcolours'
   import { createAltTap, isWindows } from './lib/altmenu'
+  import { actionForKey, isLinux } from './lib/mainmenu'
   import { Events } from '@wailsio/runtime'
 
   onMount(() => app.init())
+
+  // Linux has no native menu to carry the shortcuts, so the page answers them (the menu button lists them).
+  onMount(() => {
+    if (!isLinux(navigator.userAgent)) return
+    const keys = (e: KeyboardEvent) => {
+      const action = actionForKey(e)
+      if (!action) return
+      e.preventDefault()
+      app.onMenu(action)
+    }
+    window.addEventListener('keydown', keys)
+    return () => window.removeEventListener('keydown', keys)
+  })
 
   // On Windows the menu bar stays hidden until Alt is tapped (the Go side hides it and answers this event).
   onMount(() => {
@@ -257,6 +273,8 @@
         <HomeScreen />
       {:else if tab && tab.node === 'screen:welcome'}
         <WelcomeScreen />
+      {:else if tab && tab.node === 'screen:about'}
+        <AboutScreen />
       {:else if tab && tab.node === 'screen:telemetry'}
         <TelemetryScreen />
       {:else if tab && tab.node === 'screen:tracing'}
@@ -265,6 +283,8 @@
         <SettingsScreen />
       {:else if tab && tab.node === 'screen:secrets'}
         <SecretsScreen />
+      {:else if tab && tab.node === 'screen:auths'}
+        <AuthsScreen />
       {:else if tab && tab.node === 'screen:blueprints'}
         <BlueprintsScreen />
       {:else if tab && tab.node === 'screen:trash'}

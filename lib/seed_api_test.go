@@ -466,3 +466,30 @@ func saveDataset(t *testing.T, w *Workspace, path string) RequestTarget {
 	}
 	return target
 }
+
+// Before: the built-in defaults could not be changed; the only way to seed other hooks was to name
+// blueprints in requests.seed_blueprint, which replaced the default for every kind of request at once.
+func TestSeedRequestHooks_Given_the_collection_keeps_its_own_default_Then_it_replaces_the_built_in_until_deleted(t *testing.T) {
+	w := demoWorkspace(t)
+	flow, _ := onboardingFlow(t, w)
+	own, err := w.CreateHookBlueprint(flow.Collection, DefaultBlueprintPath("http", "post"), "Our default", "post",
+		[]model.Node{{ID: "ours", Type: "log", Params: []model.Field{{Key: "value", Value: "ours"}}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	edited := newSeedRequest(t, w, "seeded/edited")
+
+	errEdited := w.SeedRequestHooks(edited)
+	errDelete := w.DeleteBlueprint(own)
+	reset := newSeedRequest(t, w, "seeded/reset")
+	errReset := w.SeedRequestHooks(reset)
+
+	_, withOwn, _ := w.requestFor(edited)
+	_, withBuiltIn, _ := w.requestFor(reset)
+	if errEdited != nil || len(withOwn.Hooks.Post) != 1 || withOwn.Hooks.Post[0].Inline[0].ID != "ours" {
+		t.Fatalf("err %v hooks %+v, want the collection's own default", errEdited, withOwn.Hooks)
+	}
+	if errDelete != nil || errReset != nil || len(withBuiltIn.Hooks.Post) != 1 || withBuiltIn.Hooks.Post[0].Inline[0].ID != "response" {
+		t.Fatalf("errs %v %v hooks %+v, want the built-in default back", errDelete, errReset, withBuiltIn.Hooks)
+	}
+}

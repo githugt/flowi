@@ -93,6 +93,15 @@ func (s *Secrets) Set(info flowi.SecretInfo, value string, done func(error)) {
 	s.change(func() error { return s.b.SetSecret(info.Environment, info.Name, value) }, done)
 }
 
+// Declare makes name a secret of the environment (when it is not one) and stores value as its value.
+func (s *Secrets) Declare(info flowi.SecretInfo, value string, done func(error)) {
+	if value == "" {
+		done(errors.New("a secret needs a value"))
+		return
+	}
+	s.change(func() error { return s.b.DeclareSecret(info.Environment, info.Name, value) }, done)
+}
+
 // Unset removes the stored value.
 func (s *Secrets) Unset(info flowi.SecretInfo, done func(error)) {
 	s.change(func() error { return s.b.UnsetSecret(info.Environment, info.Name) }, done)

@@ -43,6 +43,9 @@ type frame struct {
 	// and lane say where the frame sits for NodeStarted events.
 	prefix, parentPath, lane string
 	depth                    int
+	// activeHooks are the hook steps running above this frame (see hookKey): a request they send does not run them
+	// again.
+	activeHooks []string
 }
 
 // newRootFrame is the top frame of a flow scope.

@@ -741,6 +741,59 @@
     },
     "settings": {
       "$ref": "settings.schema.json"
+    },
+    "auth": {
+      "description": "An authentication: either {use: name}, one of the collection's named authentications (auths/<name>.auth.yaml), or a scheme (type) and its parameters. Every parameter value is a template, so credentials come from the vault.",
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "use"
+          ],
+          "properties": {
+            "use": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        {
+          "$ref": "#/$defs/authScheme"
+        }
+      ]
+    },
+    "authScheme": {
+      "type": "object",
+      "required": [
+        "type"
+      ],
+      "properties": {
+        "type": {
+          "enum": [
+            "apikey",
+            "digest",
+            "oauth2",
+            "oauth1",
+            "aws_sigv4",
+            "jwt",
+            "hawk",
+            "mtls",
+            "ntlm",
+            "httpsig",
+            "dpop"
+          ]
+        },
+        "use": false
+      },
+      "additionalProperties": {
+        "type": [
+          "string",
+          "number",
+          "boolean",
+          "null"
+        ]
+      }
     }
   }
 }

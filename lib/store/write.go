@@ -101,8 +101,17 @@ func (s *Store) DecodeFlowBody(file, path string, data []byte) (model.Flow, diag
 	return s.codec.DecodeFlow(file, path, data)
 }
 
+// DecodeBlueprint reads the text of a blueprint file; diagnostics are
+// positioned in data.
+func (s *Store) DecodeBlueprint(file, path string, data []byte) (model.Blueprint, diag.List) {
+	return s.codec.DecodeBlueprint(file, path, data)
+}
+
 // EncodeBlueprint is the canonical file content of b.
 func (s *Store) EncodeBlueprint(b model.Blueprint) ([]byte, error) { return s.codec.EncodeBlueprint(b) }
+
+// EncodeAuth is the canonical file content of a named authentication.
+func (s *Store) EncodeAuth(a model.NamedAuth) ([]byte, error) { return s.codec.EncodeAuth(a) }
 
 // EncodeFolder is the canonical _folder.yaml for f.
 func (s *Store) EncodeFolder(f model.Folder) ([]byte, error) { return s.codec.EncodeFolder(f) }

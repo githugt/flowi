@@ -272,8 +272,38 @@ func (w *Workspace) ApplyImport(p ImportPlan, o ApplyOptions) error {
 			return err
 		}
 	}
-	_, err = w.Reload(Change{Root: c.Root, File: c.Root, Op: store.ChangeRescan})
-	return err
+	if _, err = w.Reload(Change{Root: c.Root, File: c.Root, Op: store.ChangeRescan}); err != nil {
+		return err
+	}
+	w.noteImported(p, changes)
+	return nil
+}
+
+// noteImported records, for each request and flow an import wrote as a new file, that it came from an import. One
+// that already has activity (an overwrite) keeps it.
+func (w *Workspace) noteImported(p ImportPlan, changes []store.FileChange) {
+	fresh := map[string]bool{}
+	for _, ch := range changes {
+		if ch.Old == nil && ch.New != nil {
+			fresh[ch.File] = true
+		}
+	}
+	w.mu.RLock()
+	c, ok := w.collection(p.Collection)
+	w.mu.RUnlock()
+	if !ok {
+		return
+	}
+	for _, r := range c.Requests {
+		if _, has := w.readActivityLocked(p.Collection, activityRequest, r.ID); fresh[r.File] && !has {
+			w.noteOrigin(p.Collection, activityRequest, r.ID, OriginImported, "")
+		}
+	}
+	for _, f := range c.Flows {
+		if _, has := w.readActivityLocked(p.Collection, activityFlow, f.ID); fresh[f.File] && !has {
+			w.noteOrigin(p.Collection, activityFlow, f.ID, OriginImported, "")
+		}
+	}
 }
 
 // splitRemovals separates files to write from files to remove (New nil).
@@ -687,8 +717,17 @@ func (w *Workspace) planResult(c model.Collection, r importers.Result) (ImportPl
 	for _, x := range c.Requests {
 		byPath[x.Path] = x.ID
 	}
+	renamed, err := w.planAuths(c, r.Auths, files)
+	if err != nil {
+		return ImportPlan{}, err
+	}
 	for _, req := range r.Requests {
 		req.ID = w.newID()
+		for i := range req.Versions {
+			if a := req.Versions[i].Auth; a != nil && renamed[a.Use] != "" {
+				req.Versions[i].Auth = &model.Auth{Use: renamed[a.Use]}
+			}
+		}
 		if _, err := w.planRequestFile(c, req, ids, files); err != nil {
 			return ImportPlan{}, err
 		}
@@ -893,4 +932,33 @@ func (w *Workspace) FindCollection(ref string) (model.ID, error) {
 		return "", err
 	}
 	return c.Manifest.ID, nil
+}
+
+// planAuths plans auths/<name>.auth.yaml for each authentication an importer produced. A name the collection already
+// has (or an earlier one took) gets a number, and the returned map says which names changed so the requests that use
+// them can follow.
+func (w *Workspace) planAuths(c model.Collection, auths []model.NamedAuth, files map[string][]byte) (map[string]string, error) {
+	renamed := map[string]string{}
+	taken := map[string]bool{}
+	for _, a := range c.Auths {
+		taken[a.Name] = true
+	}
+	for _, a := range auths {
+		name := a.Name
+		for n := 2; taken[name]; n++ {
+			name = fmt.Sprintf("%s-%d", a.Name, n)
+		}
+		taken[name] = true
+		if name != a.Name {
+			renamed[a.Name] = name
+		}
+		a.Name, a.ID = name, w.newID()
+		a.File = filepath.Join(c.Root, "auths", name+authSuffix)
+		data, err := w.store.EncodeAuth(a)
+		if err != nil {
+			return nil, fmt.Errorf("encoding %s: %w", a.File, err)
+		}
+		files[a.File] = data
+	}
+	return renamed, nil
 }

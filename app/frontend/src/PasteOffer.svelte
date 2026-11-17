@@ -188,7 +188,6 @@
   .choose { display: flex; justify-content: space-between; align-items: center; gap: 8px; text-align: left; width: 100%; box-sizing: border-box; background: var(--raised); color: var(--text); border: 0; box-shadow: inset 0 0 0 1px var(--line); border-radius: var(--r-md); padding: 0 12px; min-height: var(--ctl-h); font: inherit; font-weight: 500; }
   .choose:hover { background: var(--raised-3); }
   .chev { color: var(--muted); }
-  select { background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); padding: 5px 8px; font: inherit; }
   .item { border-left: 2px solid var(--line); padding: 2px 10px; font-size: var(--fs-sm); }
   .item.skipped { border-color: var(--fail); }
   .tag { margin-left: 8px; color: var(--fail); font-size: var(--fs-xs); }

@@ -11,6 +11,7 @@ import (
 
 	"github.com/githugt/flowi/lib/analysis"
 	"github.com/githugt/flowi/lib/diag"
+	"github.com/githugt/flowi/lib/model"
 )
 
 func loginTarget(t *testing.T, w *Workspace) RequestTarget {
@@ -94,5 +95,36 @@ func TestValidateDir_Given_example_missing_read_field_Then_contract_warning(t *t
 
 	if err != nil || !slices.ContainsFunc(got, func(d diag.Diagnostic) bool { return d.Code == diag.CodeContractBroken }) {
 		t.Fatalf("got %v %v", got, err)
+	}
+}
+
+func TestImpactOfDraft_Given_the_request_unchanged_Then_it_reports_what_Impact_reports(t *testing.T) {
+	w := demoWorkspace(t)
+	c := w.Collections()[0]
+	var target RequestTarget
+	var req model.Request
+	for _, r := range c.Requests {
+		target, req = RequestTarget{Collection: c.Manifest.ID, Request: r.ID}, r
+		if r.Path == "auth/login" {
+			break
+		}
+	}
+
+	saved, _, err1 := w.Impact(target, "")
+	edited, _, err2 := w.ImpactOfDraft(target, req)
+
+	if err1 != nil || err2 != nil || len(saved.Versions) != len(edited.Versions) || saved.Status != edited.Status {
+		t.Fatalf("saved %+v (%v) edited %+v (%v)", saved, err1, edited, err2)
+	}
+}
+
+func TestImpactOfDraft_Given_an_unknown_request_Then_an_error(t *testing.T) {
+	w := demoWorkspace(t)
+	c := w.Collections()[0]
+
+	_, _, err := w.ImpactOfDraft(RequestTarget{Collection: c.Manifest.ID, Request: "nope"}, model.Request{})
+
+	if err == nil {
+		t.Fatal("want an error")
 	}
 }

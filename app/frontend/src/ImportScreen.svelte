@@ -145,7 +145,6 @@
   .choose { min-height: var(--ctl-h); display: flex; justify-content: space-between; align-items: center; gap: 8px; text-align: left; background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); padding: 5px 8px; font: inherit; }
   .choose:hover { border-color: var(--accent); }
   .chev { color: var(--muted); }
-  select, textarea { background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); padding: 5px 8px; font: inherit; -webkit-user-select: text; user-select: text; }
   textarea { min-height: 90px; font: var(--fs-sm) var(--mono); resize: vertical; }
   .actions { display: flex; gap: 8px; }
   .link { background: none; border: 0; color: var(--text); padding: 0; font: inherit; font-weight: 600; }

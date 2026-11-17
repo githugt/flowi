@@ -66,8 +66,21 @@ func (s *Store) Format(c model.Collection) ([]FileChange, error) {
 			return nil, err
 		}
 	}
+	for _, a := range c.Auths {
+		if err := add(a.File, func() ([]byte, error) { return s.codec.EncodeAuth(withoutDefaultAuthName(a)) }); err != nil {
+			return nil, err
+		}
+	}
 	slices.SortFunc(changes, func(a, b FileChange) int { return strings.Compare(a.File, b.File) })
 	return changes, nil
+}
+
+// withoutDefaultAuthName drops a name that Load derived from the file stem.
+func withoutDefaultAuthName(a model.NamedAuth) model.NamedAuth {
+	if a.Name == strings.TrimSuffix(fileBase(a.File), authSuffix) {
+		a.Name = ""
+	}
+	return a
 }
 
 // withoutDefaultName drops a name that Load derived from the file stem, so

@@ -58,7 +58,7 @@
     <h2>Tracing</h2>
     <p class="expl">
       Send a trace of every send and flow run to your own OpenTelemetry collector, such as Jaeger, Grafana Tempo or Honeycomb, to see how long each step took and where runs fail. Nothing is sent until you enter an address.
-      This goes to your server only; it is separate from Usage reporting.
+      This goes to your server only.
     </p>
 
     <div class="state" class:on={view.running}>
@@ -138,7 +138,7 @@
   .have { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
   .chip { display: inline-flex; gap: 6px; padding: 2px 10px; border: 1px solid var(--line); border-radius: var(--r-pill); font: var(--fs-sm) var(--mono, ui-monospace, monospace); }
   .chip i { font-style: normal; color: var(--muted); }
-  textarea { box-sizing: border-box; width: 100%; padding: 6px 8px; background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); font: var(--fs-sm) var(--mono, ui-monospace, monospace); resize: vertical; -webkit-user-select: text; user-select: text; }
+  textarea { box-sizing: border-box; width: 100%; padding: 6px 8px; font: var(--fs-sm) var(--mono, ui-monospace, monospace); resize: vertical; }
   textarea:focus { border-color: var(--accent); }
   textarea::placeholder { color: var(--muted); }
   .actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }

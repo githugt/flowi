@@ -373,6 +373,8 @@ func customKind(v model.RequestVersion) string {
 		return "gRPC call"
 	case model.FamilyDataset:
 		return "dataset query"
+	case model.FamilyFile:
+		return "file query"
 	}
 	return ""
 }

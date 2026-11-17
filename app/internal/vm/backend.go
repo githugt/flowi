@@ -46,6 +46,8 @@ type Backend interface {
 	NewGRPCRequest(collection model.ID, path string) (flowi.RequestTarget, error)
 	// NewDatasetRequest is NewRequest for a dataset request of the given driver.
 	NewDatasetRequest(collection model.ID, path, driver string) (flowi.RequestTarget, error)
+	// NewFileRequest is NewRequest for a data file request of the given format.
+	NewFileRequest(collection model.ID, path, format string) (flowi.RequestTarget, error)
 	// GenerateGRPCRequests makes a gRPC request per method of base's schema.
 	GenerateGRPCRequests(collection model.ID, base model.GRPC, methods []grpcx.Method) (flowi.GeneratedGRPC, error)
 	// GRPCMethods lists the methods of the schema the gRPC version v would use.
@@ -124,9 +126,13 @@ type Backend interface {
 	Cookies(collection string) ([]flowi.CookieInfo, error)
 	DeleteCookie(collection, key string) error
 	Impact(t flowi.RequestTarget, version string) (analysis.Report, diag.List, error)
+	// ImpactOfDraft is Impact for the request as it would be once the edited copy is saved.
+	ImpactOfDraft(t flowi.RequestTarget, draft model.Request) (analysis.Report, diag.List, error)
 
 	Secrets() ([]flowi.SecretInfo, error)
 	SetSecret(env, name, value string) error
+	// DeclareSecret adds name as a secret of the environment when it is not one, and stores its value.
+	DeclareSecret(env, name, value string) error
 	RevealSecret(env, name string) (string, error)
 	DiscardSecret(env, name string) error
 	UnsetSecret(env, name string) error
@@ -164,6 +170,13 @@ type Backend interface {
 	NewFlowFromBlueprint(bp flowi.BlueprintTarget, collection model.ID, path string, values map[string]string) (flowi.FlowTarget, error)
 	CreateBlueprint(flow flowi.FlowTarget, path, name string) (flowi.BlueprintTarget, error)
 	DeleteBlueprint(t flowi.BlueprintTarget) error
+	BlueprintSource(t flowi.BlueprintTarget) (string, error)
+	CustomizeDefault(collection model.ID, kind, phase string) (flowi.BlueprintTarget, error)
+	SaveBlueprintSource(t flowi.BlueprintTarget, text string) (diag.List, error)
+	NewNamedAuth(collection model.ID, name, description string, auth model.Auth) (flowi.AuthTarget, error)
+	SaveNamedAuth(t flowi.AuthTarget, a model.NamedAuth) error
+	RenameNamedAuth(t flowi.AuthTarget, name string) error
+	DeleteNamedAuth(t flowi.AuthTarget) error
 	CreateHookBlueprint(collection model.ID, path, name, phase string, nodes []model.Node) (flowi.BlueprintTarget, error)
 	FlowLayout(t flowi.FlowTarget) (model.Layout, diag.List, error)
 	SaveFlowLayout(t flowi.FlowTarget, l model.Layout) error
@@ -173,6 +186,12 @@ type Backend interface {
 	RunFlow(ctx context.Context, t flowi.FlowTarget, o flowi.RunOptions) (Running, error)
 
 	ServeDefaults() flowi.ServeOptions
+	// ForwardTargets lists the APIs the saved requests call in environment env, for the replayer's preview.
+	ForwardTargets(env string) []flowi.ForwardTarget
+	// RequestActivity and FlowActivity say where a request or flow came from and how its runs went, as this client
+	// knows it (started on first look for what arrived with the files).
+	RequestActivity(t flowi.RequestTarget) (flowi.Activity, error)
+	FlowActivity(t flowi.FlowTarget) (flowi.Activity, error)
 	Schedules() []model.Schedule
 	AddSchedule(s model.Schedule) error
 	SaveSchedule(old string, s model.Schedule) error

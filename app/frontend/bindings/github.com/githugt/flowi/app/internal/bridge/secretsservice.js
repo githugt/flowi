@@ -16,6 +16,19 @@ import { Call as $Call, CancellablePromise as $CancellablePromise, Create as $Cr
 import * as $models from "./models.js";
 
 /**
+ * Declare makes name a secret of the environment, declaring it in the environment's file when it is not one yet,
+ * and stores value for it. It answers "" when done, or what went wrong: the request editor moves a password out of
+ * a connection string with it.
+ * @param {string} environment
+ * @param {string} name
+ * @param {string} value
+ * @returns {$CancellablePromise<string>}
+ */
+export function Declare(environment, name, value) {
+    return $Call.ByID(3043327424, environment, name, value);
+}
+
+/**
  * Reveal returns one stored value for the window to show for a moment; it is the only call that sends a
  * value to the window, and it sends one. The window asks the passphrase first (PassphraseService.Unlock),
  * so this never waits for the user. The reveal is logged, without the value.

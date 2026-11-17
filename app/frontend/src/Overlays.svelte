@@ -86,7 +86,7 @@
           </label>
         {/if}
       {:else}
-        <p>{ui.dialog.text}</p>
+        <p class="dtext">{ui.dialog.text}</p>
       {/if}
       <div class="actions">
         <button type="button" onclick={() => ui.dismiss()}>Cancel</button>
@@ -128,4 +128,5 @@
   .actions { display: flex; justify-content: flex-end; gap: 8px; }
   .actions button { background: var(--raised-3); color: var(--text); border: 0; border-radius: var(--r-md); padding: 0 14px; min-height: var(--ctl-h); font: inherit; font-weight: 500; }
   .primary { background: var(--accent) !important; color: var(--on-accent) !important; border-color: var(--accent) !important; }
+  .dtext { white-space: pre-line; }
 </style>

@@ -72,6 +72,7 @@
       {#each view.snippet.formats as f}<option value={f}>{f}</option>{/each}
     </select>
     <Toggle checked={view.snippet.exclude} onchange={(on) => RequestService.SetSnippetExclude(node, on)}>Leave secrets out</Toggle>
+    {#if view.snippet.secrets}<span class="secretmark" title="This snippet has your real secret values in it. Do not paste it where others can read it.">⚠ contains real secrets</span>{/if}
     <span class="spacer"></span>
     <button disabled={!view.snippet.text} onclick={() => copy(view.snippet.text)}>Copy</button>
   </div>
@@ -172,4 +173,5 @@
   .scard input, .scard select { width: 100%; box-sizing: border-box; min-height: var(--ctl-h); background-color: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); padding: 0 10px; font: inherit; }
   .scard select { padding-right: 28px; }
   .schema { margin: 8px 0; }
+  .secretmark { color: var(--warn); font-size: var(--fs-sm); font-weight: 600; }
 </style>

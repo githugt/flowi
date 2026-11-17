@@ -61,3 +61,84 @@ func TestDataset_should_report_what_is_wrong_with_a_version(t *testing.T) {
 		})
 	}
 }
+
+func TestFile_should_report_what_is_wrong_with_a_file_version(t *testing.T) {
+	ok := model.DataFile{Format: "csv", Path: "data/sales.csv", Query: "SELECT * FROM sales WHERE region = ?", Params: []string{"{{var.region}}"}}
+	with := func(change func(*model.DataFile)) model.RequestVersion {
+		f := ok
+		change(&f)
+		return model.RequestVersion{Label: "1", File: &f}
+	}
+	tests := []struct {
+		name string
+		v    model.RequestVersion
+		want diag.Code
+		path string
+	}{
+		{name: "valid", v: with(func(*model.DataFile) {})},
+		{name: "templated_path", v: with(func(f *model.DataFile) { f.Path = "{{var.dir}}/sales.csv" })},
+		{name: "database_is_not_a_format", v: with(func(f *model.DataFile) { f.Format = "postgres" }), want: diag.CodeDatasetRequest, path: "$.versions.1.file.format"},
+		{name: "no_path", v: with(func(f *model.DataFile) { f.Path = "" }), want: diag.CodeDatasetRequest, path: "$.versions.1.file.path"},
+		{name: "writing_query", v: with(func(f *model.DataFile) { f.Query = "DELETE FROM sales" }), want: diag.CodeDatasetRequest, path: "$.versions.1.file.query"},
+		{name: "writing_query_with_writes_on", v: with(func(f *model.DataFile) { f.Query, f.Writes = "DELETE FROM sales", true })},
+		{name: "negative_limit", v: with(func(f *model.DataFile) { f.Limit = -1 }), want: diag.CodeDatasetRequest, path: "$.versions.1.file.limit"},
+		{name: "bad_template_in_a_param", v: with(func(f *model.DataFile) { f.Params = []string{"{{"} }), want: diag.CodeTemplateSyntax, path: "$.versions.1.file.params[0]"},
+		{name: "also_a_database", v: func() model.RequestVersion {
+			v := with(func(*model.DataFile) {})
+			v.Dataset = &model.Dataset{Driver: "sqlite", Server: "a.db", Query: "SELECT 1"}
+			return v
+		}(), want: diag.CodeDatasetRequest, path: "$.versions.1.file"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			f := newFixture(t)
+			c := f.collection("c")
+			c.Requests = append(c.Requests, model.Request{
+				Meta: model.Meta{ID: "01J9ZA3M4N5P6Q7R8S9T0VAAAA", Name: "r"}, Path: "r", File: "r.req.yaml", Versions: []model.RequestVersion{tt.v},
+			})
+
+			got := Validate(Target{Collections: []model.Collection{c}})
+
+			if tt.want == "" {
+				for _, d := range got {
+					t.Fatalf("unexpected %v", d)
+				}
+				return
+			}
+			if d := only(t, got, tt.want); d.Path != tt.path {
+				t.Fatalf("path %q, want %q", d.Path, tt.path)
+			}
+		})
+	}
+}
+
+func TestDataset_Given_a_data_file_driver_Then_it_is_refused_because_files_are_a_kind_of_their_own(t *testing.T) {
+	f := newFixture(t)
+	c := f.collection("c")
+	c.Requests = append(c.Requests, model.Request{
+		Meta: model.Meta{ID: "01J9ZA3M4N5P6Q7R8S9T0VAAAA", Name: "r"}, Path: "r", File: "r.req.yaml",
+		Versions: []model.RequestVersion{{Label: "1", Dataset: &model.Dataset{Driver: "csv", Server: "a.csv", Query: "SELECT 1"}}},
+	})
+
+	got := Validate(Target{Collections: []model.Collection{c}})
+
+	if d := only(t, got, diag.CodeDatasetRequest); d.Path != "$.versions.1.dataset.driver" {
+		t.Fatalf("path %q", d.Path)
+	}
+}
+
+func TestDataset_Given_read_only_Then_a_writing_query_is_a_problem_even_with_writes_on(t *testing.T) {
+	for name, v := range map[string]model.RequestVersion{
+		"database": {Label: "1", Dataset: &model.Dataset{Driver: "sqlite", Server: "a.db", Query: "DELETE FROM t", Writes: true}},
+		"file":     {Label: "1", File: &model.DataFile{Format: "csv", Path: "a.csv", Query: "DELETE FROM t", Writes: true}},
+	} {
+		f := newFixture(t)
+		c := f.collection("c")
+		c.Requests = append(c.Requests, model.Request{Meta: model.Meta{ID: "01J9ZA3M4N5P6Q7R8S9T0VAAAA", Name: "r"}, Path: "r", File: "r.req.yaml", Versions: []model.RequestVersion{v}})
+
+		got := Validate(Target{Collections: []model.Collection{c}, DatasetReadOnly: true, AllowDatasetWrites: true})
+
+		only(t, got, diag.CodeDatasetRequest)
+		_ = name
+	}
+}

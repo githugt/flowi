@@ -84,7 +84,8 @@ func (ws *Workspace) CreateGRPCRequest(collection model.ID, path string, open fu
 	}, ws.openThenReport(open, fail, &seedErr), fail)
 }
 
-// CreateDatasetRequest is CreateRequest for a dataset request of the given driver.
+// CreateDatasetRequest is CreateRequest for a database request of the given driver, or for a data file request when
+// the driver is a data file format (csv, xlsx, parquet): those are a kind of their own in the library.
 func (ws *Workspace) CreateDatasetRequest(collection model.ID, path, driver string, open func(nodeID string), fail func(error)) {
 	var seedErr error
 	path = ws.untitledIfBlank(collection, path)
@@ -93,7 +94,12 @@ func (ws *Workspace) CreateDatasetRequest(collection model.ID, path, driver stri
 		if err != nil {
 			return "", err
 		}
-		t, err := ws.b.NewDatasetRequest(id, path, driver)
+		var t flowi.RequestTarget
+		if model.IsDataFormat(driver) {
+			t, err = ws.b.NewFileRequest(id, path, driver)
+		} else {
+			t, err = ws.b.NewDatasetRequest(id, path, driver)
+		}
 		if err == nil {
 			seedErr = ws.b.SeedRequestHooks(t) // the library seeds a dataset request with hooks that read the outcome
 		}

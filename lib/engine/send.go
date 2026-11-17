@@ -81,6 +81,10 @@ type SchemaViolation struct {
 
 // Deps are the engine's collaborators.
 type Deps struct {
+	// OnSend and OnRun, when set, are called with the result of a send or a flow run just before it is reported as
+	// ended, so whatever they write is there by the time Wait returns.
+	OnSend  func(SendResult)
+	OnRun   func(RunResult)
 	Lookup  Lookup
 	Schemas SchemaChecker // nil: bodies are not checked or learned
 	// Transports runs async requests, by protocol (nil → every protocol this
@@ -178,6 +182,9 @@ func StartSend(ctx context.Context, d Deps, in SendInput) *Send {
 		defer close(s.done)
 		defer close(s.events)
 		s.result = newRunner(d, in, s.events).run(ctx)
+		if d.OnSend != nil {
+			d.OnSend(s.result)
+		}
 	}()
 	return s
 }

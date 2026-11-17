@@ -91,3 +91,45 @@ func TestRunMatrix_Given_a_bad_matrix_Then_nothing_runs(t *testing.T) {
 		})
 	}
 }
+
+func TestRunRequestMatrix_Given_env_and_a_value_Then_every_combination_is_sent_with_them_and_nothing_is_saved(t *testing.T) {
+	// Arrange
+	b := &vmtest.Backend{SendFor: func(o flowi.SendOptions) (*vmtest.Sending, error) {
+		rec := &engine.Record{Status: 200}
+		if o.With["id"] == "404" {
+			rec.Status = 404
+			d := diag.New(diag.CodeRunAssertFailed, diag.Location{}, map[string]string{"check": "status == 200", "message": ""})
+			return &vmtest.Sending{Result: engine.SendResult{Status: engine.StatusFailed, Record: rec, Diags: diag.List{d}}}, nil
+		}
+		return &vmtest.Sending{Result: engine.SendResult{Status: engine.StatusPassed, Record: rec}}, nil
+	}}
+	dims := []vm.MatrixDim{{Name: "env", Values: []string{"local", "staging"}}, {Name: "with.id", Values: []string{"1", "404"}}}
+
+	// Act
+	cells, err := vm.RunRequestMatrix(context.Background(), b, flowi.RequestTarget{}, flowi.SendOptions{Seed: 3, Version: "2"}, dims)
+
+	// Assert
+	if err != nil || len(cells) != 4 || len(b.SendOpts) != 4 {
+		t.Fatalf("err %v cells %d sends %d", err, len(cells), len(b.SendOpts))
+	}
+	if strings.Join(cells[1].Labels, "|") != "local|404" || cells[1].Status != "failed" || cells[1].Detail != "404" || cells[1].Why == "" {
+		t.Fatalf("cell 1 %+v", cells[1])
+	}
+	if cells[2].Status != "passed" || cells[2].Detail != "200" {
+		t.Fatalf("cell 2 %+v", cells[2])
+	}
+	o := b.SendOpts[3]
+	if o.Env != "staging" || o.With["id"] != "404" || o.Save != "none" || o.Seed != 3 || o.Version != "2" {
+		t.Fatalf("options of the last cell %+v", o)
+	}
+}
+
+func TestRunRequestMatrix_Given_a_flow_style_input_dimension_Then_it_is_refused(t *testing.T) {
+	b := &vmtest.Backend{}
+
+	_, err := vm.RunRequestMatrix(context.Background(), b, flowi.RequestTarget{}, flowi.SendOptions{}, []vm.MatrixDim{{Name: "input.email", Values: []string{"a"}}})
+
+	if err == nil || !strings.Contains(err.Error(), "with.<name>") || len(b.SendOpts) != 0 {
+		t.Fatalf("err %v", err)
+	}
+}

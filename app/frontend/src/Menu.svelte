@@ -11,6 +11,8 @@
     separated?: boolean
     /** Shown with a check: the current choice in a list of options (every row then keeps room for the tick). */
     checked?: boolean
+    /** A keyboard shortcut shown at the right of the label. */
+    hint?: string
   }
 </script>
 
@@ -48,7 +50,7 @@
   {#each items as item}
     {#if item.separated}<hr />{/if}
     <button role={item.checked === undefined ? 'menuitem' : 'menuitemradio'} aria-checked={item.checked} class:on={item.active} disabled={item.disabled} title={item.title} onclick={() => choose(item)}>
-      {#if hasChecks}<span class="tick" aria-hidden="true">{item.checked ? '✓' : ''}</span>{/if}{#if item.icon}<Icon name={item.icon} size={15} />{/if}{item.label}
+      {#if hasChecks}<span class="tick" aria-hidden="true">{item.checked ? '✓' : ''}</span>{/if}{#if item.icon}<Icon name={item.icon} size={15} />{/if}{item.label}{#if item.hint}<span class="hint">{item.hint}</span>{/if}
     </button>
   {/each}
 </div>
@@ -60,5 +62,6 @@
   button:hover:not(:disabled), button:focus-visible { background: var(--tint-sel); outline: none; }
   button:disabled { opacity: 0.4; }
   button.on { color: var(--accent); }
+  .hint { margin-left: auto; padding-left: 24px; color: var(--muted); font-size: var(--fs-xs); }
   hr { width: 100%; border: 0; border-top: 1px solid var(--line); margin: 4px 0; }
 </style>

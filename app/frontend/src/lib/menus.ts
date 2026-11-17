@@ -21,40 +21,40 @@ export async function rowMenu(id: string): Promise<MenuItem[]> {
 }
 
 async function run(e: MenuEntry, ids: string[]) {
-  if (e.guard === 'dirty' && (await touchesUnsaved(ids))) {
-    ui.toast('Save or close the unsaved tabs of these rows first.', 'error')
-    return
-  }
+  // A rename or delete closes the tabs of its rows, so it says first when that loses unsaved edits.
+  const unsaved = e.guard === 'dirty' ? (await tabsAffected(ids)).filter((id) => app.isDirty(id)).length : 0
+  const lost = unsaved ? `Unsaved edits in ${unsaved} open ${unsaved === 1 ? 'tab' : 'tabs'} will be lost.` : ''
   const go = async (text = '', protocol = '') => {
     if (needsTabsClosed.includes(e.action)) await app.closeAll(await tabsAffected(ids))
     await WorkspaceService.Do(e.action, ids, text, protocol)
   }
-  if (e.dialog === 'move') {
-    ui.moving = ids
-  } else if (e.prompt) {
-    ui.prompt({
-      title: e.prompt.title,
-      label: e.prompt.label,
-      initial: e.prompt.initial,
-      protocols: e.prompt.protocols?.map((p) => ({ id: p.id, label: p.label })),
-      protocolsLabel: e.action === 'newDataset' ? 'Database' : undefined,
-      done: (text, protocol) => go(text, protocol),
-    })
-  } else if (e.confirm) {
-    ui.confirm('Delete', e.confirm, () => go())
-  } else {
-    await go()
+  const ask = () => {
+    if (e.dialog === 'move') {
+      ui.moving = ids
+    } else if (e.prompt) {
+      ui.prompt({
+        title: e.prompt.title,
+        label: e.prompt.label,
+        initial: e.prompt.initial,
+        protocols: e.prompt.protocols?.map((p) => ({ id: p.id, label: p.label })),
+        protocolsLabel: e.action === 'newDataset' ? 'Database' : undefined,
+        done: (text, protocol) => go(text, protocol),
+      })
+    } else if (e.confirm) {
+      ui.confirm('Delete', `${e.confirm} ${lost}`.trim(), () => go())
+    } else {
+      void go()
+    }
   }
+  // A delete's own question carries the warning; anything else is asked about it first.
+  if (lost && !e.confirm) ui.confirm('Unsaved edits', `${lost} Continue?`, ask, 'Continue')
+  else ask()
 }
 
 export async function tabsAffected(ids: string[]): Promise<string[]> {
   const out = new Set(ids)
   for (const id of ids) for (const inner of (await WorkspaceService.Inside(id)) as string[]) out.add(inner)
   return [...out]
-}
-
-export async function touchesUnsaved(ids: string[]): Promise<boolean> {
-  return (await tabsAffected(ids)).some((id) => app.isDirty(id))
 }
 
 // The "New" menu: quick starts and creation in a chosen collection or folder.
@@ -76,12 +76,14 @@ export function newMenu(): MenuItem[] {
     { label: 'New flow', run: () => WorkspaceService.NewScratchFlow() },
     { label: 'New message request', run: newScratchMessage },
     { label: 'New gRPC request', run: () => WorkspaceService.NewAt('grpc', '', '', '') },
-    { label: 'New dataset query', run: newScratchDataset },
+    { label: 'New database query', run: newScratchDataset },
+    { label: 'New data file query', run: newScratchFileQuery },
     { separator: true, label: '', run: () => {} },
     { label: 'New request in a collection…', run: ask('request', 'New request', 'requests', 'Name or path (for example users/create)') },
     { label: 'New message request in a collection…', run: ask('async', 'New message request', 'requests', 'Name or path (for example orders/placed)', true) },
     { label: 'New gRPC request in a collection…', run: ask('grpc', 'New gRPC request', 'requests', 'Name or path (for example shop/get-order)') },
-    { label: 'New dataset query in a collection…', run: ask('dataset', 'New dataset query', 'requests', 'Name or path (for example customers/by-id)', true, databases, 'Database') },
+    { label: 'New database query in a collection…', run: ask('dataset', 'New database query', 'requests', 'Name or path (for example customers/by-id)', true, databases, 'Database') },
+    { label: 'New data file query in a collection…', run: ask('dataset', 'New data file query', 'requests', 'Name or path (for example reports/sales)', true, dataFiles, 'File type') },
     { label: 'New flow in a collection…', run: ask('flow', 'New flow', 'flows', 'Name or path (for example journeys/signup)') },
     { label: 'New flow from blueprint…', run: () => (ui.blueprint = { collection: '', folder: '' }) },
     { separator: true, label: '', run: () => {} },
@@ -99,14 +101,28 @@ const databases = [
   ['postgres', 'PostgreSQL'], ['mysql', 'MySQL'], ['mariadb', 'MariaDB'], ['sqlite', 'SQLite'],
 ].map(([id, label]) => ({ id, label }))
 
+// Data files are their own kind of source: no server, no login, just a file or a folder of them.
+const dataFiles = [['csv', 'CSV files'], ['xlsx', 'Excel files'], ['parquet', 'Parquet files']].map(([id, label]) => ({ id, label }))
+
 // A dataset query needs its database before it can be made; the draft goes to Scratch like New request.
 function newScratchDataset() {
   ui.prompt({
-    title: 'New dataset query',
+    title: 'New database query',
     label: 'Name (blank for untitled)',
     initial: '',
     protocols: databases,
     protocolsLabel: 'Database',
+    done: (path, driver) => WorkspaceService.NewAt('dataset', '', path, driver),
+  })
+}
+
+function newScratchFileQuery() {
+  ui.prompt({
+    title: 'New data file query',
+    label: 'Name (blank for untitled)',
+    initial: '',
+    protocols: dataFiles,
+    protocolsLabel: 'File type',
     done: (path, driver) => WorkspaceService.NewAt('dataset', '', path, driver),
   })
 }

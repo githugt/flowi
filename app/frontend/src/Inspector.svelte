@@ -45,12 +45,6 @@
     }
   }
 
-  // Steps that make sense to draw with a request: not requests themselves, and not containers.
-  const attachable = $derived((view.palette ?? []).filter((p) => !['request', 'subflow', 'parallel', 'condition', 'batch', 'run_till'].includes(p.type)))
-  function addAttached(e: MouseEvent, after: boolean, side = '') {
-    const r = (e.currentTarget as HTMLElement).getBoundingClientRect()
-    ui.openMenu(r.left, r.bottom + 4, attachable.map((p) => ({ label: p.type, run: () => (side ? FlowService.AddAttachedAt(node, p.type, side) : FlowService.AddAttached(node, p.type, after)) })))
-  }
   const complete = $derived(completeFor(node))
   const vocabulary = (context: string) => vocabularyFor(node, context)
 
@@ -153,44 +147,8 @@
       {/if}
     {/if}
 
-    {#if step.type === 'request' || step.type === 'subflow'}
-      <h4>Actions shown with this request<Hint>Steps drawn in one block with this {step.type}, before and after it. The run order is the order of the list: moving one here (or dragging it inside the block) changes when it runs.</Hint></h4>
-      {#each step.attached as id, i}
-        <div class="line">
-          <button class="lane named" onclick={() => FlowService.Select(node, id)}>{id}</button>
-          <button class="add" title="Move earlier" disabled={i === 0} onclick={() => FlowService.MoveAttachedBy(node, id, -1)}>↑</button>
-          <button class="add" title="Move later" disabled={i === step.attached.length - 1} onclick={() => FlowService.MoveAttachedBy(node, id, 1)}>↓</button>
-        </div>
-      {/each}
-      <!-- Above and below are where a step is drawn, not when it runs: they read like a third and fourth
-           timing beside Before and After. The rows now say when, and the buttons where. -->
-      <div class="line"><span class="when">Runs before</span>
-        <button class="add" onpointerdown={(e) => e.stopPropagation()} onclick={(e) => addAttached(e, false)} title="Drawn beside the request, on its left; runs right before it">+ Beside</button>
-        <button class="add" onpointerdown={(e) => e.stopPropagation()} onclick={(e) => addAttached(e, false, 'above')} title="Drawn in a stack above the request; runs right before it">+ Stacked above</button>
-      </div>
-      <div class="line"><span class="when">Runs after</span>
-        <button class="add" onpointerdown={(e) => e.stopPropagation()} onclick={(e) => addAttached(e, true)} title="Drawn beside the request, on its right; runs right after it">+ Beside</button>
-        <button class="add" onpointerdown={(e) => e.stopPropagation()} onclick={(e) => addAttached(e, true, 'below')} title="Drawn in a stack below the request; runs right after it">+ Stacked below</button>
-      </div>
-    {:else if step.attachTo.length || step.attach}
-      <label class="field">
-        <span class="label">Shown with request<Hint>Draws this step in one block with that request (it has to sit right next to it in the list). The run order does not change.</Hint></span>
-        <select value={step.attach} onchange={(e) => FlowService.SetAttach(node, e.currentTarget.value)}>
-          <option value="">none: a step of the flow</option>
-          {#each [...new Set([...step.attachTo, ...(step.attach ? [step.attach] : [])])] as r}<option value={r}>{r}</option>{/each}
-        </select>
-      </label>
-      {#if step.attach}
-        <label class="field">
-          <span class="label">Drawn</span>
-          <select value={step.attachAt} onchange={(e) => FlowService.SetAttachAt(node, e.currentTarget.value)}>
-            <option value="">beside the request</option>
-            <option value="above">in a stack above the request</option>
-            <option value="below">in a stack below the request</option>
-          </select>
-        </label>
-      {/if}
-    {/if}
+    <!-- "Shown with request" is not offered: the canvas draws every step as its own card, so where an action was
+         "drawn" around its request changes nothing on screen. -->
 
     {#if step.type === 'set'}
       <h4>Values<Hint>Each row writes a variable: from an expression, text as written, a part of the last response, or a generator. Later steps read it as {'{{vars.name}}'}.</Hint></h4>
@@ -358,8 +316,6 @@
   }
   .lane button:disabled { opacity: 0.35; }
   .add { align-self: flex-start; color: var(--accent); }
-  .when { color: var(--muted); font-size: var(--fs-xs); min-width: 72px; align-self: center; }
   button.inline { background: none; border: 0; padding: 0; color: var(--accent); font: inherit; cursor: pointer; }
-  select.wait { background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); padding: 5px 6px; font: inherit; }
   .err { color: var(--fail); margin: 0; font-size: var(--fs-sm); }
 </style>

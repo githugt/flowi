@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 	"slices"
+	"strconv"
 	"strings"
 
 	flowi "github.com/githugt/flowi/lib"
@@ -28,13 +29,14 @@ type MatrixCell struct {
 	Labels []string // the value taken on each dimension, in the order of the dimensions
 	Status string
 	Why    string
+	Detail string // what a passed cell shows besides the mark: the response status of a request, say
 }
 
 // RunMatrix runs the flow once for every combination of the dimensions' values (the first dimension varies slowest)
 // and reports each. Cells run one after the other; a cell that cannot start (an unknown environment) is an error cell
 // and the others still run. It must be called off the UI goroutine, since it waits for every run.
 func RunMatrix(ctx context.Context, b Backend, t flowi.FlowTarget, base flowi.RunOptions, dims []MatrixDim) ([]MatrixCell, error) {
-	if err := checkMatrix(dims); err != nil {
+	if err := checkMatrix(dims, "input"); err != nil {
 		return nil, err
 	}
 	var out []MatrixCell
@@ -47,15 +49,35 @@ func RunMatrix(ctx context.Context, b Backend, t flowi.FlowTarget, base flowi.Ru
 	return out, nil
 }
 
-func checkMatrix(dims []MatrixDim) error {
+// RunRequestMatrix sends the saved request once for every combination of the dimensions' values (env, overlay or
+// with.<name>, a value for one of the request's bare names) and reports each. The responses are not saved: a matrix is
+// a check, not a history. It must be called off the UI goroutine, since it waits for every send.
+func RunRequestMatrix(ctx context.Context, b Backend, t flowi.RequestTarget, base flowi.SendOptions, dims []MatrixDim) ([]MatrixCell, error) {
+	if err := checkMatrix(dims, "with"); err != nil {
+		return nil, err
+	}
+	base.Save = "none"
+	var out []MatrixCell
+	for _, labels := range combinations(dims) {
+		if ctx.Err() != nil {
+			return out, ctx.Err()
+		}
+		out = append(out, sendCell(ctx, b, t, sendCellOptions(base, dims, labels), labels))
+	}
+	return out, nil
+}
+
+// checkMatrix checks the dimensions; valueDim is what a dimension of the form <valueDim>.<name> is called: input for
+// a flow's inputs, with for a request's values.
+func checkMatrix(dims []MatrixDim, valueDim string) error {
 	if len(dims) == 0 {
 		return fmt.Errorf("choose at least one thing to vary")
 	}
 	cells := 1
 	for i, d := range dims {
-		input, isInput := strings.CutPrefix(d.Name, "input.")
+		input, isInput := strings.CutPrefix(d.Name, valueDim+".")
 		if d.Name != "env" && d.Name != "overlay" && (!isInput || input == "") {
-			return fmt.Errorf("a matrix varies env, overlay or input.<name>, not %q", d.Name)
+			return fmt.Errorf("a matrix varies env, overlay or %s.<name>, not %q", valueDim, d.Name)
 		}
 		if slices.ContainsFunc(dims[:i], func(o MatrixDim) bool { return o.Name == d.Name }) {
 			return fmt.Errorf("%s is listed twice: give its values once", d.Name)
@@ -125,6 +147,46 @@ func runCell(ctx context.Context, b Backend, t flowi.FlowTarget, o flowi.RunOpti
 	return cell
 }
 
+// sendCellOptions is base with one combination's values set; base is not changed.
+func sendCellOptions(base flowi.SendOptions, dims []MatrixDim, labels []string) flowi.SendOptions {
+	o := base
+	o.With = make(map[string]string, len(base.With)+1)
+	for k, v := range base.With {
+		o.With[k] = v
+	}
+	for i, d := range dims {
+		switch d.Name {
+		case "env":
+			o.Env = labels[i]
+		case "overlay":
+			o.Overlay = labels[i]
+		default:
+			o.With[strings.TrimPrefix(d.Name, "with.")] = labels[i]
+		}
+	}
+	return o
+}
+
+func sendCell(ctx context.Context, b Backend, t flowi.RequestTarget, o flowi.SendOptions, labels []string) MatrixCell {
+	cell := MatrixCell{Labels: labels}
+	sending, err := b.Send(ctx, t, o)
+	if err != nil {
+		cell.Status, cell.Why = "error", ErrorText(err)
+		return cell
+	}
+	for range sending.Events() { //nolint:revive // a cell shows nothing of its own: draining lets the send end
+	}
+	res := sending.Wait()
+	cell.Status = cellStatus(res.Status)
+	if res.Record != nil && res.Record.Status > 0 {
+		cell.Detail = strconv.Itoa(res.Record.Status)
+	}
+	if cell.Status != "passed" {
+		cell.Why = problemOf(res.Status, res.Diags)
+	}
+	return cell
+}
+
 func cellStatus(s engine.Status) string {
 	switch s {
 	case engine.StatusPassed:
@@ -138,12 +200,14 @@ func cellStatus(s engine.Status) string {
 }
 
 // firstProblem is the first error of a run, as a sentence with its code, or the run's own status.
-func firstProblem(res engine.RunResult) string {
-	for _, d := range res.Diags {
+func firstProblem(res engine.RunResult) string { return problemOf(res.Status, res.Diags) }
+
+func problemOf(status engine.Status, diags diag.List) string {
+	for _, d := range diags {
 		if d.Severity == diag.SeverityError {
 			msg, _ := diag.English().Message(d)
 			return string(d.Code) + " " + msg
 		}
 	}
-	return "the run " + string(res.Status)
+	return "the run " + string(status)
 }

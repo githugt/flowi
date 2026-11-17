@@ -91,6 +91,9 @@ func StartRun(ctx context.Context, d Deps, in RunInput) *Run {
 		defer close(run.done)
 		defer close(run.events)
 		run.result = newFlowRunner(d, in, run.events).runFlow(ctx, in)
+		if d.OnRun != nil {
+			d.OnRun(run.result)
+		}
 	}()
 	return run
 }

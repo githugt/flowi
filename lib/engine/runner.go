@@ -278,6 +278,8 @@ type call struct {
 	outcomes   []model.Outcome   // the step's own, in place of the version's; none: the version's
 	bodyOver   *any              // a fuzz case: sent in place of the request's own body
 	conn       connUse           // a request node's use of a connection kept open
+	// activeHooks are the hook steps this request is being sent from, at any depth: it does not run them again.
+	activeHooks []string
 }
 
 // outcome is what executing one request produced.

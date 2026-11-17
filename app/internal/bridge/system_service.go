@@ -25,6 +25,20 @@ type Pickers struct {
 // SystemService is what the window needs from the operating system.
 type SystemService struct{ app *App }
 
+func (p Pickers) pickFolder(title string) (string, error) {
+	if p.Folder == nil {
+		return "", errNoDialogs
+	}
+	return p.Folder(title)
+}
+
+func (p Pickers) pickFile(title string) (string, error) {
+	if p.File == nil {
+		return "", errNoDialogs
+	}
+	return p.File(title)
+}
+
 // SetPickers installs the file dialogs.
 func (a *App) SetPickers(p Pickers) { a.pickers = p }
 

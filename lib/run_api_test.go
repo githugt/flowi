@@ -71,7 +71,27 @@ func drainRun(run *engine.Run) engine.RunResult {
 	return run.Wait()
 }
 
-func TestRunFlow_Given_validation_error_Then_ListError_and_no_run(t *testing.T) {
+func TestRunFlow_Given_validation_error_in_the_flow_Then_ListError_and_no_run(t *testing.T) {
+	w := demoWorkspace(t)
+	c := w.Collections()[0]
+	broken := filepath.Join(c.Root, "flows", "broken.arazzo.yaml")
+	if err := os.WriteFile(broken, []byte(arazzoFlow("id: 01JA0000000000000000000077\nnodes:\n  - id: a\n    type: teleport\n")), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	reloadAll(t, w)
+	target, err := w.FindFlow("01JA0000000000000000000077", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	run, err := w.RunFlow(context.Background(), target, RunOptions{Env: "local"})
+
+	if run != nil || !slicesContains(codesOfErr(err), diag.CodeNodeUnknownType) {
+		t.Fatalf("run %v err %v", run, err)
+	}
+}
+
+func TestRunFlow_Given_a_broken_flow_the_run_does_not_use_Then_the_run_starts(t *testing.T) {
 	w := demoWorkspace(t)
 	c := w.Collections()[0]
 	broken := filepath.Join(c.Root, "flows", "broken.arazzo.yaml")
@@ -86,9 +106,10 @@ func TestRunFlow_Given_validation_error_Then_ListError_and_no_run(t *testing.T) 
 
 	run, err := w.RunFlow(context.Background(), target, RunOptions{Env: "local"})
 
-	if run != nil || !slicesContains(codesOfErr(err), diag.CodeNodeUnknownType) {
+	if err != nil || run == nil {
 		t.Fatalf("run %v err %v", run, err)
 	}
+	_ = drainRun(run)
 }
 
 func TestRunFlow_Given_undeclared_or_missing_input_Then_FLW_RUN_010_or_009(t *testing.T) {

@@ -107,7 +107,7 @@
   .done strong { color: var(--muted); }
   .body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
   .detail { color: var(--muted); font-size: var(--fs-sm); }
-  li select { flex: none; background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); padding: 4px 12px; font: inherit; }
+  li select { flex: none; padding: 4px 12px; }
   .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: var(--sp-3); }
   .cards button { text-align: left; background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: var(--r-xl); padding: 14px; font: inherit; display: flex; flex-direction: column; gap: 4px; }
   .sq { width: 32px; height: 32px; border-radius: 9px; display: grid; place-items: center; margin-bottom: 6px; }

@@ -129,12 +129,12 @@ func versionFacts(v model.RequestVersion) card.Facts {
 		return asyncFacts(v)
 	case v.GRPC != nil:
 		return grpcFacts(v)
-	case v.Dataset != nil:
+	case v.SQL() != nil:
 		return datasetFacts(v)
 	}
 	headers, auth := withoutAuthorization(v.Headers)
 	if v.Auth != nil {
-		auth = v.Auth.Type
+		auth = authLabel(v.Auth)
 	}
 	return card.Facts{
 		Kind: "http", Method: v.Method, Target: pathOf(v.URL), Auth: auth,
@@ -150,14 +150,14 @@ func grpcFacts(v model.RequestVersion) card.Facts {
 	}
 	_, auth := withoutAuthorization(v.Headers)
 	if v.Auth != nil {
-		auth = v.Auth.Type
+		auth = authLabel(v.Auth)
 	}
 	return card.Facts{Kind: "grpc", Method: method, Target: g.Method, Auth: auth, Body: bodyKind(g.Body), Props: len(v.Headers)}
 }
 
 func datasetFacts(v model.RequestVersion) card.Facts {
-	d := v.Dataset
-	return card.Facts{Kind: "dataset", Method: datasetVerb, Target: datasetTip(*d), Sends: true, Body: d.Driver, Props: len(d.Params)}
+	d := v.SQL()
+	return card.Facts{Kind: "dataset", Method: datasetVerbOf(*d), Target: datasetTip(*d), Sends: true, Body: d.Driver, Props: len(d.Params)}
 }
 
 func asyncFacts(v model.RequestVersion) card.Facts {
@@ -173,7 +173,7 @@ func asyncFacts(v model.RequestVersion) card.Facts {
 	}
 	_, f.Auth = withoutAuthorization(v.Headers)
 	if v.Auth != nil {
-		f.Auth = v.Auth.Type
+		f.Auth = authLabel(v.Auth)
 	}
 	if a.Send != nil && a.Receive != nil && a.Protocol == "nats" {
 		f.Method = "request"

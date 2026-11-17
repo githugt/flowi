@@ -61,6 +61,21 @@ type RequestVersion struct {
 	// Dataset, when set, makes this a query of a data store instead of an HTTP
 	// request. The version's Headers, Method, URL, Query and Body are unused.
 	Dataset *Dataset
+	// File, when set, makes this a query over data files (CSV, Excel, Parquet) instead of an HTTP request. A version
+	// has one of Dataset and File, not both.
+	File *DataFile
+}
+
+// SQL is the SQL query of a database or data file version, as the runner takes it: nil for any other kind.
+func (v RequestVersion) SQL() *Dataset {
+	switch {
+	case v.Dataset != nil:
+		return v.Dataset
+	case v.File != nil:
+		d := v.File.AsDataset()
+		return &d
+	}
+	return nil
 }
 
 // Async is what an async request version does: it sends a message to a

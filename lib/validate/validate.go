@@ -18,6 +18,10 @@ import (
 // that cross-collection references can be checked.
 type Target struct {
 	Collections []model.Collection
+	// AllowDatasetWrites is the datasets.allow_writes setting: a query that writes is then not a problem.
+	AllowDatasetWrites bool
+	// DatasetReadOnly is the datasets.read_only setting: no dataset query may write, whatever else allows it.
+	DatasetReadOnly bool
 }
 
 type check func(ix *index) diag.List
@@ -57,6 +61,8 @@ func checks() []check {
 // Validate runs every check and returns the diagnostics sorted.
 func Validate(t Target) diag.List {
 	ix := buildIndex(t.Collections)
+	ix.allowWrites = t.AllowDatasetWrites
+	ix.readOnly = t.DatasetReadOnly
 	var out diag.List
 	for _, run := range checks() {
 		out = append(out, run(ix)...)

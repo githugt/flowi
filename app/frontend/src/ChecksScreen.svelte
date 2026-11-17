@@ -70,6 +70,7 @@
 </script>
 
 <div class="page">
+  <p class="note">Checks look at the OpenAPI descriptions you imported. Use Coverage to see which API operations your flows never call, and Spec change before importing a newer description, to see which flows and requests it would break. Both only read: nothing is changed. If the lists below are empty, import an OpenAPI description first (Import).</p>
   <label class="f"><span>Collection</span>
     <select bind:value={collection}>{#each targets as t}<option value={t.id}>{t.label}</option>{/each}</select>
   </label>
@@ -151,7 +152,6 @@
   .line { display: flex; align-items: center; gap: 14px; margin: 8px 0; }
   .inline { font-size: var(--fs-sm); color: var(--muted); display: flex; align-items: center; gap: 6px; }
   .num { width: 56px; }
-  select, input { background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); padding: 4px 8px; font: inherit; }
   .totals { border: 1px solid var(--line); border-radius: var(--r-lg); padding: 8px 12px; display: flex; flex-direction: column; gap: 2px; margin: 8px 0; font-size: var(--fs-sm); }
   .totals.bad { border-color: var(--fail); }
   .badnote, .badline { color: var(--fail); }

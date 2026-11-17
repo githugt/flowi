@@ -19,6 +19,8 @@ type sqlSource struct {
 	open func(q Query) (*sql.DB, error)
 	// readOnly asks the store for a read-only transaction. SQLite has none and is opened read-only instead.
 	readOnly bool
+	// after runs once a query that may write has committed, on the same pool: a file source writes the changes back.
+	after func(db *sql.DB) error
 }
 
 func (s sqlSource) Query(ctx context.Context, q Query) (Result, error) {
@@ -30,11 +32,12 @@ func (s sqlSource) Query(ctx context.Context, q Query) (Result, error) {
 	limitPool(db, q.Timeout)
 
 	// The first thing a pool does is connect, so this is where a wrong address or login shows.
-	tx, err := db.BeginTx(ctx, &sql.TxOptions{ReadOnly: s.readOnly})
+	tx, err := db.BeginTx(ctx, &sql.TxOptions{ReadOnly: s.readOnly && !q.AllowWrites})
 	if err != nil {
-		return Result{}, fmt.Errorf("connecting and starting a read-only transaction: %w", redactServer(err, q.Server))
+		return Result{}, fmt.Errorf("connecting and starting a transaction: %w", redactServer(err, q.Server))
 	}
-	// Never committed: a query reads, so there is nothing to keep, and a rollback ends it whatever happened.
+	// A read-only query never commits: a rollback ends it whatever happened. One that may write commits once its
+	// rows are read.
 	defer func() { _ = tx.Rollback() }()
 
 	rows, err := tx.QueryContext(ctx, q.Statement, bind(q.Params)...)
@@ -42,7 +45,22 @@ func (s sqlSource) Query(ctx context.Context, q Query) (Result, error) {
 		return Result{}, fmt.Errorf("running the query: %w", redactServer(err, q.Server))
 	}
 	defer func() { _ = rows.Close() }()
-	return collect(rows, q.Limit)
+	res, err := collect(rows, q.Limit)
+	if err != nil || !q.AllowWrites {
+		return res, err
+	}
+	if err := rows.Close(); err != nil {
+		return res, fmt.Errorf("finishing the query: %w", redactServer(err, q.Server))
+	}
+	if err := tx.Commit(); err != nil {
+		return res, fmt.Errorf("committing the changes: %w", redactServer(err, q.Server))
+	}
+	if s.after != nil {
+		if err := s.after(db); err != nil {
+			return res, err
+		}
+	}
+	return res, nil
 }
 
 // limitPool sets every pool limit explicitly: one connection, closed when idle or old, so nothing outlives the query.
