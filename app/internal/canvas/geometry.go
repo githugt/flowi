@@ -233,10 +233,7 @@ func InsertNear(d Diagram, p Point, exclude string) (list string, index int, ok 
 			continue
 		}
 		path := EdgePath(d, e)
-		lo, hi := along(path[0]), along(path[0])
-		for _, pt := range path {
-			lo, hi = min(lo, along(pt)), max(hi, along(pt))
-		}
+		lo, hi := extent(path, along)
 		if along(p) < lo-gapMargin || along(p) > hi+gapMargin {
 			continue
 		}
@@ -246,10 +243,7 @@ func InsertNear(d Diagram, p Point, exclude string) (list string, index int, ok 
 			}
 			return pt.X
 		}
-		sideLo, sideHi := side(path[0]), side(path[0])
-		for _, pt := range path {
-			sideLo, sideHi = min(sideLo, side(pt)), max(sideHi, side(pt))
-		}
+		sideLo, sideHi := extent(path, side)
 		if side(p) < sideLo-sideReach || side(p) > sideHi+sideReach {
 			continue // too far to the side: a card carried past the arrow is not dropped into it
 		}
@@ -263,6 +257,15 @@ func InsertNear(d Diagram, p Point, exclude string) (list string, index int, ok 
 		return "", 0, false
 	}
 	return InsertAt(d, best)
+}
+
+// extent is the lowest and highest value f takes along the path.
+func extent(path []Point, f func(Point) int64) (lo, hi int64) {
+	lo, hi = f(path[0]), f(path[0])
+	for _, pt := range path {
+		lo, hi = min(lo, f(pt)), max(hi, f(pt))
+	}
+	return lo, hi
 }
 
 // runsHorizontally reports whether the flow runs left to right (as laid out

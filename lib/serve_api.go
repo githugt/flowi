@@ -112,7 +112,12 @@ func (w *Workspace) ServeDefaults() ServeOptions {
 
 // resolve fills blanks from settings and rejects what cannot work.
 func (w *Workspace) resolveServe(o ServeOptions) (ServeOptions, error) {
-	def := w.ServeDefaults()
+	o = fillServeDefaults(o, w.ServeDefaults())
+	return o, validateServe(o)
+}
+
+// fillServeDefaults sets the blanks of o from def.
+func fillServeDefaults(o, def ServeOptions) ServeOptions {
 	if o.ReplayAddr == "" {
 		o.ReplayAddr = def.ReplayAddr
 	}
@@ -131,31 +136,37 @@ func (w *Workspace) resolveServe(o ServeOptions) (ServeOptions, error) {
 	if o.ValkeyAddr == "" {
 		o.ValkeyAddr, o.ValkeyTLS = def.ValkeyAddr, def.ValkeyTLS
 	}
+	return o
+}
+
+// validateServe rejects the options that cannot work together or at all.
+func validateServe(o ServeOptions) error {
+	faultsErr := o.Faults.Validate()
 	switch {
 	case o.NoReplay && o.NoTriggers && o.NoSchedules:
-		return o, fmt.Errorf("%w: nothing to serve, the replayer, triggers and schedules are all turned off", ErrInvalidServeOptions)
+		return fmt.Errorf("%w: nothing to serve, the replayer, triggers and schedules are all turned off", ErrInvalidServeOptions)
 	case o.PassThrough != "" && o.Record != "":
-		return o, fmt.Errorf("%w: pass-through and record both forward calls; use one", ErrInvalidServeOptions)
+		return fmt.Errorf("%w: pass-through and record both forward calls; use one", ErrInvalidServeOptions)
 	case o.CORS && o.PassThrough != "":
-		return o, fmt.Errorf("%w: CORS with pass-through would let any web page read the real API through your network position", ErrInvalidServeOptions)
+		return fmt.Errorf("%w: CORS with pass-through would let any web page read the real API through your network position", ErrInvalidServeOptions)
 	case o.CORS && o.Record != "":
-		return o, fmt.Errorf("%w: --cors with --record would let any web page read the real API through your network position", ErrInvalidServeOptions)
+		return fmt.Errorf("%w: --cors with --record would let any web page read the real API through your network position", ErrInvalidServeOptions)
 	case o.CORS && (o.Forward != "" || o.PassThrough != ""):
-		return o, fmt.Errorf("%w: browsers (CORS) together with forwarding would let any web page read the real API through your network position", ErrInvalidServeOptions)
-	case o.Faults.Validate() != nil:
-		return o, fmt.Errorf("%w: %w", ErrInvalidServeOptions, o.Faults.Validate())
+		return fmt.Errorf("%w: browsers (CORS) together with forwarding would let any web page read the real API through your network position", ErrInvalidServeOptions)
+	case faultsErr != nil:
+		return fmt.Errorf("%w: %w", ErrInvalidServeOptions, faultsErr)
 	case o.Faults.Active() && o.Record != "":
-		return o, fmt.Errorf("%w: faults are for replayed answers; with --record the calls go to the real API", ErrInvalidServeOptions)
+		return fmt.Errorf("%w: faults are for replayed answers; with --record the calls go to the real API", ErrInvalidServeOptions)
 	case o.Latency < 0:
-		return o, fmt.Errorf("%w: the latency cannot be negative", ErrInvalidServeOptions)
+		return fmt.Errorf("%w: the latency cannot be negative", ErrInvalidServeOptions)
 	case o.ShutdownTimeout < 0:
-		return o, fmt.Errorf("%w: the shutdown timeout cannot be negative", ErrInvalidServeOptions)
+		return fmt.Errorf("%w: the shutdown timeout cannot be negative", ErrInvalidServeOptions)
 	case o.ValkeyAddr != "" && !validHostPort(o.ValkeyAddr):
-		return o, fmt.Errorf("%w: the Valkey address needs the form host:port, got %q", ErrInvalidServeOptions, o.ValkeyAddr)
+		return fmt.Errorf("%w: the Valkey address needs the form host:port, got %q", ErrInvalidServeOptions, o.ValkeyAddr)
 	case o.MaxRuns < 0 || o.TrafficLog < 0:
-		return o, fmt.Errorf("%w: run and traffic-log limits cannot be negative", ErrInvalidServeOptions)
+		return fmt.Errorf("%w: run and traffic-log limits cannot be negative", ErrInvalidServeOptions)
 	}
-	return o, nil
+	return nil
 }
 
 // Server is a running `flowi serve`.

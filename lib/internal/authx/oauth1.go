@@ -174,7 +174,7 @@ func formParams(r *httpx.Request) ([]pair, error) {
 func percent(s string) string {
 	const hexDigits = "0123456789ABCDEF"
 	var b strings.Builder
-	for i := 0; i < len(s); i++ {
+	for i := range len(s) {
 		c := s[i]
 		switch {
 		case c >= 'A' && c <= 'Z', c >= 'a' && c <= 'z', c >= '0' && c <= '9', c == '-', c == '.', c == '_', c == '~':

@@ -301,7 +301,8 @@ func parametersOf(op operation) []any {
 
 func requestBodyOf(op operation, schemas SchemaLookup) any {
 	b := op.version.Body
-	media, schema := "", any(yaml.MapSlice{})
+	var media string
+	schema := any(yaml.MapSlice{})
 	switch {
 	case b.JSON != "":
 		media = "application/json"

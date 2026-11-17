@@ -102,6 +102,12 @@ func runWatcher(ctx context.Context, w *fsnotify.Watcher, roots []string, dirs m
 	// The timer starts at the first pending event and is not pushed back by
 	// later ones, so a file written continuously cannot starve the others.
 	armed := false
+	arm := func() {
+		if !armed {
+			timer.Reset(coalesceWindow)
+			armed = true
+		}
+	}
 	for {
 		select {
 		case <-ctx.Done():
@@ -110,9 +116,8 @@ func runWatcher(ctx context.Context, w *fsnotify.Watcher, roots []string, dirs m
 			if !ok {
 				return
 			}
-			if handleEvent(w, roots, dirs, ev, pending) && !armed {
-				timer.Reset(coalesceWindow)
-				armed = true
+			if handleEvent(w, roots, dirs, ev, pending) {
+				arm()
 			}
 		case err, ok := <-w.Errors:
 			if !ok {
@@ -123,10 +128,7 @@ func runWatcher(ctx context.Context, w *fsnotify.Watcher, roots []string, dirs m
 				for _, root := range roots {
 					pending[root] = pendingChange{root: root, rescan: true}
 				}
-				if !armed {
-					timer.Reset(coalesceWindow)
-					armed = true
-				}
+				arm()
 				continue
 			}
 			send(ctx, out, Change{Err: fmt.Errorf("file watcher: %w", err)})

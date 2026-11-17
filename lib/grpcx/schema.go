@@ -170,6 +170,15 @@ func registerWithImports(files *protoregistry.Files, fd protoreflect.FileDescrip
 // asking fetch for imports that were not sent (and the well-known ones come
 // from the global registry). initial is what the server sent first.
 func buildFiles(initial [][]byte, fetch func(name string) ([][]byte, error)) (*protoregistry.Files, error) {
+	protos, err := collectProtos(initial, fetch)
+	if err != nil {
+		return nil, err
+	}
+	return registerProtos(protos)
+}
+
+// collectProtos reads the files the server sent and, one by one, the imports they still need.
+func collectProtos(initial [][]byte, fetch func(name string) ([][]byte, error)) (map[string]*descriptorpb.FileDescriptorProto, error) {
 	protos := map[string]*descriptorpb.FileDescriptorProto{}
 	var queue []*descriptorpb.FileDescriptorProto
 	add := func(raw [][]byte) error {
@@ -207,6 +216,11 @@ func buildFiles(initial [][]byte, fetch func(name string) ([][]byte, error)) (*p
 			}
 		}
 	}
+	return protos, nil
+}
+
+// registerProtos builds the files into a registry, each after the files it imports.
+func registerProtos(protos map[string]*descriptorpb.FileDescriptorProto) (*protoregistry.Files, error) {
 	files := &protoregistry.Files{}
 	done := map[string]bool{}
 	var register func(name string) error

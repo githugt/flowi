@@ -25,27 +25,33 @@ func checkAuth(ix *index) diag.List {
 		out = append(out, namedAuthProblems(c)...)
 		for _, r := range c.Requests {
 			for _, v := range r.Versions {
-				if v.Auth == nil {
-					continue
-				}
-				loc := diag.Location{File: r.File, Path: yamlpath.Key(yamlpath.Key(yamlpath.Key("$", "versions"), v.Label), "auth")}
-				if v.Auth.Use != "" {
-					if v.Auth.Type != "" || len(v.Auth.Params) > 0 {
-						out = append(out, diag.New(diag.CodeAuthInvalid, loc, map[string]string{"detail": "an auth block that uses a named authentication has no type or parameters of its own"}))
-						continue
-					}
-					named, ok := c.NamedAuth(v.Auth.Use)
-					if !ok {
-						out = append(out, diag.New(diag.CodeAuthUnknown, loc, map[string]string{"name": v.Auth.Use}))
-						continue
-					}
-					v.Auth = &named.Auth
-				}
-				for _, detail := range authProblems(v) {
-					out = append(out, diag.New(diag.CodeAuthInvalid, loc, map[string]string{"detail": detail}))
-				}
+				out = append(out, versionAuthProblems(c, r, v)...)
 			}
 		}
+	}
+	return out
+}
+
+// versionAuthProblems checks the auth block of one request version: a named authentication is looked up in c and
+// checked as the block it stands for.
+func versionAuthProblems(c model.Collection, r model.Request, v model.RequestVersion) diag.List {
+	if v.Auth == nil {
+		return nil
+	}
+	loc := diag.Location{File: r.File, Path: yamlpath.Key(yamlpath.Key(yamlpath.Key("$", "versions"), v.Label), "auth")}
+	if v.Auth.Use != "" {
+		if v.Auth.Type != "" || len(v.Auth.Params) > 0 {
+			return diag.List{diag.New(diag.CodeAuthInvalid, loc, map[string]string{"detail": "an auth block that uses a named authentication has no type or parameters of its own"})}
+		}
+		named, ok := c.NamedAuth(v.Auth.Use)
+		if !ok {
+			return diag.List{diag.New(diag.CodeAuthUnknown, loc, map[string]string{"name": v.Auth.Use})}
+		}
+		v.Auth = &named.Auth
+	}
+	var out diag.List
+	for _, detail := range authProblems(v) {
+		out = append(out, diag.New(diag.CodeAuthInvalid, loc, map[string]string{"detail": detail}))
 	}
 	return out
 }

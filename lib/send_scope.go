@@ -98,11 +98,7 @@ func filesNotRun(all []model.Collection, c model.Collection, r model.Request) ma
 	skipped := flowFilesNotRun(all, c, r)
 	var refs []model.Ref
 	for _, h := range hookSets(c, r) {
-		for _, steps := range [][]model.HookStep{h.Pre, h.Post, h.Message} {
-			for _, s := range steps {
-				refs = append(refs, requestRefs(s.Inline)...)
-			}
-		}
+		refs = append(refs, hookRequestRefs(h)...)
 	}
 	for _, coll := range all {
 		for _, f := range coll.Flows {
@@ -147,51 +143,23 @@ func filesNotRunByFlow(all []model.Collection, f model.Flow) map[string]bool {
 	flowsRun := map[string]bool{f.File: true}
 	reqsRun := map[string]bool{}
 	flowQueue := []model.Flow{f}
-	reqQueue := []model.Ref{}
-	hookQueue := []model.Hooks{}
+	var hookQueue []model.Hooks
 
-	for len(flowQueue)+len(reqQueue)+len(hookQueue) > 0 {
+	for len(flowQueue)+len(hookQueue) > 0 {
 		var flowRefs, reqRefs []model.Ref
-		switch {
-		case len(flowQueue) > 0:
+		if len(flowQueue) > 0 {
 			g := flowQueue[0]
 			flowQueue = flowQueue[1:]
 			flowRefs, reqRefs = subflowRefs(g.Nodes), requestRefs(g.Nodes)
-		case len(hookQueue) > 0:
+		} else {
 			h := hookQueue[0]
 			hookQueue = hookQueue[1:]
-			flowRefs = hookRefs(h)
-			for _, steps := range [][]model.HookStep{h.Pre, h.Post, h.Message} {
-				for _, s := range steps {
-					reqRefs = append(reqRefs, requestRefs(s.Inline)...)
-				}
-			}
-		default:
-			reqRefs = []model.Ref{reqQueue[0]}
-			reqQueue = reqQueue[1:]
+			flowRefs, reqRefs = hookRefs(h), hookRequestRefs(h)
 		}
-		for _, ref := range flowRefs {
-			for _, coll := range all {
-				for _, g := range coll.Flows {
-					if !flowsRun[g.File] && refersTo(ref, g) {
-						flowsRun[g.File] = true
-						flowQueue = append(flowQueue, g)
-					}
-				}
-			}
-		}
-		for _, ref := range reqRefs {
-			for _, coll := range all {
-				for _, r := range coll.Requests {
-					if reqsRun[r.File] || ((ref.ID == "" || ref.ID != r.ID) && (ref.Path == "" || ref.Path != r.Path)) {
-						continue
-					}
-					reqsRun[r.File] = true
-					hookQueue = append(hookQueue, hookSets(coll, r)...) // what a send of it runs around it
-				}
-			}
-		}
+		flowQueue = append(flowQueue, newlyCalledFlows(all, flowRefs, flowsRun)...)
+		hookQueue = append(hookQueue, newlySentRequestHooks(all, reqRefs, reqsRun)...)
 	}
+
 	skipped := map[string]bool{}
 	for _, coll := range all {
 		for _, g := range coll.Flows {
@@ -206,4 +174,49 @@ func filesNotRunByFlow(all []model.Collection, f model.Flow) map[string]bool {
 		}
 	}
 	return skipped
+}
+
+// hookRequestRefs are the requests the inline steps of the hooks send.
+func hookRequestRefs(h model.Hooks) []model.Ref {
+	var refs []model.Ref
+	for _, steps := range [][]model.HookStep{h.Pre, h.Post, h.Message} {
+		for _, s := range steps {
+			refs = append(refs, requestRefs(s.Inline)...)
+		}
+	}
+	return refs
+}
+
+// newlyCalledFlows are the flows the references call that are not yet in run; it marks them as run.
+func newlyCalledFlows(all []model.Collection, refs []model.Ref, run map[string]bool) []model.Flow {
+	var found []model.Flow
+	for _, ref := range refs {
+		for _, coll := range all {
+			for _, g := range coll.Flows {
+				if !run[g.File] && refersTo(ref, g) {
+					run[g.File] = true
+					found = append(found, g)
+				}
+			}
+		}
+	}
+	return found
+}
+
+// newlySentRequestHooks are the hooks a send of each referenced request runs around it, for the requests not yet in
+// sent; it marks them as sent.
+func newlySentRequestHooks(all []model.Collection, refs []model.Ref, sent map[string]bool) []model.Hooks {
+	var found []model.Hooks
+	for _, ref := range refs {
+		for _, coll := range all {
+			for _, r := range coll.Requests {
+				if sent[r.File] || ((ref.ID == "" || ref.ID != r.ID) && (ref.Path == "" || ref.Path != r.Path)) {
+					continue
+				}
+				sent[r.File] = true
+				found = append(found, hookSets(coll, r)...)
+			}
+		}
+	}
+	return found
 }

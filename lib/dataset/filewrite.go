@@ -87,7 +87,6 @@ func readBack(db *sql.DB, lt loadedTable) (outTable, bool, error) {
 	}
 	out := outTable{cols: cols[1:]}
 	out.colsChanged = !slices.Equal(out.cols, lt.cols)
-	changed := out.colsChanged || false
 	for rows.Next() {
 		values := make([]any, len(cols))
 		targets := make([]any, len(cols))
@@ -113,18 +112,22 @@ func readBack(db *sql.DB, lt loadedTable) (outTable, bool, error) {
 	if err := rows.Err(); err != nil {
 		return outTable{}, false, err
 	}
-	if len(out.rows) != len(lt.rows) {
-		changed = true
+	return out, out.colsChanged || rowsDiffer(out.rows, lt.rows), nil
+}
+
+// rowsDiffer is whether the rows now differ from the rows loaded (both as wide as the table's columns).
+func rowsDiffer(now, loaded [][]any) bool {
+	if len(now) != len(loaded) {
+		return true
 	}
-	for i := 0; !changed && i < len(out.rows); i++ {
-		for c := range out.rows[i] {
-			if !equalCells(out.rows[i][c], lt.rows[i][c]) {
-				changed = true
-				break
+	for i := range now {
+		for c := range now[i] {
+			if !equalCells(now[i][c], loaded[i][c]) {
+				return true
 			}
 		}
 	}
-	return out, changed, rows.Err()
+	return false
 }
 
 // plainCell is a value the SQLite driver returned as a Go value the writers handle.
@@ -268,53 +271,59 @@ func writeXLSX(path string, changes []tableChange) error {
 	}
 	defer func() { _ = f.Close() }()
 	for _, t := range changes {
-		sheet := t.loaded.sheet
-		oldRows, oldCols := len(t.loaded.rows), len(t.loaded.table.cols)
-		set := func(col, row int, v any) error {
-			cell, err := excelize.CoordinatesToCellName(col+1, row)
-			if err != nil {
-				return err
-			}
-			if v == nil {
-				v = ""
-			}
-			return f.SetCellValue(sheet, cell, v)
+		if err := updateSheet(f, t); err != nil {
+			return err
 		}
-		if t.out.colsChanged {
-			for c := 0; c < max(len(t.out.cols), oldCols); c++ {
-				var v any
-				if c < len(t.out.cols) {
-					v = t.out.cols[c]
-				}
-				if err := set(c, 1, v); err != nil {
-					return err
-				}
-			}
+	}
+	return replaceFile(path, func(tmp string) error { return f.SaveAs(tmp) })
+}
+
+// updateSheet writes the changed cells of one table into its sheet and removes the rows the query dropped.
+func updateSheet(f *excelize.File, t tableChange) error {
+	sheet := t.loaded.sheet
+	oldRows, oldCols := len(t.loaded.rows), len(t.loaded.table.cols)
+	set := func(col, row int, v any) error {
+		cell, err := excelize.CoordinatesToCellName(col+1, row)
+		if err != nil {
+			return err
 		}
-		for r, row := range t.out.rows {
-			for c := 0; c < max(len(row), oldCols); c++ {
-				var v, was any
-				if c < len(row) {
-					v = row[c]
-				}
-				if r < oldRows && c < len(t.loaded.rows[r]) {
-					was = t.loaded.rows[r][c]
-				}
-				if r < oldRows && equalCells(v, was) {
-					continue
-				}
-				if err := set(c, r+2, v); err != nil {
-					return err
-				}
-			}
+		if v == nil {
+			v = ""
 		}
-		for r := oldRows + 1; r > len(t.out.rows)+1; r-- { // from the bottom, so the rows above keep their numbers
-			if err := f.RemoveRow(sheet, r); err != nil {
+		return f.SetCellValue(sheet, cell, v)
+	}
+	if t.out.colsChanged {
+		for c := 0; c < max(len(t.out.cols), oldCols); c++ {
+			if err := set(c, 1, cellAt(t.out.cols, c)); err != nil {
 				return err
 			}
 		}
 	}
-	return replaceFile(path, func(tmp string) error { return f.SaveAs(tmp) })
+	for r, row := range t.out.rows {
+		for c := 0; c < max(len(row), oldCols); c++ {
+			v := cellAt(row, c)
+			if r < oldRows && equalCells(v, cellAt(t.loaded.rows[r], c)) {
+				continue
+			}
+			if err := set(c, r+2, v); err != nil {
+				return err
+			}
+		}
+	}
+	for r := oldRows + 1; r > len(t.out.rows)+1; r-- { // from the bottom, so the rows above keep their numbers
+		if err := f.RemoveRow(sheet, r); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// cellAt is the value at index i, nil past the end.
+func cellAt[T any](values []T, i int) any {
+	if i < len(values) {
+		return values[i]
+	}
+	return nil
 }
 
 // writeParquet rewrites the whole file: Parquet cannot be edited in place. The file's own schema is kept, so a column
@@ -401,13 +410,7 @@ func parquetValue(field parquet.Field, v any) (any, error) {
 	}
 	switch field.Type().Kind() {
 	case parquet.Boolean:
-		switch x := v.(type) {
-		case bool:
-			return x, nil
-		case int64:
-			return x != 0, nil
-		case string:
-			b, err := strconv.ParseBool(strings.TrimSpace(x))
+		if b, ok, err := parquetBool(v); ok {
 			return b, err
 		}
 	case parquet.Int32:
@@ -435,13 +438,30 @@ func parquetValue(field parquet.Field, v any) (any, error) {
 	return nil, fmt.Errorf("the value %v does not fit a column of type %s", v, field.Type())
 }
 
+// parquetBool reads a boolean cell: a bool, a number (non-zero is true) or text; ok is false for any other value.
+func parquetBool(v any) (b, ok bool, err error) {
+	switch x := v.(type) {
+	case bool:
+		return x, true, nil
+	case int64:
+		return x != 0, true, nil
+	case string:
+		b, err = strconv.ParseBool(strings.TrimSpace(x))
+		return b, true, err
+	}
+	return false, false, nil
+}
+
 func wholeNumber(v any) (int64, bool) {
 	if x, isText := v.(string); isText {
 		n, err := strconv.ParseInt(strings.TrimSpace(x), 10, 64)
 		return n, err == nil
 	}
 	f, ok := asFloat(v)
-	return int64(f), ok && f == math.Trunc(f)
+	if !ok || f != math.Trunc(f) || f < -(1<<63) || f >= 1<<63 { // beyond int64, the conversion would wrap silently
+		return 0, false
+	}
+	return int64(f), true
 }
 
 func numberOf(v any) (float64, bool) {

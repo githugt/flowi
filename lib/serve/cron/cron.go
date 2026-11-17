@@ -194,7 +194,7 @@ const searchDays = 366 * 9
 func (s Schedule) Next(after time.Time) time.Time {
 	loc := after.Location()
 	y, m, d := after.Date()
-	for day := 0; day < searchDays; day++ {
+	for day := range searchDays {
 		date := time.Date(y, m, d+day, 12, 0, 0, 0, loc) // noon: stable across DST shifts
 		if !s.matchesDay(date) {
 			continue
@@ -220,11 +220,11 @@ func (s Schedule) matchesDay(date time.Time) bool {
 
 func (s Schedule) firstOnDay(date, after time.Time) (time.Time, bool) {
 	y, m, d := date.Date()
-	for h := 0; h < 24; h++ {
+	for h := range 24 {
 		if s.hour&(1<<uint(h)) == 0 { //nolint:gosec // h is 0-23
 			continue
 		}
-		for mi := 0; mi < 60; mi++ {
+		for mi := range 60 {
 			if s.minute&(1<<uint(mi)) == 0 { //nolint:gosec // mi is 0-59
 				continue
 			}

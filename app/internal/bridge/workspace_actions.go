@@ -270,8 +270,7 @@ func (s *WorkspaceService) do(action string, ids []string, text, protocol string
 			ws.CreateEnvironment(text, open, fail)
 		}
 	case "newFlow":
-		folder, _ := folderPrefix(n)
-		ws.CreateUntitledFlowIn(n.Collection, strings.TrimSuffix(folder, "/"), open, fail)
+		ws.CreateUntitledFlowIn(n.Collection, strings.TrimSuffix(prefix, "/"), open, fail)
 	case "flowFromRequests":
 		requests := ids
 		if len(ids) == 1 {

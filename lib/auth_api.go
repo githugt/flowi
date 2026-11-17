@@ -171,30 +171,14 @@ func (w *Workspace) RenameNamedAuth(t AuthTarget, name string, o SaveOptions) er
 	changes := []store.FileChange{{File: file, New: data}}
 	touched := []string{file, a.File}
 	for _, r := range c.Requests {
-		if !slices.ContainsFunc(r.Versions, func(v model.RequestVersion) bool { return v.Auth != nil && v.Auth.Use == a.Name }) {
-			continue
-		}
-		r.Versions = slices.Clone(r.Versions)
-		for i, v := range r.Versions {
-			if v.Auth != nil && v.Auth.Use == a.Name {
-				use := *v.Auth
-				use.Use = name
-				r.Versions[i].Auth = &use
-			}
-		}
-		old, err := os.ReadFile(r.File)
+		change, used, err := w.renameAuthUse(r, a.Name, name, o)
 		if err != nil {
-			return fmt.Errorf("reading %s: %w", r.File, err)
+			return err
 		}
-		if !o.DropComments && w.store.HasComments(old) {
-			return diag.List{diag.New(diag.CodeWriteDropsComments, diag.Location{File: r.File}, map[string]string{"file": filepath.Base(r.File)})}.Err()
+		if used {
+			changes = append(changes, change)
+			touched = append(touched, r.File)
 		}
-		enc, err := w.store.EncodeRequest(r)
-		if err != nil {
-			return fmt.Errorf("encoding %s: %w", r.File, err)
-		}
-		changes = append(changes, store.FileChange{File: r.File, Old: old, New: enc})
-		touched = append(touched, r.File)
 	}
 	if err := store.Apply(changes); err != nil {
 		return err
@@ -208,4 +192,33 @@ func (w *Workspace) RenameNamedAuth(t AuthTarget, name string, o SaveOptions) er
 		}
 	}
 	return nil
+}
+
+// renameAuthUse is the change that makes the versions of r which use the authentication oldName use newName; used is
+// false when none does.
+func (w *Workspace) renameAuthUse(r model.Request, oldName, newName string, o SaveOptions) (change store.FileChange, used bool, err error) {
+	usesOld := func(v model.RequestVersion) bool { return v.Auth != nil && v.Auth.Use == oldName }
+	if !slices.ContainsFunc(r.Versions, usesOld) {
+		return store.FileChange{}, false, nil
+	}
+	r.Versions = slices.Clone(r.Versions)
+	for i, v := range r.Versions {
+		if usesOld(v) {
+			use := *v.Auth
+			use.Use = newName
+			r.Versions[i].Auth = &use
+		}
+	}
+	old, err := os.ReadFile(r.File)
+	if err != nil {
+		return store.FileChange{}, false, fmt.Errorf("reading %s: %w", r.File, err)
+	}
+	if !o.DropComments && w.store.HasComments(old) {
+		return store.FileChange{}, false, diag.List{diag.New(diag.CodeWriteDropsComments, diag.Location{File: r.File}, map[string]string{"file": filepath.Base(r.File)})}.Err()
+	}
+	enc, err := w.store.EncodeRequest(r)
+	if err != nil {
+		return store.FileChange{}, false, fmt.Errorf("encoding %s: %w", r.File, err)
+	}
+	return store.FileChange{File: r.File, Old: old, New: enc}, true, nil
 }

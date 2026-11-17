@@ -166,48 +166,49 @@ func (m *mapper) place(n, prev *gnode, g *graph) []model.Node {
 func (m *mapper) nodes(n *gnode) []model.Node {
 	prefix, rest, has := strings.Cut(n.label, ":")
 	rest = strings.TrimSpace(rest)
-	switch strings.ToLower(strings.TrimSpace(prefix)) {
-	case "req", "request":
-		if has {
-			return m.request(n, rest)
-		}
-	case "subflow", "flow":
-		if has {
-			ref, ok := m.r.Flow(rest)
-			if !ok {
-				return m.placeholder(n, "no flow "+rest+" in this collection")
-			}
-			return []model.Node{{Type: "subflow", Subflow: &model.SubflowCall{Flow: ref}}}
-		}
-	case "delay":
-		if has {
-			return m.delay(n, rest)
-		}
-	case "extract":
-		if has {
-			return m.extract(n, rest)
-		}
-	case "set":
-		if name, value, ok := strings.Cut(rest, "="); has && ok && identifier(strings.TrimSpace(name)) {
-			return []model.Node{{Type: "set", Values: []model.SetValue{{Name: strings.TrimSpace(name), Value: strings.TrimSpace(value)}}}}
-		}
-	case "assert":
-		if has && rest != "" {
-			return []model.Node{{Type: "assert", Params: []model.Field{{Key: "check", Value: rest}}}}
-		}
-	case "log":
-		if has && rest != "" {
-			return []model.Node{{Type: "log", Params: []model.Field{{Key: "value", Value: rest}}}}
-		}
-	case "note":
-		if has {
-			return []model.Node{{Type: "note", Params: []model.Field{{Key: "text", Value: rest}}}}
+	if has { // every convention is "kind: rest"
+		if mapped := m.conventional(n, strings.ToLower(strings.TrimSpace(prefix)), rest); mapped != nil {
+			return mapped
 		}
 	}
 	if ref, ok := m.r.Request(strings.TrimSpace(n.label)); ok {
 		return []model.Node{{Type: "request", Request: &model.RequestCall{Request: ref}}}
 	}
 	return m.placeholder(n, "no label convention matches; write req: <path>, delay: 2s, extract: name=$.path, set: name=value, assert: …, log: …, note: …")
+}
+
+// conventional maps a node labelled "kind: rest" by its kind; nil when the kind or the rest is not one the
+// conventions know.
+func (m *mapper) conventional(n *gnode, kind, rest string) []model.Node {
+	switch kind {
+	case "req", "request":
+		return m.request(n, rest)
+	case "subflow", "flow":
+		ref, ok := m.r.Flow(rest)
+		if !ok {
+			return m.placeholder(n, "no flow "+rest+" in this collection")
+		}
+		return []model.Node{{Type: "subflow", Subflow: &model.SubflowCall{Flow: ref}}}
+	case "delay":
+		return m.delay(n, rest)
+	case "extract":
+		return m.extract(n, rest)
+	case "set":
+		if name, value, ok := strings.Cut(rest, "="); ok && identifier(strings.TrimSpace(name)) {
+			return []model.Node{{Type: "set", Values: []model.SetValue{{Name: strings.TrimSpace(name), Value: strings.TrimSpace(value)}}}}
+		}
+	case "assert":
+		if rest != "" {
+			return []model.Node{{Type: "assert", Params: []model.Field{{Key: "check", Value: rest}}}}
+		}
+	case "log":
+		if rest != "" {
+			return []model.Node{{Type: "log", Params: []model.Field{{Key: "value", Value: rest}}}}
+		}
+	case "note":
+		return []model.Node{{Type: "note", Params: []model.Field{{Key: "text", Value: rest}}}}
+	}
+	return nil
 }
 
 func (m *mapper) request(n *gnode, rest string) []model.Node {

@@ -4,6 +4,7 @@ package snippet
 
 import (
 	"fmt"
+	"net/http"
 	"strings"
 
 	"github.com/githugt/flowi/lib/engine"
@@ -67,8 +68,8 @@ const (
 func curl(r engine.PreviewRequest) string {
 	args := []string{"curl"}
 	switch r.Method {
-	case "", "GET":
-	case "HEAD":
+	case "", http.MethodGet:
+	case http.MethodHead:
 		args[0] = "curl -I"
 	default:
 		args[0] = "curl -X " + r.Method
@@ -106,7 +107,7 @@ func wget(r engine.PreviewRequest) string {
 		return "# wget cannot send multipart/form-data; use the cURL or xh snippet instead."
 	}
 	args := []string{"wget -O -"}
-	if r.Method != "" && r.Method != "GET" {
+	if r.Method != "" && r.Method != http.MethodGet {
 		args[0] += " --method=" + r.Method
 	}
 	for _, h := range r.Headers {
@@ -173,7 +174,7 @@ func psParts(parts []engine.PreviewPart) []string {
 
 func xh(r engine.PreviewRequest) string {
 	head := "xh"
-	if r.Method != "" && r.Method != "GET" {
+	if r.Method != "" && r.Method != http.MethodGet {
 		head += " " + r.Method
 	}
 	args := []string{head + " " + shellQuote(r.URL)}
