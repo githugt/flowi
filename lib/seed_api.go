@@ -228,7 +228,7 @@ func kindOf(r model.Request) requestKind {
 		}
 	}
 	switch opening.Family() {
-	case model.FamilyDataset:
+	case model.FamilyDataset, model.FamilyFile:
 		return kindDataset
 	case model.FamilyRPC:
 		return kindGRPC

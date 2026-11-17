@@ -349,3 +349,25 @@ func TestNewFolder_Given_a_name_with_spaces_Then_the_folder_takes_the_file_safe_
 		t.Fatal(statErr)
 	}
 }
+
+func TestNewFileRequest_Given_a_format_Then_the_request_is_a_file_query_and_a_database_is_refused(t *testing.T) {
+	w := demoWorkspace(t)
+	c := w.Collections()[0]
+
+	target, err := w.NewFileRequest(c.Manifest.ID, "reports/sales", model.FormatXLSX)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, r, _ := w.requestFor(target)
+	v := r.Versions[0]
+	if v.Family() != model.FamilyFile || v.File.Format != "xlsx" || v.File.Path != "data.xlsx" || v.Dataset != nil {
+		t.Fatalf("version %+v", v)
+	}
+	if _, err := w.NewFileRequest(c.Manifest.ID, "reports/x", model.DriverPostgres); err == nil {
+		t.Fatal("a database was accepted as a file format")
+	}
+	if _, err := w.NewDatasetRequest(c.Manifest.ID, "reports/y", model.FormatCSV); err == nil {
+		t.Fatal("a file format was accepted as a database driver")
+	}
+}

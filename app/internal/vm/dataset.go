@@ -28,22 +28,37 @@ func datasetVerbOf(d model.Dataset) string {
 }
 
 // IsDataset reports whether the selected version is a dataset query.
-func (r *Request) IsDataset() bool { return r.Current().Dataset != nil }
+// IsDataset reports whether the selected version is a SQL query: of a database or of data files. The two are kinds of
+// their own in the library (model.Dataset and model.DataFile); the screen that edits a query is the same for both.
+func (r *Request) IsDataset() bool { return r.Current().SQL() != nil }
 
-// Dataset is a copy of the selected version's dataset block; the zero value for any other version.
+// IsDataFile reports whether the selected version is a query over data files (CSV, Excel, Parquet).
+func (r *Request) IsDataFile() bool { return r.Current().File != nil }
+
+// Dataset is a copy of the selected version's query block (a data file query as its SQL equivalent: the format is the
+// driver and the path is the server); the zero value for any other version.
 func (r *Request) Dataset() model.Dataset {
-	if d := r.Current().Dataset; d != nil {
+	if d := r.Current().SQL(); d != nil {
 		return *cloneDataset(d)
 	}
 	return model.Dataset{}
 }
 
-// EditDataset changes the dataset block of the selected version; it does nothing for another kind.
+// EditDataset changes the query block of the selected version; it does nothing for another kind. A data file query
+// stays one: the format and the path are written back to its file block.
 func (r *Request) EditDataset(f func(d *model.Dataset)) {
 	if !r.IsDataset() {
 		return
 	}
-	r.Edit(func(v *model.RequestVersion) { f(v.Dataset) })
+	r.Edit(func(v *model.RequestVersion) {
+		if v.File != nil {
+			d := v.File.AsDataset()
+			f(&d)
+			*v.File = model.DataFileOf(d)
+			return
+		}
+		f(v.Dataset)
+	})
 }
 
 // cloneDataset deep-copies a dataset block, so an edit never reaches the copy it came from.
@@ -53,6 +68,16 @@ func cloneDataset(d *model.Dataset) *model.Dataset {
 	}
 	out := *d
 	out.Params = slices.Clone(d.Params)
+	return &out
+}
+
+// cloneDataFile deep-copies a file block, so an edit never reaches the copy it came from.
+func cloneDataFile(f *model.DataFile) *model.DataFile {
+	if f == nil {
+		return nil
+	}
+	out := *f
+	out.Params = slices.Clone(f.Params)
 	return &out
 }
 

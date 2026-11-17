@@ -264,3 +264,49 @@ func TestExplainArguments_Given_a_driver_count_mismatch_When_explained_Then_it_n
 		t.Fatalf("another error was rewritten: %q", other)
 	}
 }
+
+func fileVersion(f model.DataFile) model.RequestVersion {
+	if f.Format == "" {
+		f.Format = model.FormatCSV
+	}
+	if f.Path == "" {
+		f.Path = "data/sales.csv"
+	}
+	if f.Query == "" {
+		f.Query = "SELECT id, name FROM sales"
+	}
+	return model.RequestVersion{File: &f}
+}
+
+func TestSend_File_should_run_the_query_over_the_file_as_a_dataset_record(t *testing.T) {
+	runner := &scriptedDataset{res: twoCustomers()}
+	v := fileVersion(model.DataFile{Path: "{{dir}}/sales.csv", Query: "SELECT id, name FROM sales WHERE id > ?", Params: []string{"{{id}}"}, Limit: 5})
+	v.Assert = []string{`row_count == 2`, `body.rows[0].name == "Ada"`}
+
+	res, _ := sendDatasetRequest(t, runner, v, func(in *SendInput) { in.With = map[string]string{"id": "0", "dir": "data"} })
+
+	if res.Status != StatusPassed {
+		t.Fatalf("status %s diags %v", res.Status, res.Diags)
+	}
+	q := runner.got
+	if q.Driver != "csv" || q.Server != "data/sales.csv" || q.Params[0] != "0" || q.Limit != 5 || q.AllowWrites {
+		t.Fatalf("query %+v", q)
+	}
+	if res.Record.Kind != KindDataset || res.Record.Proto != "csv" {
+		t.Fatalf("record kind %q proto %q", res.Record.Kind, res.Record.Proto)
+	}
+}
+
+func TestSend_File_Given_datasets_allow_writes_Then_a_file_query_still_may_not_write(t *testing.T) {
+	runner := &scriptedDataset{res: twoCustomers()}
+	f := newFixture(t)
+	f.dataset = runner
+	f.update(func(c *model.Collection) { c.Manifest.Settings = model.Settings{"datasets.allow_writes": true} })
+	r := f.addRequest("sales/list", fileVersion(model.DataFile{}))
+
+	f.send(f.input(r))
+
+	if runner.got.AllowWrites {
+		t.Fatal("a file query was allowed to write")
+	}
+}

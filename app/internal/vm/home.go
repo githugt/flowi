@@ -69,7 +69,7 @@ func (s *Setup) countRequest(r model.Request) {
 		s.GRPC++
 	case v.Async != nil:
 		s.Messaging++
-	case v.Dataset != nil:
+	case v.SQL() != nil:
 		s.Datasets++
 	default:
 		s.HTTP++

@@ -17,6 +17,9 @@ const (
 	FamilyMessaging Family = "messaging"
 	// FamilyDataset is a query of a data store, answered with rows (SQL).
 	FamilyDataset Family = "dataset"
+	// FamilyFile is a query of data files (CSV, Excel, Parquet), answered with rows (SQL). It runs like a dataset
+	// query but has no server and nothing to log in to.
+	FamilyFile Family = "file"
 )
 
 // Exchange is which directions a request has: what it sends and what it receives.
@@ -56,6 +59,8 @@ func (v RequestVersion) Family() Family {
 	switch {
 	case v.Dataset != nil:
 		return FamilyDataset
+	case v.File != nil:
+		return FamilyFile
 	case v.GRPC != nil:
 		return FamilyRPC
 	case v.Async != nil:

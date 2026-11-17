@@ -46,6 +46,8 @@ type Backend interface {
 	NewGRPCRequest(collection model.ID, path string) (flowi.RequestTarget, error)
 	// NewDatasetRequest is NewRequest for a dataset request of the given driver.
 	NewDatasetRequest(collection model.ID, path, driver string) (flowi.RequestTarget, error)
+	// NewFileRequest is NewRequest for a data file request of the given format.
+	NewFileRequest(collection model.ID, path, format string) (flowi.RequestTarget, error)
 	// GenerateGRPCRequests makes a gRPC request per method of base's schema.
 	GenerateGRPCRequests(collection model.ID, base model.GRPC, methods []grpcx.Method) (flowi.GeneratedGRPC, error)
 	// GRPCMethods lists the methods of the schema the gRPC version v would use.

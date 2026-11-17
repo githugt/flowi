@@ -164,6 +164,12 @@ func (b *Workspace) NewGRPCRequest(collection model.ID, path string) (flowi.Requ
 	return b.ws.NewGRPCRequest(collection, path)
 }
 
+// NewFileRequest creates a data file request of the given format.
+func (b *Workspace) NewFileRequest(collection model.ID, path, format string) (flowi.RequestTarget, error) {
+	b.guard.Check("NewFileRequest")
+	return b.ws.NewFileRequest(collection, path, format)
+}
+
 // NewDatasetRequest creates a dataset request of the given driver.
 func (b *Workspace) NewDatasetRequest(collection model.ID, path, driver string) (flowi.RequestTarget, error) {
 	b.guard.Check("NewDatasetRequest")

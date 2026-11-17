@@ -18,11 +18,13 @@ func checkDataset(ix *index) diag.List {
 	for _, c := range ix.collections {
 		for _, r := range c.Requests {
 			for _, v := range r.Versions {
-				if v.Dataset == nil {
-					continue
-				}
 				base := yamlpath.Key(yamlpath.Key("$", "versions"), v.Label)
-				out = append(out, datasetDiags(r.File, yamlpath.Key(base, "dataset"), v, ix.allowWrites)...)
+				if v.Dataset != nil {
+					out = append(out, datasetDiags(r.File, yamlpath.Key(base, "dataset"), v, ix.allowWrites)...)
+				}
+				if v.File != nil {
+					out = append(out, fileDiags(r.File, yamlpath.Key(base, "file"), v)...)
+				}
 			}
 		}
 	}
@@ -49,6 +51,31 @@ func datasetDiags(file, path string, v model.RequestVersion, allowWrites bool) d
 		problem(yamlpath.Key(path, "query"), detail)
 	}
 	if d.Limit < 0 {
+		problem(yamlpath.Key(path, "limit"), "limit must not be negative")
+	}
+	return out
+}
+
+// fileDiags checks one file block. path is the path of the block itself. The files are only read, so no query may write.
+func fileDiags(file, path string, v model.RequestVersion) diag.List {
+	var out diag.List
+	problem := func(p, detail string) {
+		out = append(out, diag.New(diag.CodeDatasetRequest, diag.Location{File: file, Path: p}, map[string]string{"detail": detail}))
+	}
+	f := *v.File
+	if v.Dataset != nil || v.GRPC != nil || v.Async != nil {
+		problem(path, "a version is one kind of request: a file query cannot also be a database, gRPC or async request")
+	}
+	if !slices.Contains(model.DataFileFormats(), f.Format) {
+		problem(yamlpath.Key(path, "format"), "the format is one of "+strings.Join(model.DataFileFormats(), ", "))
+	}
+	if strings.TrimSpace(f.Path) == "" {
+		problem(yamlpath.Key(path, "path"), "the path is empty: give a file or a folder of the collection")
+	}
+	if detail := queryProblem(f.Query, false); detail != "" {
+		problem(yamlpath.Key(path, "query"), detail)
+	}
+	if f.Limit < 0 {
 		problem(yamlpath.Key(path, "limit"), "limit must not be negative")
 	}
 	return out

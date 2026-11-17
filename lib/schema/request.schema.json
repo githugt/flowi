@@ -242,22 +242,19 @@
         "dataset": {
           "type": "object",
           "additionalProperties": false,
-          "description": "A SQL query against a database or data file instead of an HTTP call.",
+          "description": "A SQL query against a database instead of an HTTP call.",
           "properties": {
             "driver": {
               "enum": [
                 "postgres",
                 "mysql",
                 "mariadb",
-                "sqlite",
-                "csv",
-                "xlsx",
-                "parquet"
+                "sqlite"
               ]
             },
             "server": {
               "type": "string",
-              "description": "A connection URL, or the path of a file or folder. Templated."
+              "description": "A connection URL, or for sqlite the path of the file. Templated."
             },
             "query": {
               "type": "string",
@@ -280,6 +277,42 @@
             "writes": {
               "type": "boolean",
               "description": "Let this query change data. Off by default."
+            }
+          }
+        },
+        "file": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "A SQL query over data files (CSV, Excel, Parquet) instead of an HTTP call. The files are only read.",
+          "properties": {
+            "format": {
+              "enum": [
+                "csv",
+                "xlsx",
+                "parquet"
+              ]
+            },
+            "path": {
+              "type": "string",
+              "description": "A file or a folder, relative to the collection. Templated."
+            },
+            "query": {
+              "type": "string",
+              "description": "One statement. Not templated: values go in params."
+            },
+            "params": {
+              "type": "array",
+              "items": {
+                "type": [
+                  "string",
+                  "number",
+                  "boolean"
+                ]
+              }
+            },
+            "limit": {
+              "type": "integer",
+              "minimum": 0
             }
           }
         }

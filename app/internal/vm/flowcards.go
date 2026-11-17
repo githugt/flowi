@@ -129,7 +129,7 @@ func versionFacts(v model.RequestVersion) card.Facts {
 		return asyncFacts(v)
 	case v.GRPC != nil:
 		return grpcFacts(v)
-	case v.Dataset != nil:
+	case v.SQL() != nil:
 		return datasetFacts(v)
 	}
 	headers, auth := withoutAuthorization(v.Headers)
@@ -156,7 +156,7 @@ func grpcFacts(v model.RequestVersion) card.Facts {
 }
 
 func datasetFacts(v model.RequestVersion) card.Facts {
-	d := v.Dataset
+	d := v.SQL()
 	return card.Facts{Kind: "dataset", Method: datasetVerbOf(*d), Target: datasetTip(*d), Sends: true, Body: d.Driver, Props: len(d.Params)}
 }
 

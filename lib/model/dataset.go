@@ -2,10 +2,12 @@
 
 package model
 
+import "slices"
+
 // Dataset is what a dataset request version does: it runs one read-only query against a data store and keeps the
 // rows it returns.
 type Dataset struct {
-	// Driver is the store: postgres, mysql, mariadb, sqlite, csv, xlsx or parquet (SQL over data files or a folder of them).
+	// Driver is the database: postgres, mysql, mariadb or sqlite. Data files are a DataFile, not a Dataset.
 	Driver string
 	// Server is the connection string, templated: a postgres:// or mysql:// URL, or for sqlite a file path
 	// relative to the collection.
@@ -33,12 +35,49 @@ const (
 	DriverMySQL    = "mysql"
 	DriverMariaDB  = "mariadb"
 	DriverSQLite   = "sqlite"
-	DriverCSV      = "csv"     // SQL over a CSV file, or a folder of them
-	DriverXLSX     = "xlsx"    // SQL over an Excel workbook (a table for each sheet), or a folder of them
-	DriverParquet  = "parquet" // SQL over a Parquet file, or a folder of them
 )
 
-// DatasetDrivers lists the drivers in the order a picker shows them.
+// The formats of a data file query.
+const (
+	FormatCSV     = "csv"     // SQL over a CSV file, or a folder of them
+	FormatXLSX    = "xlsx"    // SQL over an Excel workbook (a table for each sheet), or a folder of them
+	FormatParquet = "parquet" // SQL over a Parquet file, or a folder of them
+)
+
+// DatasetDrivers lists the databases in the order a picker shows them.
 func DatasetDrivers() []string {
-	return []string{DriverPostgres, DriverMySQL, DriverMariaDB, DriverSQLite, DriverCSV, DriverXLSX, DriverParquet}
+	return []string{DriverPostgres, DriverMySQL, DriverMariaDB, DriverSQLite}
 }
+
+// DataFileFormats lists the formats of a data file query in the order a picker shows them.
+func DataFileFormats() []string { return []string{FormatCSV, FormatXLSX, FormatParquet} }
+
+// DataFile is what a data file request version does: it runs one read-only query over a file, or a folder of files,
+// of the collection and keeps the rows it returns. It has no server, no login and nothing to change: the files are
+// only read. A database is a Dataset.
+type DataFile struct {
+	// Format is csv, xlsx or parquet.
+	Format string
+	// Path is a file or a folder relative to the collection, templated. A folder holds one table for each file of the
+	// format; a workbook has one table for each sheet.
+	Path string
+	// Query is one SELECT (or WITH, VALUES, DESCRIBE …) statement; like a database query it is not templated.
+	Query string
+	// Params are the values of the query's placeholders, in order, templated.
+	Params []string
+	// Limit is the most rows kept; 0 means DefaultDatasetLimit.
+	Limit int
+}
+
+// AsDataset is the query as the SQL runner takes it: the format is the driver and the path is the server.
+func (f DataFile) AsDataset() Dataset {
+	return Dataset{Driver: f.Format, Server: f.Path, Query: f.Query, Params: f.Params, Limit: f.Limit}
+}
+
+// DataFileOf is the data file a SQL query of a file format stands for.
+func DataFileOf(d Dataset) DataFile {
+	return DataFile{Format: d.Driver, Path: d.Server, Query: d.Query, Params: d.Params, Limit: d.Limit}
+}
+
+// IsDataFormat reports whether driver names a data file format.
+func IsDataFormat(driver string) bool { return slices.Contains(DataFileFormats(), driver) }

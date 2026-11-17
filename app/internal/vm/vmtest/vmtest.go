@@ -772,6 +772,15 @@ func (f *Backend) NewGRPCRequest(collection model.ID, path string) (flowi.Reques
 	return flowi.RequestTarget{Collection: collection, Request: "new"}, nil
 }
 
+// NewFileRequest records the call and fails like NewRequest.
+func (f *Backend) NewFileRequest(collection model.ID, path, format string) (flowi.RequestTarget, error) {
+	f.record("NewFileRequest " + path + " " + format)
+	if f.NewErr != nil {
+		return flowi.RequestTarget{}, f.NewErr
+	}
+	return flowi.RequestTarget{Collection: collection, Request: "new"}, nil
+}
+
 // NewDatasetRequest records the call and fails like NewRequest.
 func (f *Backend) NewDatasetRequest(collection model.ID, path, driver string) (flowi.RequestTarget, error) {
 	f.record("NewDatasetRequest " + path + " " + driver)

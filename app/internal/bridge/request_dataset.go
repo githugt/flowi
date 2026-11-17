@@ -24,7 +24,8 @@ type DatasetInfo struct {
 // driverLabels are the names a person knows each driver by.
 func driverLabels() map[string]string {
 	return map[string]string{
-		model.DriverPostgres: "PostgreSQL", model.DriverMySQL: "MySQL", model.DriverMariaDB: "MariaDB", model.DriverSQLite: "SQLite", model.DriverCSV: "CSV files", model.DriverXLSX: "Excel files", model.DriverParquet: "Parquet files",
+		model.DriverPostgres: "PostgreSQL", model.DriverMySQL: "MySQL", model.DriverMariaDB: "MariaDB", model.DriverSQLite: "SQLite",
+		model.FormatCSV: "CSV files", model.FormatXLSX: "Excel files", model.FormatParquet: "Parquet files",
 	}
 }
 
@@ -32,7 +33,7 @@ func driverLabels() map[string]string {
 func driverChoices() []DriverChoice {
 	labels := driverLabels()
 	out := []DriverChoice{}
-	for _, id := range model.DatasetDrivers() {
+	for _, id := range append(model.DatasetDrivers(), model.DataFileFormats()...) {
 		out = append(out, DriverChoice{ID: id, Label: labels[id]})
 	}
 	return out

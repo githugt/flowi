@@ -101,6 +101,7 @@ func (c *Codec) requestVersion(d *decoder, m *mapping, label string) model.Reque
 	v.Async = m.async()
 	v.GRPC = m.grpc()
 	v.Dataset = m.dataset()
+	v.File = m.dataFile()
 	v.Settings = c.settingsChild(d, m, settings.LayerRequest)
 	v.Hooks = m.hooks()
 	m.closeStrict()
@@ -173,6 +174,20 @@ func (m *mapping) dataset() *model.Dataset {
 	}
 	dm.closeStrict()
 	return d
+}
+
+// dataFile reads the file: block of a version, nil when there is none.
+func (m *mapping) dataFile() *model.DataFile {
+	fm, ok := m.child("file")
+	if !ok {
+		return nil
+	}
+	f := &model.DataFile{Format: fm.str("format"), Path: fm.str("path"), Query: fm.str("query"), Limit: int(fm.integer("limit"))}
+	if e, ok := fm.take("params"); ok {
+		f.Params = fm.d.lenientStrings(e)
+	}
+	fm.closeStrict()
+	return f
 }
 
 // lenientStrings reads a list of scalars as text, numbers and booleans as written.
@@ -358,6 +373,9 @@ func (c *Codec) encodeVersion(v model.RequestVersion) yaml.MapSlice {
 	if v.GRPC != nil {
 		o.putAlways("grpc", encodeGRPC(v.GRPC))
 	}
+	if v.File != nil {
+		o.putAlways("file", encodeDataFile(v.File))
+	}
 	if v.Dataset != nil {
 		o.putAlways("dataset", encodeDataset(v.Dataset))
 	}
@@ -505,6 +523,19 @@ func encodeDataset(d *model.Dataset) yaml.MapSlice {
 	}
 	if d.Writes {
 		o.put("writes", true)
+	}
+	return presentMap(o.items)
+}
+
+// encodeDataFile is the file mapping of a version.
+func encodeDataFile(f *model.DataFile) yaml.MapSlice {
+	var o omap
+	o.put("format", f.Format)
+	o.put("path", f.Path)
+	o.put("query", f.Query)
+	o.put("params", stringsToYAML(f.Params))
+	if f.Limit != 0 {
+		o.put("limit", f.Limit)
 	}
 	return presentMap(o.items)
 }

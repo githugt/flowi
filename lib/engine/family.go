@@ -27,7 +27,7 @@ func (x *execution) exchange() exchange {
 		return rpcExchange{x}
 	case model.FamilyMessaging:
 		return messagingExchange{x}
-	case model.FamilyDataset:
+	case model.FamilyDataset, model.FamilyFile:
 		return datasetExchange{x}
 	}
 	return httpExchange{x}

@@ -75,6 +75,18 @@ func VersionTemplates(file string, v model.RequestVersion) []Site {
 	if v.Dataset != nil {
 		sites = append(sites, datasetTemplates(file, yamlpath.Key(base, "dataset"), *v.Dataset)...)
 	}
+	if v.File != nil {
+		sites = append(sites, fileTemplates(file, yamlpath.Key(base, "file"), *v.File)...)
+	}
+	return sites
+}
+
+// fileTemplates are the templates of a file version: the path and the params.
+func fileTemplates(file, base string, f model.DataFile) []Site {
+	sites := []Site{{File: file, Path: yamlpath.Key(base, "path"), Field: "path", Src: f.Path}}
+	for i, p := range f.Params {
+		sites = append(sites, Site{File: file, Path: yamlpath.Index(yamlpath.Key(base, "params"), i), Field: "param", Src: p})
+	}
 	return sites
 }
 

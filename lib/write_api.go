@@ -100,10 +100,27 @@ func datasetStarters() map[string]struct{ server, query string } {
 		model.DriverMySQL:    {"mysql://root@localhost:3306/mysql", "SELECT ? AS greeting"},
 		model.DriverMariaDB:  {"mariadb://root@localhost:3306/mysql", "SELECT ? AS greeting"},
 		model.DriverSQLite:   {"data.db", "SELECT ? AS greeting"},
-		model.DriverCSV:      {"data.csv", "SELECT * FROM data LIMIT 10"},
-		model.DriverXLSX:     {"data.xlsx", "SELECT * FROM Sheet1 LIMIT 10"},
-		model.DriverParquet:  {"data.parquet", "SELECT * FROM data LIMIT 10"},
 	}
+}
+
+// fileStarters is the path and query a new file request of each format starts with.
+func fileStarters() map[string]struct{ path, query string } {
+	return map[string]struct{ path, query string }{
+		model.FormatCSV:     {"data.csv", "SELECT * FROM data LIMIT 10"},
+		model.FormatXLSX:    {"data.xlsx", "SELECT * FROM Sheet1 LIMIT 10"},
+		model.FormatParquet: {"data.parquet", "SELECT * FROM data LIMIT 10"},
+	}
+}
+
+// NewFileRequest is NewRequest for a data file request of the given format (any of model.DataFileFormats): its
+// version "1" has a path and a query that run as they are on a file of that format. An unknown format is FLW-DATA-001.
+func (w *Workspace) NewFileRequest(collection model.ID, path, format string) (RequestTarget, error) {
+	starter, ok := fileStarters()[format]
+	if !ok {
+		return RequestTarget{}, diagErr(diag.CodeDatasetRequest, map[string]string{"detail": "the format is one of " + strings.Join(model.DataFileFormats(), ", ")})
+	}
+	f := model.DataFile{Format: format, Path: starter.path, Query: starter.query}
+	return w.newRequestWith(collection, path, model.RequestVersion{Label: "1", File: &f})
 }
 
 // GeneratedGRPC is what GenerateGRPCRequests did.

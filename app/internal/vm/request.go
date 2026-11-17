@@ -169,6 +169,7 @@ func cloneRequest(r model.Request) model.Request {
 		v.Async = cloneAsync(v.Async)
 		v.GRPC = cloneGRPC(v.GRPC)
 		v.Dataset = cloneDataset(v.Dataset)
+		v.File = cloneDataFile(v.File)
 		r.Versions[i] = v
 	}
 	r.Hooks = cloneHooks(r.Hooks)

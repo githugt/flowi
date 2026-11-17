@@ -221,14 +221,15 @@ func (x *execution) renderDataset(lenient bool) (builtDataset, diag.List) {
 		secret: x.r.secrets.derived, verbatim: lenient,
 	})
 	b.query.Timeout = x.cfg.timeout
-	b.query.AllowWrites = x.cfg.datasetWrites || (x.version.Dataset != nil && x.version.Dataset.Writes)
+	// A file query never writes: its files are only read, whatever datasets.allow_writes says.
+	b.query.AllowWrites = x.version.File == nil && (x.cfg.datasetWrites || (x.version.Dataset != nil && x.version.Dataset.Writes))
 	return b, diags
 }
 
 // buildDataset renders the templated fields of a dataset version: the server and the params. The statement is sent
 // as written; a value reaches the store only as a param.
 func buildDataset(in buildInput) (builtDataset, diag.List) {
-	d := *in.version.Dataset
+	d := *in.version.SQL()
 	b := &builder{in: in, tainted: map[string]bool{}}
 	server, _ := b.text("server", "server", d.Server)
 	params := make([]string, len(d.Params))

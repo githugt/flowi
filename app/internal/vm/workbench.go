@@ -42,7 +42,7 @@ func (r *Request) Configured(s Section) bool {
 	if v.GRPC != nil && grpcConfigured(*v.GRPC, s) {
 		return true
 	}
-	if v.Dataset != nil && datasetConfigured(*v.Dataset, s) {
+	if d := v.SQL(); d != nil && datasetConfigured(*d, s) {
 		return true
 	}
 	switch s {

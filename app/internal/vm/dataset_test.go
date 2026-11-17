@@ -64,6 +64,35 @@ func TestWorkspace_CreateDatasetRequest_should_create_through_the_backend_and_se
 	}
 }
 
+func TestWorkspace_CreateDatasetRequest_Given_a_file_format_Then_it_creates_a_file_request(t *testing.T) {
+	b := sampleBackend()
+	ws, w := loadedWorkspace(t, b)
+
+	ws.CreateDatasetRequest("C1", "reports/sales", "parquet", func(string) {}, func(err error) { t.Fatal(err) })
+	w.Wait()
+
+	if !b.Called("NewFileRequest reports/sales parquet") || b.Called("NewDatasetRequest reports/sales parquet") {
+		t.Fatalf("calls %v", b.Calls)
+	}
+}
+
+func TestRequest_EditDataset_Given_a_file_version_Then_the_change_is_written_to_its_file_block(t *testing.T) {
+	b := asyncBackend()
+	b.Cols[0].Requests[3].Versions[0].Async = nil
+	b.Cols[0].Requests[3].Versions[0].File = &model.DataFile{Format: "csv", Path: "a.csv", Query: "SELECT 1"}
+	r, _ := asyncRequestVM(t, b)
+
+	r.EditDataset(func(d *model.Dataset) { d.Server, d.Driver = "b.xlsx", "xlsx" })
+
+	f := r.Current().File
+	if !r.IsDataset() || !r.IsDataFile() || r.Current().Dataset != nil || f.Path != "b.xlsx" || f.Format != "xlsx" {
+		t.Fatalf("version %+v", r.Current())
+	}
+	if got := vm.Verb(r.Current()); got != "XLSX" {
+		t.Fatalf("verb %q", got)
+	}
+}
+
 func TestMenuFor_should_offer_a_new_dataset_request_where_it_offers_a_new_grpc_one(t *testing.T) {
 	ws, _, _ := shopWorkspace(t)
 

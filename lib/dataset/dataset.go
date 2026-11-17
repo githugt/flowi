@@ -70,9 +70,9 @@ func Default() Registry {
 		model.DriverMySQL:    mysqlSource(),
 		model.DriverMariaDB:  mysqlSource(), // MariaDB speaks the MySQL protocol
 		model.DriverSQLite:   sqliteSource(),
-		model.DriverCSV:      csvSource(),
-		model.DriverXLSX:     xlsxSource(),
-		model.DriverParquet:  parquetSource(),
+		model.FormatCSV:      csvSource(),
+		model.FormatXLSX:     xlsxSource(),
+		model.FormatParquet:  parquetSource(),
 	}
 }
 
