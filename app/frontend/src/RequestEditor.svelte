@@ -440,7 +440,7 @@
     <!-- The method and the address are one field: one outline and one focus ring around both. -->
     <div class="addr">
     {#if view.kind === 'http'}
-      <Dropdown pill title="Method" options={methodOptions} value={v.Method} width="108px" onpick={pickMethod} />
+      <Dropdown tinted title="Method" options={methodOptions} value={v.Method} width="108px" onpick={pickMethod} />
       <div class="url">
         <TemplateField
           value={view.fullUrl}
@@ -768,6 +768,8 @@
   /* The fields inside draw no edge of their own: the bar does. */
   .addr :global(input), .addr :global(.field), .addr :global(.box) { background: none; border: 0; box-shadow: none; min-height: 0; }
   .addr :global(.dd .btn) { background: none; border: 0; border-right: 1px solid var(--line); border-radius: var(--r-lg) 0 0 var(--r-lg); min-height: 36px; }
+  /* The method box carries the verb's colour and glow; its right edge is the separator. */
+  .addr :global(.dd .btn.tinted) { background: color-mix(in srgb, var(--v) 14%, transparent); border-right: 1px solid color-mix(in srgb, var(--v) 55%, transparent); box-shadow: inset 0 0 14px color-mix(in srgb, var(--v) 26%, transparent); }
   .addr > .url2 { padding-right: 6px; }
   .url { flex: 1; min-width: 0; }
   .url2 { flex: 1; min-width: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
