@@ -47,6 +47,18 @@
     them as <code>{placeholder}</code>: they travel apart from the statement, so a value can never change what it means.
     {#if !isFile}For the strongest guarantee, connect as a database user that can only read.{/if}
   </p>
+  {#if isFile}
+    <details class="muted note filenote">
+      <summary>What writing to files can and cannot do</summary>
+      <ul>
+        <li>Only changes to the rows and cells of the tables in the files are written back. Creating or dropping a table is not.</li>
+        <li><strong>CSV:</strong> rewritten whole. Cells the query did not touch keep their text (<code>007</code> stays <code>007</code>); line endings become <code>\n</code>.</li>
+        <li><strong>Excel:</strong> only the changed cells are updated, so other sheets and formatting stay. A formula cell the query overwrites loses its formula.</li>
+        <li><strong>Parquet:</strong> rewritten whole with its own column types. Number, true/false and text columns only: a value a column cannot hold, or a date or nested column, is refused and nothing is written.</li>
+        <li>The setting <code>datasets.read_only</code> forbids writing for every query.</li>
+      </ul>
+    </details>
+  {/if}
   <label class="limit">Keep at most
     <input class="mini" inputmode="numeric" placeholder="1000" value={block.Limit || ''} onchange={(e) => setLimit(e.currentTarget.value)} aria-label="Most rows kept" />
     rows
@@ -77,6 +89,8 @@
 
 <style>
   .note { margin: 8px 0 0; font-size: var(--fs-xs); }
+  .filenote summary { cursor: pointer; }
+  .filenote ul { margin: 6px 0 0; padding-left: 18px; }
   .writes { color: var(--warn); font-size: var(--fs-sm); font-weight: 600; margin: 8px 0 0; }
   .limit { display: inline-flex; gap: 6px; align-items: center; margin-top: 8px; color: var(--muted); font-size: var(--fs-xs); }
   .mini { width: 5em; box-sizing: border-box; background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); padding: 3px 6px; font: inherit; }
