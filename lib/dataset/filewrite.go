@@ -321,20 +321,10 @@ func writeXLSX(path string, changes []tableChange) error {
 // keeps its type; a change a column of that type cannot hold is refused before anything is written.
 func writeParquet(path string, changes []tableChange) error {
 	t := changes[0]
-	src, err := os.Open(path) //nolint:gosec // the path is the request's own server
+	schema, err := parquetSchemaOf(path)
 	if err != nil {
 		return err
 	}
-	defer func() { _ = src.Close() }()
-	info, err := src.Stat()
-	if err != nil {
-		return err
-	}
-	pf, err := parquet.OpenFile(src, info.Size())
-	if err != nil {
-		return err
-	}
-	schema := pf.Schema()
 	if t.out.colsChanged {
 		return errors.New("a Parquet file keeps its columns: adding, dropping or renaming one is not supported")
 	}
@@ -370,6 +360,25 @@ func writeParquet(path string, changes []tableChange) error {
 		}
 		return err
 	})
+}
+
+// parquetSchemaOf reads the schema of a Parquet file and closes the file again: on Windows a file that is open
+// cannot be renamed over, and the rewrite replaces it.
+func parquetSchemaOf(path string) (*parquet.Schema, error) {
+	src, err := os.Open(path) //nolint:gosec // the path is the request's own server
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = src.Close() }()
+	info, err := src.Stat()
+	if err != nil {
+		return nil, err
+	}
+	pf, err := parquet.OpenFile(src, info.Size())
+	if err != nil {
+		return nil, err
+	}
+	return pf.Schema(), nil
 }
 
 // parquetValue converts a cell to what the field holds. Only plain columns are supported: numbers, booleans and text.
