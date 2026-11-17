@@ -66,7 +66,7 @@
   .line { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
   .vars { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: center; }
   .var { display: flex; align-items: center; gap: 4px; font-size: var(--fs-sm); }
-  .var input { width: 150px; background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); padding: 2px 6px; font: var(--fs-sm) var(--mono); }
+  .var input { width: 150px; padding: 2px 6px; font: var(--fs-sm) var(--mono); }
   .var.new input { width: 130px; }
   .hint { color: var(--muted); font-size: var(--fs-xs); }
   button { background: var(--raised); color: var(--text); border: 0; box-shadow: inset 0 0 0 1px var(--line); border-radius: var(--r-md); padding: 0 12px; min-height: var(--ctl-h-sm); font: inherit; font-weight: 500; }

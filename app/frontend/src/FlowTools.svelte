@@ -243,7 +243,7 @@
   .group { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 14px; font-size: var(--fs-sm); }
   .group > strong { min-width: 90px; }
   .opt { display: flex; align-items: center; gap: 4px; font-size: var(--fs-sm); }
-  select, input:not([type]) { background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); padding: 3px 8px; font: inherit; }
+  select, input:not([type]) { padding: 3px 8px; }
   .actions { display: flex; align-items: center; justify-content: flex-end; gap: 8px; margin-top: 4px; }
   .actions .muted { margin-right: auto; }
   .result { margin: 4px 0 0; font-weight: 600; }

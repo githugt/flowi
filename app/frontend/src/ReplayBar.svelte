@@ -67,7 +67,7 @@
   .on .toggle { border-color: var(--fail); color: var(--fail); }
   .toggle:not(:disabled):hover { border-color: var(--accent); }
   .port { display: flex; align-items: center; gap: 4px; color: var(--muted); }
-  .port input { width: 52px; background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); padding: 2px 6px; font: var(--fs-sm) var(--mono); }
+  .port input { width: 52px; padding: 2px 6px; font: var(--fs-sm) var(--mono); }
   .url { flex: 1; min-width: 0; background: color-mix(in srgb, var(--bg) 70%, transparent); color: var(--muted); border: 1px dashed var(--line); border-radius: var(--r-md); padding: 2px 8px; font: var(--fs-sm) var(--mono); -webkit-user-select: text; user-select: text; cursor: text; }
   .muted { color: var(--muted); }
   .state { color: var(--ok); white-space: nowrap; }

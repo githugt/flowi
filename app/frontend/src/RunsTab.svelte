@@ -130,7 +130,7 @@
   .changed td { color: var(--accent); }
   .gap { color: var(--muted); text-align: right; }
   .pick { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
-  .pick select { flex: 1; min-width: 0; background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); padding: 3px 4px; font: inherit; font-size: var(--fs-sm); }
+  .pick select { flex: 1; min-width: 0; padding: 3px 4px; font-size: var(--fs-sm); }
   tr.body { cursor: default; }
   tr.body:hover td { background: var(--tint-hover); }
   .chev { margin-left: 8px; color: var(--accent); }

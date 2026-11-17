@@ -737,6 +737,12 @@ export interface BlueprintsView {
     kind: 'flow' | 'post-hooks' | 'pre-hooks'
     params: { name: string; description: string; type: string; default: string }[]
     nodes: number
+    /** The top-level steps: a name, the step type and its first setting. */
+    steps: { name: string; type: string; detail: string }[]
+    /** Where it is listed: the kind of request whose default it is, other hooks, or flow templates. */
+    group: 'http' | 'async' | 'grpc' | 'dataset' | 'hooks' | 'flow'
+    /** A collection's own version of a built-in default: deleting it brings the built-in back. */
+    replacesDefault?: boolean
     /** Shipped with Flowi: new requests start with it unless requests.seed_blueprint names others. */
     builtIn?: boolean
   }[]

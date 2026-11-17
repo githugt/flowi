@@ -151,7 +151,6 @@
   .line { display: flex; align-items: center; gap: 14px; margin: 8px 0; }
   .inline { font-size: var(--fs-sm); color: var(--muted); display: flex; align-items: center; gap: 6px; }
   .num { width: 56px; }
-  select, input { background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); padding: 4px 8px; font: inherit; }
   .totals { border: 1px solid var(--line); border-radius: var(--r-lg); padding: 8px 12px; display: flex; flex-direction: column; gap: 2px; margin: 8px 0; font-size: var(--fs-sm); }
   .totals.bad { border-color: var(--fail); }
   .badnote, .badline { color: var(--fail); }

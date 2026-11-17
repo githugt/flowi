@@ -304,6 +304,24 @@ func (b *Workspace) NewTriggerToken() (string, error) {
 	return b.ws.NewTriggerToken()
 }
 
+// CustomizeDefault gives a collection its own copy of a built-in default blueprint.
+func (b *Workspace) CustomizeDefault(collection model.ID, kind, phase string) (flowi.BlueprintTarget, error) {
+	b.guard.Check("CustomizeDefault")
+	return b.ws.CustomizeDefault(collection, kind, phase)
+}
+
+// BlueprintSource is the text of a blueprint, for an editor.
+func (b *Workspace) BlueprintSource(t flowi.BlueprintTarget) (string, error) {
+	b.guard.Check("BlueprintSource")
+	return b.ws.BlueprintSource(t)
+}
+
+// SaveBlueprintSource writes the edited text of a blueprint, or returns its problems.
+func (b *Workspace) SaveBlueprintSource(t flowi.BlueprintTarget, text string) (diag.List, error) {
+	b.guard.Check("SaveBlueprintSource")
+	return b.ws.SaveBlueprintSource(t, text)
+}
+
 func (b *Workspace) DeleteBlueprint(t flowi.BlueprintTarget) error {
 	b.guard.Check("DeleteBlueprint")
 	return b.ws.DeleteBlueprint(t)

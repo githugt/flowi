@@ -21,40 +21,40 @@ export async function rowMenu(id: string): Promise<MenuItem[]> {
 }
 
 async function run(e: MenuEntry, ids: string[]) {
-  if (e.guard === 'dirty' && (await touchesUnsaved(ids))) {
-    ui.toast('Save or close the unsaved tabs of these rows first.', 'error')
-    return
-  }
+  // A rename or delete closes the tabs of its rows, so it says first when that loses unsaved edits.
+  const unsaved = e.guard === 'dirty' ? (await tabsAffected(ids)).filter((id) => app.isDirty(id)).length : 0
+  const lost = unsaved ? `Unsaved edits in ${unsaved} open ${unsaved === 1 ? 'tab' : 'tabs'} will be lost.` : ''
   const go = async (text = '', protocol = '') => {
     if (needsTabsClosed.includes(e.action)) await app.closeAll(await tabsAffected(ids))
     await WorkspaceService.Do(e.action, ids, text, protocol)
   }
-  if (e.dialog === 'move') {
-    ui.moving = ids
-  } else if (e.prompt) {
-    ui.prompt({
-      title: e.prompt.title,
-      label: e.prompt.label,
-      initial: e.prompt.initial,
-      protocols: e.prompt.protocols?.map((p) => ({ id: p.id, label: p.label })),
-      protocolsLabel: e.action === 'newDataset' ? 'Database' : undefined,
-      done: (text, protocol) => go(text, protocol),
-    })
-  } else if (e.confirm) {
-    ui.confirm('Delete', e.confirm, () => go())
-  } else {
-    await go()
+  const ask = () => {
+    if (e.dialog === 'move') {
+      ui.moving = ids
+    } else if (e.prompt) {
+      ui.prompt({
+        title: e.prompt.title,
+        label: e.prompt.label,
+        initial: e.prompt.initial,
+        protocols: e.prompt.protocols?.map((p) => ({ id: p.id, label: p.label })),
+        protocolsLabel: e.action === 'newDataset' ? 'Database' : undefined,
+        done: (text, protocol) => go(text, protocol),
+      })
+    } else if (e.confirm) {
+      ui.confirm('Delete', `${e.confirm} ${lost}`.trim(), () => go())
+    } else {
+      void go()
+    }
   }
+  // A delete's own question carries the warning; anything else is asked about it first.
+  if (lost && !e.confirm) ui.confirm('Unsaved edits', `${lost} Continue?`, ask, 'Continue')
+  else ask()
 }
 
 export async function tabsAffected(ids: string[]): Promise<string[]> {
   const out = new Set(ids)
   for (const id of ids) for (const inner of (await WorkspaceService.Inside(id)) as string[]) out.add(inner)
   return [...out]
-}
-
-export async function touchesUnsaved(ids: string[]): Promise<boolean> {
-  return (await tabsAffected(ids)).some((id) => app.isDirty(id))
 }
 
 // The "New" menu: quick starts and creation in a chosen collection or folder.

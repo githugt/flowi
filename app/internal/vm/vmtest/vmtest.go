@@ -126,7 +126,10 @@ type Backend struct {
 
 	DraftIDs map[model.ID]bool
 	NewErr   error // NewRequest, NewFlow and NewScratchRequest fail with it
-	SeedErr  error // SeedRequestHooks fails with it
+	// BlueprintText is the text of the blueprint being edited; BlueprintDiags are the problems a save reports.
+	BlueprintText  string
+	BlueprintDiags diag.List
+	SeedErr        error // SeedRequestHooks fails with it
 
 	GRPCMethodList []grpcx.Method      // what GRPCMethods returns
 	GRPCMethodsErr error               // GRPCMethods fails with it
@@ -1249,6 +1252,28 @@ func (f *Backend) CreateHookBlueprint(collection model.ID, path, name, phase str
 		return flowi.BlueprintTarget{}, f.NewErr
 	}
 	return flowi.BlueprintTarget{Collection: collection, Blueprint: "new"}, nil
+}
+
+// CustomizeDefault records the call and returns a target named after the default.
+func (f *Backend) CustomizeDefault(collection model.ID, kind, phase string) (flowi.BlueprintTarget, error) {
+	f.record(fmt.Sprintf("CustomizeDefault %s %s %s", collection, kind, phase))
+	return flowi.BlueprintTarget{Collection: collection, Blueprint: model.ID(kind + "-" + phase)}, f.NewErr
+}
+
+// BlueprintSource returns BlueprintText, the text SaveBlueprintSource last stored.
+func (f *Backend) BlueprintSource(t flowi.BlueprintTarget) (string, error) {
+	f.record("BlueprintSource " + string(t.Blueprint))
+	return f.BlueprintText, f.NewErr
+}
+
+// SaveBlueprintSource stores text as BlueprintText, or returns BlueprintDiags when they hold errors.
+func (f *Backend) SaveBlueprintSource(t flowi.BlueprintTarget, text string) (diag.List, error) {
+	f.record("SaveBlueprintSource " + string(t.Blueprint))
+	if f.BlueprintDiags.HasErrors() || f.NewErr != nil {
+		return f.BlueprintDiags, f.NewErr
+	}
+	f.BlueprintText = text
+	return nil, nil
 }
 
 func (f *Backend) DeleteBlueprint(t flowi.BlueprintTarget) error {

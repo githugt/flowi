@@ -56,6 +56,7 @@ export {
     AuthView,
     AvailableSettingView,
     BlueprintParam,
+    BlueprintStep,
     BlueprintView,
     BlueprintsView,
     BodyLineView,

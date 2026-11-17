@@ -157,10 +157,10 @@
   .list .add { color: var(--accent); }
   .none { padding: 6px 8px; }
   .edit { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
-  textarea { flex: 1; min-height: 180px; resize: none; background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); padding: 8px; font: var(--fs-sm)/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; }
+  textarea { flex: 1; min-height: 180px; resize: none; padding: 8px; font: var(--fs-sm)/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; }
   .field { display: flex; align-items: center; gap: 8px; }
   .field span { color: var(--muted); font-size: var(--fs-sm); width: 44px; }
-  .field input { flex: 1; background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); padding: 4px 8px; font: inherit; }
+  .field input { flex: 1; }
   .export { border-top: 1px solid var(--line); padding-top: 8px; display: flex; flex-direction: column; gap: 6px; }
   .export textarea { min-height: 90px; flex: none; }
   .export ul { margin: 4px 0 0; padding-left: 18px; font-size: var(--fs-xs); color: var(--muted); }

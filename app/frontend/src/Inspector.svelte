@@ -360,6 +360,5 @@
   .add { align-self: flex-start; color: var(--accent); }
   .when { color: var(--muted); font-size: var(--fs-xs); min-width: 72px; align-self: center; }
   button.inline { background: none; border: 0; padding: 0; color: var(--accent); font: inherit; cursor: pointer; }
-  select.wait { background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); padding: 5px 6px; font: inherit; }
   .err { color: var(--fail); margin: 0; font-size: var(--fs-sm); }
 </style>

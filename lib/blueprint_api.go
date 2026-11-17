@@ -68,6 +68,42 @@ func (w *Workspace) Blueprint(t BlueprintTarget) (model.Blueprint, error) {
 	return c.Blueprints[i], nil
 }
 
+// BlueprintSource is the text of the blueprint t names, as its file would be
+// written: what an editor shows and hands back to SaveBlueprintSource.
+func (w *Workspace) BlueprintSource(t BlueprintTarget) (string, error) {
+	bp, err := w.Blueprint(t)
+	if err != nil {
+		return "", err
+	}
+	data, err := w.store.EncodeBlueprint(bp)
+	if err != nil {
+		return "", fmt.Errorf("encoding %s: %w", bp.File, err)
+	}
+	return string(data), nil
+}
+
+// SaveBlueprintSource replaces the file of the blueprint t names with text.
+// The text is checked first: with problems in it nothing is written and they
+// are returned, positioned in text. The blueprint keeps its id, so whatever
+// names it by id still finds it.
+func (w *Workspace) SaveBlueprintSource(t BlueprintTarget, text string) (diag.List, error) {
+	current, err := w.Blueprint(t)
+	if err != nil {
+		return nil, err
+	}
+	edited, diags := w.store.DecodeBlueprint(current.File, current.Path, []byte(text))
+	if !diags.HasErrors() {
+		diags = append(diags, blueprint.Check(edited)...)
+	}
+	if diags.HasErrors() {
+		return diags, nil
+	}
+	if edited.ID != current.ID {
+		return nil, diagErr(diag.CodeBlueprintUse, map[string]string{"blueprint": current.Name, "detail": "the id cannot be changed"})
+	}
+	return diags, w.writeAndReload(t.Collection, current.File, []byte(text), SaveOptions{})
+}
+
 // DeleteBlueprint removes the blueprint's file. Flows made from it are not
 // touched: they keep what they were made with. An unknown blueprint is
 // FLW-BP-006.

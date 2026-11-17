@@ -119,30 +119,95 @@ func (w *Workspace) seedSetting(collection model.ID) []string {
 	return names
 }
 
-// seedBlueprint is the built-in default or the stored blueprint named which,
-// looked for in the request's own collection first so that a copy of it in
-// another mounted collection does not make the name ambiguous.
-func (w *Workspace) seedBlueprints(which string, collection model.ID, kind requestKind) ([]model.Blueprint, error) {
-	switch {
-	case which == seedDefault && kind == kindGRPC:
+// DefaultKinds are the kinds of request that have built-in default blueprints.
+func DefaultKinds() []string { return []string{"http", "async", "grpc", "dataset"} }
+
+// DefaultBlueprints are the built-in blueprints a new request of kind (one
+// of DefaultKinds) starts with when requests.seed_blueprint says "default".
+func DefaultBlueprints(kind string) []model.Blueprint {
+	switch kind {
+	case "grpc":
 		// A gRPC call has a status code, not an HTTP status.
-		return []model.Blueprint{blueprint.DefaultGRPCPre(), blueprint.DefaultGRPC()}, nil
-	case which == seedDefault && kind == kindDataset:
+		return []model.Blueprint{blueprint.DefaultGRPCPre(), blueprint.DefaultGRPC()}
+	case "dataset":
 		// A query has an outcome and rows, not an HTTP status.
-		return []model.Blueprint{blueprint.DefaultAsyncPre(), blueprint.DefaultDataset()}, nil
-	case which == seedDefault && kind == kindAsync:
-		// The built-in default checks the HTTP status, which a message request lacks.
-		return []model.Blueprint{blueprint.DefaultAsyncPre(), blueprint.DefaultAsync()}, nil
-	case which == seedDefault:
-		return []model.Blueprint{blueprint.Default()}, nil
+		return []model.Blueprint{blueprint.DefaultAsyncPre(), blueprint.DefaultDataset()}
+	case "async":
+		// The HTTP default checks the HTTP status, which a message request lacks.
+		return []model.Blueprint{blueprint.DefaultAsyncPre(), blueprint.DefaultAsync()}
 	}
-	bp, err := w.seedBlueprint(which, collection)
-	return []model.Blueprint{bp}, err
+	return []model.Blueprint{blueprint.Default()}
+}
+
+// DefaultBlueprintPath is the path of the blueprint that replaces, in its own
+// collection, the built-in default of a kind and phase ("pre" or "post"):
+// blueprints/defaults/http-post.blueprint.yaml is what "default" means for
+// the HTTP requests of that collection. Deleting the file brings the built-in
+// back.
+func DefaultBlueprintPath(kind, phase string) string { return "defaults/" + kind + "-" + phase }
+
+// CustomizeDefault gives collection its own, editable copy of the built-in
+// default of a kind and phase, at DefaultBlueprintPath, and returns it. New
+// requests of that kind in the collection start with the copy from then on.
+func (w *Workspace) CustomizeDefault(collection model.ID, kind, phase string) (BlueprintTarget, error) {
+	path := DefaultBlueprintPath(kind, phase)
+	i := slices.IndexFunc(DefaultBlueprints(kind), func(b model.Blueprint) bool { return (b.Phase == "pre") == (phase == "pre") })
+	if !slices.Contains(DefaultKinds(), kind) || i < 0 {
+		return BlueprintTarget{}, diagErr(diag.CodeBlueprintUse, map[string]string{"blueprint": path, "detail": "there is no built-in default of that kind and phase"})
+	}
+	w.mu.RLock()
+	c, ok := w.collection(collection)
+	w.mu.RUnlock()
+	if !ok {
+		return BlueprintTarget{}, diagErr(diag.CodeWSUnknownCollection, map[string]string{"name": string(collection)})
+	}
+	file, err := newEntityFile(c, "blueprints", path, blueprintSuffix)
+	if err != nil {
+		return BlueprintTarget{}, err
+	}
+	bp := DefaultBlueprints(kind)[i]
+	bp.ID, bp.Path, bp.File, bp.Phase = w.newID(), path, file, phase
+	data, err := w.store.EncodeBlueprint(bp)
+	if err != nil {
+		return BlueprintTarget{}, fmt.Errorf("encoding %s: %w", file, err)
+	}
+	if err := w.writeAndReload(collection, file, data, SaveOptions{}); err != nil {
+		return BlueprintTarget{}, err
+	}
+	return BlueprintTarget{Collection: collection, Blueprint: bp.ID}, nil
+}
+
+// seedBlueprints is what a name in requests.seed_blueprint stands for:
+// "default" is the built-in blueprints of the request's kind, each replaced by
+// the collection's own version when it keeps one (DefaultBlueprintPath);
+// anything else is the stored blueprint of that name, looked for in the
+// request's own collection first so that a copy of it in another mounted
+// collection does not make the name ambiguous.
+func (w *Workspace) seedBlueprints(which string, collection model.ID, kind requestKind) ([]model.Blueprint, error) {
+	if which != seedDefault {
+		bp, err := w.seedBlueprint(which, collection)
+		return []model.Blueprint{bp}, err
+	}
+	name := DefaultKinds()[kind]
+	bps := DefaultBlueprints(name)
+	for i, bp := range bps {
+		phase := "post"
+		if bp.Phase == "pre" {
+			phase = "pre"
+		}
+		if t, err := w.FindBlueprint(DefaultBlueprintPath(name, phase), string(collection)); err == nil {
+			if own, err := w.Blueprint(t); err == nil {
+				bps[i] = own
+			}
+		}
+	}
+	return bps, nil
 }
 
 // requestKind is what a request's opening version is: HTTP, async, gRPC or a dataset query.
 type requestKind int
 
+// The order is that of DefaultKinds.
 const (
 	kindHTTP requestKind = iota
 	kindAsync

@@ -81,7 +81,6 @@
   .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
   .wide { grid-column: 1 / -1; }
   .f { display: flex; flex-direction: column; gap: 3px; color: var(--muted); font-size: var(--fs-xs); }
-  select { background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); padding: 5px 8px; font: inherit; }
   .faults { border: 1px solid var(--line); border-radius: var(--r-lg); padding: var(--sp-2) var(--sp-3); margin: var(--sp-2) 0; display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-2) var(--sp-3); }
   .faults legend { color: var(--muted); font-size: var(--fs-sm); padding: 0 6px; }
   .faults .wide { grid-column: 1 / -1; }

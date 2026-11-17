@@ -192,7 +192,6 @@
   pre { background: var(--bg); border: 1px solid var(--line); border-radius: var(--r-md); padding: 8px; -webkit-user-select: text; user-select: text; }
   .edit { border: 1px solid var(--accent); border-radius: var(--r-lg); padding: 12px; margin: 10px 0; display: flex; flex-direction: column; gap: 8px; }
   label { display: flex; flex-direction: column; gap: 3px; color: var(--muted); font-size: var(--fs-xs); }
-  select, textarea { background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); padding: 5px 8px; font: inherit; -webkit-user-select: text; user-select: text; }
   textarea { min-height: 70px; font: var(--fs-sm) var(--mono); }
   .actions { display: flex; gap: 8px; justify-content: flex-end; }
   .runner { display: flex; align-items: center; gap: 10px; flex: none; }

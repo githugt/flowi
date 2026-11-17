@@ -144,7 +144,6 @@
   .muted { color: var(--muted); font-size: var(--fs-sm); margin: 0; }
   .at code { font: var(--fs-xs) var(--mono); }
   .f { display: flex; flex-direction: column; gap: 3px; color: var(--muted); font-size: var(--fs-xs); }
-  input { background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); padding: 5px 8px; font: inherit; -webkit-user-select: text; user-select: text; }
   input:focus { border-color: var(--accent); }
   .where { display: flex; align-items: center; justify-content: space-between; gap: 8px; color: var(--muted); font-size: var(--fs-xs); }
   .make { display: flex; gap: 6px; }

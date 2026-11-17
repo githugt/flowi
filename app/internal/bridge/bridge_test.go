@@ -705,17 +705,18 @@ func TestBlueprintsService_State_should_list_blueprints_of_the_collections(t *te
 
 // The screen was empty for a workspace without blueprints of its own, though
 // new requests start with Flowi's built-in hooks: those are listed too.
+// Before: the dataset hook was missing from the list, and no blueprint said what its steps were.
 func TestBlueprintsService_State_Given_no_blueprints_Then_it_lists_the_built_in_hooks(t *testing.T) {
 	app := bridge.NewApp(&vmtest.Backend{Cols: []model.Collection{vmtest.SampleCollection()}}, bridge.NewInlineActor(), (&published{}).emit)
 	app.Start(t.Context())
 
 	v := app.Blueprints().State()
 
-	want := map[string]string{"built-in/http-post": "post-hooks", "built-in/async-pre": "pre-hooks", "built-in/async-post": "post-hooks", "built-in/grpc-pre": "pre-hooks", "built-in/grpc-post": "post-hooks"}
+	want := map[string]string{"built-in/http-post": "post-hooks", "built-in/async-pre": "pre-hooks", "built-in/async-post": "post-hooks", "built-in/grpc-pre": "pre-hooks", "built-in/grpc-post": "post-hooks", "built-in/dataset-pre": "pre-hooks", "built-in/dataset-post": "post-hooks"}
 	got := map[string]string{}
 	for _, b := range v.Blueprints {
-		if !b.BuiltIn || b.Nodes == 0 || b.Name == "" {
-			t.Fatalf("blueprint %+v, want a named built-in with steps", b)
+		if !b.BuiltIn || b.Name == "" || b.Group == "" || len(b.Steps) != b.Nodes || b.Steps[0].Type == "" || b.Steps[0].Detail == "" {
+			t.Fatalf("blueprint %+v, want a named built-in that says its group and lists its steps", b)
 		}
 		got[b.Key] = b.Kind
 	}

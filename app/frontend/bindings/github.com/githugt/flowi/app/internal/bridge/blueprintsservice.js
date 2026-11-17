@@ -29,12 +29,56 @@ export function CreateFlow(key, collection, path, values) {
 }
 
 /**
+ * Customize gives collection its own, editable copy of the built-in default
+ * `key` ("built-in/http-post") and returns the copy's key, for the editor.
+ * When the collection already has one, that one's key is returned.
+ * @param {string} key
+ * @param {string} collection
+ * @returns {$CancellablePromise<string>}
+ */
+export function Customize(key, collection) {
+    return $Call.ByID(871812766, key, collection);
+}
+
+/**
  * Delete removes a blueprint.
  * @param {string} key
  * @returns {$CancellablePromise<void>}
  */
 export function Delete(key) {
     return $Call.ByID(4116649356, key);
+}
+
+/**
+ * New makes a hook blueprint named name in collection, for the phase "pre" or
+ * "post", with one step to start from, and returns its key for the editor.
+ * @param {string} collection
+ * @param {string} name
+ * @param {string} phase
+ * @returns {$CancellablePromise<string>}
+ */
+export function New(collection, name, phase) {
+    return $Call.ByID(538667727, collection, name, phase);
+}
+
+/**
+ * SaveSource writes the edited text of a blueprint. With problems in the text
+ * nothing is written and they are returned, one per line; "" means saved.
+ * @param {string} key
+ * @param {string} text
+ * @returns {$CancellablePromise<string>}
+ */
+export function SaveSource(key, text) {
+    return $Call.ByID(1034837927, key, text);
+}
+
+/**
+ * Source is the text of a blueprint, for the editor.
+ * @param {string} key
+ * @returns {$CancellablePromise<string>}
+ */
+export function Source(key) {
+    return $Call.ByID(3516973194, key);
 }
 
 /**

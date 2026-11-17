@@ -27,7 +27,7 @@ type MenuEntry struct {
 	Label   string  `json:"label"`
 	Prompt  *Prompt `json:"prompt,omitempty"`  // ask this first
 	Confirm string  `json:"confirm,omitempty"` // ask yes or no first
-	Guard   string  `json:"guard,omitempty"`   // "dirty": refuse while a tab of these rows has unsaved edits
+	Guard   string  `json:"guard,omitempty"`   // "dirty": a tab of these rows may have unsaved edits; the window warns that they are lost before it goes on
 	Dialog  string  `json:"dialog,omitempty"`  // "move": the window asks where with its own dialog
 }
 
