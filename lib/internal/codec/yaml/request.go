@@ -167,7 +167,7 @@ func (m *mapping) dataset() *model.Dataset {
 	if !ok {
 		return nil
 	}
-	d := &model.Dataset{Driver: dm.str("driver"), Server: dm.str("server"), Query: dm.str("query"), Limit: int(dm.integer("limit"))}
+	d := &model.Dataset{Driver: dm.str("driver"), Server: dm.str("server"), Query: dm.str("query"), Limit: int(dm.integer("limit")), Writes: dm.boolean("writes")}
 	if e, ok := dm.take("params"); ok {
 		d.Params = dm.d.lenientStrings(e)
 	}
@@ -502,6 +502,9 @@ func encodeDataset(d *model.Dataset) yaml.MapSlice {
 	o.put("params", stringsToYAML(d.Params))
 	if d.Limit != 0 {
 		o.put("limit", d.Limit)
+	}
+	if d.Writes {
+		o.put("writes", true)
 	}
 	return presentMap(o.items)
 }

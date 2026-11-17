@@ -27,6 +27,7 @@ export const screens: Screen[] = [
   { id: 'screen:settings', title: 'Settings', icon: 'settings', menu: 'settings', rail: true },
   { id: 'screen:home', title: 'Home', icon: 'home', menu: 'home', rail: false },
   { id: 'screen:welcome', title: 'Welcome', icon: 'home', menu: 'welcome', rail: false },
+  { id: 'screen:about', title: 'About', icon: 'home', menu: 'about', rail: false },
   { id: 'screen:telemetry', title: 'Telemetry', icon: 'chart', menu: 'telemetry', rail: false },
 ]
 

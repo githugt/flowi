@@ -126,7 +126,7 @@ func (s *RequestService) open(node string) (RequestView, error) {
 	}
 	req := vm.NewRequest(s.app.backend, s.app.worker, c, c.Requests[i])
 	req.SetScheduler(s.app.scheduler)
-	o := &openRequest{req: req, format: vm.ViewJSON, snip: vm.NewSnippet(s.app.backend, s.app.worker, s.app.workspace, req, true)}
+	o := &openRequest{req: req, format: vm.ViewJSON, snip: vm.NewSnippet(s.app.backend, s.app.worker, s.app.workspace, req, s.snippetExcludesSecrets())}
 	req.OnChange(func() {
 		s.app.workspace.SetLabel(node, untitledName(s.app.workspace, node, req))
 		s.app.emit("request", s.view(node, o))
@@ -386,6 +386,14 @@ func (s *RequestService) ShowLatest(node string) {
 	})
 }
 
+// snippetExcludesSecrets is ui.snippet_exclude_secrets: what the "Leave secrets out" toggle of a request's code
+// snippet starts as. It was always on, whatever the setting said.
+func (s *RequestService) snippetExcludesSecrets() bool {
+	v, ok := s.app.backend.Settings("").Get("ui.snippet_exclude_secrets")
+	exclude, _ := v.Value.(bool)
+	return ok && exclude
+}
+
 // SuggestSavePath is the path offered when a try-out request is kept: its
 // name, or for an untitled one its URL as a single dashed name.
 func (s *RequestService) SuggestSavePath(node string) string {
@@ -414,6 +422,11 @@ func (s *RequestService) SaveTo(node, placeRow, text string) {
 				return // saved where it was
 			}
 			s.app.workspace.MoveRequest(target, to, dest, func(newRow string) {
+				if newRow == node {
+					// Kept in its own collection under a new name: the row, and so the tab, are the same one. Opening
+					// and closing it raced, and left a tab with nothing in it ("not ported to the new window yet").
+					return
+				}
 				s.app.emit("open", newRow)
 				s.app.emit("close", node)
 			}, func(err error) { s.app.emit("notice", Notice{Level: "error", Text: vm.ErrorText(err)}) })

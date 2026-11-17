@@ -35,8 +35,12 @@
   import type { CodeLang } from './lib/highlight'
   import EmptyState from './EmptyState.svelte'
   import { protocolVerb } from './lib/verbs'
+  import { moveServerPassword, serverHasPassword } from './lib/dataset'
+  import { SecretsService } from '../bindings/github.com/githugt/flowi/app/internal/bridge'
+  const PASSWORD_NOTE = "The password is saved in this request's file, which is often committed. Put it in a secret and write {{secret.name}} in its place."
   import { recognise } from './lib/paste'
   import AuthFields from './AuthFields.svelte'
+  import { authSummary } from './lib/authsummary'
   import type { DropOption } from './lib/types'
   import { WorkspaceService, ManagerService } from '../bindings/github.com/githugt/flowi/app/internal/bridge'
   import { Events } from '@wailsio/runtime'
@@ -61,8 +65,10 @@
   // What a check or an extract on this kind of request can read, and the example its help gives.
   const checkContext = $derived(view.kind === 'http' ? 'request.check' : view.kind === 'dataset' ? 'dataset.check' : 'message.check')
   const checkExample = $derived(view.kind === 'http' ? 'status == 200' : view.kind === 'dataset' ? 'row_count >= 1' : 'received >= 1')
+  // Databases that take a login in the connection URL; a file or an SQLite path has none.
+  const urlDriver = $derived(['postgres', 'mysql', 'mariadb'].includes(view.dataset?.block.Driver ?? ''))
   const sections = $derived.by(() => {
-    if (view.kind === 'dataset') return ['Query', 'Values', 'Extract', 'Assert', 'Outcomes', 'Variables', 'Settings', 'Hooks', 'Docs', 'Responses', 'Used by']
+    if (view.kind === 'dataset') return ['Query', 'Values', ...(urlDriver ? ['Credentials'] : []), 'Extract', 'Assert', 'Outcomes', 'Variables', 'Settings', 'Hooks', 'Docs', 'Responses', 'Used by']
     if (view.kind === 'grpc') return ['Message', 'Headers', 'Receive', 'Auth', 'Proto', 'Variables', 'Extract', 'Assert', 'Outcomes', 'Settings', 'Hooks', 'Schema', 'Docs', 'Responses', 'Used by']
     if (view.kind === 'async') {
       const p = view.async?.block.Protocol
@@ -75,7 +81,7 @@
   // The sections shown as tabs: what most sends need. The rest are under "More", in their usual order.
   const mainOf = $derived(
     view.kind === 'dataset'
-      ? ['Query', 'Values', 'Extract', 'Assert']
+      ? ['Query', 'Values', ...(urlDriver ? ['Credentials'] : []), 'Extract', 'Assert']
       : view.kind === 'grpc'
         ? ['Message', 'Headers', 'Receive', 'Auth', 'Extract', 'Assert']
         : view.kind === 'async'
@@ -237,8 +243,60 @@
   const fail = (e: unknown) => ui.toast(errorText(e), 'error')
   // Writes the working copy over the saved version. With a flowi overlay laid over it, that includes the overlay.
   function saveVersion() {
+    const server = view.dataset?.block.Server ?? ''
+    if (view.kind === 'dataset' && serverHasPassword(server)) return askPasswordMove(server)
+    askBreaking()
+  }
+
+  // An edit that breaks what uses the request (a flow that reads a value the request no longer extracts) is said
+  // before it is saved. A request nothing uses, a new one and a check that cannot be made save without asking.
+  async function askBreaking() {
+    let lines: string[] = []
+    if (view.dirty && !view.inScratch) lines = await RequestService.BreakingChanges(node).catch(() => [])
+    if (!lines.length) return writeVersion()
+    const shown = lines.slice(0, 6).join('\n') + (lines.length > 6 ? `\n… and ${lines.length - 6} more` : '')
+    ui.unsaved(
+      'This change breaks something that uses this request',
+      `Saving it makes ${lines.length === 1 ? 'this' : 'these'} stop working:\n${shown}`,
+      writeVersion,
+      () => {},
+      { save: 'Save anyway', discard: 'Do not save' },
+    )
+  }
+  function writeVersion() {
     if (view.inScratch) saveTo()
     else RequestService.Save(node)
+  }
+
+  // A password written in a connection URL would be saved in the request's file, often committed: offer to keep it
+  // in a secret of the selected environment instead. Not forced: "Save as is" saves it as it is.
+  function askPasswordMove(server: string) {
+    const env = app.tree?.selected ?? ''
+    if (!env) return askBreaking()
+    ui.unsaved(
+      'Password in the connection string',
+      `The password is saved in this request's file, which is often committed. Move it into a secret of the environment "${env}" and write {{secret.name}} in its place?`,
+      () =>
+        ui.prompt({
+          title: 'Keep the password in a secret',
+          label: `Name of the secret (stored for "${env}", never in a file)`,
+          initial: 'db_password',
+          done: (name) => void moveToSecret(env, name.trim(), server),
+        }),
+      askBreaking,
+      { save: 'Move to a secret…', discard: 'Save as is' },
+    )
+  }
+  async function moveToSecret(env: string, name: string, server: string) {
+    const moved = /^[A-Za-z_][A-Za-z0-9_]*$/.test(name) ? moveServerPassword(server, name) : null
+    if (!moved) return ui.toast('A secret name is letters, digits and _, and starts with a letter or _.', 'error')
+    const problem = await SecretsService.Declare(env, name, moved.password)
+    if (problem) return ui.toast(problem, 'error')
+    const block = structuredClone($state.snapshot(view.dataset!.block))
+    block.Server = moved.server
+    await RequestService.SetDataset(node, block as never)
+    ui.toast(`The password is now the secret "${name}" of "${env}".`)
+    askBreaking()
   }
   // Save (the button, ⌘S): with a flowi overlay open, the edit belongs to the overlay.
   function save() {
@@ -392,6 +450,9 @@
         <TextField mono value={db.Server} placeholder={db.Driver === 'sqlite' ? 'shop.db (a file in the collection)' : '{{env.database_url}}'}
           oninput={(t) => RequestService.SetDataset(node, { ...db, Server: t } as never)} onenter={() => RequestService.Send(node, hooks)} />
       </div>
+      {#if serverHasPassword(db.Server)}
+        <span class="pwwarn" role="note" title={PASSWORD_NOTE}>⚠ Password in the file</span>
+      {/if}
     {:else if view.grpc}
       {@const gb = view.grpc.block}
       <Verb verb="GRPC" />
@@ -548,7 +609,9 @@
           <div class="typebar"><Dropdown title="Auth type" options={authOptions} value={view.auth.kind} onpick={pickAuth} /></div>
         {/if}
         <div class="section">
-          {#if ['Message', 'Receive', 'Credentials', 'Binding', 'Proto'].includes(section)}
+          {#if view.kind === 'dataset' && section === 'Credentials'}
+            <DatasetSections {view} {section} />
+          {:else if ['Message', 'Receive', 'Credentials', 'Binding', 'Proto'].includes(section)}
             <MessageSections {view} {section} />
           {:else if ['Query', 'Values'].includes(section)}
             <DatasetSections {view} {section} />
@@ -595,6 +658,9 @@
               <TextField label={view.auth.kind === 'bearer' ? 'Token' : view.auth.kind === 'basic' ? 'Base64 credentials or a template' : 'Authorization header value'} mono
                 value={view.auth.value} oninput={(t) => RequestService.SetAuth(node, view.auth.kind, t)} />
               <p class="muted">Keep credentials out of the file: use {'{{secret.name}}'}.</p>
+            {/if}
+            {#if authSummary(view.auth.kind, view.auth.value, view.auth.fields)}
+              <p class="sends">When sent, it {authSummary(view.auth.kind, view.auth.value, view.auth.fields).replace(/`([^`]+)`/g, '“$1”')}.</p>
             {/if}
           {:else if section === 'Extract' && !extract.length}
             <EmptyState icon="extract" title="Nothing extracted" hint="Take a value out of the response into a variable, for later requests and steps." compact>
@@ -767,6 +833,7 @@
   .menu button { display: flex; align-items: center; white-space: nowrap; }
   .section { flex: 1; overflow: auto; padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; }
   .muted { color: var(--muted); font-size: var(--fs-sm); margin: 0; }
+  .sends { color: var(--muted); font-size: var(--fs-sm); margin: 8px 0 0; }
   .row { display: flex; gap: 4px; }
   .row input {
     flex: 1; min-width: 0; background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); padding: 5px 8px;
@@ -778,4 +845,5 @@
   code { font-family: var(--mono); }
   .builtin { border-top: 1px solid var(--line); padding-top: 8px; }
   .chain { margin: 0; padding-left: 18px; font: var(--fs-sm) var(--mono); }
+  .pwwarn { flex: none; color: var(--warn); font-size: var(--fs-xs); white-space: nowrap; }
 </style>

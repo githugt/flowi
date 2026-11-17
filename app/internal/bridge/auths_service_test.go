@@ -91,3 +91,18 @@ func TestAuthsService_Delete_Given_a_named_auth_When_deleted_Then_it_is_gone_and
 		t.Fatalf("calls %v auths %+v", b.Calls, app.Auths().State().Auths)
 	}
 }
+
+// Before: an authentication could only be renamed by deleting it and making it again.
+func TestAuthsService_Rename_Given_a_new_name_When_renamed_Then_the_backend_is_asked_and_the_screen_shows_it(t *testing.T) {
+	app, b, pub := authsFixture(t)
+
+	app.Auths().Rename("C1/A1", " partner ")
+
+	if !slices.Contains(b.Calls, "RenameNamedAuth A1 partner") {
+		t.Fatalf("calls %v", b.Calls)
+	}
+	v, ok := pub.last["auths"].(bridge.AuthsView)
+	if !ok || len(v.Auths) != 1 || v.Auths[0].Name != "partner" {
+		t.Fatalf("published %+v", pub.last["auths"])
+	}
+}

@@ -295,13 +295,14 @@ func TestFlowService_NodeData_should_show_the_outputs_of_a_step_that_ran(t *test
 	}
 }
 
-func TestFlowService_Run_should_refuse_while_the_flow_has_unsaved_edits(t *testing.T) {
+// Before: unsaved edits refused the run with "save the flow first".
+func TestFlowService_Run_should_try_unsaved_edits_without_saving_them(t *testing.T) {
 	flows, v, pub := openRunnable(t, nil)
 	flows.Insert(v.Node, "log", "$.nodes", 0)
 
 	flows.Run(v.Node, nil)
 
-	if got := pub.last["flowrun"].(bridge.FlowRunEvent).Run.Error; !strings.Contains(got, "save the flow first") {
+	if got := pub.last["flowrun"].(bridge.FlowRunEvent).Run.Error; strings.Contains(got, "save the flow first") {
 		t.Fatalf("error %q", got)
 	}
 }
@@ -1053,12 +1054,19 @@ func TestWorkspaceService_NewIn_Given_no_collection_Then_a_message_or_gRPC_draft
 }
 
 func TestRequestService_SaveTo_should_move_the_request_and_ask_to_open_it(t *testing.T) {
-	reqs, v, pub, _ := openLogin(t)
-	_ = v
+	other := model.Collection{Root: "/d", Manifest: model.Manifest{Meta: model.Meta{ID: "C2", Name: "Other"}, File: "/d/flowi.yaml"}}
+	pub := &published{}
+	app := bridge.NewApp(&vmtest.Backend{Cols: []model.Collection{vmtest.SampleCollection(), other}}, bridge.NewInlineActor(), pub.emit)
+	app.Start(t.Context())
+	reqs := app.Requests()
+	if _, err := reqs.Open("r:C1:R1"); err != nil {
+		t.Fatal(err)
+	}
 
-	reqs.SaveTo(v.Node, "c:C1", "kept/login")
+	reqs.SaveTo("r:C1:R1", "c:C2", "kept/login")
 
-	if opened, _ := pub.last["open"].(string); opened == "" || pub.last["close"] != v.Node {
+	// Moved to another collection, it is another row: that one opens and this tab closes.
+	if pub.last["open"] != "r:C2:R1" || pub.last["close"] != "r:C1:R1" {
 		t.Fatalf("open %v, close %v", pub.last["open"], pub.last["close"])
 	}
 }

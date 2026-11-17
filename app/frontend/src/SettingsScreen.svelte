@@ -48,6 +48,8 @@
     SettingsService.Set(f.name, typed[f.name])
     delete typed[f.name]
   }
+  // The themes app.css defines colours for; system and custom follow the OS or a file, so their swatch shows the current one.
+  const THEMES_WITH_COLOURS = ['classic', 'light', 'dark', 'high-contrast', 'solarized-light', 'solarized-dark', 'nord', 'anuppuccin-dark', 'anuppuccin-light', 'flowi-dark', 'flowi-light']
 </script>
 
 {#snippet field(f: SettingView)}
@@ -64,6 +66,14 @@
         {#each f.enum ?? [] as o}
           <button class="swatch" role="radio" aria-checked={f.value === o} class:on={f.value === o} data-send={o} title={o} onclick={() => SettingsService.Set(f.name, o)}>
             <span class="sample">Send</span>{o}
+          </button>
+        {/each}
+      </div>
+    {:else if f.name === 'appearance.theme'}
+      <div class="swatches" role="radiogroup" aria-label="Theme">
+        {#each f.enum ?? [] as o}
+          <button class="swatch themeswatch" role="radio" aria-checked={f.value === o} class:on={f.value === o} data-theme={THEMES_WITH_COLOURS.includes(o) ? o : undefined} title={o} onclick={() => SettingsService.Set(f.name, o)}>
+            <span class="themesample" aria-hidden="true"><i class="bar"></i><i class="line"></i><i class="dot"></i></span>{o.replace(/-/g, ' ')}
           </button>
         {/each}
       </div>
@@ -145,6 +155,12 @@
   .swatch { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 10px 14px; background: var(--panel); border: 1px solid var(--line); border-radius: var(--r-lg); color: var(--muted); font: inherit; font-size: var(--fs-xs); text-transform: capitalize; }
   .swatch.on { border-color: var(--accent); color: var(--text); box-shadow: 0 0 0 3px var(--tint-accent); }
   .sample { display: inline-block; padding: 0 14px; line-height: 26px; border-radius: var(--r-md); background: var(--send-fill); color: var(--on-send); box-shadow: var(--send-edge), 0 4px 14px var(--send-glow); font-size: var(--fs-sm); font-weight: 600; text-transform: none; }
+  .themeswatch { background: var(--panel); }
+  .themesample { position: relative; display: block; width: 72px; height: 44px; border-radius: var(--r-md); background: var(--bg); border: 1px solid var(--line); overflow: hidden; }
+  .themesample i { position: absolute; display: block; }
+  .themesample .bar { left: 0; top: 0; bottom: 0; width: 18px; background: var(--panel); border-right: 1px solid var(--line); }
+  .themesample .line { left: 26px; top: 12px; width: 34px; height: 5px; border-radius: 3px; background: var(--text); opacity: 0.7; }
+  .themesample .dot { left: 26px; top: 26px; width: 22px; height: 8px; border-radius: 4px; background: var(--accent); }
   .problem { color: var(--fail); margin: 4px 0 0; font-size: var(--fs-sm); }
   .link { background: none; border: 0; color: var(--accent); font: inherit; font-size: var(--fs-sm); font-weight: 400; margin-left: auto; }
 </style>

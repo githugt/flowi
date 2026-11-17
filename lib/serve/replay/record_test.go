@@ -352,3 +352,26 @@ func TestRecord_Given_Capture_fails_Then_the_call_is_still_forwarded_and_nothing
 		t.Errorf("something was saved: %v", err)
 	}
 }
+
+func TestPassThrough_should_forward_only_the_calls_nothing_saved_answers_and_save_nothing(t *testing.T) {
+	up := newUpstream(t, func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusAccepted)
+		_, _ = io.WriteString(w, `{"from": "upstream"}`)
+	})
+	f := newFixture(t, spec{path: "users/get", versions: get("{{env.base_url}}/v1/users/{{id}}")}).materialise()
+	f.options.PassThrough = recorderFor(t, up)
+	f.options.Log = replay.NewLog(50)
+	f.start()
+
+	unknown := f.do("GET", "/v1/nothing/here")
+
+	if unknown.status != 202 || unknown.header.Get(replay.HeaderMatch) != replay.MatchPassed || len(up.seen) != 1 {
+		t.Fatalf("answer %d %s %v, upstream calls %d", unknown.status, unknown.body, unknown.header, len(up.seen))
+	}
+	if _, err := os.Stat(filepath.Join(f.dir, "data")); err == nil {
+		entries, _ := os.ReadDir(filepath.Join(f.dir, "data"))
+		for _, e := range entries {
+			t.Fatalf("pass-through saved something: %s", e.Name())
+		}
+	}
+}

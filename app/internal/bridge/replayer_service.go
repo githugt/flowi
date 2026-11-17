@@ -20,6 +20,8 @@ type ReplayerForm struct {
 	RecordTo string `json:"recordTo"` // collection id; "" is the Scratch draft
 	// RecordHAR is a file the recorded calls are also written to, in order.
 	RecordHAR string `json:"recordHar"`
+	// PassThrough is an upstream for the calls nothing saved can answer; they are forwarded, nothing is saved.
+	PassThrough string `json:"passThrough"`
 	// Faults: percentages 0 to 100, the status of an injected error, and up to how much extra delay.
 	FaultErrorPercent string `json:"faultErrorPercent"`
 	FaultStatus       string `json:"faultStatus"`

@@ -57,12 +57,18 @@ type Options struct {
 	// Record, when set, forwards matched calls upstream and saves the
 	// answers (see record.go).
 	Record *Recorder
+
+	// PassThrough, when set, forwards a call that has nothing saved to answer it (no request fits, or the one that
+	// does has no such response) to its Upstream and relays the answer, without saving anything. Calls a saved
+	// response can answer are still replayed. Only Upstream, Client, MaxBody and Now of it are used.
+	PassThrough *Recorder
 }
 
 // Handler is the replayer. It is safe for concurrent use.
 type Handler struct {
 	opts Options
 	rec  *Recorder // opts.Record with defaults filled in; nil when not recording
+	pass *Recorder // opts.PassThrough with defaults filled in; nil when not passing through
 	idx  atomic.Pointer[index]
 
 	seqMu sync.Mutex // guards seq
@@ -87,6 +93,10 @@ func New(opts Options) *Handler {
 	if opts.Record != nil {
 		rec := opts.Record.withDefaults()
 		h.rec = &rec
+	}
+	if opts.PassThrough != nil {
+		pass := opts.PassThrough.withDefaults()
+		h.pass = &pass
 	}
 	h.Refresh()
 	return h
@@ -183,7 +193,12 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		cw = &captureWriter{ResponseWriter: w}
 		w = cw
 	}
-	a, dropped := h.applyFaults(r, h.decide(r))
+	decided := h.decide(r)
+	if h.pass != nil && (decided.match == MatchNone || decided.match == MatchNoResponse) {
+		h.servePassThrough(w, r, start)
+		return
+	}
+	a, dropped := h.applyFaults(r, decided)
 	if a.wait > 0 {
 		if err := h.opts.Sleep(r.Context(), a.wait); err != nil {
 			return // the caller went away

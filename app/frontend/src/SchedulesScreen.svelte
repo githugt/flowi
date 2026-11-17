@@ -97,7 +97,7 @@
         <Button variant="danger" onclick={() => ui.confirm('Remove schedule', `Remove the schedule ${s.name}?`, () => SchedulesService.Remove(s.name))}>Remove</Button>
       </div>
     {:else}
-      <p class="muted none">No schedules yet.</p>
+      <p class="muted none">No schedules yet. A schedule runs a flow on a timer, for example a health check every five minutes. Choose <b>+ Add schedule</b>, pick a flow and how often.</p>
     {/each}
   </div>
 
@@ -157,7 +157,7 @@
 </div>
 
 <style>
-  .page { position: absolute; inset: 0; overflow: auto; padding: 28px 32px 56px; max-width: 880px; margin: 0 auto; width: 100%; box-sizing: border-box; }
+  .page { position: absolute; inset: 0; overflow: auto; padding: 28px 32px 56px; max-width: 820px; }
   .muted { color: var(--muted); font-size: var(--fs-sm); margin: 0 0 6px; }
   .err { color: var(--fail); }
   h3 { margin: 22px 0 8px; font-size: var(--fs-lg); font-weight: 600; display: flex; justify-content: space-between; align-items: center; }

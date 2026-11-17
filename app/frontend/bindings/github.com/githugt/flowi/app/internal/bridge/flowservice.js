@@ -749,12 +749,14 @@ export function Select(node, step) {
 
 /**
  * Sequence draws the last run of the open flow as a sequence diagram: the hosts it called, each attempt with its
- * status and time, and a note for a step that failed. Mermaid is the same picture as text.
+ * status and time, and a note for a step that failed. others also notes the steps that call nothing (delays, sets,
+ * assertions). Mermaid is the same picture as text.
  * @param {string} node
+ * @param {boolean} others
  * @returns {$CancellablePromise<$models.SequenceView>}
  */
-export function Sequence(node) {
-    return $Call.ByID(1938749126, node).then(/** @type {($result: any) => any} */(($result) => {
+export function Sequence(node, others) {
+    return $Call.ByID(1938749126, node, others).then(/** @type {($result: any) => any} */(($result) => {
         return $$createType15($result);
     }));
 }

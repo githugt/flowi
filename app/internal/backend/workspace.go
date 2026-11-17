@@ -316,6 +316,13 @@ func (b *Workspace) SaveNamedAuth(t flowi.AuthTarget, a model.NamedAuth) error {
 	return b.ws.SaveNamedAuth(t, a, flowi.SaveOptions{DropComments: true})
 }
 
+// RenameNamedAuth gives a named authentication another name; the requests that use it follow. The app's screen has
+// said so, so a request file with comments is rewritten.
+func (b *Workspace) RenameNamedAuth(t flowi.AuthTarget, name string) error {
+	b.guard.Check("RenameNamedAuth")
+	return b.ws.RenameNamedAuth(t, name, flowi.SaveOptions{DropComments: true})
+}
+
 func (b *Workspace) DeleteNamedAuth(t flowi.AuthTarget) error {
 	b.guard.Check("DeleteNamedAuth")
 	return b.ws.DeleteNamedAuth(t)
@@ -354,6 +361,16 @@ func (b *Workspace) Impact(t flowi.RequestTarget, version string) (analysis.Repo
 func (b *Workspace) Secrets() ([]flowi.SecretInfo, error) {
 	b.guard.Check("Secrets")
 	return b.ws.Secrets()
+}
+
+func (b *Workspace) DeclareSecret(env, name, value string) error {
+	b.guard.Check("DeclareSecret")
+	return b.ws.DeclareSecret(env, name, value)
+}
+
+func (b *Workspace) ImpactOfDraft(t flowi.RequestTarget, draft model.Request) (analysis.Report, diag.List, error) {
+	b.guard.Check("ImpactOfDraft")
+	return b.ws.ImpactOfDraft(t, draft)
 }
 
 func (b *Workspace) SetSecret(env, name, value string) error {

@@ -158,3 +158,31 @@ func TestSendRequest_Given_a_version_uses_a_named_auth_When_sent_Then_the_named_
 		t.Fatalf("X-Api-Key was not sent: %+v", res.Record.Request.Header)
 	}
 }
+
+// Before: an authentication could not be renamed; deleting and recreating it left its requests detached.
+func TestRenameNamedAuth_Given_requests_use_it_When_renamed_Then_they_follow_the_new_name(t *testing.T) {
+	w := demoWorkspace(t)
+	c := w.Collections()[0]
+	target, err := w.NewNamedAuth(c.Manifest.ID, "partner-key", "", apiKeyAuth("{{secret.password}}"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	req := echoWithAuth(t, w, &model.Auth{Use: "partner-key"})
+
+	err = w.RenameNamedAuth(target, "partner", SaveOptions{})
+
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, r, _ := w.requestFor(req)
+	uses, usesErr := w.NamedAuthUses(target)
+	if r.Versions[0].Auth == nil || r.Versions[0].Auth.Use != "partner" || usesErr != nil || len(uses) != 1 {
+		t.Fatalf("auth %+v, uses %v (%v)", r.Versions[0].Auth, uses, usesErr)
+	}
+	if _, err := w.NamedAuth(target); err != nil {
+		t.Fatalf("the id no longer resolves: %v", err)
+	}
+	if err := w.RenameNamedAuth(target, "a/b", SaveOptions{}); err == nil {
+		t.Fatal("a name with a folder was accepted")
+	}
+}

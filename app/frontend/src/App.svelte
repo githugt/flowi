@@ -59,6 +59,7 @@
   import HomeScreen from './HomeScreen.svelte'
   import Logo from './Logo.svelte'
   import WelcomeScreen from './WelcomeScreen.svelte'
+  import AboutScreen from './AboutScreen.svelte'
   import TelemetryScreen from './TelemetryScreen.svelte'
   import TracingScreen from './TracingScreen.svelte'
   import Announcements from './Announcements.svelte'
@@ -258,6 +259,8 @@
         <HomeScreen />
       {:else if tab && tab.node === 'screen:welcome'}
         <WelcomeScreen />
+      {:else if tab && tab.node === 'screen:about'}
+        <AboutScreen />
       {:else if tab && tab.node === 'screen:telemetry'}
         <TelemetryScreen />
       {:else if tab && tab.node === 'screen:tracing'}

@@ -30,6 +30,9 @@ func (im *importer) request(r map[string]any, folders []string, in inherited) {
 	rep.Name = path
 	t := &translator{Translator: importers.Translator{Item: &rep}}
 	v := t.version(r, in)
+	if v.Auth != nil && v.Auth.Use == "" && !ownAuth(r) {
+		v.Auth = im.named(in.scope, *v.Auth) // set once on the collection or folder, used by every request under it
+	}
 	req := model.Request{Meta: model.Meta{Name: name}, Path: path, Versions: []model.RequestVersion{v}}
 	im.result.Requests = append(im.result.Requests, req)
 	reportScripts(&rep, r)
@@ -223,4 +226,22 @@ func (t *translator) multipart(body any) model.Body {
 		parts = append(parts, model.Field{Key: t.text(key), Value: t.credential("form field "+key, key, loose.Str(p["value"]))})
 	}
 	return model.Body{Multipart: parts}
+}
+
+// ownAuth is true when the request sets its own auth rather than taking its folder's.
+func ownAuth(r map[string]any) bool {
+	a := loose.Map(r["auth"])
+	return a != nil && loose.Str(a["authType"]) != "inherit" && loose.Str(a["authType"]) != ""
+}
+
+// named keeps an authentication a collection or folder sets as a named authentication of the result, one for each
+// scope, and returns the block that uses it by name.
+func (im *importer) named(scope string, block model.Auth) *model.Auth {
+	if !slices.ContainsFunc(im.result.Auths, func(n model.NamedAuth) bool { return n.Name == scope }) {
+		im.result.Auths = append(im.result.Auths, model.NamedAuth{
+			Meta: model.Meta{Name: scope, Description: "Imported from Hoppscotch: the authentication set on a collection or folder"},
+			Auth: block,
+		})
+	}
+	return &model.Auth{Use: scope}
 }

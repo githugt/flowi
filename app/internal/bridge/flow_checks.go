@@ -236,8 +236,9 @@ func (s *FlowService) CheckDrift(node, env string, failOn []string) (DriftView, 
 }
 
 // Sequence draws the last run of the open flow as a sequence diagram: the hosts it called, each attempt with its
-// status and time, and a note for a step that failed. Mermaid is the same picture as text.
-func (s *FlowService) Sequence(node string) (SequenceView, error) {
+// status and time, and a note for a step that failed. others also notes the steps that call nothing (delays, sets,
+// assertions). Mermaid is the same picture as text.
+func (s *FlowService) Sequence(node string, others bool) (SequenceView, error) {
 	var run report.Run
 	err := s.edit(node, func(o *openFlow) error {
 		run = o.run.Result().Report
@@ -249,13 +250,13 @@ func (s *FlowService) Sequence(node string) (SequenceView, error) {
 	if run.ID == "" {
 		return SequenceView{}, errors.New("run the flow first: the diagram is drawn from a run")
 	}
-	seq := report.SequenceOf(run)
+	seq := report.SequenceWith(run, others)
 	v := SequenceView{Title: seq.Title, Hosts: nonNil(seq.Hosts), Steps: []SequenceStepView{}}
 	for _, st := range seq.Steps {
 		v.Steps = append(v.Steps, SequenceStepView{Kind: st.Kind, Host: st.Host, Text: st.Text, Failed: st.Failed})
 	}
 	var sb strings.Builder
-	if err := report.WriteMermaid(&sb, run); err != nil {
+	if err := report.WriteSequence(&sb, seq); err != nil {
 		return SequenceView{}, err
 	}
 	v.Mermaid = sb.String()

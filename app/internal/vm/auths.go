@@ -4,6 +4,7 @@ package vm
 
 import (
 	"slices"
+	"strings"
 
 	flowi "github.com/githugt/flowi/lib"
 	"github.com/githugt/flowi/lib/model"
@@ -75,6 +76,12 @@ func (ws *Workspace) SaveNamedAuth(a NamedAuth, done func(), fail func(error)) {
 	ws.changeAuths(func() error {
 		return ws.b.SaveNamedAuth(a.Target(), model.NamedAuth{Meta: model.Meta{Description: a.Description}, Auth: a.Auth})
 	}, done, fail)
+}
+
+// RenameNamedAuth gives a another name, then refreshes the lists. The requests that use it are changed to the new
+// name, so none is left detached.
+func (ws *Workspace) RenameNamedAuth(a NamedAuth, name string, done func(), fail func(error)) {
+	ws.changeAuths(func() error { return ws.b.RenameNamedAuth(a.Target(), strings.TrimSpace(name)) }, done, fail)
 }
 
 // DeleteNamedAuth deletes a, then refreshes the lists. The requests in

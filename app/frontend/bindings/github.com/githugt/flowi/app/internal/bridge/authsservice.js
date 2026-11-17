@@ -38,6 +38,16 @@ export function Delete(key) {
 }
 
 /**
+ * Rename gives an authentication another name. The requests that use it are changed to the new name.
+ * @param {string} key
+ * @param {string} name
+ * @returns {$CancellablePromise<void>}
+ */
+export function Rename(key, name) {
+    return $Call.ByID(745449662, key, name);
+}
+
+/**
  * Save writes the description, scheme and parameter values of an
  * authentication; an empty value leaves the parameter out.
  * @param {string} key

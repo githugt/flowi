@@ -30,6 +30,19 @@ export function AddSetting(node, key) {
 }
 
 /**
+ * BreakingChanges says what saving the request as edited would break for the flows, hooks and checks that use it and
+ * are fine today, one line each. None (an empty list) means saving breaks nothing, or the check could not be made: it
+ * never holds a save up. The window asks before it saves a request that has consumers.
+ * @param {string} node
+ * @returns {$CancellablePromise<string[]>}
+ */
+export function BreakingChanges(node) {
+    return $Call.ByID(210095592, node).then(/** @type {($result: any) => any} */(($result) => {
+        return $$createType0($result);
+    }));
+}
+
+/**
  * Cancel stops a send in progress.
  * @param {string} node
  * @returns {$CancellablePromise<void>}
@@ -64,7 +77,7 @@ export function Close(node) {
  */
 export function Cookies(node) {
     return $Call.ByID(1377379633, node).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType0($result);
+        return $$createType1($result);
     }));
 }
 
@@ -161,7 +174,7 @@ export function Edit(node, v) {
  */
 export function ExportFlowiOverlay(node, name) {
     return $Call.ByID(1183129753, node, name).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType1($result);
+        return $$createType2($result);
     }));
 }
 
@@ -173,7 +186,7 @@ export function ExportFlowiOverlay(node, name) {
  */
 export function ExpressionNames(node) {
     return $Call.ByID(433467096, node).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType3($result);
+        return $$createType4($result);
     }));
 }
 
@@ -211,7 +224,7 @@ export function FillFromPaste(node, kind, text) {
  */
 export function FlowiOverlayDiff(node) {
     return $Call.ByID(1743977768, node).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType4($result);
+        return $$createType5($result);
     }));
 }
 
@@ -235,7 +248,7 @@ export function FlowiOverlayText(node, name) {
  */
 export function GenerateRequests(node) {
     return $Call.ByID(3536890955, node).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType5($result);
+        return $$createType6($result);
     }));
 }
 
@@ -282,7 +295,7 @@ export function MakeJSONRPC(node) {
  */
 export function Missing(node) {
     return $Call.ByID(3886754734, node).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType6($result);
+        return $$createType7($result);
     }));
 }
 
@@ -304,7 +317,7 @@ export function NewVersion(node, label) {
  */
 export function Open(node) {
     return $Call.ByID(4108184050, node).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType7($result);
+        return $$createType8($result);
     }));
 }
 
@@ -403,7 +416,7 @@ export function PrettyJSON(text) {
  */
 export function PreviewOverlay(node) {
     return $Call.ByID(538770798, node).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType8($result);
+        return $$createType9($result);
     }));
 }
 
@@ -530,7 +543,7 @@ export function SaveToOverlay(node, chosen) {
  */
 export function Schemas(node) {
     return $Call.ByID(208416882, node).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType10($result);
+        return $$createType11($result);
     }));
 }
 
@@ -848,7 +861,7 @@ export function SetSchemasInfer(node, on) {
  */
 export function SetSettings(node, rows) {
     return $Call.ByID(2276053871, node, rows).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType11($result);
+        return $$createType0($result);
     }));
 }
 
@@ -1021,18 +1034,18 @@ export function UsedBy(node) {
 }
 
 // Private type creation functions
-const $$createType0 = $models.CookiesView.createFrom;
-const $$createType1 = $models.SpecExportView.createFrom;
-const $$createType2 = $models.SuggestionView.createFrom;
-const $$createType3 = $Create.Array($$createType2);
-const $$createType4 = $models.FlowiOverlayDiffView.createFrom;
-const $$createType5 = $models.GeneratedView.createFrom;
-const $$createType6 = $models.MissingView.createFrom;
-const $$createType7 = $models.RequestView.createFrom;
-const $$createType8 = $models.OverlayPreviewView.createFrom;
-const $$createType9 = $models.SchemaView.createFrom;
-const $$createType10 = $Create.Array($$createType9);
-const $$createType11 = $Create.Array($Create.Any);
+const $$createType0 = $Create.Array($Create.Any);
+const $$createType1 = $models.CookiesView.createFrom;
+const $$createType2 = $models.SpecExportView.createFrom;
+const $$createType3 = $models.SuggestionView.createFrom;
+const $$createType4 = $Create.Array($$createType3);
+const $$createType5 = $models.FlowiOverlayDiffView.createFrom;
+const $$createType6 = $models.GeneratedView.createFrom;
+const $$createType7 = $models.MissingView.createFrom;
+const $$createType8 = $models.RequestView.createFrom;
+const $$createType9 = $models.OverlayPreviewView.createFrom;
+const $$createType10 = $models.SchemaView.createFrom;
+const $$createType11 = $Create.Array($$createType10);
 const $$createType12 = $models.RequestSettingsView.createFrom;
 const $$createType13 = $models.SpecOriginView.createFrom;
 const $$createType14 = $models.StoredView.createFrom;

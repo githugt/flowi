@@ -147,7 +147,7 @@ func (x *execution) failGRPC(err error, b builtGRPC, res grpcx.Result) {
 		x.fail(StatusError, diag.List{diag.New(diag.CodeAsyncTimeout, diag.Location{}, map[string]string{
 			"got": itoa(receivedCount(res)), "want": itoa(rc.Count), "timeout": rc.Timeout.String()})})
 	default:
-		x.fail(StatusError, diag.List{diag.New(diag.CodeHTTPFailed, diag.Location{}, map[string]string{"detail": x.r.secrets.String(err.Error())})})
+		x.fail(StatusError, diag.List{diag.New(diag.CodeHTTPFailed, diag.Location{}, map[string]string{"detail": x.r.secrets.String(driverHint(err.Error()))})})
 	}
 }
 

@@ -29,7 +29,11 @@ func openSQLite(q Query) (*sql.DB, error) {
 	}
 	options := url.Values{}
 	options.Set("mode", "ro")
-	options.Add("_pragma", "query_only(1)")
+	if q.AllowWrites {
+		options.Set("mode", "rw") // still never creates a missing file
+	} else {
+		options.Add("_pragma", "query_only(1)")
+	}
 	options.Add("_pragma", fmt.Sprintf("busy_timeout(%d)", sqliteBusyWaitMillis))
 	return sql.Open("sqlite", (&url.URL{Scheme: "file", Opaque: filepath.ToSlash(path), RawQuery: options.Encode()}).String())
 }

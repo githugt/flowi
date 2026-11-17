@@ -4,6 +4,7 @@
   import { AuthsService } from '../bindings/github.com/githugt/flowi/app/internal/bridge'
   import { ui } from './lib/ui.svelte'
   import AuthFields from './AuthFields.svelte'
+  import { authSummary } from './lib/authsummary'
   import Button from './Button.svelte'
   import Dropdown from './Dropdown.svelte'
   import EmptyState from './EmptyState.svelte'
@@ -47,6 +48,11 @@
     AuthsService.Save(a.key, draft.description, draft.scheme, Object.fromEntries(names.map((n) => [n, draft.values[n] ?? ''])))
   }
 
+  function rename(a: NamedAuth) {
+    const uses = a.uses.length ? ` The ${a.uses.length === 1 ? 'request' : `${a.uses.length} requests`} that use it will follow.` : ''
+    ui.prompt({ title: 'Rename authentication', label: `New name for ${a.name}.${uses}`, initial: a.name, done: (name) => AuthsService.Rename(a.key, name) })
+  }
+
   function remove(a: NamedAuth) {
     const used = a.uses.length
       ? ` ${a.uses.length === 1 ? 'One request uses' : `${a.uses.length} requests use`} it (${a.uses.join(', ')}) and cannot be sent until another authentication is picked there.`
@@ -55,7 +61,7 @@
   }
 </script>
 
-<div class="page">
+<div class="page shell-page">
   <p class="note">An authentication defined here has a name. A request uses it by that name instead of repeating the values: in the request's Auth section, pick Named authentication. Each is a file in the collection's <code>auths</code> folder.</p>
 
   <div class="new">
@@ -72,12 +78,13 @@
     <EmptyState icon="auth" title="No authentications yet" hint="Name one above, then fill in its values." compact />
   {/if}
   {#each view.auths as a (a.key)}
-    <div class="card">
-      <div class="top">
-        <strong>{a.name}</strong><span class="tag">{a.schemeLabel || 'Unknown scheme'}</span><span class="muted">{a.collectionName}</span>
+    <div class="shell-card">
+      <div class="shell-top">
+        <strong>{a.name}</strong><span class="shell-tag">{a.schemeLabel || 'Unknown scheme'}</span><span class="muted">{a.collectionName}</span>
         <span class="muted">{a.uses.length ? `Used by ${a.uses.length} ${a.uses.length === 1 ? 'request' : 'requests'}` : 'Not used yet'}</span>
-        <span class="spacer"></span>
+        <span class="shell-spacer"></span>
         <Button aria-expanded={opened === a.key} onclick={() => edit(a)}>{opened === a.key ? 'Close' : 'Edit'}</Button>
+        <Button onclick={() => rename(a)}>Rename…</Button>
         <Button variant="danger" onclick={() => remove(a)}>Delete…</Button>
       </div>
       {#if a.description && opened !== a.key}<p class="muted">{a.description}</p>{/if}
@@ -86,6 +93,7 @@
           <TextField label="Description" value={draft.description} oninput={(t) => (draft.description = t)} />
           <div class="typebar"><Dropdown title="Scheme" options={schemeOptions} value={draft.scheme} onpick={(v) => (draft.scheme = v)} /></div>
           <AuthFields fields={fieldsOf(a)} onparam={(n, t) => (draft.values[n] = t)} />
+          {#if authSummary('scheme:' + draft.scheme, '', fieldsOf(a))}<p class="muted">When sent, it {authSummary('scheme:' + draft.scheme, '', fieldsOf(a)).replace(/`([^`]+)`/g, '“$1”')}.</p>{/if}
           {#if a.uses.length}<p class="muted">Used by {a.uses.join(', ')}.</p>{/if}
           <div class="actions"><Button variant="primary" onclick={() => save(a)}>Save</Button></div>
         </div>
@@ -95,14 +103,9 @@
 </div>
 
 <style>
-  .page { position: absolute; inset: 0; overflow: auto; padding: 28px 32px 56px; max-width: 820px; }
   .note, .muted { color: var(--muted); font-size: var(--fs-sm); margin: 0 0 4px; }
   .new { display: flex; align-items: flex-end; gap: 10px; margin: 12px 0; }
   .grow { flex: 1; min-width: 0; }
-  .card { border: 1px solid var(--line); border-radius: var(--r-xl); background: var(--panel); padding: 8px 12px; margin: 8px 0; }
-  .top { display: flex; align-items: center; gap: 10px; }
-  .spacer { flex: 1; }
-  .tag { font-size: var(--fs-xs); border: 1px solid var(--line); border-radius: var(--r-pill); padding: 0 8px; color: var(--muted); }
   .form { display: flex; flex-direction: column; gap: 8px; padding: 10px 0 4px; }
   .typebar, .actions { display: flex; gap: 10px; }
   code { font: var(--fs-xs) var(--mono); }

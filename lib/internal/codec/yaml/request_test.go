@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/githugt/flowi/lib/diag"
+	"github.com/githugt/flowi/lib/model"
 )
 
 const requestHeader = "id: 01J9ZA3M4N5P6Q7R8S9T0VWXYZ\nname: R\n"
@@ -569,5 +570,20 @@ func TestNode_Given_a_step_with_its_own_outcomes_When_saved_and_loaded_Then_they
 	got := f.Nodes[0].Request.Outcomes
 	if err != nil || len(got) != 2 || got[1].Name != "gone" || got[1].Color != "pink" || !bytes.Equal(out, []byte(src)) {
 		t.Fatalf("err %v outcomes %+v, output:\n%s", err, got, out)
+	}
+}
+
+func TestDataset_Given_writes_true_Then_it_is_written_and_left_out_when_false(t *testing.T) {
+	has := func(d *model.Dataset) bool {
+		for _, it := range encodeDataset(d) {
+			if it.Key == "writes" && it.Value == true {
+				return true
+			}
+		}
+		return false
+	}
+
+	if !has(&model.Dataset{Driver: "sqlite", Writes: true}) || has(&model.Dataset{Driver: "sqlite"}) {
+		t.Fatal("writes must be written only when true")
 	}
 }

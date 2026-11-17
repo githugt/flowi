@@ -117,8 +117,8 @@ func (r *FlowRun) Detail(node string) (NodeDetail, bool) {
 	return *d, true
 }
 
-// Run runs the saved flow with env and inputs. Unsaved edits refuse the
-// run: the engine runs the file on disk.
+// Run runs the flow with env and inputs: the saved one, or the draft when it has unsaved edits (they are tried
+// without being saved).
 func (r *FlowRun) Run(env string, inputs map[string]string) {
 	r.start(env, inputs, nil)
 }
@@ -136,14 +136,13 @@ func (r *FlowRun) RunPart(env string, inputs map[string]string, node string, sco
 	return true
 }
 
-// start runs the saved flow, all of it when only is nil.
+// start runs the flow, all of it when only is nil.
 func (r *FlowRun) start(env string, inputs map[string]string, only []string) {
-	if r.doc.Dirty() {
-		r.err = "save the flow first: runs use the file on disk"
-		r.changed()
-		return
-	}
 	opts := flowi.RunOptions{Env: env, Inputs: inputs, Only: only}
+	if r.doc.Dirty() {
+		draft := r.doc.Draft() // try the edits without saving them
+		opts.Draft = &draft
+	}
 	if r.dbg != nil {
 		opts.Seed = r.dbg.seed
 	}

@@ -290,3 +290,55 @@ func TestBlueprintSchema_should_reject_what_the_decoder_rejects(t *testing.T) {
 		}
 	}
 }
+
+func TestSchemas_should_accept_dataset_grpc_async_and_outcome_blocks_of_a_request(t *testing.T) {
+	src := `id: 01JA0000000000000000000001
+versions:
+  "1":
+    dataset:
+      driver: postgres
+      server: postgres://u:{{secret.pw}}@host/db
+      query: SELECT * FROM t WHERE id = $1
+      params: [42, "{{id}}"]
+      limit: 10
+      writes: true
+    outcomes:
+      - name: found
+        when: response.rows > 0
+  "2":
+    grpc:
+      server: localhost:50051
+      method: pkg.Svc/Say
+      body: {json: '{"a":1}'}
+      proto: [svc.proto]
+      receive: {count: 2, timeout: 5s}
+  "3":
+    async:
+      protocol: kafka
+      server: localhost:9092
+      channel: orders
+      send: {body: {text: hi}, headers: {k: v}}
+      receive: {count: 1, timeout: 2s, match: "message.id == 1"}
+`
+	js, err := yaml.YAMLToJSON([]byte(src))
+	if err != nil {
+		t.Fatal(err)
+	}
+	v, err := jsonschema.UnmarshalJSON(bytes.NewReader(js))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := compile(t, "request").Validate(v); err != nil {
+		t.Fatalf("%v", err)
+	}
+}
+
+func TestSchemas_should_reject_an_unknown_dataset_driver(t *testing.T) {
+	js, _ := yaml.YAMLToJSON([]byte("id: 01JA0000000000000000000001\nversions:\n  \"1\":\n    dataset: {driver: oracle, server: x, query: y}\n"))
+	v, _ := jsonschema.UnmarshalJSON(bytes.NewReader(js))
+
+	if err := compile(t, "request").Validate(v); err == nil {
+		t.Fatal("want an error")
+	}
+}

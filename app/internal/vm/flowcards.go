@@ -157,7 +157,7 @@ func grpcFacts(v model.RequestVersion) card.Facts {
 
 func datasetFacts(v model.RequestVersion) card.Facts {
 	d := v.Dataset
-	return card.Facts{Kind: "dataset", Method: datasetVerb, Target: datasetTip(*d), Sends: true, Body: d.Driver, Props: len(d.Params)}
+	return card.Facts{Kind: "dataset", Method: datasetVerbOf(*d), Target: datasetTip(*d), Sends: true, Body: d.Driver, Props: len(d.Params)}
 }
 
 func asyncFacts(v model.RequestVersion) card.Facts {

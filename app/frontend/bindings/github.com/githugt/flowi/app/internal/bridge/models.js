@@ -6486,6 +6486,14 @@ export class ReplayerForm {
              */
             this["recordHar"] = "";
         }
+        if (!("passThrough" in $$source)) {
+            /**
+             * PassThrough is an upstream for the calls nothing saved can answer; they are forwarded, nothing is saved.
+             * @member
+             * @type {string}
+             */
+            this["passThrough"] = "";
+        }
         if (!("faultErrorPercent" in $$source)) {
             /**
              * Faults: percentages 0 to 100, the status of an injected error, and up to how much extra delay.
@@ -8297,6 +8305,14 @@ export class SnippetView {
              * @type {boolean}
              */
             this["exclude"] = false;
+        }
+        if (!("secrets" in $$source)) {
+            /**
+             * the text contains real secret values
+             * @member
+             * @type {boolean}
+             */
+            this["secrets"] = false;
         }
         if (!("text" in $$source)) {
             /**

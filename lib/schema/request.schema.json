@@ -73,30 +73,7 @@
           "$ref": "common.schema.json#/$defs/stringMap"
         },
         "body": {
-          "type": "object",
-          "additionalProperties": false,
-          "maxProperties": 1,
-          "properties": {
-            "json": {
-              "type": "string"
-            },
-            "text": {
-              "type": "string"
-            },
-            "file": {
-              "type": "string"
-            },
-            "form": {
-              "$ref": "common.schema.json#/$defs/stringMap"
-            },
-            "multipart": {
-              "type": [
-                "object",
-                "array"
-              ],
-              "description": "Parts by name; a list of one-entry mappings when a name repeats."
-            }
-          }
+          "$ref": "#/$defs/body"
         },
         "auth": {
           "$ref": "common.schema.json#/$defs/auth"
@@ -168,6 +145,188 @@
         },
         "hooks": {
           "$ref": "common.schema.json#/$defs/hooks"
+        },
+        "outcomes": {
+          "type": "array",
+          "description": "Named results a run can end in, each with a condition.",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "when": {
+                "type": "string"
+              },
+              "disabled": {
+                "type": "boolean"
+              },
+              "color": {
+                "type": "string"
+              },
+              "description": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "async": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "A message sent to, or received from, a broker channel instead of an HTTP call.",
+          "properties": {
+            "protocol": {
+              "type": "string"
+            },
+            "server": {
+              "type": "string"
+            },
+            "channel": {
+              "type": "string"
+            },
+            "binding": {
+              "$ref": "common.schema.json#/$defs/stringMap"
+            },
+            "send": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "body": {
+                  "$ref": "#/$defs/body"
+                },
+                "headers": {
+                  "$ref": "common.schema.json#/$defs/stringMap"
+                }
+              }
+            },
+            "receive": {
+              "$ref": "#/$defs/receive"
+            }
+          }
+        },
+        "grpc": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "A gRPC call instead of an HTTP one.",
+          "properties": {
+            "server": {
+              "type": "string"
+            },
+            "method": {
+              "type": "string"
+            },
+            "body": {
+              "$ref": "#/$defs/body"
+            },
+            "proto": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "import": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "web": {
+              "type": "boolean"
+            },
+            "receive": {
+              "$ref": "#/$defs/receive"
+            }
+          }
+        },
+        "dataset": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "A SQL query against a database or data file instead of an HTTP call.",
+          "properties": {
+            "driver": {
+              "enum": [
+                "postgres",
+                "mysql",
+                "mariadb",
+                "sqlite",
+                "csv",
+                "xlsx",
+                "parquet"
+              ]
+            },
+            "server": {
+              "type": "string",
+              "description": "A connection URL, or the path of a file or folder. Templated."
+            },
+            "query": {
+              "type": "string",
+              "description": "One statement. Not templated: values go in params."
+            },
+            "params": {
+              "type": "array",
+              "items": {
+                "type": [
+                  "string",
+                  "number",
+                  "boolean"
+                ]
+              }
+            },
+            "limit": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "writes": {
+              "type": "boolean",
+              "description": "Let this query change data. Off by default."
+            }
+          }
+        }
+      }
+    },
+    "body": {
+      "type": "object",
+      "additionalProperties": false,
+      "maxProperties": 1,
+      "properties": {
+        "json": {
+          "type": "string"
+        },
+        "text": {
+          "type": "string"
+        },
+        "file": {
+          "type": "string"
+        },
+        "form": {
+          "$ref": "common.schema.json#/$defs/stringMap"
+        },
+        "multipart": {
+          "type": [
+            "object",
+            "array"
+          ],
+          "description": "Parts by name; a list of one-entry mappings when a name repeats."
+        }
+      }
+    },
+    "receive": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "What to wait for after sending.",
+      "properties": {
+        "count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "timeout": {
+          "type": "string",
+          "description": "A duration, such as 5s."
+        },
+        "match": {
+          "type": "string",
+          "description": "An expression a message must satisfy to count."
         }
       }
     }

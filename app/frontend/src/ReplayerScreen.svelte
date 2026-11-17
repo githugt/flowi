@@ -6,10 +6,11 @@
   import { live } from './lib/live'
   import { ReplayerService } from '../bindings/github.com/githugt/flowi/app/internal/bridge'
   import type { ReplayerView } from './lib/types'
+  import { errorText } from './lib/errors'
   import TrafficLog from './TrafficLog.svelte'
 
   let view = $state<ReplayerView | null>(null)
-  let form = $state({ addr: '', latency: '', sequence: false, cors: false, record: '', recordTo: '', recordHar: '', faultErrorPercent: '', faultStatus: '', faultDropPercent: '', faultJitter: '' })
+  let form = $state({ addr: '', latency: '', sequence: false, cors: false, record: '', recordTo: '', recordHar: '', passThrough: '', faultErrorPercent: '', faultStatus: '', faultDropPercent: '', faultJitter: '' })
   let seeded = false
 
   // The form starts from the defaults Go read; after that it is the user's.
@@ -22,18 +23,42 @@
     if (!seeded && v.form.addr) seeded = true
   }
 
-  onMount(() => live<ReplayerView>('replayer', () => ReplayerService.State(), adopt))
+  // Before this, a state that never came (or failed) left the tab blank, with nothing to say why or to try again.
+  let loadError = $state('')
+  let stop = () => {}
+  function load() {
+    loadError = ''
+    stop()
+    stop = live<ReplayerView>('replayer', () => ReplayerService.State().catch((e) => { loadError = errorText(e); throw e }), adopt)
+  }
+  onMount(() => {
+    load()
+    return () => stop()
+  })
 
   const running = $derived(view?.state === 'running' || view?.state === 'stopping')
 </script>
 
-{#if view}
+{#if !view}
+  <div class="page">
+    {#if loadError}
+      <p class="note">The replayer could not be loaded: {loadError}</p>
+      <div class="actions"><Button onclick={load}>Try again</Button></div>
+    {:else}
+      <p class="note">Loading the replayer…</p>
+    {/if}
+  </div>
+{:else}
   <div class="page">
     <p class="note">Answers calls with the responses saved in your requests' examples, like <code>flowi serve</code>'s replayer. Triggers and schedules are not run here. From a request's screen you can start it and copy the address of that request.</p>
     <div class="grid">
       <label class="f"><span>Listen on (host:port)</span><TextInput mono bind:value={form.addr} disabled={running} /></label>
       <label class="f"><span>Latency (e.g. 250ms)</span><TextInput mono bind:value={form.latency} disabled={running} /></label>
-      <label class="f wide"><span>Record from an upstream API (empty: replay)</span><TextInput mono bind:value={form.record} disabled={running} placeholder="https://api.example.test" /></label>
+      <label class="f wide"><span>Record from a real API (leave empty to replay saved responses instead)</span><TextInput mono bind:value={form.record} disabled={running} placeholder="https://api.example.test" /></label>
+      {#if !form.record.trim()}
+        <label class="f wide"><span>Pass calls with no saved answer on to (optional)</span><TextInput mono bind:value={form.passThrough} disabled={running} placeholder="https://api.example.test" /></label>
+        <p class="note wide">Replay mode: calls are answered from saved responses and never reach a real API. To capture new ones, type the real API's address above: calls pass through to it, and each new call is saved as a request with its response.</p>
+      {/if}
       {#if form.record.trim()}
         <label class="f wide"><span>Save requests of new calls in</span>
           <select bind:value={form.recordTo} disabled={running}>{#each view.targets as t}<option value={t.id}>{t.label}</option>{/each}</select>
@@ -55,7 +80,7 @@
       </fieldset>
     {/if}
     <div class="checks">
-      <Toggle checked={form.sequence} disabled={running} onchange={(on) => (form.sequence = on)}>Answer repeated calls in sequence</Toggle>
+      <Toggle checked={form.sequence} disabled={running} onchange={(on) => (form.sequence = on)} title="When one request has several saved responses, answer the first call with the first, the second call with the second, and so on, instead of always the same one.">Answer repeated calls with the saved responses in turn</Toggle>
       <Toggle checked={form.cors} disabled={running} onchange={(on) => (form.cors = on)}>Allow browsers (CORS)</Toggle>
     </div>
     <div class="actions">

@@ -26,6 +26,7 @@ func WithWorkspaceFile(f WorkspaceFile) Option {
 var (
 	errNoWorkspaceFile = errors.New("the workspace's file is not available here")
 	errNoReveal        = errors.New("showing a folder is not available here")
+	errNoFolderToShow  = errors.New("this is a draft in Scratch: it has no folder yet")
 )
 
 // RenameWorkspace changes the name the sidebar shows; the folder keeps its

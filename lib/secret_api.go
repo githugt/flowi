@@ -4,6 +4,7 @@ package flowi
 
 import (
 	"errors"
+	"fmt"
 	"slices"
 
 	"github.com/githugt/flowi/lib/diag"
@@ -63,6 +64,28 @@ func (w *Workspace) SetSecret(env, name, value string) error {
 		return err
 	}
 	return vaultErr(w.secrets().Set(entry, value))
+}
+
+// DeclareSecret makes name a secret variable of environment env (when it is not one yet, the environment file
+// gains the declaration) and stores value for it in the vault. A name that is a plain variable there is refused
+// (FLW-SEC-003 would be misleading): turn it into a secret in the environment first.
+func (w *Workspace) DeclareSecret(env, name, value string) error {
+	envs := w.Environments()
+	i := slices.IndexFunc(envs, func(e model.Environment) bool { return e.Name == env })
+	if i < 0 {
+		return diagErr(diag.CodeRequestEnvUnknown, map[string]string{"env": env})
+	}
+	e := envs[i]
+	switch j := slices.IndexFunc(e.Vars, func(v model.EnvVar) bool { return v.Name == name }); {
+	case j < 0:
+		e.Vars = append(slices.Clone(e.Vars), model.EnvVar{Name: name, Secret: true})
+		if err := w.SaveEnvironment(e, SaveOptions{}); err != nil {
+			return err
+		}
+	case !e.Vars[j].Secret:
+		return fmt.Errorf("%q is a plain variable of the environment %q: pick another name, or make it a secret in the environment", name, env)
+	}
+	return w.SetSecret(env, name, value)
 }
 
 // UnsetSecret removes a secret's value from the vault.

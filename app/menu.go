@@ -43,7 +43,7 @@ func buildMenu(wails *application.App, emit func(name string, data any)) *applic
 		menuAction{"Next tab", "CmdOrCtrl+Shift+]", "next-tab"},
 		menuAction{"Previous tab", "CmdOrCtrl+Shift+[", "previous-tab"},
 	)
-	menu.AddRole(application.EditMenu)
+	addEditMenu(menu)
 	add(menu.AddSubmenu("Workspace"),
 		menuAction{"Home", "", "home"},
 		menuAction{"", "", ""},
@@ -64,6 +64,29 @@ func buildMenu(wails *application.App, emit func(name string, data any)) *applic
 	add(menu.AddSubmenu("Help"),
 		menuAction{"Welcome", "", "welcome"},
 		menuAction{"Telemetry…", "", "telemetry"},
+		menuAction{"", "", ""},
+		menuAction{"About Flowi", "", "about"},
 	)
 	return menu
+}
+
+// addEditMenu adds the Edit menu. Off the Mac it is built here, not taken
+// from the EditMenu role: that role's Delete item has Backspace as its
+// shortcut, so the menu took the key and typing Backspace in a text field
+// deleted nothing unless something was selected.
+func addEditMenu(menu *application.Menu) {
+	if runtime.GOOS == "darwin" {
+		menu.AddRole(application.EditMenu)
+		return
+	}
+	edit := menu.AddSubmenu("Edit")
+	for _, role := range editRoles() {
+		edit.AddRole(role)
+	}
+}
+
+// editRoles are the Edit menu's items off the Mac: everything the standard
+// menu has but Delete.
+func editRoles() []application.Role {
+	return []application.Role{application.Undo, application.Redo, application.Cut, application.Copy, application.Paste, application.SelectAll}
 }

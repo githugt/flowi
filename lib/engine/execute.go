@@ -138,11 +138,14 @@ func (r *runner) prepare(c call) (*execution, diag.List) {
 		return nil, diags
 	}
 	v, overlayNotes := laidOver(c, v)
+	cfg := newConfig(r.deps.Lookup.Settings(c.collection.Manifest.ID, folderOf(c.request), v.Settings))
+	if v.Auth == nil && cfg.defaultAuth != "" {
+		v.Auth = &model.Auth{Use: cfg.defaultAuth} // inherited from the collection or a folder, unless the request has its own
+	}
 	v, diags = withNamedAuth(c.collection, v)
 	if diags.HasErrors() {
 		return nil, diags
 	}
-	cfg := newConfig(r.deps.Lookup.Settings(c.collection.Manifest.ID, folderOf(c.request), v.Settings))
 	env, diags := selectEnvironment(c.collection, r.env, cfg.defaultEnv)
 	if diags.HasErrors() {
 		return nil, diags
@@ -183,7 +186,8 @@ func (x *execution) renderWith() (map[string]any, diag.List) {
 
 // hookChain is the hooks this execution runs. Requests inside hook flows
 // (depth > 0) run their own hooks only with hooks.nested, and no deeper
-// than hooks.max_depth.
+// than hooks.max_depth. A request never runs the hook it is being sent from (or one above it), so a hook that sends a
+// request of its own collection cannot recurse.
 func (x *execution) hookChain() (HookChain, bool) {
 	chain := ChainFor(x.c.collection, x.c.request, x.version).Filter(x.c.hooks)
 	if x.c.depth == 0 {
@@ -192,6 +196,7 @@ func (x *execution) hookChain() (HookChain, bool) {
 	if !x.cfg.nested {
 		return HookChain{}, true
 	}
+	chain = chain.without(x.c.activeHooks)
 	if x.c.depth > x.cfg.maxDepth {
 		x.fail(StatusFailed, diag.List{diag.New(diag.CodeRunHookDepth, diag.Location{}, map[string]string{"max": itoa(x.cfg.maxDepth)})})
 		return HookChain{}, false

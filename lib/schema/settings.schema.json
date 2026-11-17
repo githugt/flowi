@@ -186,7 +186,7 @@
       "properties": {
         "nested": {
           "type": "boolean",
-          "default": false
+          "default": true
         },
         "max_depth": {
           "type": "integer",
@@ -514,7 +514,27 @@
         },
         "snippet_exclude_secrets": {
           "type": "boolean",
-          "default": true
+          "default": false
+        }
+      }
+    },
+    "auth": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "default": {
+          "type": "string",
+          "default": ""
+        }
+      }
+    },
+    "datasets": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "allow_writes": {
+          "type": "boolean",
+          "default": false
         }
       }
     },

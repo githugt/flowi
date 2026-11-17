@@ -249,3 +249,18 @@ func TestRecord_Rows_should_be_zero_for_any_other_record(t *testing.T) {
 		t.Fatalf("count %d truncated %v", count, truncated)
 	}
 }
+
+// Before: "the query failed: running the query: expected 0 arguments, got 1" did not say which side was which,
+// or that the starter value left under Values was the one too many.
+func TestExplainArguments_Given_a_driver_count_mismatch_When_explained_Then_it_names_placeholders_and_values(t *testing.T) {
+	detail := "running the query: expected 0 arguments, got 1"
+
+	got := explainArguments(detail)
+
+	if !strings.Contains(got, "0 placeholder(s)") || !strings.Contains(got, "passes 1 value(s)") || !strings.Contains(got, "Values") {
+		t.Fatalf("got %q", got)
+	}
+	if other := explainArguments("relation \"rna\" does not exist"); other != "relation \"rna\" does not exist" {
+		t.Fatalf("another error was rewritten: %q", other)
+	}
+}

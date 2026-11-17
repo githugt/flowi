@@ -4,6 +4,7 @@
   // control ports on its right edge. It draws what internal/card decided; it never reads a step's fields.
   import Icon from './Icon.svelte'
   import type { Face, Unit } from './lib/types'
+  import { verbKey } from './lib/verbs'
   import { CARD, COLOUR_NAMES, categoryToken, clipText, colourToken, portToken, rowIcon, typeIcon } from './lib/card'
 
   let {
@@ -96,8 +97,16 @@
 
   {#if skipped}<path class="hatch" d={`M0,${h > CARD.header ? CARD.header : h} V14 a14,14 0 0 1 14,-14 H${w - 14} a14,14 0 0 1 14,14 V${CARD.header} Z`} />{/if}
   {#if chipInHeader}
-    <rect class="tile" x="12" y="9" width={chipW} height="28" rx="8" style:fill={`var(${tile})`} />
-    <text class="chip" x={12 + chipW / 2} y="27.5" text-anchor="middle" style:fill={colour ? 'var(--on-tile)' : 'var(--text)'}>{face.badge}</text>
+    {#if colour}
+      <rect class="tile" x="12" y="9" width={chipW} height="28" rx="8" style:fill={`var(${tile})`} />
+      <text class="chip" x={12 + chipW / 2} y="27.5" text-anchor="middle" style:fill="var(--on-tile)">{face.badge}</text>
+    {:else}
+      <!-- The chip wears the verb's own colour, as the pill in the tree does, not the one blue of every request. -->
+      <g style:--v={`var(--v-${verbKey(face.badge ?? '')})`}>
+        <rect class="verbtile" x="12" y="9" width={chipW} height="28" rx="8" />
+        <text class="chip" x={12 + chipW / 2} y="27.5" text-anchor="middle" style:fill="var(--v)">{face.badge}</text>
+      </g>
+    {/if}
   {:else}
     <rect class="tile" x="12" y="9" width="28" height="28" rx="8" style:fill={`var(${tile})`} />
     <g class="tileicon" transform="translate(16 13)" style:color={colour ? 'var(--on-tile)' : 'var(--text)'}><Icon name={typeIcon(type)} size={20} /></g>
@@ -238,6 +247,7 @@
   .swatch.black { stroke: var(--line); }
   .swatch.black.chosen { stroke: var(--text); }
   .tile { stroke: none; }
+  .verbtile { fill: color-mix(in srgb, var(--v) 16%, var(--raised)); stroke: color-mix(in srgb, var(--v) 50%, transparent); stroke-width: 1; }
   .tileicon { pointer-events: none; }
   .chip { font-size: 12px; font-weight: 700; letter-spacing: 0.04em; pointer-events: none; }
   .title { fill: var(--text); font-size: 14px; font-weight: 600; pointer-events: none; }

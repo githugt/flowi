@@ -124,9 +124,13 @@ type Backend interface {
 	Cookies(collection string) ([]flowi.CookieInfo, error)
 	DeleteCookie(collection, key string) error
 	Impact(t flowi.RequestTarget, version string) (analysis.Report, diag.List, error)
+	// ImpactOfDraft is Impact for the request as it would be once the edited copy is saved.
+	ImpactOfDraft(t flowi.RequestTarget, draft model.Request) (analysis.Report, diag.List, error)
 
 	Secrets() ([]flowi.SecretInfo, error)
 	SetSecret(env, name, value string) error
+	// DeclareSecret adds name as a secret of the environment when it is not one, and stores its value.
+	DeclareSecret(env, name, value string) error
 	RevealSecret(env, name string) (string, error)
 	DiscardSecret(env, name string) error
 	UnsetSecret(env, name string) error
@@ -166,6 +170,7 @@ type Backend interface {
 	DeleteBlueprint(t flowi.BlueprintTarget) error
 	NewNamedAuth(collection model.ID, name, description string, auth model.Auth) (flowi.AuthTarget, error)
 	SaveNamedAuth(t flowi.AuthTarget, a model.NamedAuth) error
+	RenameNamedAuth(t flowi.AuthTarget, name string) error
 	DeleteNamedAuth(t flowi.AuthTarget) error
 	CreateHookBlueprint(collection model.ID, path, name, phase string, nodes []model.Node) (flowi.BlueprintTarget, error)
 	FlowLayout(t flowi.FlowTarget) (model.Layout, diag.List, error)

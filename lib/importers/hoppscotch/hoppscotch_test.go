@@ -62,3 +62,24 @@ func TestImport_should_refuse_what_is_not_an_export(t *testing.T) {
 		})
 	}
 }
+
+func TestImport_Given_a_scheme_auth_set_on_a_collection_and_a_folder_Then_requests_use_named_authentications(t *testing.T) {
+	src := `{"name": "Shop", "auth": {"authType": "digest", "authActive": true, "username": "ada", "password": "pw"},
+	  "requests": [
+	    {"name": "A", "method": "GET", "endpoint": "https://example.com/a", "auth": {"authType": "inherit"}},
+	    {"name": "Own", "method": "GET", "endpoint": "https://example.com/o", "auth": {"authType": "digest", "authActive": true, "username": "bob", "password": "x"}}],
+	  "folders": [{"name": "Admin", "auth": {"authType": "digest", "authActive": true, "username": "root", "password": "y"},
+	    "requests": [{"name": "C", "method": "GET", "endpoint": "https://example.com/c", "auth": {"authType": "inherit"}}]}]}`
+
+	res, _ := Import([]byte(src), "shop.json")
+
+	use := map[string]string{}
+	for _, r := range res.Requests {
+		if a := r.Versions[0].Auth; a != nil {
+			use[r.Path] = a.Use + "/" + a.Type
+		}
+	}
+	if use["A"] != "Shop-auth/" || use["Admin/C"] != "Admin-auth/" || use["Own"] != "/digest" || len(res.Auths) != 2 {
+		t.Fatalf("got %v auths %+v", use, res.Auths)
+	}
+}

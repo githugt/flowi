@@ -49,3 +49,27 @@ func TestWithNamedAuth_Given_an_inline_auth_When_resolved_Then_it_is_left_alone(
 		t.Fatalf("auth %+v diags %v", got.Auth, diags)
 	}
 }
+
+// Before: every request had to name its authentication; a collection or folder could not hand one down.
+func TestSend_Given_auth_default_set_on_the_collection_Then_requests_without_auth_use_it_and_own_auth_wins(t *testing.T) {
+	f := newFixture(t)
+	f.update(func(c *model.Collection) {
+		c.Auths = []model.NamedAuth{{Meta: model.Meta{Name: "partner-key"}, Auth: model.Auth{Type: model.AuthAPIKey,
+			Params: []model.KeyValue{{Key: "name", Value: "X-Api-Key"}, {Key: "value", Value: "from-default"}, {Key: "in", Value: "header"}}}}}
+		c.Manifest.Settings = model.Settings{"auth.default": "partner-key"}
+	})
+	plain := f.addRequest("plain", get("/echo/a"))
+	ownVersion := get("/echo/b")
+	ownVersion.Auth = &model.Auth{Type: model.AuthAPIKey,
+		Params: []model.KeyValue{{Key: "name", Value: "X-Api-Key"}, {Key: "value", Value: "its-own"}, {Key: "in", Value: "header"}}}
+	own := f.addRequest("own", ownVersion)
+
+	f.send(f.input(plain))
+	inherited := f.lastEcho()["X-Api-Key"]
+	f.send(f.input(own))
+	explicit := f.lastEcho()["X-Api-Key"]
+
+	if inherited != "from-default" || explicit != "its-own" {
+		t.Fatalf("inherited %q, own %q", inherited, explicit)
+	}
+}

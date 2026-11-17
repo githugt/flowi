@@ -4,11 +4,13 @@ package flowi
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 	"slices"
 
 	"github.com/githugt/flowi/lib/diag"
 	"github.com/githugt/flowi/lib/model"
+	"github.com/githugt/flowi/lib/store"
 )
 
 const authSuffix = ".auth.yaml"
@@ -137,3 +139,73 @@ func (w *Workspace) NamedAuthUses(t AuthTarget) ([]AuthUse, error) {
 // plainAuth is a's scheme and parameters: a named authentication never uses
 // another one.
 func plainAuth(a model.Auth) model.Auth { return model.Auth{Type: a.Type, Params: a.Params} }
+
+// RenameNamedAuth gives the authentication another name: its file moves to auths/<name>.auth.yaml and every request
+// version that used it by the old name now uses the new one, so nothing is detached. The id stays. A name that is
+// taken or not a plain file name is FLW-WRITE-002; a request file with comments needs o.DropComments, as a save does.
+// The auth.default settings of the collection and its folders are not rewritten: check them after a rename.
+func (w *Workspace) RenameNamedAuth(t AuthTarget, name string, o SaveOptions) error {
+	c, a, err := w.authFor(t)
+	if err != nil {
+		return err
+	}
+	if name == a.Name {
+		return nil
+	}
+	if _, taken := c.NamedAuth(name); taken {
+		return diagErr(diag.CodeWriteRequestPath, map[string]string{"path": name, "detail": "it already exists"})
+	}
+	file, err := newEntityFile(c, "auths", name, authSuffix)
+	if err != nil {
+		return err
+	}
+	if base := filepath.Base(file); base != name+authSuffix {
+		return diagErr(diag.CodeWriteRequestPath, map[string]string{"path": name, "detail": "an authentication's name has no folders"})
+	}
+	renamed := a
+	renamed.Name, renamed.File = name, file
+	data, err := w.store.EncodeAuth(renamed)
+	if err != nil {
+		return fmt.Errorf("encoding %s: %w", file, err)
+	}
+	changes := []store.FileChange{{File: file, New: data}}
+	touched := []string{file, a.File}
+	for _, r := range c.Requests {
+		if !slices.ContainsFunc(r.Versions, func(v model.RequestVersion) bool { return v.Auth != nil && v.Auth.Use == a.Name }) {
+			continue
+		}
+		r.Versions = slices.Clone(r.Versions)
+		for i, v := range r.Versions {
+			if v.Auth != nil && v.Auth.Use == a.Name {
+				use := *v.Auth
+				use.Use = name
+				r.Versions[i].Auth = &use
+			}
+		}
+		old, err := os.ReadFile(r.File)
+		if err != nil {
+			return fmt.Errorf("reading %s: %w", r.File, err)
+		}
+		if !o.DropComments && w.store.HasComments(old) {
+			return diag.List{diag.New(diag.CodeWriteDropsComments, diag.Location{File: r.File}, map[string]string{"file": filepath.Base(r.File)})}.Err()
+		}
+		enc, err := w.store.EncodeRequest(r)
+		if err != nil {
+			return fmt.Errorf("encoding %s: %w", r.File, err)
+		}
+		changes = append(changes, store.FileChange{File: r.File, Old: old, New: enc})
+		touched = append(touched, r.File)
+	}
+	if err := store.Apply(changes); err != nil {
+		return err
+	}
+	if err := os.Remove(a.File); err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("removing the old %s: %w", a.File, err)
+	}
+	for _, f := range touched {
+		if err := w.reloadFile(t.Collection, f); err != nil {
+			return err
+		}
+	}
+	return nil
+}

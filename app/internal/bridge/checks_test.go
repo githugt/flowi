@@ -204,7 +204,7 @@ func TestFlowChecks_Drift_Given_a_bad_fail_on_Then_it_names_the_value(t *testing
 func TestFlowChecks_Sequence_Given_no_run_yet_Then_it_says_to_run_the_flow_first(t *testing.T) {
 	flows, v, _ := openChecksFlow(t)
 
-	_, err := flows.Sequence(v.Node)
+	_, err := flows.Sequence(v.Node, false)
 
 	if err == nil || !strings.Contains(err.Error(), "run") {
 		t.Fatalf("err %v", err)

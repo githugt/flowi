@@ -405,7 +405,7 @@ export class Dataset {
     constructor($$source = {}) {
         if (!("Driver" in $$source)) {
             /**
-             * Driver is the store: postgres, mysql, mariadb or sqlite.
+             * Driver is the store: postgres, mysql, mariadb, sqlite, csv, xlsx or parquet (SQL over data files or a folder of them).
              * @member
              * @type {string}
              */
@@ -446,6 +446,15 @@ export class Dataset {
              * @type {number}
              */
             this["Limit"] = 0;
+        }
+        if (!("Writes" in $$source)) {
+            /**
+             * Writes lets this query change data: the read-only guards are off for it. Off is the default; the setting
+             * datasets.allow_writes does the same for every query.
+             * @member
+             * @type {boolean}
+             */
+            this["Writes"] = false;
         }
 
         Object.assign(this, $$source);

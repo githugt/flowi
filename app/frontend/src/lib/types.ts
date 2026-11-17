@@ -553,7 +553,7 @@ export interface RequestView {
   showingHistory: boolean
   inScratch: boolean
   live: { direction: string; at: string; body: string; key?: string; kind?: string; type?: string }[]
-  snippet: { format: string; formats: string[]; exclude: boolean; text: string; error?: string }
+  snippet: { format: string; formats: string[]; exclude: boolean; secrets?: boolean; text: string; error?: string }
 }
 
 export interface Prompt {
@@ -716,7 +716,7 @@ export interface ReplayerView {
   addr: string
   error?: string
   notes: string[]
-  form: { addr: string; latency: string; sequence: boolean; cors: boolean; record: string; recordTo: string; recordHar: string; faultErrorPercent: string; faultStatus: string; faultDropPercent: string; faultJitter: string }
+  form: { addr: string; latency: string; sequence: boolean; cors: boolean; record: string; recordTo: string; recordHar: string; passThrough: string; faultErrorPercent: string; faultStatus: string; faultDropPercent: string; faultJitter: string }
   targets: { id: string; label: string; path?: string }[]
   traffic: { seq: number; at: string; method: string; path: string; status: number; match: string; request: string; duration: string; remote: string; version: string; example: string; source: string; delay: string }[]
 }
@@ -838,6 +838,8 @@ export interface DatasetBlock {
   Params: string[] | null
   /** The most rows kept; 0 is the default. */
   Limit: number
+  /** This query may change data: the read-only guards are off for it. */
+  Writes?: boolean
 }
 
 export interface DatasetInfo {

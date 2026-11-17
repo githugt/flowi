@@ -43,6 +43,9 @@ type ReplayerForm struct {
 	RecordTo string
 	// RecordHAR is a file the recorded calls are also written to, in order (needs Record).
 	RecordHAR string
+	// PassThrough is an upstream base URL for calls no saved response answers: they are forwarded there and
+	// nothing is saved. Blank answers them with a 404.
+	PassThrough string
 	// Faults make a share of the replayed calls fail on purpose. Percent fields are 0 to 100; blank is none.
 	FaultErrorPercent string
 	FaultStatus       string // the status of an injected error; blank is 503
@@ -173,7 +176,7 @@ func (r *Replayer) Start(form ReplayerForm) {
 			o.Latency = latency
 		}
 		o.Sequence, o.CORS, o.Record, o.RecordTo, o.NoTriggers, o.NoSchedules = form.Sequence, form.CORS, form.Record, form.RecordTo, true, true
-		o.RecordHAR, o.Faults = strings.TrimSpace(form.RecordHAR), faults
+		o.RecordHAR, o.Faults, o.PassThrough = strings.TrimSpace(form.RecordHAR), faults, strings.TrimSpace(form.PassThrough)
 		o.CaptureCalls = true // the screen opens a call to show what it carried
 		srv, err := r.b.Serve(ctx, o)
 		return started{srv, err}
@@ -195,6 +198,17 @@ func (r *Replayer) Start(form ReplayerForm) {
 func checkUpstream(form ReplayerForm) error {
 	if form.Record == "" && strings.TrimSpace(form.RecordHAR) != "" {
 		return errors.New("a HAR file needs an address to record from: there is nothing to put in it")
+	}
+	if p := strings.TrimSpace(form.PassThrough); p != "" {
+		if form.Record != "" {
+			return errors.New("record and pass-through both forward calls: fill in one")
+		}
+		if u, err := url.Parse(p); err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
+			return fmt.Errorf("the address to pass calls to must start with http:// or https://, not %q", p)
+		}
+		if form.CORS {
+			return errors.New("allowing browsers (CORS) together with passing calls through would let any web page read the real API")
+		}
 	}
 	if form.Record == "" {
 		return nil

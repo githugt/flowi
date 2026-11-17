@@ -814,3 +814,20 @@ func TestImportAsyncAPI_should_plan_the_same_files_over_the_ones_it_wrote_when_i
 		t.Errorf("first import %v, second %v", first, relsOf(again))
 	}
 }
+
+func TestPlanAuths_Given_a_name_the_collection_has_Then_the_new_one_is_numbered_and_requests_follow(t *testing.T) {
+	w := demoWorkspace(t)
+	c := w.Collections()[0]
+	_, err := w.NewNamedAuth(c.Manifest.ID, "Shop-auth", "", model.Auth{Type: model.AuthDigest})
+	if err != nil {
+		t.Fatal(err)
+	}
+	c = w.Collections()[0]
+	files := map[string][]byte{}
+
+	renamed, err := w.planAuths(c, []model.NamedAuth{{Meta: model.Meta{Name: "Shop-auth"}, Auth: model.Auth{Type: model.AuthDigest}}}, files)
+
+	if err != nil || renamed["Shop-auth"] != "Shop-auth-2" || len(files) != 1 {
+		t.Fatalf("renamed %v files %d err %v", renamed, len(files), err)
+	}
+}

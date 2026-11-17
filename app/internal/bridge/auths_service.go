@@ -82,6 +82,24 @@ func (s *AuthsService) Save(key, description, scheme string, values map[string]s
 	})
 }
 
+// Rename gives an authentication another name. The requests that use it are changed to the new name.
+func (s *AuthsService) Rename(key, name string) {
+	s.app.actor.Do(func() {
+		a, ok := s.find(key)
+		if !ok {
+			s.app.emit("notice", Notice{Level: "error", Text: "that authentication is gone"})
+			return
+		}
+		if strings.TrimSpace(name) == "" {
+			s.fail(fmt.Errorf("give the authentication a name: requests use it by that name"))
+			return
+		}
+		s.app.workspace.RenameNamedAuth(a, name, func() {
+			s.app.emit("notice", Notice{Level: "info", Text: "Renamed " + a.Name + " to " + strings.TrimSpace(name) + "."})
+		}, s.fail)
+	})
+}
+
 // Delete removes an authentication. Requests that use it keep naming it.
 func (s *AuthsService) Delete(key string) {
 	s.app.actor.Do(func() {

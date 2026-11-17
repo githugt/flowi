@@ -63,15 +63,19 @@ func TestFlowRun_maps_events_to_this_flows_nodes(t *testing.T) {
 	}
 }
 
-func TestFlowRun_Given_dirty_doc_Then_refuses(t *testing.T) {
+// Before: unsaved edits refused the run ("save the flow first"); now the draft is run without being saved.
+func TestFlowRun_Given_dirty_doc_Then_runs_the_draft(t *testing.T) {
 	r, b, w, _ := runFixture(t, nil)
 	r.Doc().Delete("a")
 
 	r.Run("staging", nil)
 	w.Wait()
 
-	if r.Err() == "" || b.Called("RunFlow") {
-		t.Fatalf("err %q", r.Err())
+	if r.Err() != "" || !b.Called("RunFlow") || b.LastRunOptions.Draft == nil {
+		t.Fatalf("err %q, draft %v", r.Err(), b.LastRunOptions.Draft)
+	}
+	if len(b.LastRunOptions.Draft.Nodes) != len(r.Doc().Draft().Nodes) {
+		t.Fatalf("the run got another flow than the draft")
 	}
 }
 

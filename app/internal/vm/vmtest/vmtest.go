@@ -1006,6 +1006,13 @@ func (f *Backend) Impact(flowi.RequestTarget, string) (analysis.Report, diag.Lis
 	return f.ImpactReport, nil, nil
 }
 
+func (f *Backend) ImpactOfDraft(flowi.RequestTarget, model.Request) (analysis.Report, diag.List, error) {
+	f.record("ImpactOfDraft")
+	f.Mu.Lock()
+	defer f.Mu.Unlock()
+	return f.ImpactReport, nil, nil
+}
+
 func (f *Backend) Secrets() ([]flowi.SecretInfo, error) {
 	if f.SecretsGate != nil {
 		<-f.SecretsGate
@@ -1013,6 +1020,23 @@ func (f *Backend) Secrets() ([]flowi.SecretInfo, error) {
 	f.Mu.Lock()
 	defer f.Mu.Unlock()
 	return slices.Clone(f.SecretList), nil
+}
+
+func (f *Backend) DeclareSecret(env, name, _ string) error {
+	f.record("DeclareSecret " + env + "/" + name)
+	f.Mu.Lock()
+	defer f.Mu.Unlock()
+	if f.SecretErr != nil {
+		return f.SecretErr
+	}
+	for i, s := range f.SecretList {
+		if s.Environment == env && s.Name == name {
+			f.SecretList[i].Set = true
+			return nil
+		}
+	}
+	f.SecretList = append(f.SecretList, flowi.SecretInfo{Environment: env, Name: name, Set: true})
+	return nil
 }
 
 func (f *Backend) SetSecret(env, name, _ string) error {
@@ -1281,6 +1305,25 @@ func (f *Backend) SaveNamedAuth(t flowi.AuthTarget, a model.NamedAuth) error {
 		for j := range auths {
 			if f.Cols[i].Manifest.ID == t.Collection && auths[j].ID == t.Auth {
 				auths[j].Description, auths[j].Auth = a.Description, a.Auth
+			}
+		}
+		f.Cols[i].Auths = auths
+	}
+	return nil
+}
+
+func (f *Backend) RenameNamedAuth(t flowi.AuthTarget, name string) error {
+	f.record("RenameNamedAuth " + string(t.Auth) + " " + name)
+	if f.NewErr != nil {
+		return f.NewErr
+	}
+	f.Mu.Lock()
+	defer f.Mu.Unlock()
+	for i := range f.Cols {
+		auths := slices.Clone(f.Cols[i].Auths)
+		for j := range auths {
+			if f.Cols[i].Manifest.ID == t.Collection && auths[j].ID == t.Auth {
+				auths[j].Name = name
 			}
 		}
 		f.Cols[i].Auths = auths
