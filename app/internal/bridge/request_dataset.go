@@ -3,6 +3,9 @@
 package bridge
 
 import (
+	"path/filepath"
+	"strings"
+
 	"github.com/githugt/flowi/lib/engine"
 	"github.com/githugt/flowi/lib/model"
 
@@ -59,6 +62,45 @@ func datasetInfoOf(r *vm.Request) *DatasetInfo {
 // SetDataset replaces the dataset block of the selected version.
 func (s *RequestService) SetDataset(node string, d model.Dataset) {
 	s.with(node, func(o *openRequest) { o.req.EditDataset(func(cur *model.Dataset) { *cur = d }) })
+}
+
+// PickDataPath asks for the file (or, with folder, the folder) a file or SQLite request reads, and returns it as the
+// request should keep it: relative to its collection when it lies inside, so the request works for whoever clones
+// the collection, else the full path. "" means the user cancelled.
+func (s *RequestService) PickDataPath(node string, folder bool) (string, error) {
+	root := ""
+	s.app.actor.Do(func() {
+		if o, ok := s.app.requests.reqs[node]; ok {
+			for _, c := range s.app.workspace.Collections() {
+				if c.Manifest.ID == o.req.Target().Collection {
+					root = c.Root
+				}
+			}
+		}
+	})
+	var picked string
+	var err error
+	if folder {
+		picked, err = s.app.pickers.pickFolder("Choose the folder of data files")
+	} else {
+		picked, err = s.app.pickers.pickFile("Choose the data file")
+	}
+	if err != nil || picked == "" {
+		return "", err
+	}
+	return relativeInside(root, picked), nil
+}
+
+// relativeInside is path relative to root when it lies inside root, else path as given.
+func relativeInside(root, path string) string {
+	if root == "" {
+		return path
+	}
+	rel, err := filepath.Rel(root, path)
+	if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+		return path
+	}
+	return filepath.ToSlash(rel)
 }
 
 // TableView is the rows of a dataset response, for the table: one value per column, in column order, as the

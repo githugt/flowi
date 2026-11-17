@@ -303,6 +303,17 @@
       { save: 'Move to a secret…', discard: 'Save as is' },
     )
   }
+  // The system's dialog picks the file or folder; the request keeps it relative to its collection when it lies inside.
+  async function pickDataPath(folder: boolean) {
+    try {
+      const picked = await RequestService.PickDataPath(node, folder)
+      const db = view.dataset?.block
+      if (picked && db) RequestService.SetDataset(node, { ...db, Server: picked } as never)
+    } catch (e) {
+      fail(e)
+    }
+  }
+
   async function moveToSecret(env: string, name: string, server: string) {
     const moved = /^[A-Za-z_][A-Za-z0-9_]*$/.test(name) ? moveServerPassword(server, name) : null
     if (!moved) return ui.toast('A secret name is letters, digits and _, and starts with a letter or _.', 'error')
@@ -468,6 +479,12 @@
         <TextField mono value={db.Server} placeholder={fileSource ? 'data/sales.csv (a file or a folder in the collection)' : db.Driver === 'sqlite' ? 'shop.db (a file in the collection)' : '{{env.database_url}}'}
           oninput={(t) => RequestService.SetDataset(node, { ...db, Server: t } as never)} onenter={() => RequestService.Send(node, hooks)} />
       </div>
+      {#if fileSource || db.Driver === 'sqlite'}
+        <span class="pick">
+          <button type="button" title={fileSource ? 'Choose a data file' : 'Choose the database file'} onclick={() => pickDataPath(false)}>File…</button>
+          {#if fileSource}<button type="button" title="Choose a folder of data files" onclick={() => pickDataPath(true)}>Folder…</button>{/if}
+        </span>
+      {/if}
       {#if !fileSource && serverHasPassword(db.Server)}
         <span class="pwwarn" role="note" title={PASSWORD_NOTE}>⚠ Password in the file</span>
       {/if}
@@ -770,6 +787,9 @@
   .addr :global(.dd .btn) { background: none; border: 0; border-right: 1px solid var(--line); border-radius: var(--r-lg) 0 0 var(--r-lg); min-height: 36px; }
   .addr > .url2 { padding-right: 6px; }
   .url { flex: 1; min-width: 0; }
+  .pick { display: flex; gap: 4px; padding-right: 6px; }
+  .pick button { background: var(--raised); color: var(--text); border: 0; box-shadow: inset 0 0 0 1px var(--line); border-radius: var(--r-md); padding: 0 10px; min-height: var(--ctl-h); font: inherit; font-size: var(--fs-sm); }
+  .pick button:hover { background: var(--raised-3); }
   .url2 { flex: 1; min-width: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
   .url2 :global(input) { width: 100%; box-sizing: border-box; }
   .url :global(input) { width: 100%; box-sizing: border-box; }

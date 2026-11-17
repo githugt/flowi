@@ -345,6 +345,18 @@ export function OverlayYAML(node, chosen) {
 }
 
 /**
+ * PickDataPath asks for the file (or, with folder, the folder) a file or SQLite request reads, and returns it as the
+ * request should keep it: relative to its collection when it lies inside, so the request works for whoever clones
+ * the collection, else the full path. "" means the user cancelled.
+ * @param {string} node
+ * @param {boolean} folder
+ * @returns {$CancellablePromise<string>}
+ */
+export function PickDataPath(node, folder) {
+    return $Call.ByID(1525596196, node, folder);
+}
+
+/**
  * PickMethod chooses a method and fills an empty message with its example.
  * @param {string} node
  * @param {string} full
