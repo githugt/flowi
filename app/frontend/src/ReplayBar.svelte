@@ -52,7 +52,7 @@
     <span class="muted">{method}</span>
     <input class="url" readonly value={url} aria-label="Address of the replayer for this request" onfocus={(e) => e.currentTarget.select()} />
     <button onclick={copy} title="Copy the address">Copy</button>
-    {#if running}<span class="state">● {view.form.record ? 'recording from ' + view.form.record : 'listening'}</span>{:else}<span class="muted">stopped</span>{/if}
+    {#if running}<span class="state">● {view.form.record ? 'recording from ' + view.form.record : view.form.passThrough ? 'listening, passing unanswered calls to ' + view.form.passThrough : 'listening'}</span>{:else}<span class="muted">stopped</span>{/if}
     {#if view.error}<span class="err">{view.error}</span>{/if}
     {#if !running && !busy && onclose}<button class="close" aria-label="Hide the replay bar" onclick={onclose}>×</button>{/if}
   </div>

@@ -57,7 +57,11 @@
       <label class="f wide"><span>Record from a real API (leave empty to replay saved responses instead)</span><TextInput mono bind:value={form.record} disabled={running} placeholder="https://api.example.test" /></label>
       {#if !form.record.trim()}
         <label class="f wide"><span>Pass calls with no saved answer on to (optional)</span><TextInput mono bind:value={form.passThrough} disabled={running} placeholder="https://api.example.test" /></label>
-        <p class="note wide">Replay mode: calls are answered from saved responses and never reach a real API. To capture new ones, type the real API's address above: calls pass through to it, and each new call is saved as a request with its response.</p>
+        {#if form.passThrough.trim()}
+          <p class="note wide">Calls a saved response can answer are replayed. Any other call is forwarded to the API above and its answer relayed; nothing from those calls is saved. To capture new responses instead, fill in the "Record from a real API" box.</p>
+        {:else}
+          <p class="note wide">Replay mode: calls are answered from saved responses and never reach a real API. To let calls with no saved answer reach a real API, fill in the box above; to capture new responses, type the real API's address in "Record from a real API".</p>
+        {/if}
       {/if}
       {#if form.record.trim()}
         <label class="f wide"><span>Save requests of new calls in</span>
