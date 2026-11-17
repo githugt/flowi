@@ -77,9 +77,23 @@
   import ChecksScreen from './ChecksScreen.svelte'
   import { envSwatch } from './lib/envcolours'
   import { createAltTap, isWindows } from './lib/altmenu'
+  import { actionForKey, isLinux } from './lib/mainmenu'
   import { Events } from '@wailsio/runtime'
 
   onMount(() => app.init())
+
+  // Linux has no native menu to carry the shortcuts, so the page answers them (the menu button lists them).
+  onMount(() => {
+    if (!isLinux(navigator.userAgent)) return
+    const keys = (e: KeyboardEvent) => {
+      const action = actionForKey(e)
+      if (!action) return
+      e.preventDefault()
+      app.onMenu(action)
+    }
+    window.addEventListener('keydown', keys)
+    return () => window.removeEventListener('keydown', keys)
+  })
 
   // On Windows the menu bar stays hidden until Alt is tapped (the Go side hides it and answers this event).
   onMount(() => {

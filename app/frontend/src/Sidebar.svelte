@@ -8,6 +8,7 @@
   import SearchField from './SearchField.svelte'
   import Menu, { type MenuItem } from './Menu.svelte'
   import Icon from './Icon.svelte'
+  import MainMenuButton from './MainMenuButton.svelte'
   import { screens } from './lib/screens'
   import type { TreeNode } from './lib/types'
   import { rootsForGroup, type RailGroup } from './lib/railgroups'
@@ -103,6 +104,7 @@
 
 <aside style:width={`${width}px`}>
   <div class="head" class:peeking={peek} class:mac={onMac}>
+    {#if !peek}<MainMenuButton />{/if}
     <button class="ws" aria-haspopup="menu" aria-expanded={wsOpen} title="Workspace" onpointerdown={(e) => e.stopPropagation()} onclick={() => (wsOpen = !wsOpen)}>
       <span class="avatar" aria-hidden="true">{(app.tree?.name ?? '?').slice(0, 1).toUpperCase()}</span><span class="wsname">{app.tree?.name ?? ''}</span><span class="caret" aria-hidden="true">▾</span>
     </button>

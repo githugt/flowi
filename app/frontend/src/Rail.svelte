@@ -8,6 +8,7 @@
   import { screens } from './lib/screens'
   import Icon from './Icon.svelte'
   import Logo from './Logo.svelte'
+  import MainMenuButton from './MainMenuButton.svelte'
   import Sidebar from './Sidebar.svelte'
   import type { RailGroup } from './lib/railgroups'
 
@@ -82,7 +83,7 @@
 
 <div class="wrap" bind:this={wrap} onpointerenter={() => enter()} onpointerleave={leave} role="presentation">
   <nav class="rail" aria-label="Sidebar">
-    <div class="spacer"></div>
+    <div class="spacer"><MainMenuButton /></div>
     <button class="homebtn" class:on={app.active === 'screen:home'} title="Home" aria-label="Home" aria-current={app.active === 'screen:home' ? 'page' : undefined} onclick={() => app.openScreen('screen:home', 'Home')}><Logo size={22} /></button>
     <button class="expand" title="Show the sidebar" aria-label="Show the sidebar" onclick={onexpand}><Icon name="list" /></button>
     {#each groups as g}
@@ -103,7 +104,7 @@
 <style>
   .wrap { position: relative; flex: none; }
   .rail { width: 40px; height: 100%; box-sizing: border-box; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 0 4px 8px; background: var(--chrome); }
-  .spacer { height: 44px; flex: none; --wails-draggable: drag; width: 100%; }
+  .spacer { height: 44px; flex: none; --wails-draggable: drag; width: 100%; display: flex; align-items: center; justify-content: center; }
   .grow { flex: 1; }
   .rail button { background: none; border: 0; border-radius: var(--r-md); color: var(--muted); padding: 6px; display: grid; place-items: center; }
   .rail button:hover { color: var(--text); background: var(--tint-hover); }
