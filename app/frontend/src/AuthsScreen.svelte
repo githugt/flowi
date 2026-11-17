@@ -22,12 +22,24 @@
   const into = $derived(view.collections.some((c) => c.id === collection) ? collection : (view.collections[0]?.id ?? ''))
   const schemeOptions = $derived(view.schemes.map((s) => ({ value: s.id, label: s.label })))
 
+  // The name just made: its form opens as soon as the list shows it, so its values can be filled in at once.
+  let justMade = $state<string | null>(null)
   function add() {
     if (!name.trim() || !into) return
+    justMade = `${into}\u0000${name.trim()}`
     AuthsService.Create(into, name, scheme)
     opened = null
     name = ''
   }
+  $effect(() => {
+    if (justMade === null) return
+    const [coll, made] = justMade.split('\u0000')
+    const a = view.auths.find((x) => x.collection === coll && x.name === made)
+    if (a) {
+      justMade = null
+      edit(a)
+    }
+  })
 
   // The one being edited, and what the form holds until Save.
   let opened = $state<string | null>(null)

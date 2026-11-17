@@ -36,7 +36,7 @@
   import EmptyState from './EmptyState.svelte'
   import { protocolVerb } from './lib/verbs'
   import { moveServerPassword, serverHasPassword } from './lib/dataset'
-  import { SecretsService } from '../bindings/github.com/githugt/flowi/app/internal/bridge'
+  import { AuthsService, SecretsService } from '../bindings/github.com/githugt/flowi/app/internal/bridge'
   const PASSWORD_NOTE = "The password is saved in this request's file, which is often committed. Put it in a secret and write {{secret.name}} in its place."
   import { recognise } from './lib/paste'
   import AuthFields from './AuthFields.svelte'
@@ -219,6 +219,15 @@
   const authOptions = $derived<DropOption[]>([...authKinds.map(([value, label]) => ({ value, label })), { value: 'use', label: 'Named authentication' }, ...view.auth.schemes.map((s) => ({ value: s.id, label: s.label }))])
   // The collection's named authentications, and the one in use even when it is gone, so the picker can say so.
   const namedOptions = $derived<DropOption[]>([...(view.auth.useMissing ? [{ value: view.auth.use, label: view.auth.use + ' (missing)' }] : []), ...view.auth.named.map((a) => ({ value: a.id, label: a.label }))])
+  // Keeps the request's own scheme and values as a named authentication of its collection, and uses it from here.
+  function keepAuth() {
+    ui.prompt({
+      title: 'Save as a named authentication',
+      label: 'Name (other requests pick it by this name; it is kept in the collection\'s auths folder)',
+      initial: '',
+      done: (n) => AuthsService.FromRequest(node, n),
+    })
+  }
   const openAuths = () => app.openScreen('screen:auths', 'Authentications')
   const isScheme = $derived(view.auth.kind.startsWith('scheme:'))
   function pickAuth(k: string) {
@@ -271,17 +280,22 @@
   // A password written in a connection URL would be saved in the request's file, often committed: offer to keep it
   // in a secret of the selected environment instead. Not forced: "Save as is" saves it as it is.
   function askPasswordMove(server: string) {
-    const env = app.tree?.selected ?? ''
-    if (!env) return askBreaking()
+    const envs = app.tree?.environments ?? []
+    if (!envs.length) {
+      ui.toast('The password is saved in the request file. To keep it in a secret, create an environment first (Environments in the sidebar), then save again.', 'error')
+      return askBreaking()
+    }
+    const selected = envs.includes(app.tree?.selected ?? '') ? (app.tree?.selected ?? '') : envs[0]
     ui.unsaved(
       'Password in the connection string',
-      `The password is saved in this request's file, which is often committed. Move it into a secret of the environment "${env}" and write {{secret.name}} in its place?`,
+      `The password is saved in this request's file, which is often committed. Move it into a secret and write {{secret.name}} in its place?`,
       () =>
         ui.prompt({
           title: 'Keep the password in a secret',
-          label: `Name of the secret (stored for "${env}", never in a file)`,
+          label: 'Name of the secret (its value is stored in the vault, never in a file)',
           initial: 'db_password',
-          done: (name) => void moveToSecret(env, name.trim(), server),
+          select: { label: 'For the environment', options: [selected, ...envs.filter((e) => e !== selected)].map((e) => ({ id: e, label: e })) },
+          done: (name, _protocol, env) => void moveToSecret(env || selected, name.trim(), server),
         }),
       askBreaking,
       { save: 'Move to a secret…', discard: 'Save as is' },
@@ -654,6 +668,10 @@
               {/if}
             {:else if isScheme}
               <AuthFields fields={view.auth.fields} onparam={(name, t) => RequestService.SetAuthParam(node, name, t)} />
+              <div class="keepauth">
+                <button disabled={view.inScratch} title={view.inScratch ? 'Save the request into a collection first' : 'Keep this authentication under a name, so other requests can use it too. This request then uses it by name.'}
+                  onclick={keepAuth}>Save as a named authentication…</button>
+              </div>
             {:else}
               <TextField label={view.auth.kind === 'bearer' ? 'Token' : view.auth.kind === 'basic' ? 'Base64 credentials or a template' : 'Authorization header value'} mono
                 value={view.auth.value} oninput={(t) => RequestService.SetAuth(node, view.auth.kind, t)} />
@@ -845,5 +863,6 @@
   code { font-family: var(--mono); }
   .builtin { border-top: 1px solid var(--line); padding-top: 8px; }
   .chain { margin: 0; padding-left: 18px; font: var(--fs-sm) var(--mono); }
-  .pwwarn { flex: none; color: var(--warn); font-size: var(--fs-xs); white-space: nowrap; }
+  .keepauth { margin-top: 8px; }
+  .pwwarn { flex: none; color: var(--warn); font-size: var(--fs-xs); white-space: nowrap; margin-right: 10px; }
 </style>

@@ -65,6 +65,32 @@ func (s *AuthsService) Create(collection, name, scheme string) {
 	})
 }
 
+// FromRequest keeps the authentication of the open request (a scheme with its values) as a named authentication of
+// the request's collection, and makes the request use it by name. The values are copied as they are: templates such
+// as {{secret.name}} stay templates.
+func (s *AuthsService) FromRequest(node, name string) {
+	s.app.actor.Do(func() {
+		name = strings.TrimSpace(name)
+		o, ok := s.app.requests.reqs[node]
+		switch {
+		case !ok:
+			return
+		case name == "":
+			s.fail(fmt.Errorf("give the authentication a name: requests use it by that name"))
+			return
+		}
+		a := o.req.Current().Auth
+		if a == nil || a.Use != "" || a.Type == "" {
+			s.fail(fmt.Errorf("this request has no authentication scheme of its own to keep: pick a scheme in its Auth section first"))
+			return
+		}
+		s.app.workspace.CreateNamedAuth(o.req.Target().Collection, name, "", *a, func() {
+			o.req.SetAuthUse(name)
+			s.app.emit("notice", Notice{Level: "info", Text: "Saved the authentication as " + name + "; this request now uses it."})
+		}, s.fail)
+	})
+}
+
 // Save writes the description, scheme and parameter values of an
 // authentication; an empty value leaves the parameter out.
 func (s *AuthsService) Save(key, description, scheme string, values map[string]string) {

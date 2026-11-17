@@ -106,3 +106,32 @@ func TestAuthsService_Rename_Given_a_new_name_When_renamed_Then_the_backend_is_a
 		t.Fatalf("published %+v", pub.last["auths"])
 	}
 }
+
+// Before: an authentication written in a request could only be moved into a named one by retyping it.
+func TestAuthsService_FromRequest_Given_a_request_with_its_own_scheme_When_kept_Then_it_is_a_named_auth_the_request_uses(t *testing.T) {
+	c := vmtest.SampleCollection()
+	c.Requests[2].Versions[0].Auth = &model.Auth{Type: model.AuthAPIKey, Params: []model.KeyValue{{Key: "name", Value: "X-Key"}, {Key: "value", Value: "{{secret.k}}"}}}
+	b := &vmtest.Backend{Cols: []model.Collection{c}}
+	app := bridge.NewApp(b, bridge.NewInlineActor(), (&published{}).emit)
+	app.Start(t.Context())
+	node := ""
+	for _, n := range app.Workspace().Tree().Roots[0].Children[0].Children {
+		if n.Label == "health" || n.Name == "health" {
+			node = n.ID
+		}
+	}
+	if node == "" {
+		t.Skip("the sample request is not in the tree under that name")
+	}
+	view, err := app.Requests().Open(node)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	app.Auths().FromRequest(node, " partner ")
+
+	view, _ = app.Requests().Open(node)
+	if !slices.Contains(b.Calls, "NewNamedAuth partner apikey") || view.Auth.Use != "partner" {
+		t.Fatalf("calls %v auth %+v", b.Calls, view.Auth)
+	}
+}

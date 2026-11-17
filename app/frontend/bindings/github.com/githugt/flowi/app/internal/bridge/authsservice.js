@@ -38,6 +38,18 @@ export function Delete(key) {
 }
 
 /**
+ * FromRequest keeps the authentication of the open request (a scheme with its values) as a named authentication of
+ * the request's collection, and makes the request use it by name. The values are copied as they are: templates such
+ * as {{secret.name}} stay templates.
+ * @param {string} node
+ * @param {string} name
+ * @returns {$CancellablePromise<void>}
+ */
+export function FromRequest(node, name) {
+    return $Call.ByID(2773516893, node, name);
+}
+
+/**
  * Rename gives an authentication another name. The requests that use it are changed to the new name.
  * @param {string} key
  * @param {string} name
