@@ -292,19 +292,14 @@ func TestReplayer_Start_Given_an_api_but_forwarding_off_Then_refuses(t *testing.
 	}
 }
 
-func TestReplayer_Start_Given_a_har_file_Then_it_goes_with_the_recording_and_is_refused_without_one(t *testing.T) {
-	// Arrange
+func TestReplayer_Start_Given_a_har_file_Then_it_goes_with_the_options_in_any_mode(t *testing.T) {
 	b := &vmtest.Backend{}
 	r, q := startReplayer(t, b)
 
-	// Act
-	r.Start(vm.ReplayerForm{RecordHAR: "/tmp/s.har"})
-	refused := r.Err()
-	r.Start(vm.ReplayerForm{Forward: "save", RecordHAR: "/tmp/s.har"})
+	r.Start(vm.ReplayerForm{RecordHAR: " /tmp/s.har "})
 	q.run(1)
 
-	// Assert
-	if refused == "" || len(b.ServedWith) != 1 || b.ServedWith[0].RecordHAR != "/tmp/s.har" {
-		t.Fatalf("refused %q served %+v", refused, b.ServedWith)
+	if len(b.ServedWith) != 1 || b.ServedWith[0].RecordHAR != "/tmp/s.har" {
+		t.Fatalf("served %+v", b.ServedWith)
 	}
 }

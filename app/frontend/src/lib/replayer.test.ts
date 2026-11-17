@@ -21,6 +21,9 @@ describe('forwardPreview', () => {
   it('Given replay only, Then unmatched calls are not found', () => {
     expect(texts(forwardPreview({ ...base, forward: '' }, null))).toContain('404')
   })
+  it('Given a HAR file, Then it is mentioned in every mode', () => {
+    for (const forward of ['', 'pass', 'save'] as const) expect(texts(forwardPreview({ ...base, forward, recordHar: '/t/s.har' }, targets))).toContain('/t/s.har')
+  })
   it('Given one API, Then everything goes there', () => {
     const t = texts(forwardPreview({ ...base, forward: 'save', forwardTo: 'https://x.test' }, targets))
     expect(t).toContain('Every call with no saved answer is sent to https://x.test')

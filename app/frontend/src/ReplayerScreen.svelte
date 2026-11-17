@@ -74,23 +74,21 @@
           <label class="mode" title={m.hint}><input type="radio" name="forward" value={m.value} bind:group={form.forward} />{m.label}</label>
         {/each}
       </fieldset>
-      {#if form.forward}
-        <details class="wide where">
-          <summary>Limit or redirect where calls go (optional)</summary>
+      <details class="wide where" class:off={!form.forward}>
+        <summary>Limit or redirect where calls go (optional){#if !form.forward} — pass through to use these{/if}</summary>
+        <fieldset class="inner" disabled={running || !form.forward}>
           <div class="grid">
-            <label class="f wide"><span>Send everything to this one API (leave empty to use each request's own API)</span><TextInput mono bind:value={form.forwardTo} disabled={running} placeholder="https://api.example.test" /></label>
-            <label class="f wide"><span>Only forward to these APIs (comma separated base URLs; leave empty to allow any)</span><TextInput mono bind:value={form.forwardOnly} disabled={running || !!form.forwardTo.trim()} placeholder="https://api.example.test, https://other.example.test" /></label>
-            {#if form.forward === 'save'}
-              <label class="f wide"><span>Save requests of new calls in (when one API is set above)</span>
-                <select bind:value={form.recordTo} disabled={running}>{#each view.targets as t}<option value={t.id}>{t.label}</option>{/each}</select>
-              </label>
-            {/if}
-            <label class="f wide"><span>Also write the forwarded calls to a HAR file (in order, credentials masked; Import → HAR turns it into a flow)</span>
-              <TextInput mono bind:value={form.recordHar} disabled={running} placeholder="/path/to/session.har" />
+            <label class="f wide"><span>Send everything to this one API (leave empty to use each request's own API)</span><TextInput mono bind:value={form.forwardTo} disabled={running || !form.forward} placeholder="https://api.example.test" /></label>
+            <label class="f wide"><span>Only forward to these APIs (comma separated base URLs; leave empty to allow any)</span><TextInput mono bind:value={form.forwardOnly} disabled={running || !form.forward || !!form.forwardTo.trim()} placeholder="https://api.example.test, https://other.example.test" /></label>
+            <label class="f wide"><span>Save requests of new calls in (pass through and save, with one API set above)</span>
+              <select bind:value={form.recordTo} disabled={running || form.forward !== 'save'}>{#each view.targets as t}<option value={t.id}>{t.label}</option>{/each}</select>
             </label>
           </div>
-        </details>
-      {/if}
+        </fieldset>
+      </details>
+      <label class="f wide"><span>Also write every call the replayer handles to a HAR file (in order, credentials masked; Import → HAR turns it into a flow)</span>
+        <TextInput mono bind:value={form.recordHar} disabled={running} placeholder="/path/to/session.har (optional)" />
+      </label>
       <div class="preview wide" aria-label="What the replayer will do">
         <strong>What it will do</strong>
         <ul>{#each preview as l}<li class={l.tone}>{l.text}</li>{/each}</ul>
@@ -139,6 +137,8 @@
   .modes { border: 1px solid var(--line); border-radius: var(--r-lg); padding: var(--sp-2) var(--sp-3); display: flex; gap: 20px; flex-wrap: wrap; }
   .modes legend { color: var(--muted); font-size: var(--fs-sm); padding: 0 6px; }
   .mode { display: flex; gap: 6px; align-items: center; }
+  .where.off { opacity: 0.6; }
+  .inner { border: 0; padding: 0; margin: 0; min-width: 0; }
   .where summary { cursor: pointer; color: var(--muted); font-size: var(--fs-sm); margin-bottom: 8px; }
   .preview { border: 1px solid var(--line); border-radius: var(--r-lg); padding: var(--sp-2) var(--sp-3); font-size: var(--fs-sm); }
   .preview ul { margin: 4px 0 0; padding-left: 18px; display: flex; flex-direction: column; gap: 3px; }

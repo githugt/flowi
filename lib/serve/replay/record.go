@@ -199,7 +199,7 @@ func (h *Handler) keepOnTape(via Recorder, r *http.Request, body []byte, res ups
 	if via.Tape == nil {
 		return
 	}
-	if err := via.Tape.add(h.tapeRecord(via, r, body, res, took)); err != nil {
+	if err := via.Tape.add(h.tapeRecord(via.Now, via.target(r).String(), r, body, res, took)); err != nil {
 		h.opts.Logger.Warn("call not kept on the tape", "Event", "ReplayTapeFailed", "Error", err)
 	}
 }

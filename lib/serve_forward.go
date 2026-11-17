@@ -56,7 +56,7 @@ func (b *serveBuild) forward() (*replay.Forward, error) {
 		}
 	}
 	if b.o.RecordHAR != "" {
-		f.Recorder.Tape = &replay.Tape{Path: b.o.RecordHAR}
+		f.Recorder.Tape = b.tape()
 	}
 	if f.Save {
 		target, err := b.w.recordCollection(b.o.RecordTo)

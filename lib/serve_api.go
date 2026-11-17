@@ -143,8 +143,6 @@ func (w *Workspace) resolveServe(o ServeOptions) (ServeOptions, error) {
 		return o, fmt.Errorf("%w: %w", ErrInvalidServeOptions, o.Faults.Validate())
 	case o.Faults.Active() && o.Record != "":
 		return o, fmt.Errorf("%w: faults are for replayed answers; with --record the calls go to the real API", ErrInvalidServeOptions)
-	case o.RecordHAR != "" && o.Record == "" && o.Forward == "" && o.PassThrough == "":
-		return o, fmt.Errorf("%w: --record-har needs --record or --forward: there is nothing to put on the tape", ErrInvalidServeOptions)
 	case o.Latency < 0:
 		return o, fmt.Errorf("%w: the latency cannot be negative", ErrInvalidServeOptions)
 	case o.ShutdownTimeout < 0:

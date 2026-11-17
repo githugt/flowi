@@ -61,6 +61,10 @@ type Options struct {
 	// Forward, when set, sends a call that has nothing saved to answer it to a real API (see Forward). Calls a
 	// saved response can answer are still replayed.
 	Forward *Forward
+
+	// Tape, when set, keeps every call in a HAR file, in order: the calls the replayer answers itself (replayed,
+	// or not found) as well as the forwarded ones. Give the Forward's Recorder the same Tape so one file holds both.
+	Tape *Tape
 }
 
 // Handler is the replayer. It is safe for concurrent use.
@@ -193,6 +197,11 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		cw = &captureWriter{ResponseWriter: w}
 		w = cw
 	}
+	var tw *tapeWriter
+	if h.opts.Tape != nil {
+		tw = newTapeWriter(w, r)
+		w = tw
+	}
 	decided := h.decide(r)
 	if h.fwd != nil && (decided.match == MatchNone || decided.match == MatchNoResponse) {
 		up, why := h.fwd.upstreamFor(decided)
@@ -215,6 +224,9 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		panic(http.ErrAbortHandler)
 	}
 	h.deliver(w, r, a)
+	if tw != nil {
+		h.keepAnswered(tw, r, time.Since(start))
+	}
 	if cw != nil {
 		kept.Got = cw.message() // before record: the log hands entries to readers, so none is changed after Add
 	}

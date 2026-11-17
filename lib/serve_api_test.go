@@ -321,7 +321,6 @@ func TestServe_should_fail_fast_on_a_port_in_use_and_on_bad_options(t *testing.T
 		"nothing to serve":            {NoReplay: true, NoTriggers: true, NoSchedules: true},
 		"negative latency":            {ReplayAddr: "127.0.0.1:0", Latency: -time.Second},
 		"negative shutdown":           {ReplayAddr: "127.0.0.1:0", ShutdownTimeout: -time.Second},
-		"tape without record":         {ReplayAddr: "127.0.0.1:0", RecordHAR: "x.har"},
 		"fault rate over one":         {ReplayAddr: "127.0.0.1:0", Faults: replay.Faults{ErrorRate: 1.5}},
 		"faults with record":          {ReplayAddr: "127.0.0.1:0", Record: "http://127.0.0.1:1", Faults: replay.Faults{DropRate: 0.5}},
 		"forward unknown mode":        {ReplayAddr: "127.0.0.1:0", Forward: "everything"},

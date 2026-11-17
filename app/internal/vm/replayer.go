@@ -51,7 +51,7 @@ type ReplayerForm struct {
 	// RecordTo is the collection (name or id) that a forwarded call matching no saved request is saved in as a
 	// new request (with Forward "save" and ForwardTo); blank is the Scratch draft.
 	RecordTo string
-	// RecordHAR is a file the forwarded calls are also written to, in order (needs Forward).
+	// RecordHAR is a file every call the replayer handles is also written to, in order, in any mode.
 	RecordHAR string
 	// Faults make a share of the replayed calls fail on purpose. Percent fields are 0 to 100; blank is none.
 	FaultErrorPercent string
@@ -200,12 +200,8 @@ func (r *Replayer) Start(form ReplayerForm) {
 
 // checkForward refuses what forwarding cannot do, with a plainer message than the library's.
 func checkForward(form ReplayerForm) error {
-	har := strings.TrimSpace(form.RecordHAR) != ""
 	switch form.Forward {
 	case "":
-		if har {
-			return errors.New("a HAR file needs forwarding: choose pass through or pass through and save, then there are calls to put in it")
-		}
 		if strings.TrimSpace(form.ForwardTo) != "" || strings.TrimSpace(form.ForwardOnly) != "" {
 			return errors.New("an API to forward to is filled in, but forwarding is off: choose pass through or pass through and save")
 		}

@@ -31,8 +31,10 @@ export function forwardLabel(f: { forward: ForwardMode; forwardTo: string; forwa
 // The lines of the preview, in the order a call meets them.
 export function forwardPreview(form: ForwardForm, p: ForwardPreview | null, labelOf: (id: string) => string = (s) => s): Line[] {
   const out: Line[] = [{ text: 'A call a saved response can answer is replayed from that response. It never reaches a real API.', tone: 'ok' }]
+  const har = form.recordHar.trim() ? { text: `Every call the replayer handles is also written to ${form.recordHar.trim()}.`, tone: 'plain' as const } : null
   if (!form.forward) {
     out.push({ text: 'Any other call is answered "not found" (404). Nothing is forwarded or saved.', tone: 'plain' })
+    if (har) out.push(har)
     return out
   }
   const to = form.forwardTo.trim()
@@ -63,6 +65,6 @@ export function forwardPreview(form: ForwardForm, p: ForwardPreview | null, labe
       if (!targets.some((t) => within(t.base, o))) out.push({ text: `${o}: no saved request calls this API.`, tone: 'warn' })
     }
   }
-  if (form.recordHar.trim()) out.push({ text: `Forwarded calls are also written to ${form.recordHar.trim()}.`, tone: 'plain' })
+  if (har) out.push(har)
   return out
 }

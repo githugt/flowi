@@ -479,3 +479,34 @@ func TestBaseOf_should_cut_a_url_before_its_path(t *testing.T) {
 		}
 	}
 }
+
+func TestTape_Given_replay_and_forwarding_Then_one_har_file_holds_every_call_in_order(t *testing.T) {
+	up := newUpstream(t, func(w http.ResponseWriter, _ *http.Request) { _, _ = io.WriteString(w, `{"from": "upstream"}`) })
+	f := newFixture(t, spec{path: "users/get", versions: get("{{env.base_url}}/v1/users/{{id}}")}).materialise()
+	tape := &replay.Tape{Path: filepath.Join(t.TempDir(), "s.har")}
+	f.options.Tape = tape
+	f.options.Forward = &replay.Forward{Upstream: recorderFor(t, up).Upstream, Recorder: replay.Recorder{Tape: tape}}
+	f.start()
+
+	f.do("GET", "/v1/users/7") // no saved response: forwarded
+	f.do("GET", "/v1/nothing") // forwarded too
+	data, err := os.ReadFile(tape.Path)
+
+	if err != nil || strings.Count(string(data), `"request"`) != 2 || !strings.Contains(string(data), "/v1/nothing") {
+		t.Fatalf("tape %v: %s", err, data)
+	}
+}
+
+func TestTape_Given_replay_only_Then_the_calls_the_replayer_answers_are_kept(t *testing.T) {
+	f := newFixture(t, spec{path: "users/get", versions: get("{{env.base_url}}/v1/users/{{id}}")}).materialise()
+	tape := &replay.Tape{Path: filepath.Join(t.TempDir(), "s.har")}
+	f.options.Tape = tape
+	f.start()
+
+	f.do("GET", "/v1/nothing")
+	data, err := os.ReadFile(tape.Path)
+
+	if err != nil || !strings.Contains(string(data), "/v1/nothing") || !strings.Contains(string(data), "404") {
+		t.Fatalf("tape %v: %s", err, data)
+	}
+}

@@ -25,6 +25,18 @@ const (
 	idleTimeout       = 2 * time.Minute
 )
 
+// tape is the session's HAR tape, shared by the replayed and the forwarded calls so one file holds them in order;
+// nil when no HAR file was asked for.
+func (b *serveBuild) tape() *replay.Tape {
+	if b.o.RecordHAR == "" {
+		return nil
+	}
+	if b.harTape == nil {
+		b.harTape = &replay.Tape{Path: b.o.RecordHAR}
+	}
+	return b.harTape
+}
+
 // serveBuild assembles the parts of one Serve call.
 type serveBuild struct {
 	w   *Workspace
@@ -38,6 +50,7 @@ type serveBuild struct {
 	mgr                 *runs.Manager
 	servers             []namedServer
 	store               shared.Store // nil when instances do not share state
+	harTape             *replay.Tape // the one tape of the session, made on first use
 }
 
 type namedServer struct {
@@ -102,7 +115,7 @@ func (b *serveBuild) assembleReplay() error {
 	}
 	b.replayLn, b.s.replayAddr = ln, ln.Addr().String()
 	ro := replay.Options{
-		Collections: b.w.Collections, DataDir: b.w.DataDir, Latency: b.o.Latency, Faults: b.o.Faults, Sequence: b.o.Sequence, CORS: b.o.CORS, Capture: b.o.CaptureCalls,
+		Tape: b.tape(), Collections: b.w.Collections, DataDir: b.w.DataDir, Latency: b.o.Latency, Faults: b.o.Faults, Sequence: b.o.Sequence, CORS: b.o.CORS, Capture: b.o.CaptureCalls,
 		Log: b.s.traffic, Logger: b.log, Sleep: b.o.replaySleep, Hosts: loopbackHosts(b.s.replayAddr),
 	}
 	if b.o.Record != "" {
