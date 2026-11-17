@@ -47,8 +47,8 @@ func TestAuthsService_Create_Given_a_name_and_a_scheme_When_created_Then_the_bac
 
 	app.Auths().Create("C1", " admin ", "scheme:digest")
 
-	if !slices.Contains(b.Calls, "NewNamedAuth admin digest") {
-		t.Fatalf("calls %v", b.Calls)
+	if !b.Called("NewNamedAuth admin digest") {
+		t.Fatal("the backend was not asked")
 	}
 	v, ok := pub.last["auths"].(bridge.AuthsView)
 	if !ok || len(v.Auths) != 2 || v.Auths[1].Name != "admin" || v.Auths[1].Scheme != "scheme:digest" {
@@ -63,8 +63,8 @@ func TestAuthsService_Create_Given_no_name_When_created_Then_an_error_notice_and
 	app.Auths().Create("C1", "  ", "scheme:digest")
 
 	n, ok := pub.last["notice"].(bridge.Notice)
-	if !ok || n.Level != "error" || slices.ContainsFunc(b.Calls, func(c string) bool { return c == "NewNamedAuth  digest" }) {
-		t.Fatalf("notice %+v calls %v", pub.last["notice"], b.Calls)
+	if !ok || n.Level != "error" || b.Called("NewNamedAuth  digest") {
+		t.Fatalf("notice %+v", pub.last["notice"])
 	}
 }
 
@@ -87,8 +87,8 @@ func TestAuthsService_Delete_Given_a_named_auth_When_deleted_Then_it_is_gone_and
 
 	app.Auths().Delete("C1/A1")
 
-	if !slices.Contains(b.Calls, "DeleteNamedAuth A1") || len(app.Auths().State().Auths) != 0 {
-		t.Fatalf("calls %v auths %+v", b.Calls, app.Auths().State().Auths)
+	if !b.Called("DeleteNamedAuth A1") || len(app.Auths().State().Auths) != 0 {
+		t.Fatalf("auths %+v", app.Auths().State().Auths)
 	}
 }
 
@@ -98,8 +98,8 @@ func TestAuthsService_Rename_Given_a_new_name_When_renamed_Then_the_backend_is_a
 
 	app.Auths().Rename("C1/A1", " partner ")
 
-	if !slices.Contains(b.Calls, "RenameNamedAuth A1 partner") {
-		t.Fatalf("calls %v", b.Calls)
+	if !b.Called("RenameNamedAuth A1 partner") {
+		t.Fatal("the backend was not asked")
 	}
 	v, ok := pub.last["auths"].(bridge.AuthsView)
 	if !ok || len(v.Auths) != 1 || v.Auths[0].Name != "partner" {
@@ -131,7 +131,7 @@ func TestAuthsService_FromRequest_Given_a_request_with_its_own_scheme_When_kept_
 	app.Auths().FromRequest(node, " partner ")
 
 	view, _ = app.Requests().Open(node)
-	if !slices.Contains(b.Calls, "NewNamedAuth partner apikey") || view.Auth.Use != "partner" {
-		t.Fatalf("calls %v auth %+v", b.Calls, view.Auth)
+	if !b.Called("NewNamedAuth partner apikey") || view.Auth.Use != "partner" {
+		t.Fatalf("auth %+v", view.Auth)
 	}
 }
