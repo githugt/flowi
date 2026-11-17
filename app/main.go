@@ -142,6 +142,8 @@ func run() error {
 		URL:              "/",
 	})
 
+	menuButtonToStart(window)
+
 	if runtime.GOOS == "windows" {
 		hideMenuBarUntilAlt(wails, window)
 	}
