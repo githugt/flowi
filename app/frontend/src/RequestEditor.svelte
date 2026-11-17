@@ -35,7 +35,7 @@
   import type { CodeLang } from './lib/highlight'
   import EmptyState from './EmptyState.svelte'
   import { protocolVerb } from './lib/verbs'
-  import { moveServerPassword, serverHasPassword } from './lib/dataset'
+  import { isFileDriver, moveServerPassword, serverHasPassword } from './lib/dataset'
   import { AuthsService, SecretsService } from '../bindings/github.com/githugt/flowi/app/internal/bridge'
   const PASSWORD_NOTE = "The password is saved in this request's file, which is often committed. Put it in a secret and write {{secret.name}} in its place."
   import { recognise } from './lib/paste'
@@ -253,7 +253,7 @@
   // Writes the working copy over the saved version. With a flowi overlay laid over it, that includes the overlay.
   function saveVersion() {
     const server = view.dataset?.block.Server ?? ''
-    if (view.kind === 'dataset' && serverHasPassword(server)) return askPasswordMove(server)
+    if (view.kind === 'dataset' && !isFileDriver(view.dataset?.block.Driver ?? '') && serverHasPassword(server)) return askPasswordMove(server)
     askBreaking()
   }
 
@@ -458,13 +458,15 @@
       </div>
     {:else if view.dataset}
       {@const db = view.dataset.block}
-      <Dropdown pill title="Database" options={view.dataset.drivers.map((x) => ({ value: x.id, label: x.label, tone: protocolVerb(x.id) }))} value={db.Driver} width="130px"
+      {@const fileSource = isFileDriver(db.Driver)}
+      <!-- A file source switches only between file types, and a database only between databases: they are different kinds of source. -->
+      <Dropdown pill title={fileSource ? 'File type' : 'Database'} options={view.dataset.drivers.filter((x) => isFileDriver(x.id) === fileSource).map((x) => ({ value: x.id, label: x.label, tone: protocolVerb(x.id) }))} value={db.Driver} width="130px"
         onpick={(id) => RequestService.SetDataset(node, { ...db, Driver: id } as never)} />
       <div class="url">
-        <TextField mono value={db.Server} placeholder={db.Driver === 'sqlite' ? 'shop.db (a file in the collection)' : '{{env.database_url}}'}
+        <TextField mono value={db.Server} placeholder={fileSource ? 'data/sales.csv (a file or a folder in the collection)' : db.Driver === 'sqlite' ? 'shop.db (a file in the collection)' : '{{env.database_url}}'}
           oninput={(t) => RequestService.SetDataset(node, { ...db, Server: t } as never)} onenter={() => RequestService.Send(node, hooks)} />
       </div>
-      {#if serverHasPassword(db.Server)}
+      {#if !fileSource && serverHasPassword(db.Server)}
         <span class="pwwarn" role="note" title={PASSWORD_NOTE}>⚠ Password in the file</span>
       {/if}
     {:else if view.grpc}

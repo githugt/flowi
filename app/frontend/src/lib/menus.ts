@@ -76,12 +76,14 @@ export function newMenu(): MenuItem[] {
     { label: 'New flow', run: () => WorkspaceService.NewScratchFlow() },
     { label: 'New message request', run: newScratchMessage },
     { label: 'New gRPC request', run: () => WorkspaceService.NewAt('grpc', '', '', '') },
-    { label: 'New dataset query', run: newScratchDataset },
+    { label: 'New database query', run: newScratchDataset },
+    { label: 'New data file query', run: newScratchFileQuery },
     { separator: true, label: '', run: () => {} },
     { label: 'New request in a collection…', run: ask('request', 'New request', 'requests', 'Name or path (for example users/create)') },
     { label: 'New message request in a collection…', run: ask('async', 'New message request', 'requests', 'Name or path (for example orders/placed)', true) },
     { label: 'New gRPC request in a collection…', run: ask('grpc', 'New gRPC request', 'requests', 'Name or path (for example shop/get-order)') },
-    { label: 'New dataset query in a collection…', run: ask('dataset', 'New dataset query', 'requests', 'Name or path (for example customers/by-id)', true, databases, 'Database') },
+    { label: 'New database query in a collection…', run: ask('dataset', 'New database query', 'requests', 'Name or path (for example customers/by-id)', true, databases, 'Database') },
+    { label: 'New data file query in a collection…', run: ask('dataset', 'New data file query', 'requests', 'Name or path (for example reports/sales)', true, dataFiles, 'File type') },
     { label: 'New flow in a collection…', run: ask('flow', 'New flow', 'flows', 'Name or path (for example journeys/signup)') },
     { label: 'New flow from blueprint…', run: () => (ui.blueprint = { collection: '', folder: '' }) },
     { separator: true, label: '', run: () => {} },
@@ -96,17 +98,31 @@ const protocols = [
 ].map(([id, label]) => ({ id, label }))
 
 const databases = [
-  ['postgres', 'PostgreSQL'], ['mysql', 'MySQL'], ['mariadb', 'MariaDB'], ['sqlite', 'SQLite'], ['csv', 'CSV files'], ['xlsx', 'Excel files'], ['parquet', 'Parquet files'],
+  ['postgres', 'PostgreSQL'], ['mysql', 'MySQL'], ['mariadb', 'MariaDB'], ['sqlite', 'SQLite'],
 ].map(([id, label]) => ({ id, label }))
+
+// Data files are their own kind of source: no server, no login, just a file or a folder of them.
+const dataFiles = [['csv', 'CSV files'], ['xlsx', 'Excel files'], ['parquet', 'Parquet files']].map(([id, label]) => ({ id, label }))
 
 // A dataset query needs its database before it can be made; the draft goes to Scratch like New request.
 function newScratchDataset() {
   ui.prompt({
-    title: 'New dataset query',
+    title: 'New database query',
     label: 'Name (blank for untitled)',
     initial: '',
     protocols: databases,
     protocolsLabel: 'Database',
+    done: (path, driver) => WorkspaceService.NewAt('dataset', '', path, driver),
+  })
+}
+
+function newScratchFileQuery() {
+  ui.prompt({
+    title: 'New data file query',
+    label: 'Name (blank for untitled)',
+    initial: '',
+    protocols: dataFiles,
+    protocolsLabel: 'File type',
     done: (path, driver) => WorkspaceService.NewAt('dataset', '', path, driver),
   })
 }

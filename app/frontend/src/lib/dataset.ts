@@ -1,3 +1,7 @@
+/** The drivers that read data files (a file or a folder of them) rather than connect to a database server. */
+export const FILE_DRIVERS = ['csv', 'xlsx', 'parquet']
+export const isFileDriver = (driver: string): boolean => FILE_DRIVERS.includes(driver)
+
 /** Whether a connection URL spells out a password (scheme://user:password@host) rather than naming a secret. */
 export function serverHasPassword(server: string): boolean {
   const m = /^[a-z][a-z0-9+.-]*:\/\/[^/@\s:]*:([^@\s/]*)@/i.exec(server.trim())

@@ -5,11 +5,12 @@
   import CodeArea from './CodeArea.svelte'
   import TextField from './TextField.svelte'
   import EmptyState from './EmptyState.svelte'
-  import { serverCredentials, withServerCredentials } from './lib/dataset'
+  import { isFileDriver, serverCredentials, withServerCredentials } from './lib/dataset'
 
   let { view, section }: { view: RequestView; section: string } = $props()
   const node = $derived(view.node)
   const block = $derived(view.dataset!.block)
+  const isFile = $derived(isFileDriver(block.Driver))
   const params = $derived(block.Params ?? [])
   // Placeholders are $1, $2 … for PostgreSQL; MySQL and MariaDB use ?; SQLite takes either.
   const placeholder = $derived(block.Driver === 'postgres' ? '$1, $2 …' : block.Driver === 'sqlite' || block.Driver === 'csv' || block.Driver === 'xlsx' || block.Driver === 'parquet' ? '? or $1, $2 …' : '?')
@@ -35,14 +36,14 @@
     oninput={(t) => put((b) => (b.Query = t))}
     empty={{ icon: 'body', title: 'No query', hint: 'Click to write the query: one SELECT, WITH, VALUES, SHOW, EXPLAIN or DESCRIBE.' }}
   />
-  {#if block.Writes}
+  {#if block.Writes && !isFile}
     <p class="writes" role="alert">⚠ This query may change data. The read-only guards are off for it: connect as a user that can only do what you mean it to.</p>
   {/if}
-  <label class="limit"><input type="checkbox" checked={!!block.Writes} onchange={(e) => put((b) => (b.Writes = e.currentTarget.checked))} /> Allow this query to change data (INSERT, UPDATE, DELETE …)</label>
+  {#if !isFile}<label class="limit"><input type="checkbox" checked={!!block.Writes} onchange={(e) => put((b) => (b.Writes = e.currentTarget.checked))} /> Allow this query to change data (INSERT, UPDATE, DELETE …)</label>{/if}
   <p class="muted note">
-    {block.Writes ? 'Writes are allowed for this request.' : 'Read-only: the query is sent in a read-only transaction, and a statement that changes data is refused.'} Put values in <strong>Values</strong> and write
+    {isFile ? 'The files are only read: a copy is loaded for the query, and the files themselves are never changed.' : block.Writes ? 'Writes are allowed for this request.' : 'Read-only: the query is sent in a read-only transaction, and a statement that changes data is refused.'} Put values in <strong>Values</strong> and write
     them as <code>{placeholder}</code>: they travel apart from the statement, so a value can never change what it means.
-    For the strongest guarantee, connect as a database user that can only read.
+    {#if !isFile}For the strongest guarantee, connect as a database user that can only read.{/if}
   </p>
   <label class="limit">Keep at most
     <input class="mini" inputmode="numeric" placeholder="1000" value={block.Limit || ''} onchange={(e) => setLimit(e.currentTarget.value)} aria-label="Most rows kept" />
