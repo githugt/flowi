@@ -48,5 +48,6 @@ type Collection struct {
 	Requests     []Request
 	Flows        []Flow
 	Blueprints   []Blueprint
+	Auths        []NamedAuth
 	Overlays     []Overlay
 }

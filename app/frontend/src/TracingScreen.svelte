@@ -58,7 +58,7 @@
     <h2>Tracing</h2>
     <p class="expl">
       Send a trace of every send and flow run to your own OpenTelemetry collector, such as Jaeger, Grafana Tempo or Honeycomb, to see how long each step took and where runs fail. Nothing is sent until you enter an address.
-      This goes to your server only; it is separate from Usage reporting.
+      This goes to your server only.
     </p>
 
     <div class="state" class:on={view.running}>

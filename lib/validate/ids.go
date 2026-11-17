@@ -39,6 +39,9 @@ func checkDuplicateIDs(ix *index) diag.List {
 		for _, b := range c.Blueprints {
 			add(b.ID, b.File)
 		}
+		for _, a := range c.Auths {
+			add(a.ID, a.File)
+		}
 	}
 	var out diag.List
 	for id, locs := range seen {

@@ -133,7 +133,7 @@ func (x *execution) failAsync(err error, res transport.Result) {
 		x.fail(StatusError, diag.List{diag.New(diag.CodeAsyncConn, diag.Location{}, map[string]string{"detail": ce.Error()})})
 		return
 	}
-	x.fail(StatusError, diag.List{diag.New(diag.CodeHTTPFailed, diag.Location{}, map[string]string{"detail": err.Error()})})
+	x.fail(StatusError, diag.List{diag.New(diag.CodeHTTPFailed, diag.Location{}, map[string]string{"detail": x.r.secrets.String(driverHint(err.Error()))})})
 }
 
 // buildAsync renders the version strictly, after the pre-hooks.

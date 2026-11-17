@@ -24,7 +24,7 @@ type DatasetInfo struct {
 // driverLabels are the names a person knows each driver by.
 func driverLabels() map[string]string {
 	return map[string]string{
-		model.DriverPostgres: "PostgreSQL", model.DriverMySQL: "MySQL", model.DriverMariaDB: "MariaDB", model.DriverSQLite: "SQLite",
+		model.DriverPostgres: "PostgreSQL", model.DriverMySQL: "MySQL", model.DriverMariaDB: "MariaDB", model.DriverSQLite: "SQLite", model.DriverCSV: "CSV files", model.DriverXLSX: "Excel files", model.DriverParquet: "Parquet files",
 	}
 }
 

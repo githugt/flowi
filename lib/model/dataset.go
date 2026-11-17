@@ -5,7 +5,7 @@ package model
 // Dataset is what a dataset request version does: it runs one read-only query against a data store and keeps the
 // rows it returns.
 type Dataset struct {
-	// Driver is the store: postgres, mysql, mariadb or sqlite.
+	// Driver is the store: postgres, mysql, mariadb, sqlite, csv, xlsx or parquet (SQL over data files or a folder of them).
 	Driver string
 	// Server is the connection string, templated: a postgres:// or mysql:// URL, or for sqlite a file path
 	// relative to the collection.
@@ -19,6 +19,9 @@ type Dataset struct {
 	Params []string
 	// Limit is the most rows kept; 0 means DefaultDatasetLimit. More rows than that are cut and the result says so.
 	Limit int
+	// Writes lets this query change data: the read-only guards are off for it. Off is the default; the setting
+	// datasets.allow_writes does the same for every query.
+	Writes bool
 }
 
 // DefaultDatasetLimit is how many rows a dataset request keeps when it sets no limit.
@@ -30,9 +33,12 @@ const (
 	DriverMySQL    = "mysql"
 	DriverMariaDB  = "mariadb"
 	DriverSQLite   = "sqlite"
+	DriverCSV      = "csv"     // SQL over a CSV file, or a folder of them
+	DriverXLSX     = "xlsx"    // SQL over an Excel workbook (a table for each sheet), or a folder of them
+	DriverParquet  = "parquet" // SQL over a Parquet file, or a folder of them
 )
 
 // DatasetDrivers lists the drivers in the order a picker shows them.
 func DatasetDrivers() []string {
-	return []string{DriverPostgres, DriverMySQL, DriverMariaDB, DriverSQLite}
+	return []string{DriverPostgres, DriverMySQL, DriverMariaDB, DriverSQLite, DriverCSV, DriverXLSX, DriverParquet}
 }

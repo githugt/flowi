@@ -32,9 +32,12 @@ type ServeOptions struct {
 	Latency time.Duration // added to every replayed answer
 	// Faults make a share of replayed calls fail on purpose (see replay.Faults). Refused with Record.
 	Faults   replay.Faults
-	Sequence bool   // replay a request's responses one call at a time
-	CORS     bool   // let browsers call the replayer
-	Record   string // upstream base URL: forward calls and save the real responses
+	Sequence bool // replay a request's responses one call at a time
+	CORS     bool // let browsers call the replayer
+	// PassThrough is an upstream base URL for the calls nothing saved can answer: they are forwarded there and the
+	// answer relayed, without saving anything. Calls a saved response can answer are still replayed.
+	PassThrough string
+	Record      string // upstream base URL: forward calls and save the real responses
 	// RecordTo is the collection (name or id) that calls matching no saved
 	// request are saved in, as new requests; "" is the Scratch draft. Only
 	// used with Record.
@@ -110,6 +113,10 @@ func (w *Workspace) resolveServe(o ServeOptions) (ServeOptions, error) {
 	switch {
 	case o.NoReplay && o.NoTriggers && o.NoSchedules:
 		return o, fmt.Errorf("%w: nothing to serve, the replayer, triggers and schedules are all turned off", ErrInvalidServeOptions)
+	case o.PassThrough != "" && o.Record != "":
+		return o, fmt.Errorf("%w: pass-through and record both forward calls; use one", ErrInvalidServeOptions)
+	case o.CORS && o.PassThrough != "":
+		return o, fmt.Errorf("%w: CORS with pass-through would let any web page read the real API through your network position", ErrInvalidServeOptions)
 	case o.CORS && o.Record != "":
 		return o, fmt.Errorf("%w: --cors with --record would let any web page read the real API through your network position", ErrInvalidServeOptions)
 	case o.Faults.Validate() != nil:

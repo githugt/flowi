@@ -25,6 +25,7 @@ const (
 	kindFlow
 	kindFolder
 	kindBlueprint
+	kindAuth
 	kindOverlay
 	kindUnrecognised
 )
@@ -35,6 +36,7 @@ const (
 	requestSuffix   = ".req.yaml"
 	flowSuffix      = ".arazzo.yaml"
 	blueprintSuffix = ".blueprint.yaml"
+	authSuffix      = ".auth.yaml"
 	layoutSuffix    = ".layout.yaml"
 	examplesDir     = ".examples"
 )
@@ -66,6 +68,11 @@ func classify(rel string) fileKind {
 	case top == "blueprints":
 		if strings.HasSuffix(rel, blueprintSuffix) {
 			return kindBlueprint
+		}
+		return kindUnrecognised
+	case top == "auths":
+		if strings.HasSuffix(rel, authSuffix) && !strings.Contains(rest, "/") {
+			return kindAuth
 		}
 		return kindUnrecognised
 	case top == "overlays":

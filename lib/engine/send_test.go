@@ -289,13 +289,18 @@ func TestSend_Given_hook_flow_with_request_node_Then_inner_request_runs_without_
 	}
 }
 
-func TestSend_Given_nested_true_Then_inner_hooks_run_until_max_depth_then_FLW_RUN_006(t *testing.T) {
+// Before: with hooks.nested on, the hook that sends a request of its own collection ran inside that request, again,
+// until max_depth failed the run.
+func TestSend_Given_nested_true_Then_a_request_does_not_run_the_hook_it_is_sent_from(t *testing.T) {
 	f, main := hookFlowFixture(t, true, true)
 
 	res, _ := f.send(f.input(main))
 
-	if res.Status != StatusFailed || !hasCode(res.Diags, diag.CodeRunHookDepth) {
+	if res.Status != StatusPassed || hasCode(res.Diags, diag.CodeRunHookDepth) {
 		t.Fatalf("status %s diags %v", res.Status, res.Diags)
+	}
+	if f.hits.Load() != 2 {
+		t.Fatalf("hits %d", f.hits.Load())
 	}
 }
 

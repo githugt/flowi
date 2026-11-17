@@ -296,3 +296,56 @@ func TestNewEnvironment_should_colour_a_prod_environment_red_and_leave_others_pl
 		t.Fatalf("colours %v", colours)
 	}
 }
+
+// Before: a new request named "Test postgres" was refused with FLW-WRITE-002, because the name was used as the
+// file name as typed.
+func TestNewRequest_Given_a_name_with_spaces_When_created_Then_the_file_is_a_plain_name_and_the_request_keeps_the_name(t *testing.T) {
+	w := demoWorkspace(t)
+	c := w.Collections()[0]
+
+	target, err := w.NewDatasetRequest(c.Manifest.ID, "db/Test postgres (v2)", model.DriverPostgres)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, r, _ := w.requestFor(target)
+	if r.Name != "Test postgres (v2)" || r.Path != "db/Test-postgres-v2" {
+		t.Fatalf("name %q path %q", r.Name, r.Path)
+	}
+	if _, err := w.NewRequest(c.Manifest.ID, "bad folder/x"); err == nil {
+		t.Fatal("a folder with a space was accepted")
+	}
+	if _, err := w.NewRequest(c.Manifest.ID, "db/???"); err == nil {
+		t.Fatal("a name with nothing to make a file name from was accepted")
+	}
+}
+
+// Before: a flow called "Sign up journey" was refused (FLW-WRITE-002) though a request of that name was accepted.
+func TestNewFlow_Given_a_name_with_spaces_Then_the_file_is_dashed_and_the_name_kept(t *testing.T) {
+	w := demoWorkspace(t)
+	c := w.Collections()[0]
+
+	target, err := w.NewFlow(c.Manifest.ID, "Sign up journey")
+
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, f, _ := w.flowFor(target)
+	if f.Name != "Sign up journey" || f.Path != "Sign-up-journey" {
+		t.Fatalf("name %q path %q", f.Name, f.Path)
+	}
+}
+
+func TestNewFolder_Given_a_name_with_spaces_Then_the_folder_takes_the_file_safe_form(t *testing.T) {
+	w := demoWorkspace(t)
+	c := w.Collections()[0]
+
+	err := w.NewFolder(c.Manifest.ID, "requests", "Test data/Edge cases")
+
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, statErr := os.Stat(filepath.Join(c.Root, "requests", "Test-data", "Edge-cases", "_folder.yaml")); statErr != nil {
+		t.Fatal(statErr)
+	}
+}

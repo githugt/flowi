@@ -196,6 +196,9 @@
   .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: var(--fs-sm); }
   /* With colours drawn behind, the input's own text is clear but its caret stays. */
   .hide { background: transparent; color: transparent; caret-color: var(--text); }
+  /* Selected text is drawn by the input itself: WebKit's selection is opaque and covered the colours behind, so a
+     selected address looked empty. */
+  .hide::selection { color: var(--text); background: color-mix(in srgb, var(--accent) 35%, var(--bg)); }
   .wrap:has(.hide)::before { content: ''; position: absolute; inset: 0; background: var(--bg); border-radius: var(--r-md); }
   .hl {
     position: absolute;

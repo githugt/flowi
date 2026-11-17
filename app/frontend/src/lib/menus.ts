@@ -96,7 +96,7 @@ const protocols = [
 ].map(([id, label]) => ({ id, label }))
 
 const databases = [
-  ['postgres', 'PostgreSQL'], ['mysql', 'MySQL'], ['mariadb', 'MariaDB'], ['sqlite', 'SQLite'],
+  ['postgres', 'PostgreSQL'], ['mysql', 'MySQL'], ['mariadb', 'MariaDB'], ['sqlite', 'SQLite'], ['csv', 'CSV files'], ['xlsx', 'Excel files'], ['parquet', 'Parquet files'],
 ].map(([id, label]) => ({ id, label }))
 
 // A dataset query needs its database before it can be made; the draft goes to Scratch like New request.

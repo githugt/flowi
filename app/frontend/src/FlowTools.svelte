@@ -4,6 +4,7 @@
   import { errorText } from './lib/errors'
   import { FlowService } from '../bindings/github.com/githugt/flowi/app/internal/bridge'
   import SequenceDiagram from './SequenceDiagram.svelte'
+  import Toggle from './Toggle.svelte'
   import type { AccessView, ChecksChoices, DriftView, FlowView, MatrixView, SequenceView } from './lib/types'
 
   let { view }: { view: FlowView } = $props()
@@ -35,6 +36,7 @@
 
   // sequence
   let sequence = $state<SequenceView | null>(null)
+  let quiet = $state(false) // also draw the steps that call nothing: delays, sets, assertions
   let copied = $state(false)
 
   async function open(t: Tool) {
@@ -81,7 +83,7 @@
   const runMatrix = () => run(() => FlowService.RunMatrix(node, dims, {}), (v) => (matrix = v as unknown as MatrixView))
   const runAccess = () => run(() => FlowService.CheckAccess(node, owner, others, stepsChosen, {}), (v) => (access = v as unknown as AccessView))
   const runDrift = () => run(() => FlowService.CheckDrift(node, '', failNew ? ['new', 'missing', 'changed'] : ['missing', 'changed']), (v) => (drift = v as unknown as DriftView))
-  const draw = () => run(() => FlowService.Sequence(node), (v) => (sequence = v as unknown as SequenceView))
+  const draw = () => run(() => FlowService.Sequence(node, quiet), (v) => (sequence = v as unknown as SequenceView))
 
   async function copy() {
     if (!sequence) return
@@ -213,6 +215,7 @@
         <h3>Sequence diagram of the last run</h3>
         {#if sequence}
           <p class="note">Flowi and one lifeline for each host it called, an arrow out and one back for each attempt with its status and time; a crossed or red arrow is a refusal or an error. Only host and path are drawn, never the query.</p>
+          <Toggle checked={quiet} onchange={(on) => { quiet = on; draw() }}>Show steps that call nothing (delays, sets, assertions)</Toggle>
           <div class="diagram"><SequenceDiagram seq={sequence} /></div>
           <div class="actions">
             <button onclick={copy}>{copied ? 'Copied' : 'Copy as Mermaid'}</button>

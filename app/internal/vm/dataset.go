@@ -18,6 +18,15 @@ const (
 // datasetVerb is what a dataset request shows where an HTTP request shows its method.
 const datasetVerb = "SQL"
 
+// datasetVerbOf is the verb of one dataset request: its database (POSTGRES, SQLITE …), as the editor's own pill
+// says, so the tab and the tree do not call the same request SQL. A request with no driver yet is SQL.
+func datasetVerbOf(d model.Dataset) string {
+	if d.Driver == "" {
+		return datasetVerb
+	}
+	return strings.ToUpper(d.Driver)
+}
+
 // IsDataset reports whether the selected version is a dataset query.
 func (r *Request) IsDataset() bool { return r.Current().Dataset != nil }
 

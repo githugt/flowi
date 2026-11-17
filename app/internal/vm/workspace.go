@@ -282,6 +282,19 @@ func (ws *Workspace) Request(t flowi.RequestTarget) (model.Collection, model.Req
 	return c, c.Requests[i], true
 }
 
+// Flow returns a loaded flow and its collection.
+func (ws *Workspace) Flow(t flowi.FlowTarget) (model.Collection, model.Flow, bool) {
+	c, ok := ws.Collection(t.Collection)
+	if !ok {
+		return model.Collection{}, model.Flow{}, false
+	}
+	i := slices.IndexFunc(c.Flows, func(f model.Flow) bool { return f.ID == t.Flow })
+	if i < 0 {
+		return model.Collection{}, model.Flow{}, false
+	}
+	return c, c.Flows[i], true
+}
+
 // Display is the name the tree shows for a node: the label set with
 // SetLabel, else its own.
 func (ws *Workspace) Display(nodeID string) string {

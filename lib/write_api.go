@@ -100,6 +100,9 @@ func datasetStarters() map[string]struct{ server, query string } {
 		model.DriverMySQL:    {"mysql://root@localhost:3306/mysql", "SELECT ? AS greeting"},
 		model.DriverMariaDB:  {"mariadb://root@localhost:3306/mysql", "SELECT ? AS greeting"},
 		model.DriverSQLite:   {"data.db", "SELECT ? AS greeting"},
+		model.DriverCSV:      {"data.csv", "SELECT * FROM data LIMIT 10"},
+		model.DriverXLSX:     {"data.xlsx", "SELECT * FROM Sheet1 LIMIT 10"},
+		model.DriverParquet:  {"data.parquet", "SELECT * FROM data LIMIT 10"},
 	}
 }
 
@@ -157,6 +160,7 @@ func (w *Workspace) newRequestWith(collection model.ID, path string, version mod
 	if !ok {
 		return RequestTarget{}, diagErr(diag.CodeWSUnknownCollection, map[string]string{"name": string(collection)})
 	}
+	path, name := pathForName(path)
 	if detail := requestPathProblem(path); detail != "" {
 		return RequestTarget{}, diagErr(diag.CodeWriteRequestPath, map[string]string{"path": path, "detail": detail})
 	}
@@ -166,7 +170,7 @@ func (w *Workspace) newRequestWith(collection model.ID, path string, version mod
 	} else if !errors.Is(err, fs.ErrNotExist) {
 		return RequestTarget{}, fmt.Errorf("checking %s: %w", file, err)
 	}
-	r := model.Request{Meta: model.Meta{ID: w.newID(), Name: filepath.Base(path)}, Path: path, File: file,
+	r := model.Request{Meta: model.Meta{ID: w.newID(), Name: name}, Path: path, File: file,
 		Versions: []model.RequestVersion{version}}
 	data, err := w.store.EncodeRequest(r)
 	if err != nil {
@@ -176,6 +180,34 @@ func (w *Workspace) newRequestWith(collection model.ID, path string, version mod
 		return RequestTarget{}, err
 	}
 	return RequestTarget{Collection: collection, Request: r.ID}, nil
+}
+
+// pathForName is the path a new request typed as path is kept at, and its name. The last part is what the request
+// is called, so it may be written as a name ("Test postgres"): the file then takes it with each run of other
+// characters as one "-" (Test-postgres) and the request keeps the name as typed. Folders stay plain names.
+func pathForName(path string) (string, string) {
+	dir, name := "", path
+	if i := strings.LastIndex(path, "/"); i >= 0 {
+		dir, name = path[:i+1], path[i+1:]
+	}
+	name = strings.TrimSpace(name)
+	if names.Valid(name) || strings.HasPrefix(name, ".") {
+		return dir + name, name // a leading dot is refused as it is: it would hide the file
+	}
+	var file strings.Builder
+	gap := false
+	for _, r := range name {
+		if names.Valid(string(r)) || (r == '.' && file.Len() > 0) {
+			if gap && file.Len() > 0 {
+				file.WriteByte('-')
+			}
+			gap = false
+			file.WriteRune(r)
+			continue
+		}
+		gap = true
+	}
+	return dir + file.String(), name
 }
 
 // NewFolder creates the folder path under tree ("requests" or "flows") of
@@ -195,6 +227,12 @@ func (w *Workspace) NewFolder(collection model.ID, tree, path string) error {
 	if tree != "requests" && tree != "flows" {
 		return fail("folders go under requests or flows")
 	}
+	// "Test data" is a fine folder name: each part takes the file-safe form (Test-data), as a request's file does.
+	parts := strings.Split(path, "/")
+	for i, p := range parts {
+		parts[i], _ = pathForName(p)
+	}
+	path = strings.Join(parts, "/")
 	if detail := requestPathProblem(path); detail != "" {
 		return fail(detail)
 	}

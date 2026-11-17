@@ -219,6 +219,16 @@ export function Reorder(parent, names, dropComments) {
 }
 
 /**
+ * RevealLocation shows the folder of the collection that holds tree node `node` in the system's file manager (Finder,
+ * Explorer, or the file manager the desktop has chosen). A draft in Scratch has no folder to show.
+ * @param {string} node
+ * @returns {$CancellablePromise<void>}
+ */
+export function RevealLocation(node) {
+    return $Call.ByID(1525907260, node);
+}
+
+/**
  * RevealWorkspace shows the workspace's folder in the file manager.
  * @returns {$CancellablePromise<void>}
  */

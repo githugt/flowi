@@ -14,6 +14,6 @@ export function live<T>(event: string, state: () => Promise<unknown>, set: (v: T
   })
   state().then((v) => {
     if (!seen) set(v as T)
-  })
+  }).catch(() => {}) // the caller's own state function reports a failure
   return off
 }

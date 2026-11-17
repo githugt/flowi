@@ -177,40 +177,55 @@ body {
   user-select: none;
 }
 
+/* The window's chrome is not selectable, but a screen is for reading: an explanation, a check's result or an error on
+   it can be selected and copied. Controls stay as they are, so a drag across a row of buttons selects nothing. */
+.page { -webkit-user-select: text; user-select: text; }
+.page button, .page label, .page summary, .page [role='tab'], .page [role='button'] { -webkit-user-select: none; user-select: none; }
+
+/* The shell of a list screen (Authentications, Blueprints): the page, its note, a card for each entry with a top row
+   and tags. One place for the padding and card look, so the screens do not each style themselves. */
+.shell-page { position: absolute; inset: 0; overflow: auto; padding: 28px 32px 56px; max-width: 820px; }
+.shell-note { color: var(--muted); font-size: var(--fs-sm); margin: 0 0 4px; }
+.shell-card { border: 1px solid var(--line); border-radius: var(--r-xl); background: var(--panel); padding: 8px 12px; margin: 8px 0; }
+.shell-top { display: flex; align-items: center; gap: 10px; }
+.shell-spacer { flex: 1; }
+.shell-tag { font-size: var(--fs-xs); border: 1px solid var(--line); border-radius: var(--r-pill); padding: 0 8px; color: var(--muted); }
+
 /* appearance.density: compact trades room for how much fits on screen; type sizes stay as they are. */
 :root[data-density='compact'] { --ctl-h: 24px; --ctl-h-sm: 20px; --row-h: 22px; --row-h-lg: 26px; --tabbar-h: 34px; --head-h: 34px; --addr-h: 32px; --addr-h-sm: 28px; }
 
-/* Themes: appearance.theme sets data-theme on the root; "system" sets none and follows the OS. */
-:root[data-theme='dark'], :root[data-theme='classic'], :root[data-theme='flowi-dark'] {
+/* Themes: appearance.theme sets data-theme on the root; "system" sets none and follows the OS. Not tied to :root, so a
+   swatch in Settings (any element with data-theme) previews its theme. */
+[data-theme='dark'], [data-theme='classic'], [data-theme='flowi-dark'] {
   --bg: #131519; --panel: #1a1d22; --chrome: #0c0d10; --line: rgb(255 255 255 / 0.09); --text: #e8e9ec; --muted: #8e939d; --accent: #6d8afa;
   --request: #1f3a5f; --strip: #3a2f5f; --action: #2f4a3a; --container: #4a3a2a; color-scheme: dark;
 }
-:root[data-theme='light'], :root[data-theme='flowi-light'] {
+[data-theme='light'], [data-theme='flowi-light'] {
   --bg: #ffffff; --panel: #f7f8fa; --chrome: #f1f2f5; --line: rgb(0 0 0 / 0.1); --text: #1b1d22; --muted: #666d7a; --accent: #4a63e0;
   --request: #dbe8fb; --strip: #e6defa; --action: #dcf0e3; --container: #f6e8d6; color-scheme: light;
 }
-:root[data-theme='high-contrast'] {
+[data-theme='high-contrast'] {
   --bg: #000000; --panel: #0a0a0a; --line: #ffffff; --text: #ffffff; --muted: #d0d0d0; --accent: #ffd700;
   --request: #00264d; --strip: #2a0050; --action: #003d1a; --container: #4d2600; --fail: #ff5555; color-scheme: dark;
 }
-:root[data-theme='solarized-light'] {
+[data-theme='solarized-light'] {
   --bg: #fdf6e3; --panel: #eee8d5; --line: #d3cbb7; --text: #073642; --muted: #657b83; --accent: #268bd2;
   --request: #d5e6ee; --strip: #e4def0; --action: #dde8cf; --container: #f0e1c8; color-scheme: light;
 }
-:root[data-theme='solarized-dark'] {
+[data-theme='solarized-dark'] {
   --bg: #002b36; --panel: #073642; --line: #17505e; --text: #eee8d5; --muted: #93a1a1; --accent: #2aa1f0;
   --request: #0e4a63; --strip: #3a3a6e; --action: #1c5440; --container: #5a4424; color-scheme: dark;
 }
-:root[data-theme='nord'] {
+[data-theme='nord'] {
   --bg: #2e3440; --panel: #3b4252; --line: #4c566a; --text: #eceff4; --muted: #a3acbd; --accent: #88c0d0;
   --request: #3d5a78; --strip: #5b4d7a; --action: #3f6350; --container: #6a5640; color-scheme: dark;
 }
-:root[data-theme='anuppuccin-dark'] {
+[data-theme='anuppuccin-dark'] {
   --bg: #1e1e2e; --panel: #181825; --line: #313244; --text: #cdd6f4; --muted: #9399b2; --accent: #89b4fa;
   --request: #2a3f66; --strip: #4a3a6e; --action: #2e5040; --container: #5a4430; --fail: #f38ba8; color-scheme: dark;
 }
 
-:root[data-theme='anuppuccin-light'] {
+[data-theme='anuppuccin-light'] {
   --bg: #eff1f5; --panel: #e6e9ef; --line: #ccd0da; --text: #4c4f69; --muted: #6c6f85; --accent: #1e66f5;
   --request: #d4e1fb; --strip: #e3dcf7; --action: #d9efdf; --container: #f5e6d3; --fail: #d20f39; color-scheme: light;
 }

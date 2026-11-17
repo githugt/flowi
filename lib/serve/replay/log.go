@@ -10,13 +10,14 @@ import (
 
 // Match values of an Entry.
 const (
-	MatchOK         = "ok"          // answered from a saved response
-	MatchNone       = "none"        // no request fits the call
-	MatchNoResponse = "no-response" // a request fits, but no response (or not the one asked for)
-	MatchBad        = "bad-request" // a malformed X-Flowi-* header
-	MatchRecorded   = "recorded"    // forwarded upstream and saved
-	MatchForwarded  = "forwarded"   // forwarded upstream, not saved
-	MatchFault      = "fault"       // an error or a dropped connection made on purpose
+	MatchOK         = "ok"             // answered from a saved response
+	MatchNone       = "none"           // no request fits the call
+	MatchNoResponse = "no-response"    // a request fits, but no response (or not the one asked for)
+	MatchBad        = "bad-request"    // a malformed X-Flowi-* header
+	MatchRecorded   = "recorded"       // forwarded upstream and saved
+	MatchForwarded  = "forwarded"      // forwarded upstream, not saved
+	MatchPassed     = "passed-through" // matched nothing saved: forwarded upstream, answer not saved
+	MatchFault      = "fault"          // an error or a dropped connection made on purpose
 )
 
 // Entry is one call the replayer handled.

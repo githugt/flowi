@@ -541,7 +541,8 @@ export interface RequestView {
   /** Set when the JSON body is a JSON-RPC 2.0 call: its method and id (empty for a notification). */
   jsonrpc?: { method: string; id: string }
   multipart: boolean
-  auth: { kind: string; value: string; fields: { name: string; value: string; secret: boolean; known: boolean }[]; schemes: { id: string; label: string }[] }
+  /** kind is none, bearer, basic, other, "scheme:<type>" for an auth block, or "use" for a named authentication (use is its name). */
+  auth: { kind: string; value: string; fields: AuthField[]; schemes: { id: string; label: string }[]; use: string; named: { id: string; label: string }[]; useMissing: boolean }
   sending: boolean
   sendError?: string
   response?: ResponseView
@@ -552,7 +553,7 @@ export interface RequestView {
   showingHistory: boolean
   inScratch: boolean
   live: { direction: string; at: string; body: string; key?: string; kind?: string; type?: string }[]
-  snippet: { format: string; formats: string[]; exclude: boolean; text: string; error?: string }
+  snippet: { format: string; formats: string[]; exclude: boolean; secrets?: boolean; text: string; error?: string }
 }
 
 export interface Prompt {
@@ -715,7 +716,7 @@ export interface ReplayerView {
   addr: string
   error?: string
   notes: string[]
-  form: { addr: string; latency: string; sequence: boolean; cors: boolean; record: string; recordTo: string; recordHar: string; faultErrorPercent: string; faultStatus: string; faultDropPercent: string; faultJitter: string }
+  form: { addr: string; latency: string; sequence: boolean; cors: boolean; record: string; recordTo: string; recordHar: string; passThrough: string; faultErrorPercent: string; faultStatus: string; faultDropPercent: string; faultJitter: string }
   targets: { id: string; label: string; path?: string }[]
   traffic: { seq: number; at: string; method: string; path: string; status: number; match: string; request: string; duration: string; remote: string; version: string; example: string; source: string; delay: string }[]
 }
@@ -724,6 +725,39 @@ export interface TrashView {
   items: { id: string; kind: 'request' | 'flow'; name: string; path: string; at: string }[]
   after: string
   error?: string
+}
+
+/** One parameter of an auth scheme, as a form shows it. */
+export interface AuthField {
+  name: string
+  value: string
+  /** A credential: written as {{secret.name}}. */
+  secret: boolean
+  /** The scheme has this parameter. */
+  known: boolean
+}
+
+/** An authentication a collection keeps under a name. */
+export interface NamedAuth {
+  key: string
+  collection: string
+  collectionName: string
+  name: string
+  description: string
+  /** "scheme:<type>". */
+  scheme: string
+  schemeLabel: string
+  fields: AuthField[]
+  /** The requests that use it. */
+  uses: string[]
+}
+
+export interface AuthsView {
+  auths: NamedAuth[]
+  collections: Choice[]
+  schemes: { id: string; label: string }[]
+  /** The empty fields of each scheme, by "scheme:<type>". */
+  forms: Record<string, AuthField[]>
 }
 
 export interface BlueprintsView {
@@ -810,6 +844,8 @@ export interface DatasetBlock {
   Params: string[] | null
   /** The most rows kept; 0 is the default. */
   Limit: number
+  /** This query may change data: the read-only guards are off for it. */
+  Writes?: boolean
 }
 
 export interface DatasetInfo {

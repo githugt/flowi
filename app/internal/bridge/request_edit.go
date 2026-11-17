@@ -14,12 +14,18 @@ import (
 
 // AuthView is the Authorization header as the Auth section shows it.
 type AuthView struct {
-	Kind  string `json:"kind"` // none, bearer, basic or other; "scheme:<type>" when the version has an auth block
+	Kind  string `json:"kind"` // none, bearer, basic or other; "scheme:<type>" when the version has an auth block; "use" when it uses a named authentication
 	Value string `json:"value"`
 	// Fields are the parameters of the auth block's scheme, in the order a form shows them.
 	Fields []AuthFieldView `json:"fields"`
 	// Schemes are the schemes an auth block can have.
 	Schemes []Choice `json:"schemes"`
+	// Use is the named authentication the version uses, when Kind is "use".
+	Use string `json:"use"`
+	// Named are the named authentications of the request's collection (id is the name, label says the scheme).
+	Named []Choice `json:"named"`
+	// UseMissing says the collection has no authentication called Use: the request cannot be sent until one is picked.
+	UseMissing bool `json:"useMissing"`
 }
 
 // AuthFieldView is one parameter of an auth block's scheme.
@@ -30,12 +36,17 @@ type AuthFieldView struct {
 	Known  bool   `json:"known"`  // the scheme has this parameter (an unknown one is a typo)
 }
 
-func authSchemeChoices() []Choice {
-	labels := map[string]string{
+// authSchemeLabels names each scheme of an auth block as the forms show it.
+func authSchemeLabels() map[string]string {
+	return map[string]string{
 		model.AuthAPIKey: "API key", model.AuthDigest: "Digest", model.AuthOAuth2: "OAuth 2.0", model.AuthOAuth1: "OAuth 1.0a",
 		model.AuthAWSSigV4: "AWS Signature v4", model.AuthJWT: "JWT bearer", model.AuthHawk: "Hawk", model.AuthMutualTLS: "Client certificate (mTLS)", model.AuthNTLM: "Windows (NTLM)",
 		model.AuthHTTPSig: "HTTP message signature (RFC 9421)", model.AuthDPoP: "DPoP proof (RFC 9449)",
 	}
+}
+
+func authSchemeChoices() []Choice {
+	labels := authSchemeLabels()
 	out := make([]Choice, 0, len(labels))
 	for _, t := range model.AuthTypes() {
 		out = append(out, Choice{ID: "scheme:" + t, Label: labels[t]})
@@ -47,17 +58,32 @@ func authKinds() map[string]vm.AuthKind {
 	return map[string]vm.AuthKind{"none": vm.AuthNone, "bearer": vm.AuthBearer, "basic": vm.AuthBasic, "other": vm.AuthOther}
 }
 
-func authViewOf(r *vm.Request) AuthView {
+// authViewOf is the Auth section of r; named are the named authentications
+// of every mounted collection, of which the request's own are offered.
+func authViewOf(r *vm.Request, named []vm.NamedAuth) AuthView {
+	v := AuthView{Kind: "none", Fields: []AuthFieldView{}, Schemes: authSchemeChoices(), Named: []Choice{}}
+	labels := authSchemeLabels()
+	for _, a := range named {
+		if a.Collection == r.Target().Collection {
+			v.Named = append(v.Named, Choice{ID: a.Name, Label: a.Name + " (" + labels[a.Auth.Type] + ")"})
+		}
+	}
+	if use := r.AuthUse(); use != "" {
+		v.Kind, v.Use = "use", use
+		v.UseMissing = !slices.ContainsFunc(v.Named, func(c Choice) bool { return c.ID == use })
+		return v
+	}
 	if scheme, params := r.AuthScheme(); scheme != "" {
-		return AuthView{Kind: "scheme:" + scheme, Fields: authFields(scheme, params), Schemes: authSchemeChoices()}
+		v.Kind, v.Fields = "scheme:"+scheme, authFields(scheme, params)
+		return v
 	}
 	kind, value := r.Auth()
 	for name, k := range authKinds() {
-		if k == kind {
-			return AuthView{Kind: name, Value: value, Fields: []AuthFieldView{}, Schemes: authSchemeChoices()}
+		if k == kind && kind != vm.AuthNone {
+			v.Kind, v.Value = name, value
 		}
 	}
-	return AuthView{Kind: "none", Fields: []AuthFieldView{}, Schemes: authSchemeChoices()}
+	return v
 }
 
 // authFields lists a scheme's parameters with their values, then any other
@@ -207,6 +233,12 @@ func (s *RequestService) SetAuth(node, kind, value string) {
 // block): apikey, digest, oauth2, oauth1, aws_sigv4, jwt, hawk, mtls, ntlm, httpsig or dpop.
 func (s *RequestService) SetAuthScheme(node, scheme string) {
 	s.with(node, func(o *openRequest) { o.req.SetAuthScheme(scheme) })
+}
+
+// SetAuthUse makes the version use the named authentication `name` of its
+// collection instead of an auth block of its own ("" removes the auth).
+func (s *RequestService) SetAuthUse(node, name string) {
+	s.with(node, func(o *openRequest) { o.req.SetAuthUse(name) })
 }
 
 // SetAuthParam sets one parameter of the auth block; "" removes it.

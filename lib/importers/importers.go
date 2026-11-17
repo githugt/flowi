@@ -24,6 +24,7 @@ type Result struct {
 	Requests     []model.Request
 	Environments []model.Environment
 	Flows        []model.Flow
+	Auths        []model.NamedAuth // authentications a collection or folder sets, used by name; written to auths/
 	Examples     []Example
 	Items        []Item
 }

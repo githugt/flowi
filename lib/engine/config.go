@@ -44,6 +44,8 @@ type config struct {
 	cookies         string // isolated | shared | off (lane jars)
 	defaultHeaders  []string
 	userAgent       string // "" → the client's own
+	datasetWrites   bool   // datasets.allow_writes
+	defaultAuth     string // auth.default
 }
 
 // newConfig reads the settings the engine uses. Every key has a validated
@@ -70,6 +72,7 @@ func newConfig(r settings.Resolved) config {
 		maxConcurrency: int(setting[int64](r, "run.max_concurrency")), grace: setting[time.Duration](r, "run.grace"),
 		cookies:        setting[string](r, "http.cookies"),
 		defaultHeaders: setting[[]string](r, "http.default_headers"), userAgent: setting[string](r, "http.user_agent"),
+		datasetWrites: setting[bool](r, "datasets.allow_writes"), defaultAuth: setting[string](r, "auth.default"),
 	}
 }
 

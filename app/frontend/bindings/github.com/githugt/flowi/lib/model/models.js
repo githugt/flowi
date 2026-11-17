@@ -191,6 +191,10 @@ export class AsyncSend {
  * Auth is a version's authentication scheme and its parameters, in file
  * order. Every value is a template, so credentials come from the vault
  * ({{secret.client_secret}}) and never sit in the file.
+ * 
+ * Use names a named authentication of the collection instead: the version
+ * then carries no scheme or parameters of its own, and the named one is
+ * applied when the request is sent.
  */
 export class Auth {
     /**
@@ -211,6 +215,13 @@ export class Auth {
              * @type {KeyValue[]}
              */
             this["Params"] = [];
+        }
+        if (!("Use" in $$source)) {
+            /**
+             * @member
+             * @type {string}
+             */
+            this["Use"] = "";
         }
 
         Object.assign(this, $$source);
@@ -394,7 +405,7 @@ export class Dataset {
     constructor($$source = {}) {
         if (!("Driver" in $$source)) {
             /**
-             * Driver is the store: postgres, mysql, mariadb or sqlite.
+             * Driver is the store: postgres, mysql, mariadb, sqlite, csv, xlsx or parquet (SQL over data files or a folder of them).
              * @member
              * @type {string}
              */
@@ -435,6 +446,15 @@ export class Dataset {
              * @type {number}
              */
             this["Limit"] = 0;
+        }
+        if (!("Writes" in $$source)) {
+            /**
+             * Writes lets this query change data: the read-only guards are off for it. Off is the default; the setting
+             * datasets.allow_writes does the same for every query.
+             * @member
+             * @type {boolean}
+             */
+            this["Writes"] = false;
         }
 
         Object.assign(this, $$source);

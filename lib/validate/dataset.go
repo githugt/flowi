@@ -22,7 +22,7 @@ func checkDataset(ix *index) diag.List {
 					continue
 				}
 				base := yamlpath.Key(yamlpath.Key("$", "versions"), v.Label)
-				out = append(out, datasetDiags(r.File, yamlpath.Key(base, "dataset"), v)...)
+				out = append(out, datasetDiags(r.File, yamlpath.Key(base, "dataset"), v, ix.allowWrites)...)
 			}
 		}
 	}
@@ -30,7 +30,7 @@ func checkDataset(ix *index) diag.List {
 }
 
 // datasetDiags checks one dataset block. path is the path of the block itself.
-func datasetDiags(file, path string, v model.RequestVersion) diag.List {
+func datasetDiags(file, path string, v model.RequestVersion, allowWrites bool) diag.List {
 	var out diag.List
 	problem := func(p, detail string) {
 		out = append(out, diag.New(diag.CodeDatasetRequest, diag.Location{File: file, Path: p}, map[string]string{"detail": detail}))
@@ -45,7 +45,7 @@ func datasetDiags(file, path string, v model.RequestVersion) diag.List {
 	if strings.TrimSpace(d.Server) == "" {
 		problem(yamlpath.Key(path, "server"), "the server is empty: give a connection URL, or for sqlite the path of the file")
 	}
-	if detail := queryProblem(d.Query); detail != "" {
+	if detail := queryProblem(d.Query, allowWrites || d.Writes); detail != "" {
 		problem(yamlpath.Key(path, "query"), detail)
 	}
 	if d.Limit < 0 {
@@ -55,13 +55,16 @@ func datasetDiags(file, path string, v model.RequestVersion) diag.List {
 }
 
 // queryProblem is what is wrong with a query, "" when it is fine.
-func queryProblem(query string) string {
+func queryProblem(query string, allowWrites bool) string {
 	if templated(query) {
 		// A value written into the statement could change what it means. Params are sent apart from it.
 		return "the query is not templated: put values in params and refer to them as $1, $2 … (postgres, sqlite) or ?"
 	}
+	if allowWrites {
+		return ""
+	}
 	if err := readonly.Check(query); err != nil {
-		return err.Error()
+		return err.Error() + ". To run statements that change data, turn on 'Allow this query to change data' on the request, or the setting datasets.allow_writes for all (Settings > Requests)"
 	}
 	return ""
 }

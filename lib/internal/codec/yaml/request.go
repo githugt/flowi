@@ -107,14 +107,14 @@ func (c *Codec) requestVersion(d *decoder, m *mapping, label string) model.Reque
 	return v
 }
 
-// auth reads the auth: block of a version, nil when there is none: its type,
-// then its parameters in file order.
+// auth reads the auth: block of a version, nil when there is none: the named
+// authentication it uses, or its type and then its parameters in file order.
 func (m *mapping) auth() *model.Auth {
 	am, ok := m.child("auth")
 	if !ok {
 		return nil
 	}
-	a := &model.Auth{Type: am.str("type")}
+	a := &model.Auth{Use: am.str("use"), Type: am.str("type")}
 	for _, e := range am.rest() {
 		am.used[e.key] = true
 		a.Params = append(a.Params, model.KeyValue{Key: e.key, Value: am.d.scalarString(e.value, e.path, e.key, true)})
@@ -167,7 +167,7 @@ func (m *mapping) dataset() *model.Dataset {
 	if !ok {
 		return nil
 	}
-	d := &model.Dataset{Driver: dm.str("driver"), Server: dm.str("server"), Query: dm.str("query"), Limit: int(dm.integer("limit"))}
+	d := &model.Dataset{Driver: dm.str("driver"), Server: dm.str("server"), Query: dm.str("query"), Limit: int(dm.integer("limit")), Writes: dm.boolean("writes")}
 	if e, ok := dm.take("params"); ok {
 		d.Params = dm.d.lenientStrings(e)
 	}
@@ -503,6 +503,9 @@ func encodeDataset(d *model.Dataset) yaml.MapSlice {
 	if d.Limit != 0 {
 		o.put("limit", d.Limit)
 	}
+	if d.Writes {
+		o.put("writes", true)
+	}
 	return presentMap(o.items)
 }
 
@@ -517,6 +520,9 @@ func presentMap(items yaml.MapSlice) yaml.MapSlice {
 
 // encodeAuth writes the scheme first, then its parameters.
 func encodeAuth(a model.Auth) yaml.MapSlice {
+	if a.Use != "" {
+		return yaml.MapSlice{{Key: "use", Value: a.Use}}
+	}
 	out := yaml.MapSlice{{Key: "type", Value: a.Type}}
 	for _, kv := range a.Params {
 		out = append(out, yaml.MapItem{Key: kv.Key, Value: kv.Value})

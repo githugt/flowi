@@ -373,13 +373,35 @@ func (r *Request) Edit(f func(v *model.RequestVersion)) {
 		return
 	}
 	f(&r.draft.Versions[r.selected])
-	r.dirty = true
 	r.rev++
-	r.scheduleAutosave()
+	if sameSaved(r.draft, r.disk) && r.orphan == "" {
+		r.becameClean() // undone, or typed back to what the file holds
+	} else {
+		r.dirty = true
+		r.scheduleAutosave()
+	}
 	r.changed()
 	for _, f := range r.onEdit {
 		f()
 	}
+}
+
+// becameClean is for an edit that left the draft equal to the file: nothing is
+// unsaved any more, and an edit stored in the file's slot is dropped.
+func (r *Request) becameClean() {
+	r.cancelAutosave()
+	r.dirty = false
+	if !r.slot || r.saving > 0 {
+		return
+	}
+	r.slot = false
+	r.write(func() error { return r.b.DiscardEdit(r.target) }, func(err error) {
+		if err != nil {
+			r.slot = true
+			r.err = ErrorText(err)
+			r.changed()
+		}
+	})
 }
 
 // SetDefault makes the selected version the request's default.
@@ -513,6 +535,27 @@ func (r *Request) AuthScheme() (string, []model.KeyValue) {
 	return a.Type, a.Params
 }
 
+// AuthUse is the named authentication the version uses, "" when it writes
+// its own auth (or has none).
+func (r *Request) AuthUse() string {
+	if a := r.Current().Auth; a != nil {
+		return a.Use
+	}
+	return ""
+}
+
+// SetAuthUse makes the version use the collection's named authentication
+// instead of an auth block of its own; "" removes the auth.
+func (r *Request) SetAuthUse(name string) {
+	r.Edit(func(v *model.RequestVersion) {
+		if name == "" {
+			v.Auth = nil
+			return
+		}
+		v.Auth = &model.Auth{Use: name}
+	})
+}
+
 // SetAuthScheme chooses the auth block's scheme; "" removes the block. A
 // different scheme starts with no parameters, since they do not carry over.
 func (r *Request) SetAuthScheme(scheme string) {
@@ -520,7 +563,7 @@ func (r *Request) SetAuthScheme(scheme string) {
 		switch {
 		case scheme == "":
 			v.Auth = nil
-		case v.Auth == nil || v.Auth.Type != scheme:
+		case v.Auth == nil || v.Auth.Use != "" || v.Auth.Type != scheme:
 			v.Auth = &model.Auth{Type: scheme}
 		}
 	})
@@ -529,7 +572,7 @@ func (r *Request) SetAuthScheme(scheme string) {
 // SetAuthParam sets a parameter of the auth block; an empty value removes it.
 func (r *Request) SetAuthParam(name, value string) {
 	r.Edit(func(v *model.RequestVersion) {
-		if v.Auth == nil {
+		if v.Auth == nil || v.Auth.Use != "" {
 			return
 		}
 		params := slices.DeleteFunc(slices.Clone(v.Auth.Params), func(kv model.KeyValue) bool { return kv.Key == name })
@@ -718,16 +761,35 @@ func (r *Request) Reloaded(c model.Collection, disk model.Request, found bool) {
 	r.coll = c
 	switch {
 	case !found:
-		r.err = "this request was removed or its file no longer loads (see Problems)"
+		r.err = removedText
 	case r.dirty && sameSaved(disk, r.disk):
 		r.slot = disk.Edit != nil
+	case r.dirty && sameSaved(inPlaceOf(disk, r.disk), r.disk):
+		// Renamed or moved, nothing else: the edits still fit, so there is no conflict to ask about.
+		r.disk.Name, r.disk.Path, r.disk.File = disk.Name, disk.Path, disk.File
+		r.draft.Name, r.draft.Path, r.draft.File = disk.Name, disk.Path, disk.File
 	case r.dirty:
 		disk.Edit, disk.EditBase = nil, ""
 		r.disk, r.onDisk = disk, true
+	case sameSaved(disk, r.disk):
+		// Every send reloads the workspace: a file that did not change must not undo a choice made in the
+		// editor that is not an edit yet (a body type picked for an empty body).
 	default:
 		r.load(disk)
 	}
+	if found && r.err == removedText {
+		r.err = "" // it is back (a rename removes the old file before the new one loads)
+	}
 	r.changed()
+}
+
+// removedText is the error an open request shows while its file is gone.
+const removedText = "this request was removed or its file no longer loads (see Problems)"
+
+// inPlaceOf is a with the name and place of b, to compare everything else.
+func inPlaceOf(a, b model.Request) model.Request {
+	a.Name, a.Path, a.File = b.Name, b.Path, b.File
+	return a
 }
 
 // sameSaved reports whether two loads of a request hold the same saved

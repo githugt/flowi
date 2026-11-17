@@ -160,3 +160,33 @@ func TestDiscardSecret_Given_an_unknown_environment_Then_FLW_REQ_004(t *testing.
 
 	requireCode(t, err, diag.CodeRequestEnvUnknown)
 }
+
+func TestDeclareSecret_Given_a_new_name_Then_the_environment_declares_it_and_the_value_is_stored(t *testing.T) {
+	w := demoWorkspace(t)
+
+	err := w.DeclareSecret("local", "db_password", "hunter2")
+	got, _ := w.Secrets()
+
+	if err != nil {
+		t.Fatal(err)
+	}
+	found := false
+	for _, s := range got {
+		if s.Environment == "local" && s.Name == "db_password" && s.Set {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("not declared and set: %+v", got)
+	}
+}
+
+func TestDeclareSecret_Given_a_plain_variable_Then_it_is_refused(t *testing.T) {
+	w := demoWorkspace(t)
+
+	err := w.DeclareSecret("local", "base_url", "x")
+
+	if err == nil || !strings.Contains(err.Error(), "plain variable") {
+		t.Fatalf("got %v", err)
+	}
+}

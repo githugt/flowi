@@ -42,10 +42,10 @@ func TestRequestService_should_show_a_dataset_request_with_its_block_and_the_dri
 	if err != nil {
 		t.Fatal(err)
 	}
-	if view.Kind != "dataset" || view.Verb != "SQL" || view.Dataset == nil || view.Dataset.Block.Driver != "postgres" {
+	if view.Kind != "dataset" || view.Verb != "POSTGRES" || view.Dataset == nil || view.Dataset.Block.Driver != "postgres" {
 		t.Fatalf("kind %q verb %q dataset %+v", view.Kind, view.Verb, view.Dataset)
 	}
-	if len(view.Dataset.Drivers) != 4 || view.Dataset.Drivers[0].ID != "postgres" || view.Dataset.Drivers[0].Label != "PostgreSQL" {
+	if len(view.Dataset.Drivers) != 7 || view.Dataset.Drivers[0].ID != "postgres" || view.Dataset.Drivers[0].Label != "PostgreSQL" {
 		t.Fatalf("drivers %+v", view.Dataset.Drivers)
 	}
 }
@@ -86,7 +86,7 @@ func TestWorkspaceService_Menu_should_offer_a_new_dataset_query_that_asks_for_th
 		if e.Action != "newDataset" {
 			continue
 		}
-		if e.Label != "New dataset query…" || e.Prompt == nil || len(e.Prompt.Protocols) != 4 || e.Prompt.Protocols[0].ID != "postgres" || e.Prompt.Protocols[0].Label != "PostgreSQL" {
+		if e.Label != "New dataset query…" || e.Prompt == nil || len(e.Prompt.Protocols) != 7 || e.Prompt.Protocols[0].ID != "postgres" || e.Prompt.Protocols[0].Label != "PostgreSQL" {
 			t.Fatalf("entry %+v prompt %+v", e, e.Prompt)
 		}
 		return

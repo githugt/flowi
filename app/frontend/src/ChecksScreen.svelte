@@ -70,6 +70,7 @@
 </script>
 
 <div class="page">
+  <p class="note">Checks look at the OpenAPI descriptions you imported. Use Coverage to see which API operations your flows never call, and Spec change before importing a newer description, to see which flows and requests it would break. Both only read: nothing is changed. If the lists below are empty, import an OpenAPI description first (Import).</p>
   <label class="f"><span>Collection</span>
     <select bind:value={collection}>{#each targets as t}<option value={t.id}>{t.label}</option>{/each}</select>
   </label>

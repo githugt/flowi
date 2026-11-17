@@ -123,6 +123,10 @@ func (w *Workspace) CreateBlueprint(flow FlowTarget, path, name string) (Bluepri
 	if err != nil {
 		return BlueprintTarget{}, err
 	}
+	path, typed := pathForName(path) // "Sign up" is a fine name: its file is Sign-up
+	if name == "" {
+		name = typed
+	}
 	file, err := newEntityFile(c, "blueprints", path, blueprintSuffix)
 	if err != nil {
 		return BlueprintTarget{}, err
@@ -158,12 +162,13 @@ func (w *Workspace) NewFlowFromBlueprint(t BlueprintTarget, collection model.ID,
 	if !ok {
 		return FlowTarget{}, diagErr(diag.CodeWSUnknownCollection, map[string]string{"name": string(collection)})
 	}
+	path, name := pathForName(path)
 	file, err := newEntityFile(c, "flows", path, flowSuffix)
 	if err != nil {
 		return FlowTarget{}, err
 	}
 	f, diags := blueprint.Instantiate(bp, blueprint.Input{
-		Values: values, Resolve: blueprintResolver{c: c}, NewID: w.newID, Path: path, Name: filepath.Base(path),
+		Values: values, Resolve: blueprintResolver{c: c}, NewID: w.newID, Path: path, Name: name,
 	})
 	if len(diags) > 0 {
 		return FlowTarget{}, diags.Err()

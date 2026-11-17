@@ -21,9 +21,32 @@ const (
 // Auth is a version's authentication scheme and its parameters, in file
 // order. Every value is a template, so credentials come from the vault
 // ({{secret.client_secret}}) and never sit in the file.
+//
+// Use names a named authentication of the collection instead: the version
+// then carries no scheme or parameters of its own, and the named one is
+// applied when the request is sent.
 type Auth struct {
 	Type   string
 	Params []KeyValue
+	Use    string
+}
+
+// NamedAuth is an authentication defined once in a collection
+// (auths/<name>.auth.yaml) and used by request versions by name.
+type NamedAuth struct {
+	Meta
+	Auth Auth
+	File string
+}
+
+// NamedAuth returns the collection's named authentication called name.
+func (c Collection) NamedAuth(name string) (NamedAuth, bool) {
+	for _, a := range c.Auths {
+		if a.Name == name {
+			return a, true
+		}
+	}
+	return NamedAuth{}, false
 }
 
 // AuthTypes lists the schemes in documentation order.

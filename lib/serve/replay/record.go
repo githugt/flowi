@@ -361,3 +361,24 @@ func writeAtomic(file string, data []byte) error {
 	}
 	return nil
 }
+
+// servePassThrough forwards a call nothing saved can answer and relays the answer. Nothing is saved.
+func (h *Handler) servePassThrough(w http.ResponseWriter, r *http.Request, start time.Time) {
+	body, err := io.ReadAll(io.LimitReader(r.Body, h.pass.MaxBody+1))
+	if err == nil && int64(len(body)) > h.pass.MaxBody {
+		err = errTooLarge
+	}
+	var res upstreamResponse
+	if err == nil {
+		res, err = h.pass.forward(r, body)
+	}
+	if err != nil {
+		a := problem(r, http.StatusBadGateway, MatchUpstreamError, "upstream: "+err.Error())
+		h.deliver(w, r, a)
+		h.record(r, a, time.Since(start), nil)
+		return
+	}
+	a := answer{status: res.status, match: MatchPassed}
+	h.relay(w, r, a, res)
+	h.record(r, a, time.Since(start), nil)
+}

@@ -73,19 +73,26 @@ func (im *importer) at() diag.Location { return diag.Location{File: im.file} }
 type inherited struct {
 	headers []map[string]any
 	auth    map[string]any
+	scope   string // the name of the named authentication the auth becomes when it is a scheme with an auth block
 }
 
-func (in inherited) with(node map[string]any) inherited {
-	out := inherited{headers: slices.Concat(in.headers, loose.List(node["headers"])), auth: in.auth}
+// with adds what node (a collection or the folder at folders) sets. Its own auth gets a scope named after it.
+func (in inherited) with(node map[string]any, folders []string) inherited {
+	out := inherited{headers: slices.Concat(in.headers, loose.List(node["headers"])), auth: in.auth, scope: in.scope}
 	if a := loose.Map(node["auth"]); a != nil && loose.Str(a["authType"]) != "inherit" && loose.Str(a["authType"]) != "" {
 		out.auth = a
+		owner := strings.Join(folders, "-")
+		if owner == "" {
+			owner = fileSegment(loose.Str(node["name"]), "collection")
+		}
+		out.scope = owner + "-auth"
 	}
 	return out
 }
 
 // collection imports a collection's requests and then its folders.
 func (im *importer) collection(node map[string]any, folders []string, parent inherited) {
-	in := parent.with(node)
+	in := parent.with(node, folders)
 	for _, r := range loose.List(node["requests"]) {
 		im.request(r, folders, in)
 	}

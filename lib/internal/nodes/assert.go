@@ -60,7 +60,17 @@ func runCheck(n model.Node, s *State, check string, warn bool) diag.List {
 	if ok {
 		return nil
 	}
-	return Failed(n.ID, check, stringParam(n, "message"), warn, s.Emit)
+	return Failed(n.ID, check, assertMessage(n, s), warn, s.Emit)
+}
+
+// assertMessage is the message with its templates filled in, so "got {{response.status}}" says what was got. A
+// message that cannot be rendered is shown as written: the check failing is what matters, not the wording.
+func assertMessage(n model.Node, s *State) string {
+	message, err := stopMessage(n, s)
+	if err != nil {
+		return stringParam(n, "message")
+	}
+	return message
 }
 
 // runSchemaCheck fails when the step has no kept schema or its response does

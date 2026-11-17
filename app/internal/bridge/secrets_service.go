@@ -57,6 +57,23 @@ func (s *SecretsService) Set(environment, name, value string) {
 	})
 }
 
+// Declare makes name a secret of the environment, declaring it in the environment's file when it is not one yet,
+// and stores value for it. It answers "" when done, or what went wrong: the request editor moves a password out of
+// a connection string with it.
+func (s *SecretsService) Declare(environment, name, value string) string {
+	out := make(chan string, 1)
+	s.app.actor.Do(func() {
+		s.vm.Declare(flowi.SecretInfo{Environment: environment, Name: name}, value, func(err error) {
+			if err != nil {
+				out <- vm.ErrorText(err)
+				return
+			}
+			out <- ""
+		})
+	})
+	return <-out
+}
+
 // Reveal returns one stored value for the window to show for a moment; it is the only call that sends a
 // value to the window, and it sends one. The window asks the passphrase first (PassphraseService.Unlock),
 // so this never waits for the user. The reveal is logged, without the value.

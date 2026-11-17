@@ -23,7 +23,7 @@ const (
 // itself, or the protocol of an async version (MQTT, WS, …).
 func Verb(v model.RequestVersion) string {
 	if v.Dataset != nil {
-		return datasetVerb
+		return datasetVerbOf(*v.Dataset)
 	}
 	if v.GRPC != nil {
 		return model.ProtocolVerbGRPC

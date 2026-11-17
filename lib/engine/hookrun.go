@@ -71,7 +71,8 @@ func (x *execution) hookFrame(fs *flowScope, label string) *frame {
 		prefix = x.c.path + "/" + label + "/"
 	}
 	return &frame{fs: fs, vars: x.state.Vars, outputs: newOutputs(nil), jar: x.jar(), noJar: x.c.noJar,
-		prefix: prefix, parentPath: x.c.path, lane: label, depth: x.c.depth + 1}
+		prefix: prefix, parentPath: x.c.path, lane: label, depth: x.c.depth + 1,
+		activeHooks: activeWith(x.c.activeHooks, hookKey(fs))}
 }
 
 // nodeOutputs are a request node's outputs: extracted values, then

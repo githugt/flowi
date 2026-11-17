@@ -1,10 +1,9 @@
 <script lang="ts">
+  import { verbKey } from './lib/verbs'
   // A verb (GET, MQTT …) in its colour. "pill" has the tinted, glowing outline of the tree and the pickers;
   // "text" is the bare coloured text (the tabs).
   let { verb, text: shown, pill = true, short = false }: { verb: string; text?: string; pill?: boolean; short?: boolean } = $props()
-  const known = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'QUERY', 'WS', 'SSE', 'MQTT', 'KAFKA', 'AMQP', 'NATS', 'GRPC', 'SQL', 'REDIS', 'SQS', 'SNS', 'BUS', 'PUBSUB', 'FLOW', 'POSTGRES', 'MYSQL', 'MARIADB', 'SQLITE']
-  const upper = $derived(verb.toUpperCase())
-  const key = $derived(known.includes(upper) ? upper : 'OTHER')
+  const key = $derived(verbKey(verb))
   // httpie-style short forms keep the tab narrow.
   const text = $derived(shown ?? (short ? (verb === 'DELETE' ? 'DEL' : verb.slice(0, 5)) : verb))
 </script>

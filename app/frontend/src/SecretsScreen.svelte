@@ -67,7 +67,7 @@
   <p class="note">Secret values live in the encrypted workspace vault, never in a file. They stay hidden; <b>Show</b> reveals one secret for {REVEAL_MS / 1000} seconds. On the command line: <code>flowi secret get &lt;env&gt; &lt;name&gt; --reveal</code>.</p>
   {#if revealError}<p class="err">{revealError}</p>{/if}
   {#if view.error}<p class="err">{view.error}</p>{/if}
-  {#if !view.secrets.length}<p class="note">No environment declares a secret yet.</p>{/if}
+  {#if !view.secrets.length}<p class="note">No environment declares a secret yet. To make one, open an environment in the sidebar, add a variable and tick <b>Secret</b>; it then appears here to be given a value. Example: a database password, kept out of the request file as <code>{`{{secret.db_password}}`}</code>.</p>{/if}
   {#each byEnv as [env, list]}
     <h3>{env}</h3>
     {#each list ?? [] as s (key(s))}

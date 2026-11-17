@@ -3,6 +3,7 @@
 package vm
 
 import (
+	"reflect"
 	"strings"
 
 	flowi "github.com/githugt/flowi/lib"
@@ -58,6 +59,11 @@ func (s *Snippet) Format() snippet.Format { return s.format }
 
 // Exclude reports whether secrets are left out.
 func (s *Snippet) Exclude() bool { return s.exclude }
+
+// HasSecrets is true when the snippet text carries real secret values: secrets are included and the request has some.
+func (s *Snippet) HasSecrets() bool {
+	return !s.exclude && s.actual != nil && !reflect.DeepEqual(*s.actual, s.masked)
+}
 
 // Text is the snippet, or "" before the first preview or after a problem.
 func (s *Snippet) Text() string { return s.text }

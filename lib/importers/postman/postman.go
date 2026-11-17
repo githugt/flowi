@@ -13,6 +13,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -74,7 +75,7 @@ func (im *importer) collection(c collection) importers.Result {
 		im.result.Environments = append(im.result.Environments, env)
 	}
 	im.result.Items = append(im.result.Items, top)
-	im.walk(c.Item, nil, c.Auth, "item")
+	im.walk(c.Item, nil, c.Auth, cmpOr(importers.FileName(c.Info.Name), "collection")+"-auth", "item")
 	return im.result
 }
 
@@ -116,33 +117,34 @@ func reportScripts(it *importers.Item, owner string, events []event) {
 }
 
 // walk imports items; folders add a path segment and may set auth.
-func (im *importer) walk(items []item, folders []string, inherited *auth, ptr string) {
+func (im *importer) walk(items []item, folders []string, inherited *auth, scope, ptr string) {
 	for i, it := range items {
 		p := ptr + "/" + strconv.Itoa(i)
 		loc := diag.Location{File: im.file, Pos: im.lines.Position(im.offsets[p])}
 		switch {
 		case it.Item != nil:
-			folderAuth := inherited
+			folderAuth, folderScope := inherited, scope
+			subfolders := append(append([]string{}, folders...), cmpOr(importers.FileName(it.Name), "folder"))
 			if it.Auth != nil && it.Auth.Type != "inherit" {
-				folderAuth = it.Auth
+				folderAuth, folderScope = it.Auth, strings.Join(subfolders, "-")+"-auth"
 			}
 			if len(it.Event) > 0 {
 				folder := importers.Item{Name: "folder " + it.Name, Source: loc}
 				reportScripts(&folder, "folder "+it.Name, it.Event)
 				im.result.Items = append(im.result.Items, folder)
 			}
-			im.walk(it.Item, append(append([]string{}, folders...), cmpOr(importers.FileName(it.Name), "folder")), folderAuth, p+"/item")
+			im.walk(it.Item, subfolders, folderAuth, folderScope, p+"/item")
 		case it.Request == nil:
 			skipped := importers.Item{Name: it.Name, Source: loc}
 			skipped.Skip("it is neither a request nor a folder")
 			im.result.Items = append(im.result.Items, skipped)
 		default:
-			im.request(it, folders, inherited, loc)
+			im.request(it, folders, inherited, scope, loc)
 		}
 	}
 }
 
-func (im *importer) request(it item, folders []string, inherited *auth, loc diag.Location) {
+func (im *importer) request(it item, folders []string, inherited *auth, scope string, loc diag.Location) {
 	path := strings.Join(append(append([]string{}, folders...), cmpOr(importers.FileName(it.Name), "request")), "/")
 	rep := importers.Item{Name: path, Source: loc}
 	req, err := decodeRequest(it.Request)
@@ -154,7 +156,7 @@ func (im *importer) request(it item, folders []string, inherited *auth, loc diag
 	default:
 		path = im.taken.Unique(path)
 		rep.Name = path
-		v := im.version(&rep, req, inherited)
+		v := im.version(&rep, req, inherited, scope)
 		im.result.Requests = append(im.result.Requests, model.Request{Meta: model.Meta{Name: it.Name}, Path: path, Versions: []model.RequestVersion{v}})
 		im.examples(&rep, path, it.Response)
 		reportScripts(&rep, "request", it.Event)
@@ -163,7 +165,7 @@ func (im *importer) request(it item, folders []string, inherited *auth, loc diag
 }
 
 // version builds the request's only version, reporting into rep.
-func (im *importer) version(rep *importers.Item, req decoded, inherited *auth) model.RequestVersion {
+func (im *importer) version(rep *importers.Item, req decoded, inherited *auth, scope string) model.RequestVersion {
 	t := &translator{Translator: importers.Translator{Item: rep}, it: rep}
 	v := model.RequestVersion{Label: "1", Method: strings.ToUpper(cmpOr(req.method, "GET"))}
 	v.URL, v.Query = t.url(req.url)
@@ -176,11 +178,14 @@ func (im *importer) version(rep *importers.Item, req decoded, inherited *auth) m
 		}
 		v.Headers = append(v.Headers, model.KeyValue{Key: h.Key, Value: t.credential("header "+h.Key, h.Key, string(h.Value))})
 	}
-	a := inherited
+	a, own := inherited, false
 	if req.auth != nil && req.auth.Type != "inherit" {
-		a = req.auth
+		a, own = req.auth, true
 	}
 	t.auth(a, &v)
+	if !own && v.Auth != nil {
+		v.Auth = im.named(scope, a, *v.Auth) // set once on the collection or folder, used by every request under it
+	}
 	v.Body = t.body(req.body, &v)
 	t.reportUnknown()
 	return v
@@ -251,4 +256,17 @@ func cmpOr(a, b string) string {
 // object), for fields Postman writes either way.
 func isJSONString(data []byte) bool {
 	return len(bytes.TrimSpace(data)) > 0 && bytes.TrimSpace(data)[0] == '"'
+}
+
+// named keeps an authentication a collection or folder sets as a named authentication of the result, one for each
+// scope, and returns the block that uses it by name: the requests under the scope say "use this" instead of each
+// carrying a copy.
+func (im *importer) named(scope string, from *auth, block model.Auth) *model.Auth {
+	if !slices.ContainsFunc(im.result.Auths, func(n model.NamedAuth) bool { return n.Name == scope }) {
+		im.result.Auths = append(im.result.Auths, model.NamedAuth{
+			Meta: model.Meta{Name: scope, Description: "Imported from Postman: the " + cmpOr(from.Type, "") + " authentication set on a collection or folder"},
+			Auth: block,
+		})
+	}
+	return &model.Auth{Use: scope}
 }

@@ -124,8 +124,21 @@ func (b *serveBuild) assembleReplay() error {
 		rec.Capture = b.w.captureTo(target)
 		ro.Record = rec
 	}
+	if b.o.PassThrough != "" {
+		upstream, err := parseUpstream(b.o.PassThrough)
+		if err != nil {
+			return err
+		}
+		if upstream.Host == b.s.replayAddr {
+			return fmt.Errorf("%w: the pass-through upstream is the replayer itself; give the real API's URL", ErrInvalidServeOptions)
+		}
+		ro.PassThrough = &replay.Recorder{Upstream: upstream}
+	}
 	b.replayH = replay.New(ro)
 	b.s.notes = appendNonEmpty(b.s.notes, exposure("the replayer", b.s.replayAddr))
+	if b.o.PassThrough != "" {
+		b.s.notes = append(b.s.notes, "pass-through: calls no saved response answers go to "+b.o.PassThrough+" and nothing is saved")
+	}
 	if b.o.Record != "" {
 		b.s.notes = append(b.s.notes, "record mode: calls go to "+b.o.Record+"; each call becomes a request in "+recordTarget(b.o.RecordTo)+" (when none matches it yet) and its response is saved in the workspace data folder")
 	}

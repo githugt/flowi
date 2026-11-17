@@ -1009,6 +1009,13 @@ func (f *Backend) Impact(flowi.RequestTarget, string) (analysis.Report, diag.Lis
 	return f.ImpactReport, nil, nil
 }
 
+func (f *Backend) ImpactOfDraft(flowi.RequestTarget, model.Request) (analysis.Report, diag.List, error) {
+	f.record("ImpactOfDraft")
+	f.Mu.Lock()
+	defer f.Mu.Unlock()
+	return f.ImpactReport, nil, nil
+}
+
 func (f *Backend) Secrets() ([]flowi.SecretInfo, error) {
 	if f.SecretsGate != nil {
 		<-f.SecretsGate
@@ -1016,6 +1023,23 @@ func (f *Backend) Secrets() ([]flowi.SecretInfo, error) {
 	f.Mu.Lock()
 	defer f.Mu.Unlock()
 	return slices.Clone(f.SecretList), nil
+}
+
+func (f *Backend) DeclareSecret(env, name, _ string) error {
+	f.record("DeclareSecret " + env + "/" + name)
+	f.Mu.Lock()
+	defer f.Mu.Unlock()
+	if f.SecretErr != nil {
+		return f.SecretErr
+	}
+	for i, s := range f.SecretList {
+		if s.Environment == env && s.Name == name {
+			f.SecretList[i].Set = true
+			return nil
+		}
+	}
+	f.SecretList = append(f.SecretList, flowi.SecretInfo{Environment: env, Name: name, Set: true})
+	return nil
 }
 
 func (f *Backend) SetSecret(env, name, _ string) error {
@@ -1274,6 +1298,77 @@ func (f *Backend) SaveBlueprintSource(t flowi.BlueprintTarget, text string) (dia
 	}
 	f.BlueprintText = text
 	return nil, nil
+}
+
+// NewNamedAuth adds the authentication to the fake's collection, so the
+// screens that list them see it after the reload.
+func (f *Backend) NewNamedAuth(collection model.ID, name, description string, auth model.Auth) (flowi.AuthTarget, error) {
+	f.record("NewNamedAuth " + name + " " + auth.Type)
+	if f.NewErr != nil {
+		return flowi.AuthTarget{}, f.NewErr
+	}
+	f.Mu.Lock()
+	defer f.Mu.Unlock()
+	id := model.ID("AUTH-" + name)
+	for i := range f.Cols {
+		if f.Cols[i].Manifest.ID == collection {
+			f.Cols[i].Auths = append(slices.Clone(f.Cols[i].Auths), model.NamedAuth{Meta: model.Meta{ID: id, Name: name, Description: description}, Auth: auth})
+		}
+	}
+	return flowi.AuthTarget{Collection: collection, Auth: id}, nil
+}
+
+func (f *Backend) SaveNamedAuth(t flowi.AuthTarget, a model.NamedAuth) error {
+	f.record("SaveNamedAuth " + string(t.Auth) + " " + a.Auth.Type)
+	if f.NewErr != nil {
+		return f.NewErr
+	}
+	f.Mu.Lock()
+	defer f.Mu.Unlock()
+	for i := range f.Cols {
+		auths := slices.Clone(f.Cols[i].Auths)
+		for j := range auths {
+			if f.Cols[i].Manifest.ID == t.Collection && auths[j].ID == t.Auth {
+				auths[j].Description, auths[j].Auth = a.Description, a.Auth
+			}
+		}
+		f.Cols[i].Auths = auths
+	}
+	return nil
+}
+
+func (f *Backend) RenameNamedAuth(t flowi.AuthTarget, name string) error {
+	f.record("RenameNamedAuth " + string(t.Auth) + " " + name)
+	if f.NewErr != nil {
+		return f.NewErr
+	}
+	f.Mu.Lock()
+	defer f.Mu.Unlock()
+	for i := range f.Cols {
+		auths := slices.Clone(f.Cols[i].Auths)
+		for j := range auths {
+			if f.Cols[i].Manifest.ID == t.Collection && auths[j].ID == t.Auth {
+				auths[j].Name = name
+			}
+		}
+		f.Cols[i].Auths = auths
+	}
+	return nil
+}
+
+func (f *Backend) DeleteNamedAuth(t flowi.AuthTarget) error {
+	f.record("DeleteNamedAuth " + string(t.Auth))
+	if f.NewErr != nil {
+		return f.NewErr
+	}
+	f.Mu.Lock()
+	defer f.Mu.Unlock()
+	for i := range f.Cols {
+		if f.Cols[i].Manifest.ID == t.Collection {
+			f.Cols[i].Auths = slices.DeleteFunc(slices.Clone(f.Cols[i].Auths), func(a model.NamedAuth) bool { return a.ID == t.Auth })
+		}
+	}
+	return nil
 }
 
 func (f *Backend) DeleteBlueprint(t flowi.BlueprintTarget) error {

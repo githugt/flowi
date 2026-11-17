@@ -28,6 +28,8 @@ type Query struct {
 	Limit int
 	// Root is the directory a relative file path (sqlite) is resolved against.
 	Root string
+	// AllowWrites lets the statement change data: the read-only guards are off. Off is the default.
+	AllowWrites bool
 	// Timeout bounds connecting and running together; 0 means DefaultTimeout.
 	Timeout time.Duration
 }
@@ -68,6 +70,9 @@ func Default() Registry {
 		model.DriverMySQL:    mysqlSource(),
 		model.DriverMariaDB:  mysqlSource(), // MariaDB speaks the MySQL protocol
 		model.DriverSQLite:   sqliteSource(),
+		model.DriverCSV:      csvSource(),
+		model.DriverXLSX:     xlsxSource(),
+		model.DriverParquet:  parquetSource(),
 	}
 }
 
@@ -77,8 +82,10 @@ func (r Registry) Run(ctx context.Context, q Query) (Result, error) {
 	if !ok {
 		return Result{}, fmt.Errorf("%w %q", ErrUnknownDriver, q.Driver)
 	}
-	if err := readonly.Check(q.Statement); err != nil {
-		return Result{}, err
+	if !q.AllowWrites {
+		if err := readonly.Check(q.Statement); err != nil {
+			return Result{}, err
+		}
 	}
 	if q.Timeout <= 0 {
 		q.Timeout = DefaultTimeout

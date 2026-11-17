@@ -31,6 +31,7 @@ func (w *Workspace) MoveRequest(t RequestTarget, to model.ID, path string) (Requ
 	if !ok {
 		return RequestTarget{}, diagErr(diag.CodeWSUnknownCollection, map[string]string{"name": string(to)})
 	}
+	path, name := pathForName(path) // a rename may be typed as a name, like a new request
 	if detail := requestPathProblem(path); detail != "" {
 		return RequestTarget{}, diagErr(diag.CodeWriteRequestPath, map[string]string{"path": path, "detail": detail})
 	}
@@ -39,6 +40,9 @@ func (w *Workspace) MoveRequest(t RequestTarget, to model.ID, path string) (Requ
 		return RequestTarget{}, err
 	}
 	moved := renamedRequest(r, path, file)
+	if name != filepath.Base(path) {
+		moved.Name = name // typed with spaces: the name keeps them, the file does not
+	}
 	data, err := w.store.EncodeRequest(moved)
 	if err != nil {
 		return RequestTarget{}, fmt.Errorf("encoding %s: %w", file, err)

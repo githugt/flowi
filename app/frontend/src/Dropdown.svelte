@@ -57,7 +57,7 @@
   <button type="button" class="btn" class:pill aria-haspopup="menu" aria-expanded={open} bind:this={button} onclick={toggle}>
     {#if icon && current?.icon}<Icon name={current.icon} size={14} />{/if}
     <!-- The button shows the bare verb (AMQP), which fits its pill; the menu names it in full (AMQP (RabbitMQ)). -->
-    {#if current?.tone}<Verb verb={current.tone} {pill} />{:else}<span class="t">{current?.label ?? label}</span>{/if}
+    {#if current?.tone}<span class="verbwrap" class:centred={pill}><Verb verb={current.tone} {pill} /></span>{:else}<span class="t">{current?.label ?? label}</span>{/if}
     <svg class="chev" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6" /></svg>
   </button>
   {#if open}
@@ -88,6 +88,8 @@
   }
   .btn:hover { background: var(--raised-3); }
   .t { flex: 1; text-align: left; white-space: nowrap; }
+  .verbwrap { flex: 1; display: flex; }
+  .verbwrap.centred { justify-content: center; }
   .chev { color: var(--muted); margin-left: auto; flex: none; }
   .menu {
     position: fixed; z-index: 30; overflow: auto;

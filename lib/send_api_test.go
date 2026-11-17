@@ -515,6 +515,36 @@ func TestSendRequest_Given_error_in_flow_it_does_not_run_Then_still_sent(t *test
 	}
 }
 
+// Before: a mistake in any request of the collection (a database request whose query writes, FLW-DATA-001) stopped
+// every other request being sent, with an error about a request the user was not sending.
+func TestSendRequest_Given_error_in_another_request_Then_still_sent_but_the_broken_one_is_not(t *testing.T) {
+	w := demoWorkspace(t)
+	c := w.Collections()[0]
+	broken, err := w.NewDatasetRequest(c.Manifest.ID, "db/write", model.DriverSQLite)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, b, _ := w.requestFor(broken)
+	b.Versions[0].Dataset.Query = "DELETE FROM users"
+	if err := w.SaveRequest(broken, b, SaveOptions{}); err != nil {
+		t.Fatal(err)
+	}
+	_, b, _ = w.requestFor(broken)
+	target, _ := w.FindRequest("auth/login", "")
+	_, req, _ := w.requestFor(target)
+
+	other := w.sendable(c, "local", filesNotRun(w.Collections(), c, req))
+	own := w.sendable(c, "local", filesNotRun(w.Collections(), c, b))
+
+	if other != nil {
+		t.Fatalf("a request the send does not run blocked it: %v", other)
+	}
+	var le *diag.ListError
+	if !errors.As(own, &le) || le.List[0].Code != diag.CodeDatasetRequest {
+		t.Fatalf("the broken request itself was let through: %v", own)
+	}
+}
+
 // brokenFlowYAML is a flow with an empty set step, which the validator rejects.
 const brokenFlowYAML = `arazzo: 1.1.0
 info: {title: unrelated, version: 1.0.0}

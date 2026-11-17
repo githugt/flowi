@@ -5,13 +5,14 @@
   import CodeArea from './CodeArea.svelte'
   import TextField from './TextField.svelte'
   import EmptyState from './EmptyState.svelte'
+  import { serverCredentials, withServerCredentials } from './lib/dataset'
 
   let { view, section }: { view: RequestView; section: string } = $props()
   const node = $derived(view.node)
   const block = $derived(view.dataset!.block)
   const params = $derived(block.Params ?? [])
   // Placeholders are $1, $2 … for PostgreSQL; MySQL and MariaDB use ?; SQLite takes either.
-  const placeholder = $derived(block.Driver === 'postgres' ? '$1, $2 …' : block.Driver === 'sqlite' ? '? or $1, $2 …' : '?')
+  const placeholder = $derived(block.Driver === 'postgres' ? '$1, $2 …' : block.Driver === 'sqlite' || block.Driver === 'csv' || block.Driver === 'xlsx' || block.Driver === 'parquet' ? '? or $1, $2 …' : '?')
 
   // Writes: the block comes from the latest view, with one change.
   function put(change: (b: DatasetBlock) => void) {
@@ -22,6 +23,8 @@
   const setParam = (i: number, text: string) => put((b) => ((b.Params ??= []), (b.Params[i] = text)))
   const addParam = () => put((b) => ((b.Params ??= []), b.Params.push('')))
   const removeParam = (i: number) => put((b) => b.Params?.splice(i, 1))
+  const creds = $derived(serverCredentials(block.Server) ?? { user: '', password: '' })
+  const setCreds = (user: string, password: string) => put((b) => (b.Server = withServerCredentials(b.Server, user, password)))
   const setLimit = (text: string) => put((b) => (b.Limit = Math.max(0, Math.trunc(Number(text)) || 0)))
 </script>
 
@@ -32,8 +35,12 @@
     oninput={(t) => put((b) => (b.Query = t))}
     empty={{ icon: 'body', title: 'No query', hint: 'Click to write the query: one SELECT, WITH, VALUES, SHOW, EXPLAIN or DESCRIBE.' }}
   />
+  {#if block.Writes}
+    <p class="writes" role="alert">⚠ This query may change data. The read-only guards are off for it: connect as a user that can only do what you mean it to.</p>
+  {/if}
+  <label class="limit"><input type="checkbox" checked={!!block.Writes} onchange={(e) => put((b) => (b.Writes = e.currentTarget.checked))} /> Allow this query to change data (INSERT, UPDATE, DELETE …)</label>
   <p class="muted note">
-    Read-only: the query is sent in a read-only transaction, and a statement that changes data is refused. Put values in <strong>Values</strong> and write
+    {block.Writes ? 'Writes are allowed for this request.' : 'Read-only: the query is sent in a read-only transaction, and a statement that changes data is refused.'} Put values in <strong>Values</strong> and write
     them as <code>{placeholder}</code>: they travel apart from the statement, so a value can never change what it means.
     For the strongest guarantee, connect as a database user that can only read.
   </p>
@@ -41,6 +48,13 @@
     <input class="mini" inputmode="numeric" placeholder="1000" value={block.Limit || ''} onchange={(e) => setLimit(e.currentTarget.value)} aria-label="Most rows kept" />
     rows
   </label>
+{:else if section === 'Credentials'}
+  <TextField label="User" mono value={creds.user} placeholder="reader" oninput={(t) => setCreds(t, creds.password)} />
+  <TextField label="Password" mono value={creds.password} placeholder={'{{secret.db_password}}'} oninput={(t) => setCreds(creds.user, t)} />
+  <p class="muted note">
+    The login is part of the connection URL in the server field: these two boxes write it there. Keep the password out of the file: write
+    <code>{'{{secret.db_password}}'}</code> and give the secret its value under Secrets. Saving a request with a written password offers to do this for you.
+  </p>
 {:else if section === 'Values'}
   {#if params.length === 0}
     <EmptyState icon="params" title="No values" hint={`Each value is sent for a placeholder of the query (${placeholder}), in order. Templates such as {{id}} work here.`} compact>
@@ -60,6 +74,7 @@
 
 <style>
   .note { margin: 8px 0 0; font-size: var(--fs-xs); }
+  .writes { color: var(--warn); font-size: var(--fs-sm); font-weight: 600; margin: 8px 0 0; }
   .limit { display: inline-flex; gap: 6px; align-items: center; margin-top: 8px; color: var(--muted); font-size: var(--fs-xs); }
   .mini { width: 5em; box-sizing: border-box; background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); padding: 3px 6px; font: inherit; }
   .row { display: grid; grid-template-columns: 2.4em 1fr auto; gap: 6px; align-items: center; margin-bottom: 6px; }

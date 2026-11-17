@@ -73,3 +73,14 @@ func TestMenuFor_should_offer_a_new_dataset_request_where_it_offers_a_new_grpc_o
 		}
 	}
 }
+
+// Before: a saved Postgres request showed POSTGRES in its editor but SQL on its tab and in the tree.
+func TestVerb_Given_a_dataset_version_with_a_driver_When_read_Then_it_is_the_database(t *testing.T) {
+	version := model.RequestVersion{Dataset: &model.Dataset{Driver: "postgres"}}
+
+	got := vm.Verb(version)
+
+	if got != "POSTGRES" {
+		t.Fatalf("verb %q", got)
+	}
+}

@@ -110,6 +110,9 @@ func (s *Store) DecodeBlueprint(file, path string, data []byte) (model.Blueprint
 // EncodeBlueprint is the canonical file content of b.
 func (s *Store) EncodeBlueprint(b model.Blueprint) ([]byte, error) { return s.codec.EncodeBlueprint(b) }
 
+// EncodeAuth is the canonical file content of a named authentication.
+func (s *Store) EncodeAuth(a model.NamedAuth) ([]byte, error) { return s.codec.EncodeAuth(a) }
+
 // EncodeFolder is the canonical _folder.yaml for f.
 func (s *Store) EncodeFolder(f model.Folder) ([]byte, error) { return s.codec.EncodeFolder(f) }
 

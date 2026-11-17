@@ -23,7 +23,9 @@ func openPostgres(q Query) (*sql.DB, error) {
 		return nil, fmt.Errorf("the postgres server is wrong: %w", errHidingPassword(err))
 	}
 	cfg.ConnectTimeout = q.Timeout
-	cfg.RuntimeParams["default_transaction_read_only"] = "on"
+	if !q.AllowWrites {
+		cfg.RuntimeParams["default_transaction_read_only"] = "on"
+	}
 	return stdlib.OpenDB(*cfg), nil
 }
 

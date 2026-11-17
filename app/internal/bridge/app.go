@@ -56,6 +56,7 @@ type App struct {
 	schedules  *SchedulesService
 	replayer   *ReplayerService
 	blueprints *BlueprintsService
+	auths      *AuthsService
 	trash      *TrashService
 	checks     *ChecksService
 	hooks      *HooksService
@@ -129,6 +130,18 @@ func (a *App) buildServices(logger *slog.Logger, tracer vm.Tracer) {
 	a.flows = &FlowService{app: a, docs: map[string]*openFlow{}}
 	a.requests = newRequestService(a)
 	a.envService = &EnvironmentService{app: a, envs: map[string]*vm.Environment{}}
+	// Open flows and environments follow their files too: a rename, an edit outside the app or a git checkout
+	// reloads them, and an open tab without unsaved edits shows the new file; one with edits keeps them and is
+	// flagged.
+	a.workspace.OnChange(func() {
+		for _, o := range a.flows.docs {
+			c, f, found := a.workspace.Flow(o.doc.Target())
+			o.doc.Reloaded(c, f, found)
+		}
+		for _, e := range a.envService.envs {
+			e.Reloaded(a.workspace.Environment())
+		}
+	})
 	a.panels = newPanelsService(a)
 	a.settings = newSettingsService(a)
 	a.secrets = newSecretsService(a)
@@ -138,6 +151,7 @@ func (a *App) buildServices(logger *slog.Logger, tracer vm.Tracer) {
 	a.schedules = newSchedulesService(a)
 	a.replayer = newReplayerService(a)
 	a.blueprints = newBlueprintsService(a)
+	a.auths = newAuthsService(a)
 	a.trash = &TrashService{app: a}
 	a.checks = &ChecksService{app: a}
 	a.hooks = newHooksService(a)
@@ -203,6 +217,9 @@ func (a *App) Replayer() *ReplayerService { return a.replayer }
 // Blueprints is the service for the blueprints library.
 func (a *App) Blueprints() *BlueprintsService { return a.blueprints }
 
+// Auths is the service for the Authentications screen.
+func (a *App) Auths() *AuthsService { return a.auths }
+
 // Trash is the service for the trash.
 func (a *App) Trash() *TrashService { return a.trash }
 
@@ -231,6 +248,15 @@ func newRequestService(a *App) *RequestService {
 	a.send.OnChange(func() {
 		for node, o := range s.reqs {
 			a.emit("request", s.view(node, o))
+		}
+	})
+	// An open request was never told its file was reloaded: after a rename its tab kept the old name, and an
+	// untitled draft kept showing its address as its name.
+	a.workspace.OnChange(func() {
+		for node, o := range s.reqs {
+			c, r, found := a.workspace.Request(o.req.Target())
+			o.req.Reloaded(c, r, found)
+			a.workspace.SetLabel(node, untitledName(a.workspace, node, o.req))
 		}
 	})
 	return s

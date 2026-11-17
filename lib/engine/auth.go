@@ -141,6 +141,22 @@ func (x *execution) clientOptionsFor(b built) (httpx.Options, bool) {
 
 // loadClientCert reads the certificate and key a mutual TLS block names, as
 // PEM files (relative paths are the collection's).
+// withNamedAuth replaces an auth block that names one of the collection's
+// authentications with that authentication, so everything after it sees an
+// ordinary auth block. A name the collection does not have is FLW-AUTH-002:
+// the request must not go out without the authentication it asked for.
+func withNamedAuth(c model.Collection, v model.RequestVersion) (model.RequestVersion, diag.List) {
+	if v.Auth == nil || v.Auth.Use == "" {
+		return v, nil
+	}
+	named, ok := c.NamedAuth(v.Auth.Use)
+	if !ok {
+		return v, diag.List{diag.New(diag.CodeAuthUnknown, diag.Location{}, map[string]string{"name": v.Auth.Use})}
+	}
+	v.Auth = &model.Auth{Type: named.Auth.Type, Params: named.Auth.Params}
+	return v, nil
+}
+
 func loadClientCert(a model.Auth, root string) (tls.Certificate, error) {
 	values := map[string]string{}
 	for _, kv := range a.Params {

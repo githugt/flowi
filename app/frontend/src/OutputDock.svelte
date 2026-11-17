@@ -58,6 +58,12 @@
     </div>
     <div class="foot"><span class="status {data.status}">{data.status}</span><span>{data.duration}</span>{#if data.size}<span>{data.size}</span>{/if}{#if data.instances > 1}<span>{data.instances} runs</span>{/if}</div>
   </div>
+{:else if data}
+  <!-- A pinned box stays while a run starts, instead of vanishing until the step has finished. -->
+  <div class="dock" role="region" aria-label={`What ${step} did`}>
+    <div class="tabs"><span class="grow"></span><button class="pin" class:on={pinned} aria-pressed={pinned} title={pinned ? "Unpin: close this when another step is selected" : "Pin: keep this open"} onclick={onpin}>{pinned ? "Pinned" : "Pin"}</button></div>
+    <div class="body"><p class="muted">{view.run.running ? `${step} is running…` : `${step} has not run yet.`}</p></div>
+  </div>
 {/if}
 
 <style>

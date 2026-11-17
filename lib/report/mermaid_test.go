@@ -122,3 +122,13 @@ func TestSequenceOf_Given_calls_Then_the_structure_lists_hosts_and_steps_in_orde
 		}
 	}
 }
+
+func TestSequenceWith_Given_a_delay_step_When_others_is_asked_Then_it_is_a_note_in_place(t *testing.T) {
+	r := Run{Nodes: []Node{{ID: "wait", Type: "delay", Status: "passed"}}}
+
+	without, with := SequenceOf(r), SequenceWith(r, true)
+
+	if len(without.Steps) != 0 || len(with.Steps) != 1 || with.Steps[0].Kind != "note" || !strings.Contains(with.Steps[0].Text, "wait (delay)") {
+		t.Fatalf("without %+v with %+v", without, with)
+	}
+}

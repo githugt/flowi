@@ -14,8 +14,10 @@ import (
 // for a step that is not a call and failed. It is the living picture of a run, drawn from the report, so it
 // cannot drift from the flow the way a hand-drawn diagram does. Only the host and path of a URL are shown:
 // the query string can hold a credential.
-func WriteMermaid(w io.Writer, r Run) error {
-	s := SequenceOf(r)
+func WriteMermaid(w io.Writer, r Run) error { return WriteSequence(w, SequenceOf(r)) }
+
+// WriteSequence writes a drawn sequence as Mermaid text.
+func WriteSequence(w io.Writer, s Sequence) error {
 	var sb strings.Builder
 	sb.WriteString("sequenceDiagram\n")
 	if s.Title != "" {
@@ -63,8 +65,12 @@ type SequenceStep struct {
 }
 
 // SequenceOf draws the run: every attempt of every request in the order it happened, loops and hooks included.
-func SequenceOf(r Run) Sequence {
-	d := &sequence{hosts: map[string]int{}}
+func SequenceOf(r Run) Sequence { return SequenceWith(r, false) }
+
+// SequenceWith is SequenceOf that can also draw the steps that call nothing (a delay, a set, an assertion, a skipped
+// step) as notes, in the place they ran.
+func SequenceWith(r Run, others bool) Sequence {
+	d := &sequence{hosts: map[string]int{}, others: others}
 	collectCalls(r.Nodes, d)
 	return Sequence{Title: runTitle(r), Hosts: d.order, Steps: d.steps}
 }
@@ -74,6 +80,8 @@ type sequence struct {
 	hosts map[string]int // host → index in order
 	order []string
 	steps []SequenceStep
+
+	others bool // also note the steps that make no call
 }
 
 func (d *sequence) host(host string) int {
@@ -96,6 +104,8 @@ func collectCalls(nodes []Node, d *sequence) {
 		}
 		if len(n.Attempts) == 0 && n.Status == "failed" && len(n.Lanes) == 0 {
 			d.steps = append(d.steps, SequenceStep{Kind: "note", Host: -1, Text: n.ID + " failed" + failureWhy(n), Failed: true})
+		} else if d.others && len(n.Attempts) == 0 && len(n.Lanes) == 0 {
+			d.steps = append(d.steps, SequenceStep{Kind: "note", Host: -1, Text: otherText(n)})
 		}
 		for _, l := range n.Lanes {
 			collectCalls(l.Nodes, d)
@@ -153,4 +163,19 @@ func hostAndPath(raw string) (host, path string) {
 // entity, and a line break would end it too.
 func mermaidText(s string) string {
 	return strings.NewReplacer(";", ",", "#", "", "\n", " ", "\r", " ").Replace(s)
+}
+
+// otherText names a step that made no call: its id, what kind of step it is, and how it ended.
+func otherText(n Node) string {
+	text := n.ID
+	if n.Type != "" {
+		text += " (" + n.Type + ")"
+	}
+	if n.Status != "" {
+		text += " " + n.Status
+	}
+	if ms := n.Duration.Milliseconds(); ms > 0 {
+		text += fmt.Sprintf(" · %d ms", ms)
+	}
+	return text
 }
