@@ -259,6 +259,7 @@ func scalar(v any) any {
 }
 
 func loadTable(db *sql.DB, t table, file string) (loadedTable, error) {
+	ctx := context.Background() // an in-memory database: nothing here waits on the network
 	cols := make([]string, len(t.cols))
 	for i, n := range t.cols {
 		cols[i] = strings.TrimSpace(n)
@@ -280,15 +281,15 @@ func loadTable(db *sql.DB, t table, file string) (loadedTable, error) {
 		ddl.WriteString(quoteIdent(n) + " " + kinds[c])
 	}
 	ddl.WriteString(")")
-	if _, err := db.Exec(ddl.String()); err != nil {
+	if _, err := db.ExecContext(ctx, ddl.String()); err != nil {
 		return loadedTable{}, fmt.Errorf("making the table %q of %s: %w", t.name, file, err)
 	}
-	tx, err := db.Begin()
+	tx, err := db.BeginTx(ctx, nil)
 	if err != nil {
 		return loadedTable{}, fmt.Errorf("loading %s: %w", file, err)
 	}
 	marks := strings.TrimSuffix(strings.Repeat("?,", len(cols)), ",")
-	stmt, err := tx.Prepare("INSERT INTO " + quoteIdent(t.name) + " VALUES (" + marks + ")")
+	stmt, err := tx.PrepareContext(ctx, "INSERT INTO "+quoteIdent(t.name)+" VALUES ("+marks+")") //nolint:gosec // the name is a quoted identifier, the values are bound
 	if err != nil {
 		_ = tx.Rollback()
 		return loadedTable{}, fmt.Errorf("loading %s: %w", file, err)
@@ -299,7 +300,7 @@ func loadTable(db *sql.DB, t table, file string) (loadedTable, error) {
 		for c := range cols {
 			args[c] = cellValue(row[c], kinds[c])
 		}
-		if _, err := stmt.Exec(args...); err != nil {
+		if _, err := stmt.ExecContext(ctx, args...); err != nil {
 			_ = tx.Rollback()
 			return loadedTable{}, fmt.Errorf("loading %s: %w", file, err)
 		}

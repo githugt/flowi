@@ -5,7 +5,6 @@ package flowi
 import (
 	"errors"
 	"fmt"
-	"github.com/githugt/flowi/lib/settings"
 	"os"
 	"path/filepath"
 	"slices"
@@ -13,6 +12,7 @@ import (
 
 	"github.com/githugt/flowi/lib/diag"
 	"github.com/githugt/flowi/lib/model"
+	"github.com/githugt/flowi/lib/settings"
 	"github.com/githugt/flowi/lib/store"
 	"github.com/githugt/flowi/lib/validate"
 )

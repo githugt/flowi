@@ -3,6 +3,7 @@
 package dataset
 
 import (
+	"context"
 	"database/sql"
 	"encoding/csv"
 	"errors"
@@ -75,7 +76,7 @@ func writeBack(db *sql.DB, files []loadedFile, write func(path string, changes [
 // readBack is the table as the query left it, and whether that differs from what was loaded. A table that no longer
 // exists is reported as unchanged.
 func readBack(db *sql.DB, lt loadedTable) (outTable, bool, error) {
-	rows, err := db.Query("SELECT rowid, * FROM " + quoteIdent(lt.name) + " ORDER BY rowid")
+	rows, err := db.QueryContext(context.Background(), "SELECT rowid, * FROM "+quoteIdent(lt.name)+" ORDER BY rowid") //nolint:gosec // the name is a quoted identifier
 	if err != nil {
 		return outTable{}, false, nil //nolint:nilerr // the query dropped or renamed the table: there is nothing to write back
 	}
@@ -401,7 +402,7 @@ func parquetValue(field parquet.Field, v any) (any, error) {
 			return b, err
 		}
 	case parquet.Int32:
-		if n, ok := wholeNumber(v); ok {
+		if n, ok := wholeNumber(v); ok && n >= math.MinInt32 && n <= math.MaxInt32 {
 			return int32(n), nil
 		}
 	case parquet.Int64:
@@ -426,8 +427,7 @@ func parquetValue(field parquet.Field, v any) (any, error) {
 }
 
 func wholeNumber(v any) (int64, bool) {
-	switch x := v.(type) {
-	case string:
+	if x, isText := v.(string); isText {
 		n, err := strconv.ParseInt(strings.TrimSpace(x), 10, 64)
 		return n, err == nil
 	}

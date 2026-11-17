@@ -183,7 +183,7 @@ func filesNotRunByFlow(all []model.Collection, f model.Flow) map[string]bool {
 		for _, ref := range reqRefs {
 			for _, coll := range all {
 				for _, r := range coll.Requests {
-					if reqsRun[r.File] || !((ref.ID != "" && ref.ID == r.ID) || (ref.Path != "" && ref.Path == r.Path)) {
+					if reqsRun[r.File] || ((ref.ID == "" || ref.ID != r.ID) && (ref.Path == "" || ref.Path != r.Path)) {
 						continue
 					}
 					reqsRun[r.File] = true
