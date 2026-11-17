@@ -703,6 +703,23 @@ func TestReplayerService_Preview_should_list_the_apis_the_saved_requests_call(t 
 	}
 }
 
+func TestReplayerService_State_should_offer_drafts_and_collections_to_save_requests_in(t *testing.T) {
+	a, d := vmtest.SampleCollection(), vmtest.SampleCollection()
+	a.Manifest.ID, a.Manifest.Name = "A1", "Shop"
+	d.Manifest.ID, d.Manifest.Name = "D1", "untitled-1"
+	app := bridge.NewApp(&vmtest.Backend{Cols: []model.Collection{a, d}, DraftIDs: map[model.ID]bool{"D1": true}}, bridge.NewInlineActor(), (&published{}).emit)
+	app.Start(t.Context())
+
+	var labels []string
+	for _, c := range app.Replayer().State().Targets {
+		labels = append(labels, c.Label)
+	}
+
+	if len(labels) != 3 || labels[1] != "Shop" || labels[2] != "untitled-1 (draft)" {
+		t.Fatalf("targets %v", labels)
+	}
+}
+
 func TestBlueprintsService_State_should_list_blueprints_of_the_collections(t *testing.T) {
 	c := vmtest.SampleCollection()
 	c.Blueprints = []model.Blueprint{{Meta: model.Meta{ID: "B1", Name: "Login journey"}, Path: "login-journey", Params: []model.Param{{Name: "user", Default: "ann"}}}}

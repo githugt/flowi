@@ -60,6 +60,9 @@ type ServeOptions struct {
 	// request are saved in, as new requests; "" is the Scratch draft. Only
 	// used with Record.
 	RecordTo string
+	// RecordFolder is the folder inside RecordTo's requests that new requests are saved in, a relative path of plain
+	// names such as "api/recorded"; "" is "recorded".
+	RecordFolder string
 	// RecordHAR is a file the recorded (or, with Forward, the forwarded) calls are also written to, as a HAR file in the order they were made
 	// (credentials masked). `flowi import har` turns it into a flow whose steps read the values earlier
 	// responses gave. Only used with Record.

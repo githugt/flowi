@@ -63,7 +63,11 @@ func (b *serveBuild) forward() (*replay.Forward, error) {
 		if err != nil {
 			return nil, err
 		}
-		f.Recorder.Capture = b.w.captureTo(target)
+		folder, err := recordFolder(b.o.RecordFolder)
+		if err != nil {
+			return nil, err
+		}
+		f.Recorder.Capture = b.w.captureTo(target, folder)
 	}
 	b.s.notes = append(b.s.notes, forwardNote(mode, to, b.o.ForwardOnly, b.o.RecordTo))
 	return f, nil

@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/githugt/flowi/lib/importers/har"
+	"github.com/githugt/flowi/lib/internal/names"
 	"github.com/githugt/flowi/lib/model"
 	"github.com/githugt/flowi/lib/serve/replay"
 )
@@ -49,7 +50,7 @@ func (w *Workspace) recordCollection(name string) (model.ID, error) {
 // {{id}} (the next call to another id matches the same request), the query
 // becomes query rows, credentials become {{secret.name}} placeholders. No
 // response is pinned: the recorder keeps responses in the data dir.
-func (w *Workspace) captureTo(collection model.ID) replay.Capture {
+func (w *Workspace) captureTo(collection model.ID, folder string) replay.Capture {
 	return func(call replay.Call) (replay.Captured, error) {
 		doc, err := harOf(call)
 		if err != nil {
@@ -59,7 +60,7 @@ func (w *Workspace) captureTo(collection model.ID) replay.Capture {
 		if diags.HasErrors() || len(result.Requests) == 0 {
 			return replay.Captured{}, errors.New("the call cannot be saved as a request")
 		}
-		path := recordedPath(result.Requests[0].Path)
+		path := recordedPath(folder, result.Requests[0].Path)
 		result.Requests[0].Path = path
 		result.Flows, result.Examples = nil, nil // one call is not a recording to replay, and a response is not pinned
 		w.mu.RLock()
@@ -94,9 +95,24 @@ func (w *Workspace) capturedAt(collection model.ID, path string) (replay.Capture
 	return replay.Captured{Collection: c, Request: c.Requests[i], Version: c.Requests[i].Versions[0]}, nil
 }
 
-// recordedPath moves a request the HAR importer put under har/ to recorded/.
-func recordedPath(path string) string {
-	return recordedFolder + "/" + strings.TrimPrefix(path, "har/")
+// recordedPath moves a request the HAR importer put under har/ to folder.
+func recordedPath(folder, path string) string {
+	return folder + "/" + strings.TrimPrefix(path, "har/")
+}
+
+// recordFolder is the folder of the collection's requests that new requests are saved in: the one asked for, as a
+// relative path of plain names ("api/recorded"), or "recorded" when none is.
+func recordFolder(raw string) (string, error) {
+	raw = strings.Trim(strings.ReplaceAll(strings.TrimSpace(raw), "\\", "/"), "/")
+	if raw == "" {
+		return recordedFolder, nil
+	}
+	for _, seg := range strings.Split(raw, "/") {
+		if !names.Valid(seg) {
+			return "", fmt.Errorf("%w: the folder %q must be a path of plain names (letters, digits, '.', '_' and '-'), like api/recorded", ErrInvalidServeOptions, raw)
+		}
+	}
+	return raw, nil
 }
 
 // harOf is a one-entry HAR document holding the call, without a response.

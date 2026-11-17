@@ -51,6 +51,8 @@ type ReplayerForm struct {
 	// RecordTo is the collection (name or id) that a forwarded call matching no saved request is saved in as a
 	// new request (with Forward "save" and ForwardTo); blank is the Scratch draft.
 	RecordTo string
+	// RecordFolder is the folder of that collection new requests go in; blank is "recorded".
+	RecordFolder string
 	// RecordHAR is a file every call the replayer handles is also written to, in order, in any mode.
 	RecordHAR string
 	// Faults make a share of the replayed calls fail on purpose. Percent fields are 0 to 100; blank is none.
@@ -181,6 +183,7 @@ func (r *Replayer) Start(form ReplayerForm) {
 		if latency > 0 || strings.TrimSpace(form.Latency) != "" {
 			o.Latency = latency
 		}
+		o.RecordFolder = strings.TrimSpace(form.RecordFolder)
 		o.Sequence, o.CORS, o.RecordTo, o.NoTriggers, o.NoSchedules = form.Sequence, form.CORS, form.RecordTo, true, true
 		o.RecordHAR, o.Faults = strings.TrimSpace(form.RecordHAR), faults
 		o.Forward, o.ForwardTo, o.ForwardOnly, o.ForwardEnv = form.Forward, strings.TrimSpace(form.ForwardTo), splitList(form.ForwardOnly), form.Env

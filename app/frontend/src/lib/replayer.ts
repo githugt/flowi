@@ -1,7 +1,7 @@
 // What the replayer will do with a call, worked out from the form, for the preview on the replayer screen.
 import type { ForwardMode, ForwardPreview } from './types'
 
-export interface ForwardForm { forward: ForwardMode; forwardTo: string; forwardOnly: string; recordTo: string; recordHar: string }
+export interface ForwardForm { forward: ForwardMode; forwardTo: string; forwardOnly: string; recordTo: string; recordFolder?: string; recordHar: string }
 
 export type Line = { text: string; tone: 'ok' | 'warn' | 'bad' | 'plain' }
 
@@ -46,7 +46,7 @@ export function forwardPreview(form: ForwardForm, p: ForwardPreview | null, labe
     out.push({ text: `Every call with no saved answer is sent to ${to}${save ? ' and its answer is saved' : ''}.`, tone: 'ok' })
     if (only.length) out.push({ text: '"Only these APIs" is ignored while one API is set.', tone: 'warn' })
     if (save) {
-      out.push({ text: `A call matching no request becomes a new request in ${labelOf(form.recordTo) || 'the Scratch draft'}.`, tone: 'plain' })
+      out.push({ text: `A call matching no request becomes a new request in ${labelOf(form.recordTo) || 'the Scratch draft'}, folder ${form.recordFolder?.trim() || 'recorded'}.`, tone: 'plain' })
     } else {
       out.push({ text: 'Answers are relayed; nothing is saved, so stopping the replayer returns those calls to "not found".', tone: 'plain' })
     }

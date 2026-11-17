@@ -12,7 +12,7 @@
   import type { ForwardPreview } from './lib/types'
 
   let view = $state<ReplayerView | null>(null)
-  let form = $state<ReplayerView['form']>({ addr: '', latency: '', sequence: false, cors: false, forward: '', forwardTo: '', forwardOnly: '', env: '', recordTo: '', recordHar: '', faultErrorPercent: '', faultStatus: '', faultDropPercent: '', faultJitter: '' })
+  let form = $state<ReplayerView['form']>({ addr: '', latency: '', sequence: false, cors: false, forward: '', forwardTo: '', forwardOnly: '', env: '', recordTo: '', recordFolder: '', recordHar: '', faultErrorPercent: '', faultStatus: '', faultDropPercent: '', faultJitter: '' })
   let seeded = false
 
   // The form starts from the defaults Go read; after that it is the user's.
@@ -82,6 +82,9 @@
             <label class="f wide"><span>Only forward to these APIs (comma separated base URLs; leave empty to allow any)</span><TextInput mono bind:value={form.forwardOnly} disabled={running || !form.forward || !!form.forwardTo.trim()} placeholder="https://api.example.test, https://other.example.test" /></label>
             <label class="f wide"><span>Save requests of new calls in (pass through and save, with one API set above)</span>
               <select bind:value={form.recordTo} disabled={running || form.forward !== 'save'}>{#each view.targets as t}<option value={t.id}>{t.label}</option>{/each}</select>
+            </label>
+            <label class="f wide"><span>Folder in that collection (default: recorded; a path like api/recorded)</span>
+              <TextInput mono bind:value={form.recordFolder} disabled={running || form.forward !== 'save'} placeholder="recorded" />
             </label>
           </div>
         </fieldset>

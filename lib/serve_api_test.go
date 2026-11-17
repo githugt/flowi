@@ -566,3 +566,33 @@ func TestForwardTargets_Given_an_environment_that_defines_the_base_Then_it_is_fi
 		t.Fatalf("targets %+v", got)
 	}
 }
+
+func TestServe_Record_Given_a_folder_Then_new_requests_are_saved_there(t *testing.T) {
+	w := demoWorkspace(t)
+	upstream := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, _ *http.Request) { _, _ = io.WriteString(rw, "{}") }))
+	t.Cleanup(upstream.Close)
+	s := serveOnFreePorts(t, w, func(o *ServeOptions) {
+		o.NoTriggers, o.NoSchedules, o.Forward, o.ForwardTo = true, true, ForwardSave, upstream.URL
+		o.RecordTo, o.RecordFolder = string(w.Collections()[0].Manifest.ID), "api/new"
+	})
+
+	call(t, "GET", "http://"+s.ReplayAddr()+"/v1/widgets/3", "", "")
+
+	files, _ := filepath.Glob(filepath.Join(w.Collections()[0].Root, "requests", "api", "new", "*", "*.req.yaml"))
+	if len(files) != 1 {
+		t.Fatalf("requests in the folder: %v", files)
+	}
+}
+
+func TestRecordFolder_Then_it_is_a_path_of_plain_names(t *testing.T) {
+	for in, want := range map[string]string{"": "recorded", "\tapi/x/": "api/x", `a\b`: "a/b"} {
+		if got, err := recordFolder(in); err != nil || got != want {
+			t.Errorf("%q: %q %v", in, got, err)
+		}
+	}
+	for _, bad := range []string{"../x", "a/../b", "a b", ".hidden"} {
+		if _, err := recordFolder(bad); err == nil {
+			t.Errorf("%q accepted", bad)
+		}
+	}
+}

@@ -722,7 +722,7 @@ export interface ReplayerView {
   addr: string
   error?: string
   notes: string[]
-  form: { addr: string; latency: string; sequence: boolean; cors: boolean; forward: ForwardMode; forwardTo: string; forwardOnly: string; env: string; recordTo: string; recordHar: string; faultErrorPercent: string; faultStatus: string; faultDropPercent: string; faultJitter: string }
+  form: { addr: string; latency: string; sequence: boolean; cors: boolean; forward: ForwardMode; forwardTo: string; forwardOnly: string; env: string; recordTo: string; recordFolder: string; recordHar: string; faultErrorPercent: string; faultStatus: string; faultDropPercent: string; faultJitter: string }
   targets: { id: string; label: string; path?: string }[]
   traffic: { seq: number; at: string; method: string; path: string; status: number; match: string; request: string; duration: string; remote: string; version: string; example: string; source: string; delay: string }[]
 }

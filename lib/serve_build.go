@@ -134,7 +134,11 @@ func (b *serveBuild) assembleReplay() error {
 		if err != nil {
 			return err
 		}
-		rec.Capture = b.w.captureTo(target)
+		folder, err := recordFolder(b.o.RecordFolder)
+		if err != nil {
+			return err
+		}
+		rec.Capture = b.w.captureTo(target, folder)
 		ro.Record = rec
 	}
 	fwd, err := b.forward()

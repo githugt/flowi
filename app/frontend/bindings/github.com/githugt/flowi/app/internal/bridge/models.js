@@ -6674,6 +6674,14 @@ export class ReplayerForm {
              */
             this["recordTo"] = "";
         }
+        if (!("recordFolder" in $$source)) {
+            /**
+             * folder inside it; "" is "recorded"
+             * @member
+             * @type {string}
+             */
+            this["recordFolder"] = "";
+        }
         if (!("recordHar" in $$source)) {
             /**
              * RecordHAR is a file the forwarded calls are also written to, in order.

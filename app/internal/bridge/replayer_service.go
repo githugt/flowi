@@ -21,10 +21,11 @@ type ReplayerForm struct {
 	Forward string `json:"forward"`
 	// ForwardTo is one API every forwarded call goes to; ForwardOnly (comma separated) limits which APIs of the saved
 	// requests may be forwarded to when ForwardTo is empty.
-	ForwardTo   string `json:"forwardTo"`
-	ForwardOnly string `json:"forwardOnly"`
-	Env         string `json:"env"`      // the environment the base URLs are worked out in; filled in by the app
-	RecordTo    string `json:"recordTo"` // collection id; "" is the Scratch draft
+	ForwardTo    string `json:"forwardTo"`
+	ForwardOnly  string `json:"forwardOnly"`
+	Env          string `json:"env"`          // the environment the base URLs are worked out in; filled in by the app
+	RecordTo     string `json:"recordTo"`     // collection id; "" is the Scratch draft
+	RecordFolder string `json:"recordFolder"` // folder inside it; "" is "recorded"
 	// RecordHAR is a file the forwarded calls are also written to, in order.
 	RecordHAR string `json:"recordHar"`
 	// Faults: percentages 0 to 100, the status of an injected error, and up to how much extra delay.
@@ -171,10 +172,14 @@ func trafficRowOf(e replay.Entry) TrafficRow {
 func (s *ReplayerService) targets() []Choice {
 	out := []Choice{{ID: "", Label: "Scratch (drafts, not saved to a folder yet)"}}
 	for _, c := range s.app.workspace.Collections() {
+		label := c.Manifest.Name
 		if s.app.workspace.IsDraftCollection(c.Manifest.ID) {
-			continue
+			if c.Manifest.Name == "Scratch" {
+				continue // the first choice
+			}
+			label += " (draft)"
 		}
-		out = append(out, Choice{ID: string(c.Manifest.ID), Label: c.Manifest.Name, Path: c.Manifest.Name})
+		out = append(out, Choice{ID: string(c.Manifest.ID), Label: label, Path: c.Manifest.Name})
 	}
 	return out
 }
