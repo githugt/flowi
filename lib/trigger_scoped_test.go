@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -85,7 +86,7 @@ func TestScopedTriggerToken_Given_the_token_file_Then_it_holds_no_secret_and_is_
 	if err != nil || strings.Contains(string(data), secret) || strings.Contains(string(data), strings.TrimPrefix(secret, "flwt_")) {
 		t.Fatalf("file %s err %v", data, err)
 	}
-	if info.Mode().Perm() != 0o600 {
+	if runtime.GOOS != "windows" && info.Mode().Perm() != 0o600 { // Windows has no owner-only mode bits
 		t.Fatalf("mode %v", info.Mode())
 	}
 }

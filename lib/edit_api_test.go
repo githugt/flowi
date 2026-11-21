@@ -5,6 +5,7 @@ package flowi
 import (
 	"bytes"
 	"os"
+	"runtime"
 	"slices"
 	"strings"
 	"testing"
@@ -34,7 +35,7 @@ func TestStoreEdit_should_keep_exactly_one_slot(t *testing.T) {
 	if strings.Contains(string(data), "edit") || strings.Count(string(kept), "\nedit:")+strings.Count(string(kept), "edit:") < 1 || !strings.Contains(string(kept), "http://two") || strings.Contains(string(kept), "http://one") {
 		t.Fatalf("request file:\n%s\nkept edit:\n%s", data, kept)
 	}
-	if info == nil || info.Mode().Perm() != 0o600 {
+	if info == nil || (runtime.GOOS != "windows" && info.Mode().Perm() != 0o600) { // Windows has no owner-only mode bits
 		t.Fatalf("the kept edit must be private to the person: %v", info)
 	}
 }

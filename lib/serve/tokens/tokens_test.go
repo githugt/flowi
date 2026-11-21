@@ -6,6 +6,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -79,7 +80,7 @@ func TestStore_New_Then_the_secret_authenticates_and_only_its_hash_is_on_disk(t 
 	if !strings.HasPrefix(secret, Prefix) || strings.Contains(string(data), secret) || strings.Contains(string(data), strings.TrimPrefix(secret, Prefix+tok.ID+"_")) {
 		t.Fatalf("the secret must not be stored: %s", data)
 	}
-	if info, _ := os.Stat(s.path); info.Mode().Perm() != 0o600 {
+	if info, _ := os.Stat(s.path); runtime.GOOS != "windows" && info.Mode().Perm() != 0o600 { // Windows has no owner-only mode bits
 		t.Errorf("the file is readable by others: %v", info.Mode())
 	}
 }
