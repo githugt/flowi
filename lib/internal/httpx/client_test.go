@@ -252,7 +252,12 @@ func TestClient_Given_proxy_Then_request_goes_through_proxy(t *testing.T) {
 }
 
 func TestClient_should_fill_timings(t *testing.T) {
-	srv := httptest.NewServer(protoHandler())
+	// A local request can finish inside one tick of the clock (Windows ticks about every 0.5 to 15 ms), which would
+	// read as zero. The server waits a little so the first byte is measurably later than the send.
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		time.Sleep(30 * time.Millisecond)
+		protoHandler().ServeHTTP(w, r)
+	}))
 	defer srv.Close()
 
 	a := get(t, newClient(t, defaultOptions()), srv.URL)
