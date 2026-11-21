@@ -50,6 +50,7 @@ type FlowDoc struct {
 	cards     map[string]card.Card // what each step shows, by node id; nil unless the graph view is on
 	dirty     bool
 	onDisk    bool
+	sum       string // the flow file's sum when it was loaded: a save is refused if the file no longer has it; "" skips the check
 	confirm   bool
 	err       string
 	onChange  []func()
@@ -63,8 +64,22 @@ func NewFlowDoc(b Backend, w *Worker, c model.Collection, f model.Flow) *FlowDoc
 	d.load(f)
 	d.loadLayout()
 	d.loadCompatibility()
+	d.loadSum()
 	return d
 }
+
+// loadSum reads the flow file's sum in the background: the version a later save must find on disk.
+func (d *FlowDoc) loadSum() {
+	target := d.target
+	Run(d.w, func() string {
+		sum, _ := d.b.FlowSum(target) // no sum, no check: the save then behaves as it did before
+		return sum
+	}, func(sum string) { d.sum = sum })
+}
+
+// KeepMine accepts that the next save overwrites a change made to the file outside Flowi (the person chose "Keep
+// mine" on the banner), so that save is no longer refused.
+func (d *FlowDoc) KeepMine() { d.sum = "" }
 
 // FlowIOnlySteps are the steps of the flow in its Arazzo file that only
 // Flowi can run, as "id (type)": other Arazzo tools cannot run them.
@@ -154,6 +169,13 @@ func (d *FlowDoc) Cards() map[string]card.Card { return d.cards }
 // Target identifies the flow.
 func (d *FlowDoc) Target() flowi.FlowTarget { return d.target }
 
+// SavedPath is the flow's path as `flowi run` takes it: the file as saved, so renaming in an unsaved edit does not
+// change what a copied command runs.
+func (d *FlowDoc) SavedPath() string { return d.disk.Path }
+
+// CollectionName is the name of the collection the flow belongs to, for the command line's --collection.
+func (d *FlowDoc) CollectionName() string { return d.coll.Manifest.Name }
+
 // Collection is the flow's collection.
 func (d *FlowDoc) Collection() model.Collection { return d.coll }
 
@@ -180,8 +202,7 @@ func (d *FlowDoc) Arazzo(done func(text string, notes []string), fail func(error
 		case r.err == nil && done != nil:
 			var notes []string
 			for _, x := range r.diags {
-				msg, _ := diag.English().Message(x)
-				notes = append(notes, msg)
+				notes = append(notes, diag.Text(x))
 			}
 			done(r.text, notes)
 		}
@@ -287,7 +308,7 @@ func (d *FlowDoc) Insert(typ model.NodeType, listPath string, index int, init fu
 	_ = d.command(func(f *model.Flow) error {
 		list, ok := listAt(f, listPath)
 		if !ok {
-			return fmt.Errorf("no node list at %s", listPath)
+			return fmt.Errorf("there is no list of steps at %s", listPath)
 		}
 		taken := map[string]bool{}
 		allIDs(f.Nodes, taken)
@@ -347,8 +368,45 @@ func (d *FlowDoc) Delete(ids ...string) {
 	})
 }
 
+// DeleteImpact says what deleting the steps would take with it: how many steps go (the ones inside a container
+// too) and which other steps read their results, which would then read nothing.
+func (d *FlowDoc) DeleteImpact(ids ...string) (gone int, readBy []string) {
+	inside := map[string]bool{}
+	for _, id := range ids {
+		if list, i, ok := d.Locate(id); ok {
+			nodes, _ := listAt(&d.draft, list)
+			allIDs((*nodes)[i:i+1], inside)
+		}
+	}
+	seen := map[string]bool{}
+	for id := range inside {
+		for _, r := range stepsReading(d.draft, id, inside) {
+			if !seen[r] {
+				seen[r] = true
+				readBy = append(readBy, r)
+			}
+		}
+	}
+	slices.Sort(readBy)
+	return countNodes(d.draft.Nodes, inside), readBy
+}
+
+// countNodes counts the nodes of list (and inside them) whose id is in ids; a branch id is not a step.
+func countNodes(list []model.Node, ids map[string]bool) int {
+	n := 0
+	for _, node := range list {
+		if ids[node.ID] {
+			n++
+		}
+		for _, child := range node.Children() {
+			n += countNodes(child, ids)
+		}
+	}
+	return n
+}
+
 // ErrMoveIntoItself refuses moving a container into one of its own lists.
-var ErrMoveIntoItself = errors.New("a node cannot move into itself")
+var ErrMoveIntoItself = errors.New("a step cannot be moved into itself")
 
 // Move puts node id at index of the list at listPath. A node that was drawn
 // with a request (Attach) is not any more: it is somewhere else now.
@@ -392,7 +450,7 @@ func (d *FlowDoc) moveRun(id string, count int, listPath string, index int, chan
 	return d.command(func(f *model.Flow) error {
 		from, i, ok := locate(f.Nodes, "$.nodes", id)
 		if !ok {
-			return fmt.Errorf("no node %s", id)
+			return fmt.Errorf("there is no step %s", id)
 		}
 		self := from + "[" + strconv.Itoa(i) + "]"
 		if strings.HasPrefix(listPath, self+".") {
@@ -415,7 +473,7 @@ func (d *FlowDoc) moveRun(id string, count int, listPath string, index int, chan
 		listPath = shiftAfterRemoval(listPath, from, i, count)
 		dst, ok := listAt(f, listPath)
 		if !ok {
-			return fmt.Errorf("no node list at %s", listPath)
+			return fmt.Errorf("there is no list of steps at %s", listPath)
 		}
 		if from == listPath && index > i {
 			index -= min(index-i, count) // the nodes left slots before the target
@@ -540,8 +598,8 @@ func (d *FlowDoc) SetArrow(from, to string, outcomes []string) error {
 	if !ok {
 		return fmt.Errorf("no step %s", to)
 	}
-	if !slices.Contains(d.EarlierIDs(to), from) {
-		return fmt.Errorf("%s does not come before %s", from, to)
+	if ok, why := d.CanWait(from, to); !ok {
+		return errors.New(why)
 	}
 	previous := d.Previous(to)
 	arrows := slices.DeleteFunc(n.Arrows(previous), func(a model.Arrow) bool { return a.From == from })
@@ -579,8 +637,8 @@ func (d *FlowDoc) ConnectOutcome(from, to, outcome string) error {
 	if !ok {
 		return fmt.Errorf("no step %s", to)
 	}
-	if !slices.Contains(d.EarlierIDs(to), from) {
-		return fmt.Errorf("%s does not come before %s", from, to)
+	if ok, why := d.CanWait(from, to); !ok {
+		return errors.New(why)
 	}
 	previous := d.Previous(to)
 	var arrows []model.Arrow
@@ -706,7 +764,7 @@ func (d *FlowDoc) EditNode(id string, change func(n *model.Node)) {
 	_ = d.command(func(f *model.Flow) error {
 		path, i, ok := locate(f.Nodes, "$.nodes", id)
 		if !ok {
-			return fmt.Errorf("no node %s", id)
+			return fmt.Errorf("there is no step %s", id)
 		}
 		list, _ := listAt(f, path)
 		change(&(*list)[i])
@@ -720,7 +778,7 @@ func (d *FlowDoc) EditNodeMerged(merge, id string, change func(n *model.Node)) {
 	_ = d.mergedCommand(merge, func(f *model.Flow) error {
 		path, i, ok := locate(f.Nodes, "$.nodes", id)
 		if !ok {
-			return fmt.Errorf("no node %s", id)
+			return fmt.Errorf("there is no step %s", id)
 		}
 		list, _ := listAt(f, path)
 		change(&(*list)[i])
@@ -742,17 +800,18 @@ func (d *FlowDoc) Rename(id, name string) error {
 		allIDs(f.Nodes, taken)
 		switch {
 		case name == "":
-			return errors.New("a node needs an id")
+			return errors.New("a step needs a name")
 		case name != id && taken[name]:
-			return fmt.Errorf("id %q is taken", name)
+			return fmt.Errorf("a step named %q already exists", name)
 		}
 		path, i, ok := locate(f.Nodes, "$.nodes", id)
 		if !ok {
-			return fmt.Errorf("no node %s", id)
+			return fmt.Errorf("there is no step %s", id)
 		}
 		list, _ := listAt(f, path)
 		(*list)[i].ID = name
 		renameNeeds(f.Nodes, id, name)
+		renameStepRefs(f, id, name)
 		return nil
 	})
 	if err == nil && id != name {
@@ -803,6 +862,15 @@ func renameNeeds(list []model.Node, from, to string) {
 	}
 }
 
+// OpenConnections lists the connection names the flow's steps open, for a step to choose the one it runs over.
+//
+// Before: the name was free text, so a typo was found when the flow ran.
+func (d *FlowDoc) OpenConnections() []string {
+	set := map[string]bool{}
+	openedConnections(d.draft.Nodes, set)
+	return slices.Sorted(maps.Keys(set))
+}
+
 // AddBranch adds an empty branch with a free id to parallel node id.
 func (d *FlowDoc) AddBranch(id string) {
 	d.EditNode(id, func(n *model.Node) {
@@ -819,6 +887,20 @@ func (d *FlowDoc) RemoveCase(id string, i int) {
 		if i >= 0 && i < len(n.Cases) && len(n.Cases[i].Nodes) == 0 {
 			n.Cases = slices.Delete(n.Cases, i, i+1)
 		}
+	})
+}
+
+// MoveCase moves case i of condition id by delta places (-1 earlier, +1 later), with the steps in its lane. The
+// first case that is true wins, so the order is part of what the condition does. Out of range is no change.
+//
+// Before: cases could be added and removed but not reordered, so putting a narrower test first meant rebuilding both.
+func (d *FlowDoc) MoveCase(id string, i, delta int) {
+	d.EditNode(id, func(n *model.Node) {
+		j := i + delta
+		if i < 0 || i >= len(n.Cases) || j < 0 || j >= len(n.Cases) {
+			return
+		}
+		n.Cases[i], n.Cases[j] = n.Cases[j], n.Cases[i]
 	})
 }
 
@@ -899,6 +981,34 @@ func (d *FlowDoc) NodePath(id string) string {
 	return list + "[" + strconv.Itoa(i) + "]"
 }
 
+// LanePath is the list path of one lane of container id: its body (a loop), its cases then its else (a condition
+// with cases), its then and else (a plain condition), or branch lane of a parallel. ok is false for a step with no such
+// lane.
+//
+// Before: a step could be dropped into a lane but not added there, and an empty lane had nothing to click.
+func (d *FlowDoc) LanePath(id string, lane int) (string, bool) {
+	base := d.NodePath(id)
+	n, found := d.Node(id)
+	if base == "" || !found || lane < 0 {
+		return "", false
+	}
+	switch {
+	case n.Type == "batch" && lane == 0:
+		return base + ".body", true
+	case n.Type == "parallel" && lane < len(n.Branches):
+		return base + ".branches[" + strconv.Itoa(lane) + "].nodes", true
+	case n.Type == "condition" && len(n.Cases) > 0 && lane < len(n.Cases):
+		return base + ".cases[" + strconv.Itoa(lane) + "].nodes", true
+	case n.Type == "condition" && len(n.Cases) > 0 && lane == len(n.Cases):
+		return base + ".else", true
+	case n.Type == "condition" && len(n.Cases) == 0 && lane == 0:
+		return base + ".then", true
+	case n.Type == "condition" && len(n.Cases) == 0 && lane == 1:
+		return base + ".else", true
+	}
+	return "", false
+}
+
 // Node returns node id as edited.
 func (d *FlowDoc) Node(id string) (model.Node, bool) {
 	list, i, ok := d.Locate(id)
@@ -970,9 +1080,10 @@ func (d *FlowDoc) Save(dropComments bool) {
 	rev, layoutRev := d.rev, d.layoutRev
 	layout := model.Layout{Flow: d.target.Flow, Nodes: maps.Clone(d.positions), Collapsed: slices.Sorted(maps.Keys(d.collapsed))}
 	target := d.target
+	expect := d.sum
 	Run(d.w, func() error {
 		if flowDue {
-			if err := d.b.SaveFlow(target, draft, dropComments); err != nil {
+			if err := d.b.SaveFlow(target, draft, dropComments, expect); err != nil {
 				return err
 			}
 		}
@@ -995,6 +1106,11 @@ func (d *FlowDoc) saved(draft model.Flow, flowDue, layoutDue bool, rev, layoutRe
 			f()
 		}
 		return
+	case hasCode(err, diag.CodeWriteChangedOnDisk):
+		// Before: the save overwrote the change. Now it waits, and the banner offers Load from disk or Keep mine.
+		d.onDisk = true
+		d.changed()
+		return
 	case err != nil:
 		d.err = ErrorText(err)
 		d.changed()
@@ -1002,6 +1118,7 @@ func (d *FlowDoc) saved(draft model.Flow, flowDue, layoutDue bool, rev, layoutRe
 	}
 	if flowDue {
 		d.disk, d.dirty, d.onDisk = draft, d.rev != rev, false
+		d.loadSum() // the file is ours now: the next save expects what this one wrote
 	}
 	if layoutDue {
 		d.layoutDue = d.layoutRev != layoutRev
@@ -1044,6 +1161,7 @@ func (d *FlowDoc) Reloaded(c model.Collection, f model.Flow, found bool) {
 		d.disk, d.onDisk = f, true
 	default:
 		d.load(f)
+		d.loadSum()
 	}
 	d.changed()
 }
@@ -1051,6 +1169,7 @@ func (d *FlowDoc) Reloaded(c model.Collection, f model.Flow, found bool) {
 // Revert drops the edits and shows the flow as on disk.
 func (d *FlowDoc) Revert() {
 	d.load(d.disk)
+	d.loadSum()
 	d.err = ""
 	d.changed()
 }

@@ -65,13 +65,13 @@ type CookiesView struct {
 
 func snippetViewOf(s *vm.Snippet) SnippetView {
 	formats := []string{}
-	for _, f := range snippet.Formats() {
+	for _, f := range s.Formats() {
 		formats = append(formats, string(f))
 	}
 	return SnippetView{Format: string(s.Format()), Formats: formats, Exclude: s.Exclude(), Secrets: s.HasSecrets(), Text: s.Text(), Error: s.Err()}
 }
 
-// SetSnippetFormat picks curl, wget, powershell or xh.
+// SetSnippetFormat picks one of the formats the snippet offers for this kind of request.
 func (s *RequestService) SetSnippetFormat(node, format string) {
 	s.with(node, func(o *openRequest) { o.snip.SetFormat(snippet.Format(format)) })
 }
@@ -254,6 +254,30 @@ func (s *RequestService) PinStored(node, version, name, example string) (string,
 	return file, err
 }
 
+// ExampleTaken says whether pinning the response shown (stored "" ) or the saved response (version and stored name) as
+// example (empty: its status) would replace an example that is already there, so the screen can ask first.
+//
+// Before: pinning wrote over an example of the same name without a word.
+func (s *RequestService) ExampleTaken(node, version, stored, example string) (bool, error) {
+	var taken bool
+	var err error
+	s.with(node, func(o *openRequest) {
+		var rec engine.Record
+		if stored != "" {
+			if rec, err = s.app.backend.StoredRecord(o.req.Target(), version, stored); err != nil {
+				return
+			}
+		} else if ex, ok := s.app.send.LastFor(o.req.Target()); ok && ex.Result.Record != nil {
+			rec = *ex.Result.Record
+		} else {
+			err = errors.New("send the request first")
+			return
+		}
+		taken, err = s.app.backend.ExampleTaken(rec, example)
+	})
+	return taken, err
+}
+
 // SaveBody writes the body of the response shown to a file the user picks in the
 // system's save dialog, and returns the file ("" when the user cancelled).
 func (s *RequestService) SaveBody(node string) (string, error) {
@@ -290,24 +314,45 @@ func (s *RequestService) SaveBody(node string) (string, error) {
 // included. It names the headers that look like credentials and is "" when
 // there is none (or nothing to pin).
 func (s *RequestService) PinWarning(node string) string {
-	var names []string
+	var warning string
 	s.with(node, func(o *openRequest) {
 		if ex, ok := s.app.send.LastFor(o.req.Target()); ok && ex.Result.Record != nil {
-			names = engine.CredentialHeaders(*ex.Result.Record)
+			warning = pinWarningFor(*ex.Result.Record)
 		}
 	})
-	return pinWarningText(names)
+	return warning
 }
 
 // PinStoredWarning is PinWarning for a saved response of the request.
 func (s *RequestService) PinStoredWarning(node, version, name string) string {
-	var names []string
+	var warning string
 	s.with(node, func(o *openRequest) {
 		if rec, err := s.app.backend.StoredRecord(o.req.Target(), version, name); err == nil {
-			names = engine.CredentialHeaders(rec)
+			warning = pinWarningFor(rec)
 		}
 	})
-	return pinWarningText(names)
+	return warning
+}
+
+// pinWarningFor is the whole warning for pinning rec: the credential headers, then what the body will be.
+func pinWarningFor(rec engine.Record) string {
+	return strings.TrimSpace(pinWarningText(engine.CredentialHeaders(rec)) + " " + pinBodyNote(rec.Body))
+}
+
+// bigPin is the size from which a pinned body is worth a word: it is committed with the collection.
+const bigPin = 1 << 20
+
+// pinBodyNote says what a pin keeps of the body, when that is not the whole body in plain view.
+//
+// Before: a binary response pinned as an empty body and a 10 MiB JSON body was committed, and neither was said.
+func pinBodyNote(b engine.Body) string {
+	switch {
+	case b.Size > 0 && b.Text == "" && b.JSON == nil:
+		return "The body is binary or too large to keep as text, so only the headers are pinned."
+	case b.Size >= bigPin:
+		return "The body is " + vm.SizeText(b.Size) + ", and it is committed with the collection."
+	}
+	return ""
 }
 
 func pinWarningText(names []string) string {

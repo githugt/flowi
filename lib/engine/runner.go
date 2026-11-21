@@ -53,6 +53,13 @@ type runner struct {
 
 	emitMu sync.Mutex
 	closed bool // set when the run was aborted: later events are dropped
+	// sealed is closed when the run's closing event starts, to free an emit that
+	// is blocked on a full buffer while holding emitMu.
+	sealed   chan struct{}
+	sealOnce sync.Once
+	// abortedSendWait bounds how long a closing event waits for room after the
+	// run was aborted, since the consumer may be gone.
+	abortedSendWait time.Duration
 
 	rngMu sync.Mutex
 	rng   *rand.Rand
@@ -71,6 +78,9 @@ type runner struct {
 	outputs []report.OutputValue
 
 	conns connections // connections kept open between steps, closed when the run ends
+	// pool is the HTTP transports of a flow run, so its requests share connections (http.reuse_connections). Nil for
+	// a send, which has one request and starts cold.
+	pool *httpx.Pool
 
 	limit    int     // run-wide concurrency limit (plan Decision 2)
 	limits   *limits // in-flight HTTP cap and rate limits, for every attempt
@@ -84,6 +94,7 @@ func newRunState(d Deps, seed uint64, events chan<- Event) *runner {
 	}
 	limits, _ := newLimits(defaultRunLimit, "", nil, d.Clock, d.After) // no rates: cannot fail
 	return &runner{
+		sealed: make(chan struct{}), abortedSendWait: 2 * time.Second,
 		deps: d, events: events, runID: d.NewID(), seed: seed, limits: limits, ctx: context.Background(),
 		gen:      lockedGenerator(template.NewGeneration(seed, d.Clock).Func()),
 		secrets:  &secretTracker{vault: d.Vault, environ: d.Environ},
@@ -216,6 +227,10 @@ func (r *runner) result(out outcome) SendResult {
 	if out.vars != nil {
 		res.Vars, _ = maskValue(out.vars, m).(map[string]any)
 	}
+	for _, c := range out.checks {
+		c.Note = m.String(c.Note)
+		res.Checks = append(res.Checks, c)
+	}
 	return res
 }
 
@@ -228,7 +243,10 @@ func (r *runner) emit(ev Event) {
 		return
 	}
 	r.record(ev)
-	r.events <- ev
+	select {
+	case r.events <- ev:
+	case <-r.sealed: // the run is closing: this late event is dropped
+	}
 }
 
 func (r *runner) record(ev Event) {
@@ -242,12 +260,37 @@ func (r *runner) record(ev Event) {
 
 // finalEmit sends one of the run's closing events (RunAborted,
 // RunFinished) and closes the run to every other event.
+//
+// Before: an emit blocked on a full buffer held emitMu, so the closing event of
+// an aborted run waited for the same lock and the run could hang for good.
+// Closing seals the run first, which frees that emit, and once the run was
+// aborted the closing events wait only abortedSendWait for room.
 func (r *runner) finalEmit(ev Event) {
+	r.seal()
 	r.emitMu.Lock()
 	defer r.emitMu.Unlock()
+	_, isAbort := ev.(RunAborted)
+	aborted := r.closed || isAbort
 	r.closed = true
 	r.record(ev)
-	r.events <- ev
+	if !aborted {
+		r.events <- ev
+		return
+	}
+	t := time.NewTimer(r.abortedSendWait)
+	defer t.Stop()
+	select {
+	case r.events <- ev:
+	case <-t.C:
+	}
+}
+
+func (r *runner) seal() {
+	r.sealOnce.Do(func() {
+		if r.sealed != nil {
+			close(r.sealed)
+		}
+	})
 }
 
 func (r *runner) warn(d diag.Diagnostic) {
@@ -290,6 +333,8 @@ type outcome struct {
 	diags  diag.List
 	// outcomes are the outcomes of the request that held when it finished (see matchOutcomes).
 	outcomes []string
+	// checks are what each assert line said (see execution.checks).
+	checks []CheckEval
 }
 
 func maskDiags(l diag.List, m interface{ String(string) string }) diag.List {

@@ -1,6 +1,8 @@
 <script lang="ts">
+  import Modal from './Modal.svelte'
   import TextInput from './TextInput.svelte'
   import Button from './Button.svelte'
+  import Checkbox from './Checkbox.svelte'
   // Save as flowi overlay: the changes of the working copy against its saved version, each with a
   // choice. Ticked changes go to the overlay's shared part (every request that uses it gets them);
   // the others stay with this request. An existing overlay keeps what it holds for other requests.
@@ -47,9 +49,7 @@
   }
 </script>
 
-<div class="scrim" role="presentation" onpointerdown={onclose}>
-  <form class="dialog" onpointerdown={(e) => e.stopPropagation()} onsubmit={(e) => { e.preventDefault(); save() }}>
-    <h3>Save as flowi overlay</h3>
+<Modal title="Save as flowi overlay" width={540} maxHeight="82vh" scroll {onclose} onsubmit={() => save()}>
     {#if error}
       <p class="err">{error}</p>
     {:else if !diff}
@@ -72,11 +72,10 @@
         <ul class="changes">
           {#each diff.ops as op}
             <li>
-              <label>
-                <input type="checkbox" bind:checked={shared[op.index]} />
-                <span>{op.summary}</span>
+              <Checkbox bind:checked={shared[op.index]}>
+                {op.summary}
                 <span class="tag">{shared[op.index] ? 'shared' : 'this request'}</span>
-              </label>
+              </Checkbox>
             </li>
           {/each}
         </ul>
@@ -88,18 +87,14 @@
         <ul class="notes">{#each diff.unsupported as u}<li>{u}</li>{/each}</ul>
       {/if}
     {/if}
-    <div class="actions">
-      <Button type="button" onclick={onclose}>Cancel</Button>
-      <Button variant="primary" type="submit" disabled={!canSave}>{exists ? 'Update overlay' : 'Save overlay'}</Button>
-    </div>
-  </form>
-</div>
+  {#snippet actions()}
+    <Button type="button" onclick={onclose}>Cancel</Button>
+    <Button variant="primary" type="submit" disabled={!canSave}>{exists ? 'Update overlay' : 'Save overlay'}</Button>
+  {/snippet}
+</Modal>
 
 <style>
-  .scrim { position: fixed; inset: 0; background: rgb(0 0 0 / 0.4); display: grid; place-items: center; z-index: 60; }
-  .dialog { width: 540px; max-width: calc(100vw - 32px); max-height: 82vh; overflow: auto; display: flex; flex-direction: column; gap: 10px; padding: 16px; background: var(--panel); border: 1px solid var(--line); border-radius: var(--r-lg); }
-  .dialog h3, .dialog h4, .dialog p { margin: 0; }
-  h4 { font-size: var(--fs-sm); color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; }
+  h4 { margin: 0; font-size: var(--fs-sm); color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; }
   ul { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 4px; }
   .notes li { color: var(--muted); font-size: var(--fs-sm); }
   label { display: flex; align-items: center; gap: 8px; }
@@ -108,5 +103,4 @@
   .muted { color: var(--muted); font-size: var(--fs-sm); }
   .small { font-size: var(--fs-xs); }
   .err { color: var(--fail); font-size: var(--fs-sm); }
-  .actions { display: flex; justify-content: flex-end; gap: 8px; }
 </style>

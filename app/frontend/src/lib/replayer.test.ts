@@ -27,7 +27,7 @@ describe('forwardPreview', () => {
   it('Given one API, Then everything goes there', () => {
     const t = texts(forwardPreview({ ...base, forward: 'save', forwardTo: 'https://x.test' }, targets))
     expect(t).toContain('Every call with no saved answer is sent to https://x.test')
-    expect(t).toContain('Scratch draft')
+    expect(t).toContain('in Drafts')
   })
   it('Given an allow-list, Then APIs outside it are marked', () => {
     const t = texts(forwardPreview({ ...base, forward: 'pass', forwardOnly: 'https://a.test' }, targets))
@@ -45,5 +45,18 @@ describe('forwardLabel', () => {
     expect(forwardLabel({ forward: '', forwardTo: '', forwardOnly: '' })).toBe('listening')
     expect(forwardLabel({ forward: 'pass', forwardTo: 'https://x.test', forwardOnly: '' })).toContain('https://x.test')
     expect(forwardLabel({ forward: 'save', forwardTo: '', forwardOnly: '' })).toContain('their own APIs')
+  })
+})
+
+describe('forwardLabel faults', () => {
+  it('names the faults and in-turn answering that are on', () => {
+    const base = { forward: '' as const, forwardTo: '', forwardOnly: '' }
+
+    expect(forwardLabel({ ...base, faultErrorPercent: '20', sequence: true })).toBe('listening · errors 20% · answers in turn')
+    expect(forwardLabel({ ...base, faultDropPercent: '5' })).toBe('listening · drops 5%')
+    expect(forwardLabel({ ...base, faultErrorPercent: '0' })).toBe('listening')
+  })
+  it('leaves the faults out while forwarding, where they do not apply', () => {
+    expect(forwardLabel({ forward: 'pass', forwardTo: 'https://x.test', forwardOnly: '', faultErrorPercent: '50' })).toBe('passing calls with no saved answer to https://x.test')
   })
 })

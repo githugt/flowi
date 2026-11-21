@@ -4,6 +4,7 @@ package bridge
 
 import (
 	"net/http"
+	"strings"
 	"testing"
 	"time"
 
@@ -95,5 +96,64 @@ func TestMessagesOf_Given_a_message_with_a_protocol_type_When_converted_Then_the
 
 	if got[0].Type != "order.paid" {
 		t.Fatalf("type = %q", got[0].Type)
+	}
+}
+
+func TestMessagesOf_Given_broker_metadata_When_converted_Then_the_row_carries_it(t *testing.T) {
+	// Before: the partition, offset, sequence and headers of a Kafka or JetStream message were dropped here.
+	in := []engine.RecordMessage{{Direction: "received", Partition: 2, Offset: 10345, Sequence: 7,
+		Headers: []engine.Header{{Name: "trace-id", Value: "abc"}}, Body: engine.Body{Text: "x", Size: 1}}}
+
+	got := messagesOf(in)
+
+	if got[0].Partition != 2 || got[0].Offset != 10345 || got[0].Sequence != 7 || len(got[0].Headers) != 1 || got[0].Headers[0].Key != "trace-id" {
+		t.Fatalf("row %+v", got[0])
+	}
+}
+
+func TestMessagesOf_Given_a_binary_message_When_converted_Then_the_row_carries_its_size_and_a_hex_dump(t *testing.T) {
+	// Before: a binary message was only the note "(binary, 3 bytes)", so its bytes could not be looked at and its row
+	// measured the note, not the message.
+	in := []engine.RecordMessage{
+		{Direction: "received", Body: engine.Body{Base64: "AAEC", Size: 3}},
+		{Direction: "received", Body: engine.Body{Text: "hello", Size: 5}},
+	}
+
+	got := messagesOf(in)
+
+	if got[0].Size != 3 || !strings.Contains(got[0].Hex, "00 01 02") {
+		t.Errorf("binary row size = %d, hex = %q", got[0].Size, got[0].Hex)
+	}
+	if got[1].Hex != "" || got[1].Size != 5 {
+		t.Errorf("text row size = %d, hex = %q", got[1].Size, got[1].Hex)
+	}
+}
+
+func TestRecordedOf_Given_forwarded_and_saved_calls_When_counted_Then_each_new_request_counts_once(t *testing.T) {
+	// Before: record mode ended with no result: it wrote request files and said nothing of how many or where.
+	entries := []replay.Entry{
+		{Match: replay.MatchRecorded, Request: "recorded/get-orders"},
+		{Match: "request", Request: "auth/login"},
+		{Match: replay.MatchRecorded, Request: "recorded/get-orders"},
+		{Match: replay.MatchRecorded, Request: "recorded/post-pay"},
+		{Match: replay.MatchRecorded, Request: ""},
+	}
+	targets := []Choice{{ID: "", Label: "Scratch (drafts)"}, {ID: "c1", Label: "Payments", Path: "Payments"}}
+
+	got := recordedOf(entries, targets, "c1", " ")
+
+	if got.Count != 2 || got.Requests[0] != "recorded/get-orders" || got.Requests[1] != "recorded/post-pay" {
+		t.Fatalf("recorded %+v", got)
+	}
+	if got.Target != "Payments/recorded" {
+		t.Fatalf("target %q", got.Target)
+	}
+}
+
+func TestRecordedOf_Given_the_scratch_draft_and_a_folder_When_counted_Then_the_target_names_them(t *testing.T) {
+	got := recordedOf(nil, []Choice{{ID: "", Label: "Scratch (drafts)"}}, "", "captured")
+
+	if got.Count != 0 || got.Requests == nil || got.Target != "Scratch/captured" {
+		t.Fatalf("recorded %+v", got)
 	}
 }

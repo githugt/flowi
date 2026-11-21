@@ -233,3 +233,49 @@ func TestStartRun_Given_a_stop_as_failed_Then_the_run_fails_with_the_message(t *
 		t.Fatalf("result %+v, b %+v", res, b)
 	}
 }
+
+func TestFinalEmit_Given_an_emit_blocked_on_a_full_buffer_and_no_reader_Then_the_closing_event_does_not_hang(t *testing.T) {
+	// Before: the blocked emit held emitMu, so the closing event waited on the lock for good.
+	events := make(chan Event, 1)
+	r := newRunState(Deps{Clock: time.Now, NewID: func() string { return "r1" }}, 1, events)
+	r.abortedSendWait = 20 * time.Millisecond
+	r.emit(Warning{}) // fills the buffer
+	blocked := make(chan struct{})
+	go func() {
+		r.emit(Warning{}) // waits for room
+		close(blocked)
+	}()
+	time.Sleep(20 * time.Millisecond)
+	finished := make(chan struct{})
+
+	go func() {
+		r.finalEmit(RunAborted{RunID: "r1"})
+		close(finished)
+	}()
+
+	for name, done := range map[string]chan struct{}{"the blocked emit": blocked, "the closing event": finished} {
+		select {
+		case <-done:
+		case <-time.After(5 * time.Second):
+			t.Fatalf("%s is still waiting with nobody reading events", name)
+		}
+	}
+}
+
+// Before: NodeStarted carried no time, so a consumer could not place a step on a timeline of the run.
+func TestStartRun_should_stamp_each_started_node_on_the_runs_clock(t *testing.T) {
+	f := newFixture(t)
+	fl := f.addFlow("stamped", flowNode("a", "set", "target", "vars.x", "value", "{{1}}"))
+
+	events, _ := runFlow(context.Background(), t, f.deps(), f.runInput(fl))
+
+	var at time.Time
+	for _, ev := range events {
+		if ns, ok := ev.(NodeStarted); ok {
+			at = ns.At
+		}
+	}
+	if at.IsZero() || at.Before(events[0].(RunStarted).At) {
+		t.Fatalf("node started at %v, run started at %v", at, events[0].(RunStarted).At)
+	}
+}

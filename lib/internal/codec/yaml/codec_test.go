@@ -334,6 +334,28 @@ func TestEncodeEnvironment_should_round_trip_its_colour(t *testing.T) {
 	}
 }
 
+func TestEncodeEnvironment_should_round_trip_its_colour_protected(t *testing.T) {
+	c := newCodec()
+	data := []byte("id: 01J9ZE3M4N5P6Q7R8S9T0VWXYZ\nname: prod\ncolour: red\nprotected: true\nvars:\n  host: example.com\n")
+
+	env, diags := c.DecodeEnvironment("prod.yaml", data)
+	requireNoDiagnostics(t, diags)
+	out, err := c.EncodeEnvironment(env)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !env.Protected {
+		t.Fatal("protected was not read")
+	}
+	if env.Colour != "red" {
+		t.Fatalf("colour = %q, want red", env.Colour)
+	}
+	if !bytes.Equal(out, data) {
+		t.Fatalf("round trip differs:\n%s", out)
+	}
+}
+
 func TestEncodeEnvironment_should_round_trip_extends(t *testing.T) {
 	c := newCodec()
 	data := []byte("id: 01J9ZE3M4N5P6Q7R8S9T0VWXYZ\nname: staging\nextends: base\nvars:\n  host: example.com\n")
@@ -400,5 +422,36 @@ func TestEnvironment_Given_a_typed_value_that_does_not_fit_Then_it_is_written_as
 
 	if err != nil || !strings.Contains(string(out), "count: five") {
 		t.Fatalf("%v\n%s", err, out)
+	}
+}
+
+func TestManifest_min_version_should_round_trip_and_be_left_out_when_empty(t *testing.T) {
+	c := newCodec()
+
+	m, diags := c.DecodeManifest("flowi.yaml", []byte("format: 1\nid: 01J9Z8K3M4N5P6Q7R8S9T0VWXY\nmin_version: 1.4.0\n"))
+	out, err := c.EncodeManifest(m)
+	m.MinVersion = ""
+	bare, _ := c.EncodeManifest(m)
+
+	requireNoDiagnostics(t, diags)
+	if err != nil || !strings.Contains(string(out), "min_version: 1.4.0") || strings.Contains(string(bare), "min_version") {
+		t.Fatalf("with:\n%s\nwithout:\n%s\n%v", out, bare, err)
+	}
+}
+
+// Before: a schedule had nowhere to say who to tell when its run failed.
+func TestDecodeWorkspace_should_read_and_round_trip_a_schedules_alert_addresses(t *testing.T) {
+	c := newCodec()
+	data := readFixture(t, "valid/workspace-schedule-alerts.yaml")
+
+	ws, diags := c.DecodeWorkspace("workspace.yaml", data)
+	requireNoDiagnostics(t, diags)
+	out, err := c.EncodeWorkspace(ws)
+
+	if err != nil || !bytes.Equal(out, data) {
+		t.Fatalf("round trip differs (%v):\n%s", err, out)
+	}
+	if s := ws.Schedules[0]; s.OnFailure != "env:SLACK_HOOK" || s.OnSuccess != "https://hooks.example/ok" {
+		t.Fatalf("schedule %+v", s)
 	}
 }

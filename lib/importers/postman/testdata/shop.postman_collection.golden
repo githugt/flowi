@@ -3,7 +3,6 @@ item "collection Shop API" imported at 1:1
   warning FLW-IMPORT-006 1:1 variable api_secret looked like a credential and was replaced by a secret declaration
 item "Auth/Login" imported at 18:9
   warning FLW-IMPORT-006 18:9 saved response OK (1 values) looked like a credential and was replaced by (redacted)
-  warning FLW-IMPORT-001 18:9 request test script has no Flowi equivalent and was left out: scripts are JavaScript; use hooks and extract or assert nodes instead
 item "Users/Get-user" imported at 43:9
 item "Users/Get-user-orders" imported at 56:9
 item "Users/Create-user" imported at 60:9
@@ -34,6 +33,10 @@ versions:
           "password": "{{secret.password}}",
           "nonce": "{{$uuid-v4}}"
         }
+    extract:
+      token:
+        from: body
+        path: $.token
 --- request Users/Get-user
 name: Get user
 versions:

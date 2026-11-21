@@ -4,6 +4,8 @@ package nodes
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"strconv"
 	"strings"
 
@@ -60,7 +62,63 @@ func runCheck(n model.Node, s *State, check string, warn bool) diag.List {
 	if ok {
 		return nil
 	}
-	return Failed(n.ID, check, assertMessage(n, s), warn, s.Emit)
+	message := assertMessage(n, s)
+	if saw := Saw(check, s.Scope()); saw != "" {
+		message = strings.TrimSpace(message + " " + saw)
+	}
+	return Failed(n.ID, check, message, warn, s.Emit)
+}
+
+// maxSaw is how many values of a failed check are shown, and sawWidth how long each one may be.
+const (
+	maxSaw   = 4
+	sawWidth = 60
+)
+
+// Saw says what the failed check read, so the person sees "(saw: response.status = 404)" and not only the rule that
+// was broken. Before: a failed assertion showed `status == 200` and nothing else, in the app, the CLI and JUnit, and
+// the reader had to run the request again to find the value. Secrets are never shown: a reference to secret.* is left
+// out, and so is any value that was built from one.
+func Saw(check string, scope template.Scope) string {
+	refs, err := template.References(check, true)
+	if err != nil {
+		return ""
+	}
+	var parts []string
+	for _, ref := range refs {
+		if len(parts) == maxSaw {
+			break
+		}
+		if len(ref.Path) == 0 || ref.Path[0] == "secret" {
+			continue
+		}
+		dotted := strings.Join(ref.Path, ".")
+		tpl, err := template.Parse("{{" + dotted + "}}")
+		if err != nil {
+			continue
+		}
+		r, err := tpl.Eval(scope)
+		if err != nil || r.Tainted {
+			continue
+		}
+		parts = append(parts, dotted+" = "+sawValue(r.Value))
+	}
+	if len(parts) == 0 {
+		return ""
+	}
+	return "(saw: " + strings.Join(parts, ", ") + ")"
+}
+
+// sawValue is v as a short single line: JSON for maps, lists and strings, cut at sawWidth.
+func sawValue(v any) string {
+	text := fmt.Sprint(v)
+	if b, err := json.Marshal(v); err == nil {
+		text = string(b)
+	}
+	if r := []rune(text); len(r) > sawWidth {
+		text = string(r[:sawWidth]) + "…"
+	}
+	return text
 }
 
 // assertMessage is the message with its templates filled in, so "got {{response.status}}" says what was got. A

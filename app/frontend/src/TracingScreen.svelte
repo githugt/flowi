@@ -1,4 +1,5 @@
 <script lang="ts">
+  import ScreenPage from './ScreenPage.svelte'
   // Where flowi's traces go: the address of the person's own OpenTelemetry collector. This is their data sent to
   // their own server, so it is kept apart from Usage reporting, which says what is sent to the project.
   import { onMount } from 'svelte'
@@ -54,7 +55,7 @@
 </script>
 
 {#if view}
-  <div class="page">
+  <ScreenPage width={760}>
     <h2>Tracing</h2>
     <p class="expl">
       Send a trace of every send and flow run to your own OpenTelemetry collector, such as Jaeger, Grafana Tempo or Honeycomb, to see how long each step took and where runs fail. Nothing is sent until you enter an address.
@@ -116,11 +117,10 @@
       <li>For each request: the method, the address, the status and how long it took.</li>
       <li>Never request or response bodies, headers or secret values.</li>
     </ul>
-  </div>
+  </ScreenPage>
 {/if}
 
 <style>
-  .page { position: absolute; inset: 0; overflow: auto; padding: 28px 32px 56px; max-width: 760px; }
   h2 { margin: 0 0 8px; }
   h4 { margin: 24px 0 6px; }
   .expl { line-height: 1.5; }

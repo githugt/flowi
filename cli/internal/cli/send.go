@@ -3,6 +3,7 @@
 package cli
 
 import (
+	"errors"
 	"fmt"
 	"log/slog"
 	"slices"
@@ -28,7 +29,7 @@ type sendFlags struct {
 	collection, env, version, prefer, save, pin string
 	overlays                                    []string
 	with, skip                                  []string
-	noHooks, headers, quiet                     bool
+	noHooks, headers, quiet, check              bool
 	seed                                        uint64
 }
 
@@ -39,7 +40,9 @@ func newSendCommand(i do.Injector) *cobra.Command {
 		Short: "Send a saved request",
 		Long: "Send a request (by path, e.g. auth/login, or id) with its hooks, and print the response.\n\n" +
 			"The response body goes to standard output and everything else to standard error, so the\n" +
-			"body can be piped (flowi send auth/login | jq .token).",
+			"body can be piped (flowi send auth/login | jq .token).\n\n" +
+			"With --check nothing is sent: for a message or database request it connects, signs in with the credentials the\n" +
+			"request uses and disconnects, so a wrong address or password shows at once and not after a timeout.",
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error { return runSend(cmd, i, args[0], f) },
 	}
@@ -58,6 +61,7 @@ func newSendCommand(i do.Injector) *cobra.Command {
 	fl.Lookup("pin").NoOptDefVal = pinDefault
 	fl.BoolVar(&f.headers, "headers", false, "also print the response headers")
 	fl.BoolVar(&f.quiet, "quiet", false, "print only the status line")
+	fl.BoolVar(&f.check, "check", false, "only test the connection (message and database requests); send, publish and read nothing")
 	return cmd
 }
 
@@ -73,6 +77,9 @@ func runSend(cmd *cobra.Command, i do.Injector, ref string, f sendFlags) error {
 	target, err := s.Workspace.FindRequest(ref, f.collection)
 	if err != nil {
 		return err
+	}
+	if f.check {
+		return runCheck(cmd, s.Workspace, target, opts)
 	}
 	send, err := s.Workspace.SendRequest(cmd.Context(), target, opts)
 	if err != nil {
@@ -131,7 +138,7 @@ func renderSend(cmd *cobra.Command, i do.Injector, send *engine.Send, f sendFlag
 	case tui.RendererJSON:
 		return writeNDJSON(cmd.OutOrStdout(), send)
 	case tui.RendererLive:
-		seen, err := tui.RunSend(watchPrompts(send.Events(), openBrowser), cmd.ErrOrStderr(), tui.Options{Color: !console.NoColor})
+		seen, err := tui.RunSend(watchPrompts(send.Events(), openBrowser), cmd.ErrOrStderr(), tui.Options{Color: console.UseColor(g.Color)})
 		if err != nil {
 			drainEvents(send) // the live view failed; the send still has to finish
 			cmd.PrintErrf("warning: %v\n", err)
@@ -195,4 +202,25 @@ func logSendFinished(i do.Injector, t flowi.RequestTarget, res engine.SendResult
 		return // logging problems are reported once by the app and never change the outcome
 	}
 	logger.Debug("send finished", "Event", "SendFinished", "RunID", res.RunID, "RequestID", t.Request, "Status", res.Status)
+}
+
+// runCheck tests the connection of a request. The verdict goes to standard error, like the rest of what is not a
+// response body; the exit code says it: 0 connected, 4 the service did not answer or refused the sign-in, 2 the
+// request could not be rendered or has no connection test.
+func runCheck(cmd *cobra.Command, ws *flowi.Workspace, target flowi.RequestTarget, opts flowi.SendOptions) error {
+	probe, err := ws.TestSavedConnection(cmd.Context(), target, opts)
+	if err != nil {
+		return err
+	}
+	switch {
+	case probe.Diags.HasErrors():
+		return &diag.ListError{List: probe.Diags}
+	case probe.Status == engine.ProbeUnsupported:
+		return &UsageError{Err: errors.New(probe.Detail)}
+	case probe.Status == engine.ProbeFailed:
+		cmd.PrintErrf("FAILED  %s: %s\n", probe.Target, probe.Detail)
+		return Exit(ExitSystem)
+	}
+	cmd.PrintErrf("OK  %s: %s (%d ms)\n", probe.Target, probe.Detail, probe.Took.Milliseconds())
+	return nil
 }

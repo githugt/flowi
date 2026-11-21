@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"slices"
 	"sync"
+	"time"
 
 	"github.com/githugt/flowi/lib/model"
 )
@@ -25,6 +26,10 @@ type Entry struct {
 // tied to any collection. It is not a valid collection id.
 const WorkspaceScope model.ID = "workspace"
 
+// TokenScope is the Entry.Collection of the OAuth tokens kept between runs. They share the vault's encryption but are
+// not secrets a user sets: Stored and Prune leave them alone, so the orphan sweep never takes them.
+const TokenScope model.ID = "oauth-tokens"
+
 // Options configures a vault.
 type Options struct {
 	File        string // workspaces/<name>/vault.enc
@@ -32,6 +37,11 @@ type Options struct {
 	Keys        KeyStore               // nil when there is no keychain
 	Environ     []string               // for FLOWI_VAULT_KEY and FLOWI_SECRET_*
 	Passphrase  func() (string, error) // nil when no prompt is possible
+	// NewPassphrase asks for the passphrase of a vault that does not exist yet, where a typo would lock the secrets for
+	// good (the window asks twice). nil: Passphrase asks, as it does for an existing vault.
+	NewPassphrase func() (string, error)
+	// Now is the clock for the idle lock; nil uses time.Now.
+	Now func() time.Time
 }
 
 // Vault is the encrypted secrets file. It is unlocked on first use and the
@@ -39,9 +49,10 @@ type Options struct {
 type Vault struct {
 	opts Options
 
-	mu  sync.Mutex // guards key and env
-	key []byte
-	env *envelope // nil until the file has been read or created
+	mu   sync.Mutex // guards key, env and last
+	key  []byte
+	env  *envelope // nil until the file has been read or created
+	last time.Time // when the vault was last used, for the idle lock
 }
 
 // New returns a vault; nothing is read or unlocked until it is used.
@@ -65,6 +76,71 @@ func (v *Vault) Get(e Entry, envName string) (value string, ok bool, err error) 
 		return "", false, nil
 	}
 	return c.Entries[i].Value, true, nil
+}
+
+// Status says where the vault stands, without opening it or asking for anything.
+type Status struct {
+	Exists   bool // a vault file exists
+	Unlocked bool // its key is in memory: the next read needs no prompt
+	// Prompts says that opening it asks for the passphrase. A vault whose key is in the OS keychain, or in
+	// FLOWI_VAULT_KEY, opens again by itself after a lock, so locking it only drops the key from this process.
+	Prompts bool
+	// Idle is how long since it was last used; zero while it is locked or unused.
+	Idle time.Duration
+}
+
+// Status reports the vault's state. It reads the file's header when that has not been done, never its secrets.
+func (v *Vault) Status() Status {
+	v.mu.Lock()
+	defer v.mu.Unlock()
+	env := v.env
+	if env == nil {
+		env, _ = readEnvelope(v.opts.File) // unreadable counts as no vault here; a real use reports the problem
+	}
+	s := Status{Exists: env != nil, Unlocked: v.key != nil}
+	if env != nil {
+		_, fromEnv := v.envKey()
+		s.Prompts = env.KeySource == sourcePhrase && !fromEnv
+	}
+	if s.Unlocked && !v.last.IsZero() {
+		s.Idle = v.now().Sub(v.last)
+	}
+	return s
+}
+
+// Lock forgets the key and the decrypted file. The next read or write opens the vault again, asking for the
+// passphrase if it has one.
+func (v *Vault) Lock() {
+	v.mu.Lock()
+	defer v.mu.Unlock()
+	v.lock()
+}
+
+// LockIfIdle locks the vault when it is open and has not been used for idle; it says whether it did. An idle of
+// zero or less never locks.
+func (v *Vault) LockIfIdle(idle time.Duration) bool {
+	if idle <= 0 {
+		return false
+	}
+	v.mu.Lock()
+	defer v.mu.Unlock()
+	if v.key == nil || v.now().Sub(v.last) < idle {
+		return false
+	}
+	v.lock()
+	return true
+}
+
+func (v *Vault) lock() {
+	clear(v.key)
+	v.key, v.env, v.last = nil, nil, time.Time{}
+}
+
+func (v *Vault) now() time.Time {
+	if v.opts.Now != nil {
+		return v.opts.Now()
+	}
+	return time.Now()
 }
 
 // Unlock opens the vault now (asking for the passphrase if it needs one),
@@ -123,6 +199,57 @@ func (v *Vault) Names(collection model.ID) ([]Entry, error) {
 	return out, nil
 }
 
+// Stored lists the identity of every secret in the vault, never a value. A vault that does not exist yet holds none.
+func (v *Vault) Stored() ([]Entry, error) {
+	v.mu.Lock()
+	defer v.mu.Unlock()
+	c, exists, err := v.read()
+	if err != nil || !exists {
+		return nil, err
+	}
+	out := make([]Entry, 0, len(c.Entries))
+	for _, s := range c.Entries {
+		if s.Collection != TokenScope {
+			out = append(out, entryOf(s))
+		}
+	}
+	return out, nil
+}
+
+// Prune removes every secret for which keep says false and returns the ones removed, never their values. Nothing is
+// written when nothing goes, and a vault that does not exist yet is left alone (it is not created to be emptied).
+func (v *Vault) Prune(keep func(Entry) bool) ([]Entry, error) {
+	v.mu.Lock()
+	defer v.mu.Unlock()
+	c, exists, err := v.read()
+	if err != nil || !exists {
+		return nil, err
+	}
+	keep = func(inner func(Entry) bool) func(Entry) bool {
+		return func(e Entry) bool { return e.Collection == TokenScope || inner(e) }
+	}(keep)
+	var gone []Entry
+	for _, s := range c.Entries {
+		if e := entryOf(s); !keep(e) {
+			gone = append(gone, e)
+		}
+	}
+	if len(gone) == 0 {
+		return nil, nil
+	}
+	err = v.update(func(c *contents) {
+		c.Entries = slices.DeleteFunc(c.Entries, func(s storedEntry) bool { return !keep(entryOf(s)) })
+	})
+	if err != nil {
+		return nil, err
+	}
+	return gone, nil
+}
+
+func entryOf(s storedEntry) Entry {
+	return Entry{Collection: s.Collection, Environment: s.Environment, Name: s.Name}
+}
+
 // read decrypts the vault file, unlocking it if needed. exists is false
 // when there is no vault file yet. Callers hold mu.
 func (v *Vault) read() (contents, bool, error) {
@@ -146,6 +273,7 @@ func (v *Vault) read() (contents, bool, error) {
 		v.key, v.env = nil, nil
 		return contents{}, false, &LockedError{Reason: err.Error()}
 	}
+	v.last = v.now()
 	return c, err == nil, err
 }
 
@@ -172,6 +300,7 @@ func (v *Vault) update(change func(*contents)) error {
 		return fmt.Errorf("saving vault: %w", err)
 	}
 	v.env = &next
+	v.last = v.now()
 	return nil
 }
 

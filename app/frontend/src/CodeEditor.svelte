@@ -2,9 +2,11 @@
   // A CodeMirror 6 editor for YAML, JSON or plain text. It owns its text while the user types;
   // outside changes to value replace it. It is coloured from the app's theme tokens (tok-* classes,
   // see lib/highlight.ts), not One Dark, so it follows the chosen theme like the rest of the window.
+  import { alreadyShown } from './lib/codeecho'
+  import { clamp } from './lib/clamp'
   import { EditorView, basicSetup } from 'codemirror'
-  import { Compartment, EditorState } from '@codemirror/state'
-  import { Decoration, MatchDecorator, ViewPlugin, type DecorationSet, type ViewUpdate } from '@codemirror/view'
+  import { Compartment, EditorState, Prec } from '@codemirror/state'
+  import { Decoration, MatchDecorator, ViewPlugin, keymap, type DecorationSet, type ViewUpdate } from '@codemirror/view'
   import { syntaxHighlighting } from '@codemirror/language'
   import { classHighlighter } from '@lezer/highlight'
   import { yaml } from '@codemirror/lang-yaml'
@@ -80,13 +82,21 @@
         doc: value,
         extensions: [
           basicSetup,
+          // Mod-Enter sends the request (the page handles it). The stock keymap would insert a blank line with it.
+          Prec.highest(keymap.of([{ key: 'Mod-Enter', run: () => true }])),
+          // The stock keymap folds on Ctrl-Shift-[ and ] and selects syntax on Mod-I: the window's own shortcuts. Taking them
+          // here (and doing nothing) leaves the page its say. Before: they folded code or moved the selection instead.
+          Prec.highest(keymap.of(['Ctrl-Shift-[', 'Ctrl-Shift-]', 'Mod-i'].map((key) => ({ key, run: () => true })))),
           language.of(languageFor(lang)),
           syntaxHighlighting(classHighlighter),
           templateMarks,
           theme,
           access.of(accessFor(readonly)),
           EditorView.updateListener.of((u) => {
-            if (u.docChanged) onchange?.(u.state.doc.toString())
+            if (u.docChanged) {
+              lastSeen = u.state.doc.toString()
+              onchange?.(lastSeen)
+            }
             if (u.selectionSet && u.transactions.some((tr) => tr.isUserEvent('select') || tr.isUserEvent('input'))) oncursor?.(u.state.doc.lineAt(u.state.selection.main.head).number)
           }),
         ],
@@ -95,6 +105,8 @@
     return () => view?.destroy()
   })
 
+  // The text the editor last reported or was set to: the echo of it from the parent is skipped without a comparison.
+  let lastSeen: string | null = null
   $effect(() => {
     view?.dispatch({ effects: language.reconfigure(languageFor(lang)) })
   })
@@ -105,7 +117,7 @@
   // Outside changes replace the text; the editor's own changes already match.
   $effect(() => {
     const next = value
-    if (!view || view.state.doc.toString() === next) return
+    if (!view || alreadyShown(lastSeen, next, () => view!.state.doc.toString())) return
     if (holdWhileFocused && view.hasFocus) return
     view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: next } })
   })
@@ -113,7 +125,7 @@
   /** Moves the cursor to a 1-based line and shows it. */
   export function goToLine(line: number) {
     if (!view) return
-    const l = view.state.doc.line(Math.min(Math.max(line, 1), view.state.doc.lines))
+    const l = view.state.doc.line(clamp(line, 1, view.state.doc.lines))
     view.dispatch({ selection: { anchor: l.from }, effects: EditorView.scrollIntoView(l.from, { y: 'center' }) })
     view.focus()
   }

@@ -952,6 +952,15 @@ export class KeyValue {
              */
             this["Description"] = "";
         }
+        if (!("Disabled" in $$source)) {
+            /**
+             * Disabled keeps the row in the file but out of what is sent: a query parameter or header switched off to try
+             * a request without it. Only query parameters and headers of a request carry it.
+             * @member
+             * @type {boolean}
+             */
+            this["Disabled"] = false;
+        }
 
         Object.assign(this, $$source);
     }
@@ -1070,6 +1079,23 @@ export class Node {
              */
             this["Timeout"] = time$0.Duration.$zero;
         }
+        if (!("Retries" in $$source)) {
+            /**
+             * Retries is how many more times a failed request, fetch, webhook or subflow step runs again before the step
+             * is taken as failed (0: it runs once). RetryWait is the pause before each new try. A step that passes only
+             * after a retry passes, and is reported as flaky. Timeout applies to each try.
+             * @member
+             * @type {number}
+             */
+            this["Retries"] = 0;
+        }
+        if (!("RetryWait" in $$source)) {
+            /**
+             * @member
+             * @type {time$0.Duration}
+             */
+            this["RetryWait"] = time$0.Duration.$zero;
+        }
         if (!("Attach" in $$source)) {
             /**
              * Attach names a request or subflow node of the same list that this node is shown
@@ -1178,15 +1204,15 @@ export class Node {
         const $$createField4_0 = $$createType11;
         const $$createField5_0 = $$createType11;
         const $$createField6_0 = $$createType11;
-        const $$createField15_0 = $$createType17;
-        const $$createField16_0 = $$createType19;
-        const $$createField17_0 = $$createType10;
-        const $$createField18_0 = $$createType21;
+        const $$createField17_0 = $$createType17;
+        const $$createField18_0 = $$createType19;
         const $$createField19_0 = $$createType10;
-        const $$createField20_0 = $$createType10;
-        const $$createField21_0 = $$createType23;
-        const $$createField22_0 = $$createType25;
-        const $$createField23_0 = $$createType8;
+        const $$createField20_0 = $$createType21;
+        const $$createField21_0 = $$createType10;
+        const $$createField22_0 = $$createType10;
+        const $$createField23_0 = $$createType23;
+        const $$createField24_0 = $$createType25;
+        const $$createField25_0 = $$createType8;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("Needs" in $$parsedSource) {
             $$parsedSource["Needs"] = $$createField4_0($$parsedSource["Needs"]);
@@ -1198,31 +1224,31 @@ export class Node {
             $$parsedSource["AfterOutcome"] = $$createField6_0($$parsedSource["AfterOutcome"]);
         }
         if ("Request" in $$parsedSource) {
-            $$parsedSource["Request"] = $$createField15_0($$parsedSource["Request"]);
+            $$parsedSource["Request"] = $$createField17_0($$parsedSource["Request"]);
         }
         if ("Subflow" in $$parsedSource) {
-            $$parsedSource["Subflow"] = $$createField16_0($$parsedSource["Subflow"]);
+            $$parsedSource["Subflow"] = $$createField18_0($$parsedSource["Subflow"]);
         }
         if ("Body" in $$parsedSource) {
-            $$parsedSource["Body"] = $$createField17_0($$parsedSource["Body"]);
+            $$parsedSource["Body"] = $$createField19_0($$parsedSource["Body"]);
         }
         if ("Branches" in $$parsedSource) {
-            $$parsedSource["Branches"] = $$createField18_0($$parsedSource["Branches"]);
+            $$parsedSource["Branches"] = $$createField20_0($$parsedSource["Branches"]);
         }
         if ("Then" in $$parsedSource) {
-            $$parsedSource["Then"] = $$createField19_0($$parsedSource["Then"]);
+            $$parsedSource["Then"] = $$createField21_0($$parsedSource["Then"]);
         }
         if ("Else" in $$parsedSource) {
-            $$parsedSource["Else"] = $$createField20_0($$parsedSource["Else"]);
+            $$parsedSource["Else"] = $$createField22_0($$parsedSource["Else"]);
         }
         if ("Cases" in $$parsedSource) {
-            $$parsedSource["Cases"] = $$createField21_0($$parsedSource["Cases"]);
+            $$parsedSource["Cases"] = $$createField23_0($$parsedSource["Cases"]);
         }
         if ("Values" in $$parsedSource) {
-            $$parsedSource["Values"] = $$createField22_0($$parsedSource["Values"]);
+            $$parsedSource["Values"] = $$createField24_0($$parsedSource["Values"]);
         }
         if ("Params" in $$parsedSource) {
-            $$parsedSource["Params"] = $$createField23_0($$parsedSource["Params"]);
+            $$parsedSource["Params"] = $$createField25_0($$parsedSource["Params"]);
         }
         return new Node(/** @type {Partial<Node>} */($$parsedSource));
     }
@@ -1554,6 +1580,15 @@ export class RequestVersion {
              */
             this["Assert"] = [];
         }
+        if (!("Expect" in $$source)) {
+            /**
+             * Expect is the HTTP status the request is meant to answer with: "401", "400-499", "4xx" or a list ("200, 404").
+             * Set, the response must match it and the seeded "fail unless 2xx" hook stands aside (see ParseExpect).
+             * @member
+             * @type {string}
+             */
+            this["Expect"] = "";
+        }
         if (!("Outcomes" in $$source)) {
             /**
              * Outcomes are the named ways the request can end (see Outcome). None (or an empty list): success and failure.
@@ -1656,15 +1691,15 @@ export class RequestVersion {
         const $$createField6_0 = $$createType6;
         const $$createField7_0 = $$createType30;
         const $$createField8_0 = $$createType11;
-        const $$createField9_0 = $$createType28;
-        const $$createField10_0 = $$createType31;
-        const $$createField11_0 = $$createType33;
-        const $$createField12_0 = $$createType5;
-        const $$createField14_0 = $$createType35;
-        const $$createField15_0 = $$createType37;
-        const $$createField16_0 = $$createType39;
-        const $$createField17_0 = $$createType41;
-        const $$createField18_0 = $$createType43;
+        const $$createField10_0 = $$createType28;
+        const $$createField11_0 = $$createType31;
+        const $$createField12_0 = $$createType33;
+        const $$createField13_0 = $$createType5;
+        const $$createField15_0 = $$createType35;
+        const $$createField16_0 = $$createType37;
+        const $$createField17_0 = $$createType39;
+        const $$createField18_0 = $$createType41;
+        const $$createField19_0 = $$createType43;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("Query" in $$parsedSource) {
             $$parsedSource["Query"] = $$createField4_0($$parsedSource["Query"]);
@@ -1682,31 +1717,31 @@ export class RequestVersion {
             $$parsedSource["Assert"] = $$createField8_0($$parsedSource["Assert"]);
         }
         if ("Outcomes" in $$parsedSource) {
-            $$parsedSource["Outcomes"] = $$createField9_0($$parsedSource["Outcomes"]);
+            $$parsedSource["Outcomes"] = $$createField10_0($$parsedSource["Outcomes"]);
         }
         if ("Settings" in $$parsedSource) {
-            $$parsedSource["Settings"] = $$createField10_0($$parsedSource["Settings"]);
+            $$parsedSource["Settings"] = $$createField11_0($$parsedSource["Settings"]);
         }
         if ("Hooks" in $$parsedSource) {
-            $$parsedSource["Hooks"] = $$createField11_0($$parsedSource["Hooks"]);
+            $$parsedSource["Hooks"] = $$createField12_0($$parsedSource["Hooks"]);
         }
         if ("Variables" in $$parsedSource) {
-            $$parsedSource["Variables"] = $$createField12_0($$parsedSource["Variables"]);
+            $$parsedSource["Variables"] = $$createField13_0($$parsedSource["Variables"]);
         }
         if ("Auth" in $$parsedSource) {
-            $$parsedSource["Auth"] = $$createField14_0($$parsedSource["Auth"]);
+            $$parsedSource["Auth"] = $$createField15_0($$parsedSource["Auth"]);
         }
         if ("Async" in $$parsedSource) {
-            $$parsedSource["Async"] = $$createField15_0($$parsedSource["Async"]);
+            $$parsedSource["Async"] = $$createField16_0($$parsedSource["Async"]);
         }
         if ("GRPC" in $$parsedSource) {
-            $$parsedSource["GRPC"] = $$createField16_0($$parsedSource["GRPC"]);
+            $$parsedSource["GRPC"] = $$createField17_0($$parsedSource["GRPC"]);
         }
         if ("Dataset" in $$parsedSource) {
-            $$parsedSource["Dataset"] = $$createField17_0($$parsedSource["Dataset"]);
+            $$parsedSource["Dataset"] = $$createField18_0($$parsedSource["Dataset"]);
         }
         if ("File" in $$parsedSource) {
-            $$parsedSource["File"] = $$createField18_0($$parsedSource["File"]);
+            $$parsedSource["File"] = $$createField19_0($$parsedSource["File"]);
         }
         return new RequestVersion(/** @type {Partial<RequestVersion>} */($$parsedSource));
     }

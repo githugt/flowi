@@ -6,17 +6,21 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/samber/do/v2"
 	"github.com/spf13/cobra"
 
 	"github.com/githugt/flowi/lib/analysis"
+	"github.com/githugt/flowi/lib/report"
 )
 
 type coverageFlags struct {
 	collection string
 	failUnder  int
+	reports    []string
 }
 
 func newCoverageCommand(i do.Injector) *cobra.Command {
@@ -27,12 +31,15 @@ func newCoverageCommand(i do.Injector) *cobra.Command {
 		Long: "For every operation of an imported API description (a request with response schemas), show which flows\n" +
 			"call it, which of its documented statuses a saved run ever got, and which response fields a flow reads.\n" +
 			"Statuses come from the run history, so a flow that never ran leaves its statuses unseen.\n\n" +
+			"--from-report reads the statuses from run reports (the JSON of `flowi run --report json=run.json`, or a folder of\n" +
+			"them) instead of the saved history, which a CI job does not have.\n\n" +
 			"--fail-under N exits 1 when fewer than N percent of the operations are used by a flow.",
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error { return runCoverage(cmd, i, f) },
 	}
 	fl := cmd.Flags()
 	fl.StringVar(&f.collection, "collection", "", "collection (name or id) to measure (default: all mounted)")
+	fl.StringArrayVar(&f.reports, "from-report", nil, "JSON run report (or a folder of them) to take the seen statuses from, instead of the saved history (repeatable)")
 	fl.IntVar(&f.failUnder, "fail-under", 0, "exit 1 when fewer than this percent of the operations are used by a flow (0 turns the check off)")
 	return cmd
 }
@@ -52,7 +59,16 @@ func runCoverage(cmd *cobra.Command, i do.Injector, f coverageFlags) error {
 	if err != nil {
 		return err
 	}
-	cov, _, err := s.Workspace.Coverage(collection)
+	var cov analysis.Coverage
+	if len(f.reports) > 0 {
+		var runs []report.Run
+		if runs, err = readRunReports(f.reports); err != nil {
+			return err
+		}
+		cov, _, err = s.Workspace.CoverageFromRuns(collection, runs)
+	} else {
+		cov, _, err = s.Workspace.Coverage(collection)
+	}
 	if err != nil {
 		return err
 	}
@@ -70,6 +86,40 @@ func runCoverage(cmd *cobra.Command, i do.Injector, f coverageFlags) error {
 		return Exit(ExitFailed)
 	}
 	return nil
+}
+
+// readRunReports reads the JSON run reports named by paths; a folder stands for its .json files. A file that is not
+// a run report is a usage error naming it, not a silently empty measurement.
+func readRunReports(paths []string) ([]report.Run, error) {
+	var files []string
+	for _, p := range paths {
+		info, err := os.Stat(p)
+		if err != nil {
+			return nil, &UsageError{Err: fmt.Errorf("--from-report: %w", err)}
+		}
+		if !info.IsDir() {
+			files = append(files, p)
+			continue
+		}
+		found, err := filepath.Glob(filepath.Join(p, "*.json"))
+		if err != nil {
+			return nil, &UsageError{Err: fmt.Errorf("--from-report %s: %w", p, err)}
+		}
+		files = append(files, found...)
+	}
+	runs := make([]report.Run, 0, len(files))
+	for _, f := range files {
+		data, err := os.ReadFile(f) //nolint:gosec // the user names the report file on the command line
+		if err != nil {
+			return nil, &UsageError{Err: fmt.Errorf("--from-report: %w", err)}
+		}
+		var r report.Run
+		if err := json.Unmarshal(data, &r); err != nil || len(r.Nodes) == 0 {
+			return nil, &UsageError{Err: fmt.Errorf("--from-report: %s is not a run report (write one with `flowi run --report json=run.json`)", f)}
+		}
+		runs = append(runs, r)
+	}
+	return runs, nil
 }
 
 func percent(part, whole int) int {

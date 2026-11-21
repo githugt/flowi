@@ -6,7 +6,9 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"strconv"
+	"strings"
 	"text/tabwriter"
 
 	"github.com/samber/do/v2"
@@ -18,6 +20,7 @@ import (
 type accessFlags struct {
 	collection, env, owner string
 	others, steps, inputs  []string
+	reports                []string
 	seed                   uint64
 }
 
@@ -32,6 +35,8 @@ func newAccessCommand(i do.Injector) *cobra.Command {
 			"An identity is a flowi overlay that makes a request that user's: it sets the Authorization header, a\n" +
 			"cookie or an API key. By default the steps tried are the request steps that read something an earlier step\n" +
 			"made (a created id), not a login credential; --steps names them instead. Only top-level steps can be tried.\n\n" +
+			"--report junit=path also writes the result for a CI job: a test case for each step and identity, failed when\n" +
+			"that identity reached the step.\n\n" +
 			"Exits 1 when another identity reached something, 2 for bad usage, 4 for a system failure.",
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error { return runAccess(cmd, i, args[0], f) },
@@ -43,6 +48,7 @@ func newAccessCommand(i do.Injector) *cobra.Command {
 	fl.StringArrayVar(&f.others, "as", nil, "an identity (an overlay) to try the steps as (repeatable)")
 	fl.StringArrayVar(&f.steps, "steps", nil, "the steps to try, instead of the ones that read what an earlier step made (repeatable)")
 	fl.StringArrayVar(&f.inputs, "input", nil, "value for a flow input, as name=value (repeatable)")
+	fl.StringArrayVar(&f.reports, "report", nil, "also write the result as junit=path, for a CI job to show which step and which user broke the rule (repeatable)")
 	fl.Uint64Var(&f.seed, "seed", 0, "seed for generated values (default: random)")
 	return cmd
 }
@@ -50,6 +56,9 @@ func newAccessCommand(i do.Injector) *cobra.Command {
 func runAccess(cmd *cobra.Command, i do.Injector, ref string, f accessFlags) error {
 	if f.owner == "" || len(f.others) == 0 {
 		return &UsageError{Err: errors.New("access wants --owner <identity> and at least one --as <identity>")}
+	}
+	if err := checkAccessReports(f.reports); err != nil {
+		return err
 	}
 	inputs, err := parsePairs("--input", f.inputs)
 	if err != nil {
@@ -70,10 +79,40 @@ func runAccess(cmd *cobra.Command, i do.Injector, ref string, f accessFlags) err
 		return &UsageError{Err: err}
 	}
 	writeAccess(cmd.OutOrStdout(), rep)
+	if err := writeAccessReports(f.reports, rep); err != nil {
+		return err
+	}
 	if rep.Exposed() {
 		return Exit(ExitFailed)
 	}
 	return nil
+}
+
+// checkAccessReports refuses a --report this command cannot write, before anything runs.
+func checkAccessReports(specs []string) error {
+	for _, s := range specs {
+		if format, path, ok := strings.Cut(s, "="); !ok || format != "junit" || path == "" {
+			return &UsageError{Err: fmt.Errorf("--report wants junit=path (the only format access writes), got %q", s)}
+		}
+	}
+	return nil
+}
+
+// writeAccessReports writes each --report junit=path file, even when another user reached something, so CI
+// can show which step broke.
+func writeAccessReports(specs []string, rep flowi.AccessReport) error {
+	var errs []error
+	for _, s := range specs {
+		_, path, _ := strings.Cut(s, "=")
+		data, err := rep.JUnit()
+		if err == nil {
+			err = os.WriteFile(path, data, 0o644) //nolint:gosec // the user names the report file on the command line; a report is meant to be read
+		}
+		if err != nil {
+			errs = append(errs, fmt.Errorf("writing junit report %s: %w", path, err))
+		}
+	}
+	return errors.Join(errs...)
 }
 
 // writeAccess prints a row for each step: its status for the owner, then each other identity's status and verdict.

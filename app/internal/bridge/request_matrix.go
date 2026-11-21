@@ -3,7 +3,6 @@
 package bridge
 
 import (
-	"context"
 	"errors"
 	"slices"
 
@@ -71,26 +70,21 @@ func (s *RequestService) MatrixChoices(node string) (RequestMatrixChoices, error
 }
 
 // RunMatrix sends the saved request once for every combination of the dimensions' values (env, overlay or
-// with.<name>) and returns the grid. The responses are not saved.
+// with.<name>) and returns the grid. The responses are not saved. Progress arrives as the "matrix" event, and
+// CancelMatrix stops it with the cells that ran so far returned (Cancelled set).
 func (s *RequestService) RunMatrix(node string, dims []MatrixDimView) (MatrixView, error) {
 	t, base, _, err := s.matrixTarget(node)
 	if err != nil {
 		return MatrixView{}, err
 	}
-	vd := make([]vm.MatrixDim, len(dims))
-	for i, d := range dims {
-		vd[i] = vm.MatrixDim{Name: d.Name, Values: d.Values}
-	}
-	cells, err := vm.RunRequestMatrix(context.Background(), s.app.backend, t, base, vd)
+	ctx, finish, err := s.app.matrices.begin(node)
 	if err != nil {
 		return MatrixView{}, err
 	}
-	v := MatrixView{Dims: dims, Cells: []MatrixCellView{}}
-	for _, c := range cells {
-		v.Cells = append(v.Cells, MatrixCellView{Labels: c.Labels, Status: c.Status, Why: c.Why, Detail: c.Detail})
-		if c.Status == "passed" {
-			v.Passed++
-		}
-	}
-	return v, nil
+	defer finish()
+	cells, err := vm.RunRequestMatrixProgress(ctx, s.app.backend, t, base, matrixDims(dims), s.app.matrices.progress(s.app.emit, node))
+	return matrixResult(dims, cells, err)
 }
+
+// CancelMatrix stops the matrix running for the node, if any; the grid so far comes back from RunMatrix.
+func (s *RequestService) CancelMatrix(node string) { s.app.matrices.cancel(node) }

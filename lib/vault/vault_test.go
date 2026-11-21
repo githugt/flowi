@@ -182,6 +182,23 @@ func TestVault_Given_no_keychain_Then_prompts_for_passphrase(t *testing.T) {
 	}
 }
 
+func TestVault_Given_a_new_vault_Then_the_new_passphrase_prompt_asks_and_the_plain_one_asks_for_an_existing_vault(t *testing.T) {
+	// Before: one prompt served both, so the window could not ask twice (to catch a typo) when the vault is made.
+	o := options(t, nil)
+	var created, unlocked int
+	o.NewPassphrase = func() (string, error) { created++; return "typed", nil }
+	o.Passphrase = func() (string, error) { unlocked++; return "typed", nil }
+	if err := New(o).Set(testEntry(), "x"); err != nil {
+		t.Fatal(err)
+	}
+
+	got, ok, err := New(o).Get(testEntry(), "staging")
+
+	if err != nil || !ok || got != "x" || created != 1 || unlocked != 1 {
+		t.Fatalf("got %q %v %v created=%d unlocked=%d", got, ok, err, created, unlocked)
+	}
+}
+
 func TestVault_Given_no_keychain_and_no_passphrase_Then_LockedError(t *testing.T) {
 	err := New(options(t, nil)).Set(testEntry(), "x")
 
@@ -329,5 +346,36 @@ func TestOverridden_should_report_only_non_empty_values(t *testing.T) {
 	}
 	if v, ok := Overridden([]string{"FLOWI_SECRET_LOCAL_PW=x"}, "local", "pw"); !ok || v != "x" {
 		t.Fatalf("got %q %v", v, ok)
+	}
+}
+
+func TestVault_Prune_Given_a_rule_Then_the_secrets_it_rejects_go_and_the_rest_stay(t *testing.T) {
+	// Before: a secret could only be removed by naming it, so those of deleted environments stayed for good.
+	o := options(t, newFakeKeys())
+	v := New(o)
+	keep, drop := testEntry(), Entry{Collection: testEntry().Collection, Environment: "01JA0000000000000000000009", Name: "token"}
+	for _, e := range []Entry{keep, drop} {
+		if err := v.Set(e, "x"); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	gone, err := v.Prune(func(e Entry) bool { return e != drop })
+	left, _ := New(o).Stored()
+
+	if err != nil || len(gone) != 1 || gone[0] != drop || len(left) != 1 || left[0] != keep {
+		t.Fatalf("gone %v, left %v, err %v", gone, left, err)
+	}
+}
+
+func TestVault_Prune_Given_nothing_to_remove_or_no_vault_Then_nothing_is_written_or_created(t *testing.T) {
+	o := options(t, failingKeys{t}) // an unlock would call the keychain
+
+	gone, err := New(o).Prune(func(Entry) bool { return false })
+	stored, storedErr := New(o).Stored()
+	_, statErr := os.Stat(o.File)
+
+	if err != nil || storedErr != nil || gone != nil || stored != nil || !os.IsNotExist(statErr) {
+		t.Fatalf("gone %v, stored %v, errs %v %v %v", gone, stored, err, storedErr, statErr)
 	}
 }

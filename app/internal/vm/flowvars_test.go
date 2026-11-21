@@ -29,6 +29,26 @@ func TestScanFlow_should_list_written_read_and_unset_variables_and_secrets(t *te
 	}
 }
 
+// Before: the variables bar listed names only, so finding who wrote or read a variable meant reading every step.
+func TestScanFlow_should_say_which_steps_write_and_read_each_variable(t *testing.T) {
+	f := model.Flow{Nodes: []model.Node{
+		{ID: "login", Type: "set", Values: []model.SetValue{{Name: "token", From: "response", Where: "body", Path: "$.t"}}},
+		{ID: "each", Type: "batch", Body: []model.Node{
+			{ID: "call", Type: "log", Params: []model.Field{param("value", "{{vars.token}}")}},
+			{ID: "bump", Type: "set", Params: []model.Field{param("target", "vars.count"), param("value", "{{vars.count}}")}},
+		}},
+	}}
+
+	got := ScanFlow(f)
+
+	if !slices.Equal(got.Writers["token"], []string{"login"}) || !slices.Equal(got.Writers["count"], []string{"bump"}) {
+		t.Fatalf("writers %v", got.Writers)
+	}
+	if !slices.Equal(got.Readers["token"], []string{"call"}) || !slices.Equal(got.Readers["count"], []string{"bump"}) || len(got.Readers["token"]) != 1 {
+		t.Fatalf("readers %v (the container must not count as a reader of what its children read)", got.Readers)
+	}
+}
+
 func TestScanFlow_Given_an_empty_flow_Then_nothing(t *testing.T) {
 	got := ScanFlow(model.Flow{})
 

@@ -4,6 +4,8 @@
 // and links.
 // Everything is escaped first, so the result holds no markup of the source's.
 
+import { linkHost } from './openurl'
+
 const escapeHTML = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
 
 function inline(text: string): string {
@@ -12,7 +14,12 @@ function inline(text: string): string {
   s = s.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
   s = s.replace(/(^|[\s(])\*([^*\s][^*]*)\*/g, '$1<em>$2</em>')
   // Links: https only, opened by the shell (data-href), never navigated to by the page.
-  s = s.replace(/\[([^\]]+)\]\((https:\/\/[^)\s]+)\)/g, '<a href="#" data-href="$2">$1</a>')
+  // The title says where the link goes, so the text cannot hide it (see claimedOtherHost).
+  s = s.replace(/\[([^\]]+)\]\((https:\/\/[^)\s]+)\)/g, (_m, text: string, url: string) => {
+    const host = linkHost(url.replace(/&amp;/g, '&'))
+    const title = host ? ` title="${escapeHTML('Opens ' + host + ' in your browser')}"` : ''
+    return `<a href="#" data-href="${url}"${title}>${text}</a>`
+  })
   return s
 }
 

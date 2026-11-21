@@ -6,6 +6,8 @@ import (
 	"context"
 	"errors"
 	"maps"
+	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/githugt/flowi/lib/diag"
@@ -28,6 +30,10 @@ type nodeResult struct {
 	outputs  map[string]any
 	diags    diag.List
 	reason   string // why a node was skipped, when it was not by its when
+	// tries is how many times the node ran: 1 unless it has retries and failed.
+	tries int
+	// checks are what each assert line of a request said.
+	checks []CheckEval
 }
 
 // skippedByYou is the reason of a node the person chose not to run.
@@ -47,7 +53,7 @@ func skipSet(ids []string) map[string]bool {
 func (r *runner) runNode(ctx context.Context, f *frame, n model.Node) nodeResult {
 	path := f.path(n.ID)
 	start := r.deps.Clock()
-	r.emit(NodeStarted{RunID: r.runID, Path: path, Parent: f.parentPath, Lane: f.lane, Node: n.ID, Type: string(n.Type), Name: n.Name, Depth: f.depth})
+	r.emit(NodeStarted{RunID: r.runID, Path: path, Parent: f.parentPath, Lane: f.lane, Node: n.ID, Type: string(n.Type), Name: n.Name, Depth: f.depth, At: start})
 	res := r.execNode(ctx, f, n, path)
 	if res.outputs != nil {
 		f.outputs.put(n.ID, res.outputs)
@@ -55,9 +61,23 @@ func (r *runner) runNode(ctx context.Context, f *frame, n model.Node) nodeResult
 	r.emit(NodeFinished{
 		RunID: r.runID, Path: path, Parent: f.parentPath, Lane: f.lane, Node: n.ID, Type: string(n.Type),
 		Status: res.status, Handled: res.handled, Duration: elapsed(r.deps.Clock, start), Depth: f.depth,
-		Outputs: r.shownOutputs(n.Type, res.outputs), Diags: maskDiags(res.diags, r.secrets.current()), Reason: res.reason,
+		Outputs: r.shownOutputs(n.Type, res.outputs), Diags: maskDiags(res.diags, r.secrets.current()), Reason: res.reason, Tries: res.tries, Outcomes: slices.Clone(res.outcomes), Checks: r.shownChecks(res.checks),
 	})
 	return res
+}
+
+// shownChecks are a node's check results as the run's events carry them: the notes masked like diagnostics.
+func (r *runner) shownChecks(list []CheckEval) []CheckEval {
+	if len(list) == 0 {
+		return nil
+	}
+	m := r.secrets.current()
+	out := make([]CheckEval, len(list))
+	for i, c := range list {
+		c.Note = m.String(c.Note)
+		out[i] = c
+	}
+	return out
 }
 
 // execNode checks skip and when, applies the node's timeout and runs it.
@@ -76,15 +96,44 @@ func (r *runner) execNode(ctx context.Context, f *frame, n model.Node, path stri
 	if !ok {
 		return nodeResult{status: StatusFailed, diags: diag.List{diag.New(diag.CodeRunNodeType, diag.Location{}, map[string]string{"type": string(n.Type), "node": n.ID})}}
 	}
+	maxTries := 1
+	if n.Type.CanRetry() {
+		maxTries += max(n.Retries, 0)
+	}
+	for try := 1; ; try++ {
+		res := r.attempt(ctx, f, n, path, runner)
+		res.tries = try
+		if try >= maxTries || !retryAfter(res.status) || ctx.Err() != nil {
+			if res.status == StatusPassed && try > 1 {
+				r.warn(diag.New(diag.CodeRunFlaky, diag.Location{}, map[string]string{"node": n.ID, "try": strconv.Itoa(try), "tries": strconv.Itoa(maxTries)}))
+			}
+			return res
+		}
+		if n.RetryWait > 0 {
+			select {
+			case <-r.after(n.RetryWait):
+			case <-ctx.Done():
+				return res
+			}
+		}
+	}
+}
+
+// attempt runs the node once, under its timeout.
+func (r *runner) attempt(ctx context.Context, f *frame, n model.Node, path string, run nodes.Runner) nodeResult {
 	nodeCtx := ctx
 	if n.Timeout > 0 {
 		var cancel context.CancelFunc
 		nodeCtx, cancel = context.WithTimeoutCause(ctx, n.Timeout, errNodeTimeout)
 		defer cancel()
 	}
-	out := runner(nodeCtx, n, f.state(r, n, path))
+	out := run(nodeCtx, n, f.state(r, n, path))
 	return classify(ctx, nodeCtx, n, out)
 }
+
+// retryAfter says whether a node that ended with this status is run again when it has retries left: a failure or
+// an error is; a pass, a skip or a cancel is not.
+func retryAfter(s Status) bool { return s == StatusFailed || s == StatusError }
 
 func shouldRun(n model.Node, sc template.Scope) (bool, diag.List) {
 	if n.When == "" {
@@ -120,7 +169,7 @@ func classify(runCtx, nodeCtx context.Context, n model.Node, out nodes.Outcome) 
 		status = StatusError
 	}
 	handled := (status == StatusFailed || status == StatusError) && handlesErrors(n.OnError)
-	return nodeResult{status: status, handled: handled, outcomes: outcomesOf(status, out.Outcomes), outputs: out.Outputs, diags: diags}
+	return nodeResult{status: status, handled: handled, outcomes: outcomesOf(status, out.Outcomes), outputs: out.Outputs, diags: diags, checks: out.Checks}
 }
 
 // outcomesOf are the outcomes a node ended with: those its runner reported (a request does), else success

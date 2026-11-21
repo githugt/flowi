@@ -1,4 +1,7 @@
 <script lang="ts">
+  import Select from './Select.svelte'
+  import Status from './Status.svelte'
+  let showHops = $state(false)
   import { tick } from 'svelte'
   import { errorText } from './lib/errors'
   import { RequestService } from '../bindings/github.com/githugt/flowi/app/internal/bridge'
@@ -9,25 +12,39 @@
   import Problem from './Problem.svelte'
   import EmptyState from './EmptyState.svelte'
   import JsonNode from './JsonNode.svelte'
+  import { matchPaths, stepMatch, MATCH_LIMIT } from './lib/jsonpath'
   import XmlNode from './XmlNode.svelte'
   import { multiStatus, parseXml, pathsOf } from './lib/xml'
   import MessageFeed from './MessageFeed.svelte'
   import { tookTone } from './lib/took'
-  import { cellOf } from './lib/cells'
-  import { Clipboard } from '@wailsio/runtime'
+  import { statusPill } from './lib/statustone'
+  import ResultGrid from './ResultGrid.svelte'
+  import Button from './Button.svelte'
+  import Tabs, { type TabItem } from './Tabs.svelte'
+  import { checkTally } from './lib/checks'
+  import { bodyTextOf, tableToCsv } from './lib/bodycopy'
+  import { bugReportNote } from './lib/bugreportcopy'
+  import { diffNotes, diffSummary, kindMark, type ResponseDiff } from './lib/respdiff'
+  import { copy } from './lib/clip'
+  import { sendAnnouncement } from './lib/announce'
   import { ui } from './lib/ui.svelte'
+  import { replaceExampleText } from './lib/pinexample'
   import { app } from './lib/app.svelte'
+  import { mediaKinds, pickShape, shapeIsFormat } from './lib/bodyshape'
+  import BodyMedia from './BodyMedia.svelte'
 
-  let { view }: { view: RequestView } = $props()
+  let { view, onchecks }: { view: RequestView; /** Opens the request's Assert section. */ onchecks?: () => void } = $props()
   let tab = $state<'received' | 'sent' | 'timing' | 'messages' | 'pipeline'>('received')
   const r = $derived(view.response)
+  const tally = $derived(checkTally(r ?? undefined))
+  const announced = $derived(sendAnnouncement(view.sending, r, view.sendError ?? ''))
   // How the body is shown. Until one is picked, a dataset's rows are read as a table and any other response as a tree.
   let chosenFormat = $state('')
   // Rows need a result: a query that failed has none, so it falls back to the tree.
-  const shape = $derived(chosenFormat === 'rows' && !r?.table ? 'tree' : chosenFormat || (view.kind === 'dataset' && r?.table ? 'rows' : 'tree'))
+  const shape = $derived(pickShape(chosenFormat, { isDataset: view.kind === 'dataset', hasTable: !!r?.table, bodyKind: r?.bodyKind ?? '', hasHtml: !!r?.bodyHtml }))
   function pickFormat(f: string) {
     chosenFormat = f
-    if (f !== 'tree' && f !== 'status' && f !== 'rows') RequestService.SetFormat(view.node, f)
+    if (shapeIsFormat(f)) RequestService.SetFormat(view.node, f)
   }
   // Go ends the pipeline with the engine's own steps under a "Built in" heading (schema learning):
   // they run with every send, hooks or not, so they are drawn apart from the hooks.
@@ -41,6 +58,13 @@
     if (steps.some((p) => p.state === 'running')) return 'run'
     return steps.some((p) => p.state === 'passed') ? 'ok' : ''
   })
+  const tabs = $derived<TabItem[]>([
+    { id: 'received', label: 'Response' },
+    { id: 'sent', label: 'Request sent' },
+    ...(view.kind === 'async' || r?.messages.length ? [{ id: 'messages', label: 'Messages', count: r?.messages.length || undefined }] : []),
+    ...(view.kind === 'http' ? [{ id: 'timing', label: 'Timing' }] : []),
+    { id: 'pipeline', label: 'Hooks' },
+  ])
   // The hook steps (the request itself is not one) and how they went.
   const hookSteps = $derived(view.pipeline.filter((p) => p.kind === 'node'))
   const hookPassed = $derived(hookSteps.filter((p) => p.state === 'passed').length)
@@ -81,7 +105,23 @@
   }
   let query = $state('')
   let picked = $state('')
+  // Expand all and Collapse all remount the tree with every node open or shut; `epoch` is the key that does it.
+  let fold = $state<{ epoch: number; all: boolean | null }>({ epoch: 0, all: null })
+  let hitAt = $state(-1)
+  let bodyEl = $state<HTMLElement>()
+  $effect(() => {
+    query // a new search starts again from the first match
+    hitAt = -1
+  })
+  function goHit(back: boolean) {
+    hitAt = stepMatch(hitAt, hits.length, back)
+    if (hitAt < 0) return
+    picked = hits[hitAt]
+    const row = [...(bodyEl?.querySelectorAll<HTMLElement>('[data-path]') ?? [])].find((el) => el.dataset.path === picked)
+    row?.scrollIntoView({ block: 'nearest' })
+  }
   const tree = $derived(shape === 'tree' && r?.bodyJson !== undefined && r?.bodyJson !== null)
+  const hits = $derived(tree && query ? matchPaths(r?.bodyJson, query) : [])
   // An XML answer (WebDAV's 207 Multi-Status among them) is read in the window; a body that is not well-formed stays text.
   const xml = $derived(r?.bodyXml ? parseXml(r.bodyXml) : null)
   const xmlRoot = $derived(xml && 'root' in xml ? xml.root : null)
@@ -90,12 +130,17 @@
   const xmlTree = $derived(shape === 'tree' && !!xmlRoot)
   const statusList = $derived(shape === 'status' && !!entries)
   const rowsShown = $derived(shape === 'rows' && !!r?.table)
-  const bodyShown = $derived(tree || xmlTree || statusList || rowsShown)
+  const previewShown = $derived(shape === 'preview' && !!r?.bodyHtml)
+  const mediaShown = $derived(shape === 'media' && mediaKinds.includes(r?.bodyKind ?? ''))
+  const bodyShown = $derived(tree || xmlTree || statusList || rowsShown || previewShown || mediaShown)
   // What the Response tab lists. The tree shows the body itself, and the Timing tab the timings, so neither
   // is listed again here.
   const received = $derived(
     (r?.received ?? []).filter((p) => !(bodyShown && p.kind === 'code') && !(r?.phases.length && p.heading === 'Timings')),
   )
+  // The tree, the table and the multi-status list show only the body. The headers (Set-Cookie, Location, rate-limit
+  // counts) are kept above it, collapsed, so they are one click away in every shape.
+  const headerParts = $derived(bodyShown ? (r?.received ?? []).filter((p) => p.kind === 'table') : [])
   const emptyHint: Record<string, string> = {
     received: 'Send the request to see its response.',
     sent: 'Send the request to see exactly what went out.',
@@ -104,8 +149,7 @@
   }
 
   function copyPath() {
-    Clipboard.SetText(picked)
-    ui.toast('Copied ' + picked)
+    void copy(picked, picked)
   }
 
   function extract() {
@@ -124,6 +168,37 @@
     })
   }
 
+  function copyBody() {
+    if (!r) return
+    const text = bodyTextOf(r)
+    if (!text) return void ui.toast('The response has no body to copy.')
+    void copy(text, 'the body')
+  }
+  // How this response differs from the one sent before it; null until asked, and dropped when the request or its response changes.
+  let compared = $state<ResponseDiff | null>(null)
+  $effect(() => {
+    void [view.node, r?.at]
+    compared = null
+  })
+  async function comparePrevious() {
+    try {
+      compared = (await RequestService.ComparePrevious(view.node)) as unknown as ResponseDiff
+    } catch (e) {
+      ui.toast(errorText(e), 'error')
+    }
+  }
+  async function copyReport() {
+    try {
+      const report = await RequestService.BugReport(view.node)
+      await copy(report.text, 'for a bug report', bugReportNote(report.masked))
+    } catch (e) {
+      ui.toast(errorText(e), 'error')
+    }
+  }
+  function copyCsv() {
+    if (!r?.table) return
+    void copy(tableToCsv(r.table), `${r.table.rows.length} ${r.table.rows.length === 1 ? 'row' : 'rows'} as CSV`)
+  }
   async function saveBody() {
     try {
       const file = (await RequestService.SaveBody(view.node)) as string
@@ -140,11 +215,21 @@
       initial: '',
       warning: (await RequestService.PinWarning(view.node)) as string,
       done: async (name) => {
-        try {
-          ui.toast('Pinned: ' + (await RequestService.PinExample(view.node, name)))
-        } catch (e) {
-          ui.toast(errorText(e), 'error')
+        const node = view.node
+        const go = async () => {
+          try {
+            ui.toast('Pinned: ' + (await RequestService.PinExample(node, name)))
+          } catch (e) {
+            ui.toast(errorText(e), 'error')
+          }
         }
+        try {
+          if (!(await RequestService.ExampleTaken(node, '', '', name))) return go()
+        } catch (e) {
+          return ui.toast(errorText(e), 'error')
+        }
+        const d = replaceExampleText(name, view.response?.status)
+        ui.confirm(d.title, d.text, go, d.action)
       },
     })
   }
@@ -191,17 +276,19 @@
   </div>
 {/snippet}
 
-<section>
+<section aria-busy={view.sending}>
+  <div class="sr" role="status" aria-live="polite">{announced}</div>
   <div class="bar">
-    <div class="tabs">
-      <button class:active={tab === 'received'} onclick={() => (tab = 'received')}>Response{#if r}<span class="status-pill" class:ok={r.passed} class:bad={!r.passed}>{r.code}</span>{:else if view.sending}<b class="tone">…</b>{/if}</button>
-      <!-- Every tab is there before a send, as httpie has it: each says "Not sent" until there is something to show. -->
-      <button class:active={tab === 'sent'} onclick={() => (tab = 'sent')}>Request sent</button>
-      {#if view.kind === 'async' || r?.messages.length}<button class:active={tab === 'messages'} onclick={() => (tab = 'messages')}>Messages{#if r?.messages.length}<span class="count">{r.messages.length}</span>{/if}</button>{/if}
-      {#if view.kind === 'http'}<button class:active={tab === 'timing'} onclick={() => (tab = 'timing')}>Timing</button>{/if}
-      <button class:active={tab === 'pipeline'} onclick={() => (tab = 'pipeline')}>Hooks{#if pipeTone}<b class="tone {pipeTone}">●</b>{/if}</button>
-    </div>
+    <Tabs label="Response" bare items={tabs} active={tab} onpick={(id) => (tab = id as typeof tab)}>
+      {#snippet after(t)}
+        <!-- Every tab is there before a send, as httpie has it: each says "Not sent" until there is something to show. -->
+        {#if t.id === 'received'}
+          {#if r}{@const pill = statusPill(r.code, r.passed)}<Status tone={pill.tone}>{pill.text}</Status>{:else if view.sending}<b class="tone">…</b>{/if}
+        {:else if t.id === 'pipeline' && pipeTone}<b class="tone {pipeTone}">●</b>{/if}
+      {/snippet}
+    </Tabs>
   </div>
+  {#if tab === 'received' && headerParts.length}<div class="facts"><Parts parts={headerParts} /></div>{/if}
   {#if tab === 'pipeline'}
     <div class="body col">
       {#if hookSteps.length}
@@ -215,10 +302,10 @@
       {#if hookSteps.length}
         <!-- One run, in the order the engine takes it: the built-in steps come after the post-hooks. -->
         {@render timeline([...ownRows, ...builtInRows])}
-        <button class="mini edit" onclick={() => app.openHooks(view.node, view.name)}>Edit this request's hooks…</button>
+        <span class="edit"><Button small onclick={() => app.openHooks(view.node, view.name)}>Edit this request's hooks…</Button></span>
       {:else}
         <EmptyState icon="hooks" title="No hooks" hint="Hooks run steps before this request and after its response." compact>
-          <button onclick={() => app.openHooks(view.node, view.name)}>Add hooks…</button>
+          <Button onclick={() => app.openHooks(view.node, view.name)}>Add hooks…</Button>
         </EmptyState>
         {#if builtInRows.length}<div class="builtins">{@render timeline(builtInRows)}</div>{/if}
       {/if}
@@ -242,28 +329,65 @@
         <p class="err sel"><Problem text={view.sendError} /></p>
       </details>
     {/if}
+    {#if r.bodyNote}
+      <p class="note-large" role="note">{r.bodyNote}</p>
+    {/if}
     {#if view.showingHistory}
-      <p class="hist">An earlier response. <button class="mini" onclick={() => RequestService.ShowLatest(view.node)}>Back to the latest</button></p>
+      <p class="hist">An earlier response. <Button small onclick={() => RequestService.ShowLatest(view.node)}>Back to the latest</Button></p>
     {/if}
     <header>
       <span class="title" class:ok={r.passed} class:bad={!r.passed}>{r.title}</span>
       {#if r.took}<span class="meta {tookTone(r.took)}" title="Time the send took">{r.took}</span>{/if}
       {#if r.size}<span class="meta" title="Size of the response body">{r.size}</span>{/if}
+      {#if tally}
+        {#if onchecks}<Button small variant="ghost" title="How many of this request's checks passed: open them" onclick={onchecks}><span class="tally" class:ok={tally.ok} class:bad={!tally.ok}>{tally.ok ? '✓' : '✗'} {tally.text}</span></Button>
+        {:else}<span class="meta tally" class:ok={tally.ok} class:bad={!tally.ok}>{tally.ok ? '✓' : '✗'} {tally.text}</span>{/if}
+      {/if}
+      {#if r.facts}
+        {#if r.hops.length}<Button small variant="ghost" aria-expanded={showHops} title="The redirects this response passed through" onclick={() => (showHops = !showHops)}>{r.facts} <Icon name={showHops ? 'chevd' : 'chevr'} size={12} /></Button>
+        {:else}<span class="meta" title="How the response came">{r.facts}</span>{/if}
+      {/if}
       <span class="muted">{r.at}</span>
       {#if tab === 'received'}
         <span class="grow"></span>
-        <button class="mini" onclick={pin}>Pin as example…</button>
-        <button class="mini" onclick={saveBody}>Save body…</button>
-        <select value={shape} onchange={(e) => pickFormat(e.currentTarget.value)} aria-label="Body format">
+        <Button small onclick={pin}>Pin as example…</Button>
+        <Button small variant="ghost" onclick={copyBody}>Copy body</Button>
+        <Button small variant="ghost" title="The request and this response as Markdown, with credentials masked" onclick={copyReport}>Copy for a bug report</Button>
+        <Button small variant="ghost" title="How this response differs from the one sent before it: status, headers and body" onclick={comparePrevious}>Compare with previous</Button>
+        {#if r.table}<Button small variant="ghost" onclick={copyCsv}>Copy as CSV</Button>{/if}
+        <Button small onclick={saveBody}>Save body…</Button>
+        <Select size="sm" tone="raised" value={shape} onchange={(e) => pickFormat(e.currentTarget.value)} label="Body format">
           {#if r.table}<option value="rows">Rows</option>{/if}
+          {#if r.bodyHtml}<option value="preview">Preview</option>{/if}
+          {#if mediaKinds.includes(r.bodyKind)}<option value="media">{r.bodyKind === 'image' ? 'Image' : 'Binary'}</option>{/if}
           <option value="tree">Tree</option>
           {#if entries}<option value="status">Multi-status</option>{/if}
           <option value="json">JSON</option>
           <option value="text">Text</option>
           <option value="raw">Raw</option>
-        </select>
+        </Select>
       {/if}
     </header>
+    {#if compared}
+      <section class="compare" aria-label="Comparison with the previous response">
+        <div class="cmphead">
+          <strong>{compared.older} → {compared.newer}</strong>
+          <span>{diffSummary(compared)}</span>
+          <span class="grow"></span>
+          <Button small variant="ghost" onclick={() => (compared = null)}>Close</Button>
+        </div>
+        {#if compared.headers.length}
+          <h5>Headers</h5>
+          <ul>{#each compared.headers as c}<li class={c.kind}><span class="mark" aria-hidden="true">{kindMark(c.kind)}</span><code>{c.path}</code> {#if c.old}<span class="old">{c.old}</span>{/if}{#if c.old && c.new} → {/if}{#if c.new}<span class="new">{c.new}</span>{/if}</li>{/each}</ul>
+        {/if}
+        {#if compared.body.length}
+          <h5>Body</h5>
+          <ul>{#each compared.body as c}<li class={c.kind}><span class="mark" aria-hidden="true">{kindMark(c.kind)}</span><code>{c.path}</code> {#if c.old}<span class="old">{c.old}</span>{/if}{#if c.old && c.new} → {/if}{#if c.new}<span class="new">{c.new}</span>{/if}</li>{/each}</ul>
+        {/if}
+        {#each diffNotes(compared) as note}<p class="muted">{note}</p>{/each}
+      </section>
+    {/if}
+    {#if showHops && r.hops.length}<ol class="hops" aria-label="Redirects">{#each r.hops as h (h)}<li>{h}</li>{/each}</ol>{/if}
     {#if tab === 'timing' && !r.phases.length}
       <EmptyState icon="clock" title="No timings" hint="This send did not record where its time went." />
     {:else if tab === 'messages' && !r.messages.length}
@@ -284,41 +408,42 @@
       <div class="body"><MessageFeed messages={r.messages} /></div>
     {:else if tab === 'received' && rowsShown && r.table}
       <div class="body">
-        <p class="muted rowsum">
-          {r.table.rowCount} {r.table.rowCount === 1 ? 'row' : 'rows'}{#if r.table.truncated}. The store had more: raise “Keep at most … rows” in the Query tab to see them.{/if}
-        </p>
-        {#if r.table.columns.length}
-          <div class="grid">
-            <table>
-              <thead><tr><th class="idx">#</th>{#each r.table.columns as c}<th>{c}</th>{/each}</tr></thead>
-              <tbody>
-                {#each r.table.rows as row, i}
-                  <tr><td class="idx">{i + 1}</td>{#each row as v}{@const cell = cellOf(v)}<td class={cell.kind}>{cell.text}</td>{/each}</tr>
-                {/each}
-              </tbody>
-            </table>
-          </div>
-        {/if}
+        <ResultGrid table={r.table} />
       </div>
+    {:else if tab === 'received' && previewShown}
+      <!-- A page from a server: sandbox="" turns off scripts, forms, popups and same-origin access. -->
+      <iframe class="preview" title="Preview of the response page" sandbox="" srcdoc={r.bodyHtml}></iframe>
+    {:else if tab === 'received' && mediaShown}
+      <div class="body"><BodyMedia {r} onsave={saveBody} /></div>
     {:else if tab === 'received' && tree}
       <div class="treebar">
-        <input type="search" placeholder="Search the body" bind:value={query} spellcheck="false" />
+        <input type="search" placeholder="Search the body" bind:value={query} spellcheck="false" onkeydown={(e) => e.key === 'Enter' && goHit(e.shiftKey)} />
+        {#if query}
+          <span class="muted hitcount" role="status">{hits.length ? `${hitAt >= 0 ? hitAt + 1 + ' of ' : ''}${hits.length}${hits.length >= MATCH_LIMIT ? '+' : ''}` : 'No matches'}</span>
+          <Button small variant="ghost" disabled={!hits.length} title="Previous match (Shift+Enter)" onclick={() => goHit(true)}>↑</Button>
+          <Button small variant="ghost" disabled={!hits.length} title="Next match (Enter)" onclick={() => goHit(false)}>↓</Button>
+        {:else}
+          <Button small variant="ghost" onclick={() => (fold = { epoch: fold.epoch + 1, all: true })}>Expand all</Button>
+          <Button small variant="ghost" onclick={() => (fold = { epoch: fold.epoch + 1, all: false })}>Collapse all</Button>
+        {/if}
         {#if picked}
           <code class="path">{picked}</code>
-          <button class="mini" onclick={copyPath}>Copy path</button>
-          <button class="mini" onclick={extract}>Extract as variable…</button>
+          <Button small onclick={copyPath}>Copy path</Button>
+          <Button small onclick={extract}>Extract as variable…</Button>
         {/if}
       </div>
-      <div class="body mono">
-        <JsonNode value={r.bodyJson} name="$" path="$" selected={picked} {query} onpick={(p) => (picked = p)} />
+      <div class="body mono" bind:this={bodyEl}>
+        {#key fold.epoch}
+          <JsonNode value={r.bodyJson} name="$" path="$" selected={picked} {query} onpick={(p) => (picked = p)} all={fold.all} />
+        {/key}
       </div>
     {:else if tab === 'received' && xmlTree && xmlRoot}
       <div class="treebar">
         <input type="search" placeholder="Search the body" bind:value={query} spellcheck="false" />
         {#if picked}
           <code class="path">{picked}</code>
-          <button class="mini" onclick={copyPath}>Copy path</button>
-          <button class="mini" onclick={extract}>Extract as variable…</button>
+          <Button small onclick={copyPath}>Copy path</Button>
+          <Button small onclick={extract}>Extract as variable…</Button>
         {/if}
       </div>
       <div class="body mono">
@@ -345,10 +470,15 @@
 </section>
 
 <style>
-  section { display: flex; flex-direction: column; min-height: 0; height: 100%; padding: 12px; gap: 8px; }
+  .note-large { margin: 0 0 var(--sp-2); padding: var(--sp-2) var(--sp-3); border-radius: var(--r-md); background: var(--warn-t); color: var(--warn); font-size: var(--fs-sm); }
+  .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  section { position: relative; display: flex; flex-direction: column; min-height: 0; height: 100%; padding: 12px; gap: 8px; }
   header { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
   .grow { flex: 1; }
+  .preview { flex: 1; min-height: 0; width: 100%; border: 1px solid var(--line); border-radius: var(--r-md); color-scheme: light; background: Canvas; }
   /* Time and size beside the title, as quiet chips: the figures people look for first. */
+  .tally.ok { color: var(--ok); }
+  .tally.bad { color: var(--fail); }
   .meta.slow { background: var(--warn-t); color: var(--warn); }
   .meta.verySlow { background: var(--fail-t); color: var(--fail); }
   .meta { padding: 1px 8px; border-radius: var(--r-pill); background: var(--tint-hover); color: var(--text); font: 600 var(--fs-xs)/16px var(--mono); font-variant-numeric: tabular-nums; }
@@ -356,29 +486,17 @@
   .ok { color: var(--ok); }
   .bad { color: var(--fail); }
   .muted { color: var(--muted); font-size: var(--fs-sm); margin: 0; }
+  .hops { margin: 0 0 var(--sp-2); padding-left: var(--sp-6); color: var(--muted); font: var(--fs-sm) var(--mono); }
   .err { color: var(--fail); margin: 0; }
   .sel, .diag { -webkit-user-select: text; user-select: text; }
+  .facts { flex: none; max-height: 30%; overflow: auto; }
   .note { font-size: var(--fs-sm); max-height: 30%; overflow: auto; }
   .note summary { color: var(--muted); cursor: default; }
   .note .err { white-space: pre-wrap; }
   /* Flush with the pane's top, as tall as the request's tab bar beside it, so the two line up. */
-  .bar { display: flex; justify-content: space-between; align-items: flex-end; height: var(--tabbar-h); box-sizing: border-box; margin: -12px -12px 0; padding: 0 8px; border-bottom: 1px solid var(--line); flex: none; }
-  .tabs { display: flex; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
-  .tabs button {
-    background: none;
-    border: 0;
-    border-bottom: 2px solid transparent;
-    color: var(--muted);
-    font: inherit;
-    padding: 8px 10px 6px;
-    white-space: nowrap;
-  }
-  .tone { margin-left: 6px; font-size: var(--fs-xs); }
-  .tabs .status-pill { margin-left: 8px; }
+  .bar { display: flex; align-items: flex-end; height: var(--tabbar-h); box-sizing: border-box; margin: -12px -12px 0; padding: 0 8px; border-bottom: 1px solid var(--line); flex: none; }
+  .tone { font-size: var(--fs-xs); }
   .tone.run { color: var(--accent); }
-  .tabs .active { color: var(--text); border-bottom-color: var(--accent); }
-  /* The format picker is a control of the same row as the mini buttons, so it takes their height and weight. */
-  select { height: var(--ctl-h-sm); padding: 0 10px; background-color: var(--raised); border: 0; box-shadow: inset 0 0 0 1px var(--line); font-size: var(--fs-xs); font-weight: 500; }
   .body { flex: 1; min-height: 0; overflow: auto; }
   .col { display: flex; flex-direction: column; }
   .col .edit { align-self: flex-start; }
@@ -391,17 +509,9 @@
   .msval { flex: 1 0 100%; order: 3; font-family: var(--mono); overflow-wrap: anywhere; color: var(--text); }
   .mstat { color: var(--muted); font-size: var(--fs-xs); margin-left: auto; text-align: right; }
   .mstat.bad { color: var(--fail); }
-  .rowsum { margin: 0 0 6px; }
-  .grid { overflow: auto; border: 1px solid var(--line); border-radius: var(--r-md); }
-  .grid table { border-collapse: collapse; width: 100%; font: var(--fs-sm)/1.5 ui-monospace, Menlo, monospace; -webkit-user-select: text; user-select: text; }
-  .grid th, .grid td { padding: 3px 10px; border-bottom: 1px solid var(--line); text-align: left; white-space: nowrap; max-width: 28em; overflow: hidden; text-overflow: ellipsis; }
-  .grid th { position: sticky; top: 0; background: var(--bg); color: var(--muted); font-weight: 600; font-size: var(--fs-xs); z-index: 1; }
-  .grid td.number { text-align: right; color: var(--syn-number); }
-  .grid td.bool { color: var(--syn-atom); }
-  .grid td.null { color: var(--muted); font-style: italic; }
-  .grid .idx { color: var(--muted); text-align: right; width: 1%; }
   .treebar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
   .treebar input { flex: 1; min-width: 120px; padding: 3px 8px; }
+  .hitcount { font-size: var(--fs-xs); white-space: nowrap; }
   .path { color: var(--muted); font: var(--fs-xs) var(--mono); }
   .phase { display: grid; grid-template-columns: 80px 1fr 70px; gap: 8px; align-items: center; margin: 6px 0; font-size: var(--fs-sm); }
   .track { background: var(--bg); border-radius: var(--r-sm); height: 10px; }
@@ -453,8 +563,16 @@
   .switch { flex: none; display: grid; place-items: center; width: var(--ctl-h-sm, 24px); height: var(--ctl-h-sm, 24px); border: 0; border-radius: var(--r-md); background: var(--raised); color: var(--muted); box-shadow: inset 0 0 0 1px var(--line); cursor: pointer; }
   .switch:hover { color: var(--text); }
   .switch.paused { color: var(--warn); background: var(--warn-t); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--warn) 50%, var(--line)); }
+  .compare { margin: 4px 0; padding: 6px 10px; border: 1px solid var(--line); border-radius: var(--r-md); background: var(--panel); font-size: var(--fs-sm); max-height: 40%; overflow: auto; }
+  .cmphead { display: flex; align-items: center; gap: 10px; }
+  .compare h5 { margin: 8px 0 2px; }
+  .compare ul { list-style: none; margin: 0; padding: 0; }
+  .compare li { padding: 1px 0; overflow-wrap: anywhere; }
+  .compare .mark { display: inline-block; width: 1.2em; font-weight: 600; }
+  .compare .added .mark, .compare .added .new { color: var(--ok); }
+  .compare .removed .mark, .compare .removed .old { color: var(--fail); }
+  .compare .changed .mark { color: var(--warn); }
   .hist { margin: 0; padding: 4px 8px; font-size: var(--fs-sm); background: color-mix(in srgb, var(--accent) 14%, transparent); border-radius: var(--r-md); }
-  .mini { background: var(--raised); color: var(--text); border: 0; box-shadow: inset 0 0 0 1px var(--line); border-radius: var(--r-md); padding: 0 10px; min-height: var(--ctl-h-sm); font: inherit; font-weight: 500; font-size: var(--fs-xs); }
   h5 { margin: 8px 0 2px; color: var(--muted); font-size: var(--fs-xs); text-transform: uppercase; letter-spacing: 0.05em; }
   .diag { color: var(--fail); font-size: var(--fs-sm); margin: 2px 0; }
 </style>

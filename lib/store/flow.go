@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/githugt/flowi/lib/arazzo"
+	"github.com/githugt/flowi/lib/diag"
 	"github.com/githugt/flowi/lib/model"
 )
 
@@ -34,6 +35,12 @@ func (s *Store) flowOptions(c model.Collection, flowPath string) arazzo.FlowOpti
 	return arazzo.FlowOptions{Body: s.codec, Resolve: arazzo.NewResolver(c), Sources: sources, NewID: s.ids.New}
 }
 
+// FlowOptionsFor is the Arazzo codec options for the flow at flowPath of c, for callers that read a flow file's text
+// themselves (the merge driver).
+func (s *Store) FlowOptionsFor(c model.Collection, flowPath string) arazzo.FlowOptions {
+	return s.flowOptions(c, flowPath)
+}
+
 // flowYAMLPath maps a path inside a flow ("$.nodes[2]") to its place in the
 // Arazzo document, where the flow's own data sits under the workflow's
 // x-flowi-flow. Other files and paths already in document terms are unchanged.
@@ -55,4 +62,10 @@ func hasAsyncRequest(c model.Collection) bool {
 		}
 	}
 	return false
+}
+
+// DecodeFlowFile reads the text of a whole flow file (an Arazzo document), as it is on disk now or was in an
+// earlier version, in the context of collection c. Diagnostics are positioned in data.
+func (s *Store) DecodeFlowFile(c model.Collection, file, path string, data []byte) (model.Flow, diag.List) {
+	return arazzo.DecodeFlow(file, path, data, s.flowOptions(c, path))
 }

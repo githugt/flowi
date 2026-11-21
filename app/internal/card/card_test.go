@@ -6,6 +6,7 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/githugt/flowi/lib/model"
 
@@ -342,5 +343,54 @@ func TestSummarize_Given_a_request_Then_its_outcomes_row_is_always_shown_and_nam
 	}
 	if !ok2 || named.Summary != "success · not-found" {
 		t.Errorf("named: %+v", named)
+	}
+}
+
+func TestSummarize_Given_guarded_steps_Then_each_guard_is_listed_in_a_fixed_order(t *testing.T) {
+	// Before: a step with a condition, a tolerated error, a time limit or a concurrent mark looked like any other.
+	n := model.Node{ID: "pay", Type: "delay", When: "vars.admin", OnError: "continue", Timeout: 5 * time.Second, Concurrent: true}
+
+	got := card.Summarize(n, card.Facts{}).Guards
+
+	want := []string{"if", "continue", "5s", "∥"}
+	var glyphs []string
+	for _, g := range got {
+		glyphs = append(glyphs, g.Glyph)
+		if g.Tip == "" {
+			t.Errorf("guard %q has no tip", g.Glyph)
+		}
+	}
+	if !reflect.DeepEqual(glyphs, want) || !strings.Contains(got[0].Tip, "vars.admin") {
+		t.Fatalf("guards %v (%+v), want %v", glyphs, got, want)
+	}
+}
+
+func TestSummarize_Given_a_goto_handler_Then_the_guard_names_its_target(t *testing.T) {
+	n := model.Node{ID: "pay", Type: "delay", OnError: "goto:cleanup"}
+
+	got := card.Summarize(n, card.Facts{}).Guards
+
+	if len(got) != 1 || got[0].Glyph != "→ cleanup" {
+		t.Fatalf("guards %+v", got)
+	}
+}
+
+func TestSummarize_Given_a_plain_step_Then_it_has_no_guards_but_a_list(t *testing.T) {
+	got := card.Summarize(model.Node{ID: "a", Type: "delay", OnError: "fail"}, card.Facts{}).Guards
+
+	if got == nil || len(got) != 0 {
+		t.Fatalf("guards %#v", got)
+	}
+}
+
+func TestSummarize_Given_a_query_that_may_write_Then_the_card_says_so(t *testing.T) {
+	n := model.Node{ID: "q", Type: "request"}
+
+	// Before: a write-enabled query looked the same as a read in a flow; the mark was only in the request's Query tab.
+	writes := card.Summarize(n, card.Facts{Kind: "dataset", Writes: true}).Guards
+	reads := card.Summarize(n, card.Facts{Kind: "dataset"}).Guards
+
+	if len(writes) != 1 || writes[0].Glyph != "✎ writes" || len(reads) != 0 {
+		t.Fatalf("writes %+v reads %+v", writes, reads)
 	}
 }

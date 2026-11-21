@@ -74,3 +74,31 @@ func TestScheduleRunner_Start_Given_the_server_cannot_start_Then_shows_why(t *te
 		t.Fatalf("state %v err %q", r.State(), r.Err())
 	}
 }
+
+func TestScheduleRunner_Restart_Given_a_running_runner_Then_it_stops_and_starts_again_with_what_changed(t *testing.T) {
+	// Before: the jobs and the token were fixed at Start, so a removed schedule kept firing and a rotated token kept working.
+	b := &vmtest.Backend{}
+	r, q := startScheduleRunner(t, b)
+	r.Start()
+	q.run(1)
+
+	r.Restart()
+	stopping := r.State()
+	q.run(1) // the waiter reports the stop, and the runner starts again
+	q.run(1) // the new server is up
+
+	if stopping != vm.ScheduleStopping || r.State() != vm.ScheduleRunning || len(b.ServedWith) != 2 {
+		t.Fatalf("while stopping %v, now %v, started %d times", stopping, r.State(), len(b.ServedWith))
+	}
+}
+
+func TestScheduleRunner_Restart_Given_a_stopped_runner_Then_it_stays_stopped(t *testing.T) {
+	b := &vmtest.Backend{}
+	r, _ := startScheduleRunner(t, b)
+
+	r.Restart()
+
+	if r.State() != vm.ScheduleStopped || len(b.ServedWith) != 0 {
+		t.Fatalf("state %v, started %d times", r.State(), len(b.ServedWith))
+	}
+}

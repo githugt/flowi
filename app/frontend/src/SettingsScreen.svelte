@@ -1,13 +1,37 @@
 <script lang="ts">
+  import EmptyState from './EmptyState.svelte'
+  import { radiogroup } from './lib/radiogroup'
+  import { acceptsText, defaultNote } from './lib/settinghint'
+  import { isEnter } from './lib/enterkey'
+  import Select from './Select.svelte'
   import TextInput from './TextInput.svelte'
   import Toggle from './Toggle.svelte'
   import { SettingsService } from '../bindings/github.com/githugt/flowi/app/internal/bridge'
   import { app } from './lib/app.svelte'
-  import { SECTIONS, labelOf, matches, sectionOf, type Section } from './lib/settings'
+  import { SECTIONS, labelOf, matches, modifiedFields, sectionOf, type Section } from './lib/settings'
+  import Button from './Button.svelte'
+  import Tabs from './Tabs.svelte'
+  import { posture, weakLines } from './lib/posture'
+  import { settingAnnouncement } from './lib/settingsaid'
   import type { SettingView } from './lib/types'
 
   let query = $state('')
-  const fields = $derived((app.settings?.groups ?? []).flatMap((g) => g.fields).filter((f) => matches(f, query)))
+  // The last change, said once to a screen reader: settings apply as a field changes or loses focus.
+  let announced = $state('')
+  let seen: { name: string; value: string; problem?: string }[] = []
+  // Show only the settings the person has changed, across every section.
+  let onlyModified = $state(false)
+  const all = $derived((app.settings?.groups ?? []).flatMap((g) => g.fields))
+  const modified = $derived(modifiedFields(all).length)
+  $effect(() => {
+    const now = all.map((f) => ({ name: f.name, value: f.value, problem: f.problem }))
+    const said = settingAnnouncement(seen, now)
+    seen = now
+    if (said) announced = said
+  })
+  const fields = $derived(all.filter((f) => matches(f, query) && (!onlyModified || f.userSet)))
+  // A search or the Modified filter looks across all sections; otherwise a tab narrows the page.
+  const searching = $derived(!!query || onlyModified)
   const isURLColour = (f: SettingView) => f.name.startsWith('appearance.url.')
   // Each section's settings, URL colours kept apart at the end of Appearance.
   const bySection = $derived(
@@ -36,9 +60,9 @@
       // a tab that is not remembered is not a problem
     }
   }
-  const visible = $derived(query ? bySection.filter(shown) : bySection.filter((s) => s.name === tab && shown(s)))
+  const visible = $derived(searching ? bySection.filter(shown) : bySection.filter((s) => s.name === tab && shown(s)))
   // While searching, a tab shows how many of its settings match, so you can see where the hits are.
-  const hits = (s: Section) => (query ? (bySection.find((b) => b.name === s)?.fields.length ?? 0) + (s === 'Appearance' ? urlColours.length : 0) : 0)
+  const hits = (s: Section) => (searching ? (bySection.find((b) => b.name === s)?.fields.length ?? 0) + (s === 'Appearance' ? urlColours.length : 0) : 0)
 
   // Text inputs apply on Enter or blur; the typed text stays until then.
   let typed = $state<Record<string, string>>({})
@@ -56,13 +80,13 @@
   <div class="field">
     <div class="head">
       <label for={'set-' + f.name}>{labelOf(f.name)}</label>
-      {#if f.userSet}<button class="link" onclick={() => SettingsService.Reset(f.name)}>Reset</button>{/if}
+      {#if f.userSet}<Button variant="link" onclick={() => SettingsService.Reset(f.name)}>Reset</Button>{/if}
     </div>
     <p class="desc">{f.description} <code title="The key in settings.yaml">{f.name}</code>{#if !f.userSet} <span class="src">default</span>{/if}</p>
     {#if f.kind === 'bool'}
       <Toggle id={'set-' + f.name} checked={f.value === 'true'} onchange={(on) => SettingsService.Set(f.name, String(on))}>{f.value === 'true' ? 'On' : 'Off'}</Toggle>
     {:else if f.name === 'appearance.send_button'}
-      <div class="swatches" role="radiogroup" aria-label="Send button colour">
+      <div class="swatches" role="radiogroup" use:radiogroup aria-label="Send button colour">
         {#each f.enum ?? [] as o}
           <button class="swatch" role="radio" aria-checked={f.value === o} class:on={f.value === o} data-send={o} title={o} onclick={() => SettingsService.Set(f.name, o)}>
             <span class="sample">Send</span>{o}
@@ -70,7 +94,7 @@
         {/each}
       </div>
     {:else if f.name === 'appearance.theme'}
-      <div class="swatches" role="radiogroup" aria-label="Theme">
+      <div class="swatches" role="radiogroup" use:radiogroup aria-label="Theme">
         {#each f.enum ?? [] as o}
           <button class="swatch themeswatch" role="radio" aria-checked={f.value === o} class:on={f.value === o} data-theme={THEMES_WITH_COLOURS.includes(o) ? o : undefined} title={o} onclick={() => SettingsService.Set(f.name, o)}>
             <span class="themesample" aria-hidden="true"><i class="bar"></i><i class="line"></i><i class="dot"></i></span>{o.replace(/-/g, ' ')}
@@ -78,20 +102,24 @@
         {/each}
       </div>
     {:else if f.kind === 'enum'}
-      <select id={'set-' + f.name} value={f.value} onchange={(e) => SettingsService.Set(f.name, e.currentTarget.value)}>
+      <Select id={'set-' + f.name} value={f.value} onchange={(e) => SettingsService.Set(f.name, e.currentTarget.value)}>
         {#each f.enum ?? [] as o}<option value={o}>{o}</option>{/each}
-      </select>
+      </Select>
     {:else}
       <TextInput
         id={'set-' + f.name}
         value={text(f)}
         placeholder={f.kind === 'list' ? 'comma-separated' : ''}
+        invalid={!!f.problem}
+        describedby={f.problem ? 'prob-' + f.name : undefined}
         oninput={(e) => (typed[f.name] = (e.currentTarget as HTMLInputElement).value)}
         onblur={() => apply(f)}
-        onkeydown={(e) => e.key === 'Enter' && apply(f)}
+        onkeydown={(e) => isEnter(e) && apply(f)}
       />
     {/if}
-    {#if f.problem}<p class="problem">{f.problem}</p>{/if}
+    {#if acceptsText(f) && f.kind !== 'bool' && f.kind !== 'enum'}<p class="desc">{acceptsText(f)}</p>{/if}
+    {#if defaultNote(f)}<p class="desc">{defaultNote(f)}</p>{/if}
+    {#if f.problem}<p class="problem" id={'prob-' + f.name} role="alert">{f.problem}</p>{/if}
     {#if (f.name === 'appearance.theme' || f.name === 'appearance.palette_file') && app.paletteProblem}
       <p class="problem">The custom theme was not applied: {app.paletteProblem} The window keeps the theme it has.</p>
     {/if}
@@ -99,31 +127,37 @@
 {/snippet}
 
 <div class="page">
+  <p class="sr-only" aria-live="polite" role="status">{announced}</p>
   <header>
     <h2>Settings</h2>
     <TextInput bind:value={query} placeholder="Search settings" label="Search settings" style="width: 260px" />
+    {#if modified > 0 || onlyModified}<Button small aria-pressed={onlyModified} variant={onlyModified ? 'primary' : 'secondary'} title="Show only the settings you have changed" onclick={() => (onlyModified = !onlyModified)}>Modified ({modified})</Button>{/if}
   </header>
   <p class="note">Your personal settings. Collections, folders and requests can override some of them.</p>
-  <div class="tabs" role="tablist" aria-label="Settings sections">
-    {#each SECTIONS as s}
-      <button role="tab" aria-selected={!query && tab === s} class:on={!query && tab === s} class:hit={!!query && hits(s) > 0} onclick={() => { query = ''; pick(s) }}>
-        {s}{#if query && hits(s) > 0}<span class="count">{hits(s)}</span>{/if}
-      </button>
-    {/each}
-  </div>
+  <div class="tabbar"><Tabs label="Settings sections" wrap active={searching ? null : tab} items={SECTIONS.map((s) => ({ id: s, label: s, count: hits(s) > 0 ? hits(s) : undefined }))} onpick={(s) => { query = ''; onlyModified = false; pick(s as Section) }} /></div>
   {#each visible as s (s.name)}
     <section role="tabpanel">
-      {#if query}<h3>{s.name}</h3>{/if}
+      {#if searching}<h3>{s.name}</h3>{/if}
+      {#if s.name === 'Security'}
+        <ul class="posture" aria-label="Security posture">
+          {#each posture(all) as p (p.name)}
+            <li class:weak={!p.ok}><span aria-hidden="true">{p.ok ? '✓' : '!'}</span> {p.text}{#if !p.ok} <Button small onclick={() => SettingsService.Set(p.name, p.safe)}>Fix</Button>{/if}</li>
+          {/each}
+        </ul>
+        {#if weakLines(posture(all)).length > 1}
+          <Button small title="Put every weaker choice above back to the built-in one" onclick={() => weakLines(posture(all)).forEach((p) => SettingsService.Set(p.name, p.safe))}>Reset to safe defaults</Button>
+        {/if}
+      {/if}
       {#each s.fields as f (f.name)}{@render field(f)}{/each}
       {#if s.name === 'Appearance' && urlColours.length}
         <details class="sub">
-          <summary>URL colours <button class="link" onclick={() => SettingsService.ResetGroup('appearance.url')}>Reset all</button></summary>
+          <summary>URL colours <Button variant="link" onclick={() => SettingsService.ResetGroup('appearance.url')}>Reset all</Button></summary>
           {#each urlColours as f (f.name)}{@render field(f)}{/each}
         </details>
       {/if}
     </section>
   {:else}
-    <p class="note">No setting matches “{query}”.</p>
+    <EmptyState kind="filtered" compact title={onlyModified && !query ? 'You have not changed any setting' : undefined} {query} onclear={() => { query = ''; onlyModified = false }} />
   {/each}
 </div>
 
@@ -132,25 +166,16 @@
   header { display: flex; align-items: center; gap: var(--sp-3); }
   h2 { margin: 0; font-size: var(--fs-lg); flex: 1; }
   .note { color: var(--muted); margin: var(--sp-2) 0 0; font-size: var(--fs-sm); }
-  .tabs { display: flex; flex-wrap: wrap; gap: 2px; margin: var(--sp-3) 0 0; border-bottom: 1px solid var(--line); }
-  .tabs button { background: none; border: 0; border-bottom: 2px solid transparent; color: var(--muted); font: inherit; padding: 6px 12px; margin-bottom: -1px; display: flex; gap: 6px; align-items: baseline; }
-  .tabs button:hover { color: var(--text); }
-  .tabs button.on { color: var(--text); border-bottom-color: var(--accent); }
-  .tabs button.hit { color: var(--text); }
-  h3, summary { margin: var(--sp-6) 0 var(--sp-2); font-size: var(--fs-lg); font-weight: 600; font-weight: 600; }
+  .tabbar { margin: var(--sp-3) 0 0; }
+  h3, summary { margin: var(--sp-6) 0 var(--sp-2); font-size: var(--fs-lg); font-weight: 600; }
   summary { cursor: pointer; display: flex; align-items: center; gap: var(--sp-2); }
   .sub summary { font-weight: 500; margin-top: var(--sp-4); }
-  .count { color: var(--muted); font-weight: 400; font-size: var(--fs-xs); }
   .field { margin: var(--sp-3) 0; }
   .head { display: flex; justify-content: space-between; align-items: baseline; }
   label { font-weight: 500; }
   code { margin-left: 0.4em; font: var(--fs-xs) var(--mono); color: var(--muted); opacity: 0.8; }
   .desc { margin: 2px 0 6px; color: var(--muted); font-size: var(--fs-sm); }
   .src { margin-left: 0.4em; font-size: var(--fs-xs); opacity: 0.7; }
-  select {
-    box-sizing: border-box; background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); padding: 5px 8px; font: inherit;
-    -webkit-user-select: text; user-select: text;
-  }
   .swatches { display: flex; flex-wrap: wrap; gap: var(--sp-2); }
   .swatch { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 10px 14px; background: var(--panel); border: 1px solid var(--line); border-radius: var(--r-lg); color: var(--muted); font: inherit; font-size: var(--fs-xs); text-transform: capitalize; }
   .swatch.on { border-color: var(--accent); color: var(--text); box-shadow: 0 0 0 3px var(--tint-accent); }
@@ -159,8 +184,7 @@
   .themesample { position: relative; display: block; width: 72px; height: 44px; border-radius: var(--r-md); background: var(--bg); border: 1px solid var(--line); overflow: hidden; }
   .themesample i { position: absolute; display: block; }
   .themesample .bar { left: 0; top: 0; bottom: 0; width: 18px; background: var(--panel); border-right: 1px solid var(--line); }
-  .themesample .line { left: 26px; top: 12px; width: 34px; height: 5px; border-radius: 3px; background: var(--text); opacity: 0.7; }
-  .themesample .dot { left: 26px; top: 26px; width: 22px; height: 8px; border-radius: 4px; background: var(--accent); }
+  .themesample .line { left: 26px; top: 12px; width: 34px; height: 5px; border-radius: var(--r-pill); background: var(--text); opacity: 0.7; }
+  .themesample .dot { left: 26px; top: 26px; width: 22px; height: 8px; border-radius: var(--r-pill); background: var(--accent); }
   .problem { color: var(--fail); margin: 4px 0 0; font-size: var(--fs-sm); }
-  .link { background: none; border: 0; color: var(--accent); font: inherit; font-size: var(--fs-sm); font-weight: 400; margin-left: auto; }
 </style>

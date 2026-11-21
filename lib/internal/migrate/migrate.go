@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"slices"
 	"strconv"
+	"strings"
 
 	"github.com/githugt/flowi/lib/diag"
 )
@@ -56,4 +57,50 @@ func planWith(steps []Step, from, to int) ([]Step, error) {
 		out = append(out, steps[i])
 	}
 	return out, nil
+}
+
+// CheckVersion tells whether the running release is new enough for a collection that names min in its flowi.yaml
+// (min_version). It returns the zero Diagnostic when it is, when min is empty, or when either is not a version
+// number (a development build has none: it reads everything).
+func CheckVersion(min, have string) diag.Diagnostic {
+	need, ok1 := parseVersion(min)
+	got, ok2 := parseVersion(have)
+	if !ok1 || !ok2 || !need.after(got) {
+		return diag.Diagnostic{}
+	}
+	return diag.New(diag.CodeFormatNeedsNewer, diag.Location{Path: "$.min_version"}, map[string]string{"min": min, "have": have})
+}
+
+type version struct {
+	parts [3]int
+	pre   string
+}
+
+// after says whether v is a later release than o (a pre-release comes before its release).
+func (v version) after(o version) bool {
+	for i := range v.parts {
+		if v.parts[i] != o.parts[i] {
+			return v.parts[i] > o.parts[i]
+		}
+	}
+	return o.pre != "" && v.pre == ""
+}
+
+// parseVersion reads "1.4.0", "v1.4" or "1.4.0-rc.1"; a missing part is 0.
+func parseVersion(s string) (version, bool) {
+	var v version
+	s = strings.TrimPrefix(strings.TrimSpace(s), "v")
+	s, v.pre, _ = strings.Cut(s, "-")
+	fields := strings.Split(s, ".")
+	if s == "" || len(fields) > 3 {
+		return v, false
+	}
+	for i, f := range fields {
+		n, err := strconv.Atoi(f)
+		if err != nil || n < 0 {
+			return v, false
+		}
+		v.parts[i] = n
+	}
+	return v, true
 }

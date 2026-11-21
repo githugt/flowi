@@ -72,3 +72,17 @@ func TestRun_Given_a_skip_inside_a_batch_iteration_Then_only_that_step_is_skippe
 		t.Fatalf("result %+v; s1 skipped %d, n1 passed %d", res, countFinished(events, "s1", StatusSkipped), countFinished(events, "n1", StatusPassed))
 	}
 }
+
+func TestRun_Given_a_trigger_Then_the_report_says_what_started_the_run(t *testing.T) {
+	// Before: a report did not say who started the run (button, schedule, HTTP trigger or CLI).
+	f := newFixture(t)
+	fl := f.addFlow("t", setValues("a", model.SetValue{Name: "a", Value: "{{1}}"}))
+	in := f.runInput(fl)
+	in.Trigger = "trigger"
+
+	_, res := runFlow(testCtx(t), t, f.deps(), in)
+
+	if res.Report.Trigger != "trigger" {
+		t.Fatalf("trigger %q", res.Report.Trigger)
+	}
+}

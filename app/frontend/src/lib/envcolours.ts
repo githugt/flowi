@@ -16,3 +16,11 @@ const swatches: Record<string, string> = {
 export function envSwatch(colour: string | undefined): string | undefined {
   return colour ? swatches[colour] : undefined
 }
+
+/**
+ * The colour of the environment in use, for the band under the tab strip and the line over the footer; undefined for
+ * no environment or the default colour. Production safety rested on one small chip at the far right of the tabs.
+ */
+export function bandColour(tree: { selected?: string; envColours?: Record<string, string> } | null | undefined): string | undefined {
+  return envSwatch(tree?.envColours?.[tree?.selected ?? ''])
+}

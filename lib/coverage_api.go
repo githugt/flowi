@@ -23,6 +23,23 @@ const maxRunsPerFlow = 200
 // operation is a request that came from an imported description and has response schemas. Statuses come from
 // the run history, so a flow that never ran leaves its statuses unseen. An empty collection measures all of them.
 func (w *Workspace) Coverage(collection model.ID) (analysis.Coverage, diag.List, error) {
+	return w.coverage(collection, nil)
+}
+
+// CoverageFromRuns is Coverage with the statuses taken from the given run reports (the JSON a `flowi run --report
+// json=…` wrote) in place of the saved history. A CI job starts with no history, so without this the statuses it
+// measures would always be unseen; it hands in the reports of the runs it just made, or of runs kept as artifacts.
+//
+// Before: coverage read only the run history in the data folder, which is empty on a fresh checkout.
+func (w *Workspace) CoverageFromRuns(collection model.ID, runs []report.Run) (analysis.Coverage, diag.List, error) {
+	if runs == nil {
+		runs = []report.Run{} // given and empty: no history is read
+	}
+	return w.coverage(collection, runs)
+}
+
+// coverage measures with runs when they are given (non-nil), else with the saved history.
+func (w *Workspace) coverage(collection model.ID, given []report.Run) (analysis.Coverage, diag.List, error) {
 	w.mu.RLock()
 	defer w.mu.RUnlock()
 	cs := w.collections
@@ -33,9 +50,11 @@ func (w *Workspace) Coverage(collection model.ID) (analysis.Coverage, diag.List,
 		}
 		cs = []model.Collection{c}
 	}
-	var runs []report.Run
-	for _, c := range cs {
-		runs = append(runs, w.runsOf(c)...)
+	runs := given
+	if runs == nil {
+		for _, c := range cs {
+			runs = append(runs, w.runsOf(c)...)
+		}
 	}
 	return analysis.Cover(cs, w.contracts(), runs), nil, nil
 }

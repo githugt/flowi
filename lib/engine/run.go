@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"path"
 	"path/filepath"
 	"slices"
@@ -45,6 +46,8 @@ type RunInput struct {
 	// Overlay is a flowi overlay (or a stack, "vip+slow") laid over every request step that names no overlay of
 	// its own. A step's own overlay wins. "" lays none.
 	Overlay string
+	// Trigger says what started the run ("app", "cli", "trigger" for the HTTP trigger server); "" when not said.
+	Trigger string
 	// PriorVars are the flow's variables as an earlier run ended (masked),
 	// for the chosen nodes' templates to read as vars.<name>: a node left out
 	// of a partial run may have set them.
@@ -112,6 +115,7 @@ func newFlowRunner(d Deps, in RunInput, events chan<- Event) *runner {
 	r.kind, r.env, r.prefer, r.overlay = "flow", in.Env, in.PreferVersion, in.Overlay
 	r.builder = newReportBuilder(d.Clock, in.Flow.Name, in.Collection.Manifest.Name)
 	r.jar = httpx.NewJar() // one in-memory jar per run (design §6.3)
+	r.pool = &httpx.Pool{}
 	return r
 }
 
@@ -119,9 +123,10 @@ func newFlowRunner(d Deps, in RunInput, events chan<- Event) *runner {
 func (r *runner) runFlow(ctx context.Context, in RunInput) RunResult {
 	r.ctx = ctx
 	defer r.conns.closeAll() // also when the run is aborted: no connection outlives its run
+	defer r.pool.Close()     // the HTTP connections too; after an abort a late request finds the pool closed and fails
 	start := r.deps.Clock()
 	cfg := newConfig(r.deps.Lookup.Settings(in.Collection.Manifest.ID, flowFolder(in.Flow), nil))
-	r.emit(RunStarted{RunID: r.runID, Kind: "flow", FlowID: string(in.Flow.ID), FlowPath: in.Flow.Path, Env: in.Env, Overlay: in.Overlay, Seed: r.seed, At: start})
+	r.emit(RunStarted{RunID: r.runID, Kind: "flow", FlowID: string(in.Flow.ID), FlowPath: in.Flow.Path, Env: in.Env, Overlay: in.Overlay, Trigger: in.Trigger, Seed: r.seed, At: start})
 	done := make(chan listOutcome, 1)
 	// The flow goroutine is owned by the run: it ends when the flow's
 	// nodes and background calls have ended, which cancellation makes
@@ -140,6 +145,10 @@ func (r *runner) runFlow(ctx context.Context, in RunInput) RunResult {
 	res.Report.Vars = r.finalVars()
 	res.Report.Outputs = r.finalOutputs()
 	res.ReportFile, res.Err = r.saveReport(in, res.Report, res.Err)
+	if res.ReportFile != "" {
+		// Reports beyond run.keep go; a report that stays is harmless and the next run tries again, so this is not an error.
+		_, _ = pruneRuns(filepath.Dir(res.ReportFile), cfg.keepRuns, cfg.keepFailed, reportStatus, os.Remove)
+	}
 	return res
 }
 
@@ -151,7 +160,7 @@ func (r *runner) saveReport(in RunInput, rep report.Run, prevErr error) (string,
 		return "", errors.Join(prevErr, err)
 	}
 	file := filepath.Join(r.deps.DataDir(in.Collection.Manifest.ID), "runs", string(in.Flow.ID), r.runID+".json")
-	if err := writeFileAtomic(file, []byte(r.secrets.String(buf.String()))); err != nil {
+	if err := writeFileAtomic(file, []byte(r.secrets.String(buf.String())), dataFileMode); err != nil {
 		return "", errors.Join(prevErr, fmt.Errorf("saving the run report: %w", err))
 	}
 	return file, prevErr

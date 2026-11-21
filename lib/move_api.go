@@ -50,6 +50,13 @@ func (w *Workspace) MoveRequest(t RequestTarget, to model.ID, path string) (Requ
 	if err := store.Apply([]store.FileChange{{File: file, New: data}}); err != nil {
 		return RequestTarget{}, err
 	}
+	if to != t.Collection {
+		// The working copy is kept per collection (edit_store.go): it goes along.
+		if err := w.writeEdit(to, moved); err != nil {
+			return RequestTarget{}, err
+		}
+		_ = os.Remove(w.editFile(t.Collection, r.ID))
+	}
 	if err := os.Remove(r.File); err != nil && !errors.Is(err, fs.ErrNotExist) {
 		return RequestTarget{}, fmt.Errorf("removing the old %s: %w", r.File, err)
 	}

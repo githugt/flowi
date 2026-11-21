@@ -38,6 +38,48 @@ func TestSnippetVM_should_preview_the_edited_version_and_render_curl_by_default(
 	}
 }
 
+// Before: only an HTTP request had a Code section, and a gRPC call would have been written as a curl command.
+func TestSnippetVM_Given_a_grpc_message_or_query_Then_the_format_is_the_tool_of_its_kind_and_secrets_stay_out(t *testing.T) {
+	tests := []struct {
+		name    string
+		preview engine.PreviewRequest
+		format  snippet.Format
+		want    string
+	}{
+		{"grpc", engine.PreviewRequest{Method: "GRPC", URL: "grpc://h:50051/p.S/M", BodyKind: "text", Body: "{}"}, snippet.Grpcurl, "grpcurl"},
+		{"mqtt", engine.PreviewRequest{Method: "MQTT", URL: "mqtt://u:" + vault.Mask + "@h/t", BodyKind: "text", Body: "x"}, snippet.Mosquitto, "-P '<secret>'"},
+		{"sql", engine.PreviewRequest{Method: "SQL", URL: "postgres://u:" + vault.Mask + "@h/db", BodyKind: "text", Body: "SELECT 1"}, snippet.Psql, "psql 'postgres://u:<secret>@h/db'"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			b := sampleBackend()
+			b.PreviewResult = engine.Preview{Masked: tt.preview}
+			s, _ := newSnippetVM(t, b, true)
+
+			s.Refresh()
+
+			if s.Format() != tt.format || !strings.Contains(s.Text(), tt.want) || strings.Contains(s.Text(), vault.Mask) || s.Err() != "" {
+				t.Fatalf("format %q text %q err %q", s.Format(), s.Text(), s.Err())
+			}
+			if f := s.Formats(); len(f) != 1 || f[0] != tt.format {
+				t.Fatalf("formats %v", f)
+			}
+		})
+	}
+}
+
+func TestSnippetVM_Given_a_kind_no_common_tool_speaks_Then_it_says_so_instead_of_writing_curl(t *testing.T) {
+	b := sampleBackend()
+	b.PreviewResult = engine.Preview{Masked: engine.PreviewRequest{Method: "SQS", URL: "sqs://queue", BodyKind: "text", Body: "x"}}
+	s, _ := newSnippetVM(t, b, true)
+
+	s.Refresh()
+
+	if s.Text() != "" || !strings.Contains(s.Err(), "No common command-line tool") || len(s.Formats()) != 0 {
+		t.Fatalf("text %q err %q", s.Text(), s.Err())
+	}
+}
+
 func TestSnippetVM_Given_exclude_secrets_Then_masked_values_become_placeholders(t *testing.T) {
 	b := sampleBackend()
 	b.PreviewResult = engine.Preview{

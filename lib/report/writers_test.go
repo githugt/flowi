@@ -200,3 +200,153 @@ func TestWriters_Given_running_node_and_unlabelled_lane_Then_no_question_marks_o
 		}
 	}
 }
+
+func TestWriteHTML_should_be_one_self_contained_page_with_every_step(t *testing.T) {
+	// Before: the app and the CLI had no report to mail or attach to a CI run as one file.
+	var buf bytes.Buffer
+
+	err := report.WriteHTML(&buf, fixtureRun())
+
+	if err != nil {
+		t.Fatal(err)
+	}
+	page := buf.String()
+	for _, want := range []string{"<!doctype html>", "<style>", "</html>", "<h2>Steps</h2>"} {
+		if !strings.Contains(page, want) {
+			t.Errorf("page lacks %q", want)
+		}
+	}
+	for _, banned := range []string{"<script", "<link", "http://", "https://"} {
+		if strings.Contains(page, banned) {
+			t.Errorf("page is not self-contained: it holds %q", banned)
+		}
+	}
+	if got := strings.Count(page, `class="status`); got < 2 {
+		t.Errorf("want a status for the run and each step, got %d", got)
+	}
+}
+
+func TestWriteHTML_Given_markup_in_a_name_When_written_Then_it_is_escaped(t *testing.T) {
+	r := fixtureRun()
+	r.FlowName = `<script>alert(1)</script>`
+	r.Env = `"><img src=x>`
+	r.Status = `x"><b>`
+
+	var buf bytes.Buffer
+	if err := report.WriteHTML(&buf, r); err != nil {
+		t.Fatal(err)
+	}
+
+	page := buf.String()
+	if strings.Contains(page, "<script>alert") || strings.Contains(page, "<img src=x>") || strings.Contains(page, `x"><b>`) {
+		t.Errorf("markup got through:\n%s", page)
+	}
+}
+
+// Before: a step that passed only after a retry looked like any other pass in the report.
+func TestWriteJUnit_should_mark_a_step_that_passed_after_a_retry_as_flaky_and_count_them(t *testing.T) {
+	r := report.Run{FlowName: "F", Nodes: []report.Node{
+		{Path: "steady", Status: "passed"},
+		{Path: "shaky", Status: "passed", Tries: 3, Flaky: true},
+		{Path: "hopeless", Status: "failed", Tries: 3, Diagnostics: []report.Diagnostic{{Code: "FLW-RUN-001", Message: "assertion failed: y"}}},
+	}}
+	var buf bytes.Buffer
+
+	err := report.WriteJUnit(&buf, r)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := buf.String()
+	for _, want := range []string{`<flakyFailure type="flaky" message="passed on try 3: it failed before">`, `<property name="flaky" value="1">`} {
+		if !strings.Contains(out, want) {
+			t.Errorf("missing %q in:\n%s", want, out)
+		}
+	}
+	if strings.Count(out, "flakyFailure") != 2 { // one element: its open and its close
+		t.Errorf("only the shaky step is flaky:\n%s", out)
+	}
+	if xmllint, err := exec.LookPath("xmllint"); err == nil {
+		file := filepath.Join(t.TempDir(), "junit.xml")
+		if err := os.WriteFile(file, buf.Bytes(), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		if res, err := exec.CommandContext(t.Context(), xmllint, "--noout", "--schema", filepath.Join("testdata", "junit-10.xsd"), file).CombinedOutput(); err != nil {
+			t.Fatalf("schema: %v\n%s", err, res)
+		}
+	}
+}
+
+func TestWriteText_and_Markdown_should_say_when_a_step_took_more_than_one_try(t *testing.T) {
+	r := report.Run{FlowName: "F", Nodes: []report.Node{
+		{Path: "shaky", ID: "shaky", Type: "request", Status: "passed", Tries: 2, Flaky: true},
+		{Path: "hopeless", ID: "hopeless", Type: "request", Status: "failed", Tries: 3},
+	}}
+	var text, md bytes.Buffer
+
+	_ = report.WriteText(&text, r)
+	_ = report.WriteMarkdown(&md, r)
+
+	for name, out := range map[string]string{"text": text.String(), "markdown": md.String()} {
+		if !strings.Contains(out, "flaky: passed on try 2") || !strings.Contains(out, "(3 tries)") {
+			t.Errorf("%s:\n%s", name, out)
+		}
+	}
+}
+
+// Before: the report knew only the checks that failed, so a request with six passing checks could not say "6/6".
+func checkedRun() report.Run {
+	return report.Run{FlowName: "F", Nodes: []report.Node{
+		{Path: "login", ID: "login", Type: "request", Status: "failed", Checks: []report.Check{
+			{Line: "status == 200", Verdict: "passed"},
+			{Line: "response.body.id > 0", Verdict: "failed", Note: "response.body.id = 0"},
+			{Line: "vars.x != empty", Verdict: "error", Note: "vars.x is not defined"},
+		}, Diagnostics: []report.Diagnostic{{Code: "FLW-RUN-001", Message: "assertion failed: y"}}},
+		{Path: "plain", ID: "plain", Type: "request", Status: "passed"},
+	}}
+}
+
+func TestWriteJUnit_should_list_each_check_in_the_case_and_total_them_in_the_suite(t *testing.T) {
+	var buf bytes.Buffer
+
+	err := report.WriteJUnit(&buf, checkedRun())
+
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := buf.String()
+	for _, want := range []string{`<property name="checks" value="1/3">`, "1/3 checks passed", "✓ status == 200", "✗ response.body.id &gt; 0 — response.body.id = 0", "! vars.x != empty"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("missing %q in:\n%s", want, out)
+		}
+	}
+	if strings.Count(out, "<testcase") != 2 {
+		t.Errorf("a check is not a test case of its own:\n%s", out)
+	}
+	if xmllint, err := exec.LookPath("xmllint"); err == nil {
+		file := filepath.Join(t.TempDir(), "junit.xml")
+		if err := os.WriteFile(file, buf.Bytes(), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		if res, err := exec.CommandContext(t.Context(), xmllint, "--noout", "--schema", filepath.Join("testdata", "junit-10.xsd"), file).CombinedOutput(); err != nil {
+			t.Fatalf("schema: %v\n%s", err, res)
+		}
+	}
+}
+
+func TestWriteText_Markdown_and_JSON_should_say_how_many_checks_passed(t *testing.T) {
+	var text, md, js bytes.Buffer
+
+	_ = report.WriteText(&text, checkedRun())
+	_ = report.WriteMarkdown(&md, checkedRun())
+	_ = report.WriteJSON(&js, checkedRun())
+
+	for name, out := range map[string]string{"text": text.String(), "markdown": md.String()} {
+		if !strings.Contains(out, "(1/3 checks)") || strings.Count(out, "checks)") != 1 {
+			t.Errorf("%s:\n%s", name, out)
+		}
+	}
+	if !strings.Contains(js.String(), `"verdict": "failed"`) || !strings.Contains(js.String(), `"note": "response.body.id = 0"`) {
+		t.Errorf("json:\n%s", js.String())
+	}
+}

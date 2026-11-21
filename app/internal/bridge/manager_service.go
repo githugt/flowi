@@ -3,6 +3,8 @@
 package bridge
 
 import (
+	"errors"
+
 	"github.com/githugt/flowi/lib/model"
 
 	"github.com/githugt/flowi/app/internal/vm"
@@ -59,33 +61,88 @@ func (s *ManagerService) State() ManagerView {
 	return v
 }
 
-// Mount mounts the collection in dir.
-func (s *ManagerService) Mount(dir string) { s.app.actor.Do(func() { s.vm.Mount(dir) }) }
+// settle runs start on the actor and waits for the outcome it reports, as an error with a message for people.
+// Before: the screen sent each of these actions and cleared its fields at once, so a failure left the person to find
+// the error at the top of the page and type everything again.
+func (s *ManagerService) settle(start func(done func(error))) error {
+	out := make(chan error, 1)
+	s.app.actor.Do(func() {
+		start(func(err error) {
+			if err != nil {
+				err = errors.New(vm.ErrorText(err))
+			}
+			out <- err
+		})
+	})
+	return <-out
+}
+
+// Mount mounts the collection in dir. A refusal comes back as the error.
+func (s *ManagerService) Mount(dir string) error {
+	return s.settle(func(done func(error)) { s.vm.MountThen(dir, done) })
+}
 
 // OpenArazzo opens an Arazzo document (a file or an http(s) address) as a collection whose flows run against the
 // server the document's OpenAPI description names, until the app quits.
-func (s *ManagerService) OpenArazzo(ref string) { s.app.actor.Do(func() { s.vm.OpenArazzo(ref) }) }
+func (s *ManagerService) OpenArazzo(ref string) error {
+	return s.settle(func(done func(error)) { s.vm.OpenArazzoThen(ref, done) })
+}
+
+// OpenExample opens the example collection with a demo server of its own (made in this process, on a free port, gone
+// when the app quits) and a "demo" environment that points at it, so its flows run with nothing set up.
+func (s *ManagerService) OpenExample() error {
+	return s.settle(func(done func(error)) { s.vm.OpenExampleThen(done) })
+}
+
+// AllowSecretHost lets secrets be sent to a host the selected environment does not name: it goes on the person's own
+// list (secrets.allowed_hosts), which a collection cannot change. A refusal (not a host) comes back as the error.
+func (s *ManagerService) AllowSecretHost(host string) error {
+	return s.settle(func(done func(error)) { s.vm.AllowSecretHostThen(host, done) })
+}
 
 // OpenBundle opens a run bundle file as a collection whose runs play the recording back.
-func (s *ManagerService) OpenBundle(path string) { s.app.actor.Do(func() { s.vm.OpenBundle(path) }) }
+func (s *ManagerService) OpenBundle(path string) error {
+	return s.settle(func(done func(error)) { s.vm.OpenBundleThen(path, done) })
+}
+
+// RepoAdvice says what to do about the generated files of a collection kept in a git repository (empty when
+// nothing needs doing, or the collection is not in a repository).
+func (s *ManagerService) RepoAdvice(id string) []string {
+	var dir string
+	s.app.actor.Do(func() {
+		for _, c := range s.view().Collections {
+			if c.ID == id && !c.Missing {
+				dir = c.Path
+			}
+		}
+	})
+	if dir == "" {
+		return []string{}
+	}
+	out := vm.RepoAdvice(dir) // walks the disk: outside the actor
+	if out == nil {
+		out = []string{}
+	}
+	return out
+}
 
 // Unmount removes a collection from the workspace; its files stay.
 func (s *ManagerService) Unmount(id string) { s.app.actor.Do(func() { s.vm.Unmount(model.ID(id)) }) }
 
 // Relocate points a missing collection at its new directory.
-func (s *ManagerService) Relocate(id, dir string) {
-	s.app.actor.Do(func() { s.vm.Relocate(model.ID(id), dir) })
+func (s *ManagerService) Relocate(id, dir string) error {
+	return s.settle(func(done func(error)) { s.vm.RelocateThen(model.ID(id), dir, done) })
 }
 
 // NewCollection creates a collection: in location when given (the folder
 // is created or must be empty), else in Flowi's own folder.
-func (s *ManagerService) NewCollection(name, location string) {
-	s.app.actor.Do(func() { s.vm.NewCollection(name, location) })
+func (s *ManagerService) NewCollection(name, location string) error {
+	return s.settle(func(done func(error)) { s.vm.NewCollectionThen(name, location, done) })
 }
 
 // SaveDraft moves a draft collection into dir.
-func (s *ManagerService) SaveDraft(id, dir string) {
-	s.app.actor.Do(func() { s.vm.SaveDraft(model.ID(id), dir) })
+func (s *ManagerService) SaveDraft(id, dir string) error {
+	return s.settle(func(done func(error)) { s.vm.SaveDraftThen(model.ID(id), dir, done) })
 }
 
 // Discard deletes a draft collection and its files.

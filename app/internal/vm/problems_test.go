@@ -31,7 +31,7 @@ func TestProblemsVM_messages_and_targets(t *testing.T) {
 	w.Wait()
 
 	items := p.Items()
-	if len(items) != 3 || items[0].Severity != "error" || !strings.Contains(items[0].Message, "unknown request id X") || items[0].Where != "login.req.yaml:3:5" {
+	if len(items) != 3 || items[0].Severity != "error" || !strings.Contains(items[0].Message, "unknown request id X") || items[0].Where != "Shop › requests/auth/login.req.yaml:3:5" {
 		t.Fatalf("items %+v", items)
 	}
 	if items[0].Node != "r:C1:R1" || items[1].Node != "e:/c/environments/staging.yaml" || items[2].Node != "" {
@@ -112,5 +112,27 @@ func TestProblems_ClearRun_should_forget_what_sends_reported_and_keep_the_valida
 
 	if len(p.Items()) != validation {
 		t.Fatalf("items %d, want the %d validation problems", len(p.Items()), validation)
+	}
+}
+
+func TestProblems_Given_an_error_in_a_flow_file_Then_the_row_opens_the_flow(t *testing.T) {
+	// Before: nodeFor knew requests and environments only, so a validation error in a flow file was a dead row.
+	c := vmtest.SampleCollection()
+	c.Flows = []model.Flow{{Meta: model.Meta{ID: "F1", Name: "Checkout"}, Path: "checkout", File: "/c/flows/checkout.flow.yaml"}}
+	b := &vmtest.Backend{Cols: []model.Collection{c}, Diags: diag.List{
+		diag.New(diag.CodeYAMLSyntax, diag.Location{File: "/c/flows/checkout.flow.yaml", Pos: diag.Position{Line: 12, Column: 5}}, map[string]string{"detail": "bad"}),
+	}}
+	w := vmtest.SyncWorker()
+	ws := vm.NewWorkspace(b, w)
+	ws.Load()
+	w.Wait()
+	p := vm.NewProblems(b, w, ws)
+
+	p.Refresh()
+	w.Wait()
+
+	got := p.Items()[0]
+	if got.Node != "f:C1:F1" || got.Where != "Shop › flows/checkout.flow.yaml:12:5" {
+		t.Fatalf("node %q, where %q", got.Node, got.Where)
 	}
 }

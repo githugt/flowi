@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"regexp"
 	"slices"
+	"time"
 
 	"github.com/githugt/flowi/lib/analysis"
 	"github.com/githugt/flowi/lib/diag"
@@ -104,6 +105,7 @@ func (w *Workspace) CheckAccess(ctx context.Context, t FlowTarget, o AccessOptio
 		}
 		rep.Steps = append(rep.Steps, step)
 	}
+	w.saveAccess(t, rep, time.Now())
 	return rep, nil
 }
 

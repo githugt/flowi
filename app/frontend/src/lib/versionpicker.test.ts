@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { pickerItems, pickerLabel, toggleOverlay } from './versionpicker'
+import { pickerItems, pickerLabel, toggleOverlay, pickerButton } from './versionpicker'
 
 const input = { versions: ['1', '2'], names: ['', 'beta'], def: '1', selected: '2', overlays: ['vip', 'slow'], stack: ['vip'] }
 
@@ -38,5 +38,18 @@ describe('pickerLabel', () => {
   it('shows the version, and the overlays after it', () => {
     expect(pickerLabel('2', ['vip', 'slow'])).toBe('2 + vip + slow')
     expect(pickerLabel('2', [])).toBe('2')
+  })
+})
+
+describe('pickerButton', () => {
+  it('offers + version when there is one version and no overlay, and a click adds one', () => {
+    // Before: the button read "Ver. 1" even with one version, which looked like a choice and was not.
+    expect(pickerButton(1, '1', [], 0)).toEqual({ prefix: '', text: '+ version', direct: true })
+  })
+
+  it('names what is open, with Ver. only for several versions', () => {
+    expect(pickerButton(3, '2', [], 0)).toEqual({ prefix: 'Ver.', text: '2', direct: false })
+    expect(pickerButton(1, '1', ['vip'], 1)).toEqual({ prefix: '', text: '1 + vip', direct: false })
+    expect(pickerButton(1, '1', [], 2).direct).toBe(false)
   })
 })

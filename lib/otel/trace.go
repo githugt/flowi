@@ -3,10 +3,13 @@
 package otel
 
 import (
+	"net/url"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/githugt/flowi/lib/engine"
+	"github.com/githugt/flowi/lib/internal/credname"
 )
 
 // OTLP span status codes and kinds.
@@ -243,9 +246,13 @@ func statusText(s engine.Status) string {
 
 // requestAttrs and responseAttrs carry what a trace viewer needs and
 // nothing more: no bodies and no headers. The URL is the engine's masked
-// URL.
+// URL with credential-named query values and any user:password removed too,
+// because the masking only knows secrets from the vault, not a token typed
+// into the query.
+//
+// Before: a literal ?api_key=… in the URL left for the trace collector as it was.
 func requestAttrs(e engine.RequestSent) []attr {
-	return []attr{{"http.request.method", e.Method}, {"url.full", e.URL}, {"flowi.attempt", int64(e.Attempt)}, {"flowi.request.id", e.RequestID}}
+	return []attr{{"http.request.method", e.Method}, {"url.full", redactURL(e.URL)}, {"flowi.attempt", int64(e.Attempt)}, {"flowi.request.id", e.RequestID}}
 }
 
 func responseAttrs(e engine.ResponseReceived) []attr {
@@ -254,4 +261,34 @@ func responseAttrs(e engine.ResponseReceived) []attr {
 		a = append(a, attr{"error.message", e.Error})
 	}
 	return a
+}
+
+const redacted = "REDACTED"
+
+// redactURL hides what in a URL is a credential: the user:password part and the
+// value of every query parameter whose name is a credential name. A URL that
+// does not parse loses its whole query, since it cannot be told apart.
+func redactURL(raw string) string {
+	u, err := url.Parse(raw)
+	if err != nil {
+		before, _, _ := strings.Cut(raw, "?")
+		return before
+	}
+	if u.User != nil {
+		u.User = url.User(redacted)
+	}
+	if u.RawQuery != "" {
+		pairs := strings.Split(u.RawQuery, "&")
+		for i, pair := range pairs {
+			name, _, hasValue := strings.Cut(pair, "=")
+			if !hasValue {
+				continue
+			}
+			if decoded, err := url.QueryUnescape(name); err == nil && credname.Sensitive(decoded) {
+				pairs[i] = name + "=" + redacted
+			}
+		}
+		u.RawQuery = strings.Join(pairs, "&")
+	}
+	return u.String()
 }

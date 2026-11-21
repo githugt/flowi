@@ -4,6 +4,7 @@ package app
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -33,7 +34,9 @@ func TestRun_exit_codes(t *testing.T) {
 		{"server down", []string{"run", "user-creation", "--env", "staging"}, 4, []string{"FLW-HTTP-001"}},
 		{"bad report flag", []string{"run", "user-creation", "--report", "pdf=x.pdf"}, 2, []string{"--report"}},
 		{"unwritable report", []string{"run", "user-creation", "--env", "local", "--report", "junit=" + unwritable}, 4, []string{"out.xml"}},
-		{"missing argument", []string{"run"}, 2, []string{"a flow or --tag"}},
+		{"missing argument", []string{"run"}, 2, []string{"a flow, --tag <tag> or --all"}},
+		{"all with a flow name", []string{"run", "user-creation", "--all"}, 2, []string{"--all runs every flow"}},
+		{"fail-fast alone", []string{"run", "user-creation", "--fail-fast"}, 2, []string{"--fail-fast needs"}},
 		{"flow and tag together", []string{"run", "user-creation", "--tag", "nightly"}, 2, []string{"not both"}},
 		{"tag nothing carries", []string{"run", "--tag", "nope"}, 2, []string{"FLW-FLOW-004"}},
 	}
@@ -119,6 +122,56 @@ func TestRun_Given_a_tag_Then_every_flow_with_it_runs_and_the_worst_outcome_is_t
 		if _, err := os.Stat(filepath.Join(filepath.Dir(report), "out-"+flow+".xml")); err != nil {
 			t.Errorf("a report per flow was expected: %v", err)
 		}
+	}
+}
+
+// flowsRan reads the closing line of a run of several flows: "5 of 6 flows ran, 1 did not pass".
+func flowsRan(t *testing.T, errOut string) (ran, total, notPassed int) {
+	t.Helper()
+	for _, line := range strings.Split(errOut, "\n") {
+		if n, err := fmt.Sscanf(line, "%d of %d flows ran, %d did not pass", &ran, &total, &notPassed); err == nil && n == 3 {
+			return ran, total, notPassed
+		}
+	}
+	t.Fatalf("no closing line in:\n%s", errOut)
+	return 0, 0, 0
+}
+
+func TestRun_Given_all_Then_every_flow_runs_and_a_line_counts_them(t *testing.T) {
+	// Arrange
+	e := newSendEnv(t)
+	writeFile(t, filepath.Join(e.dir, "tools", "flows", "a-fails.arazzo.yaml"), arazzoFlow("id: 01JA00000000000000000000T6\nnodes:\n  - id: never\n    type: assert\n    check: \"1 == 2\"\n"))
+	writeFile(t, filepath.Join(e.dir, "tools", "flows", "b-quiet.arazzo.yaml"), arazzoFlow("id: 01JA00000000000000000000T7\nnodes:\n  - id: ok\n    type: assert\n    check: \"1 == 1\"\n"))
+
+	// Act
+	code, out, errOut := e.run(context.Background(), "run", "--all", "--env", "local")
+
+	// Assert
+	if code != 1 {
+		t.Fatalf("exit %d, want 1\n%s\n%s", code, out, errOut)
+	}
+	ran, total, notPassed := flowsRan(t, errOut)
+	if ran != total || total < 3 || notPassed != 1 {
+		t.Errorf("got %d of %d ran, %d not passed; want every flow run and one failure", ran, total, notPassed)
+	}
+}
+
+func TestRun_Given_fail_fast_Then_the_run_stops_after_the_first_flow_that_does_not_pass(t *testing.T) {
+	// Arrange
+	e := newSendEnv(t)
+	writeFile(t, filepath.Join(e.dir, "tools", "flows", "a-fails.arazzo.yaml"), arazzoFlow("id: 01JA00000000000000000000T6\nnodes:\n  - id: never\n    type: assert\n    check: \"1 == 2\"\n"))
+	writeFile(t, filepath.Join(e.dir, "tools", "flows", "b-quiet.arazzo.yaml"), arazzoFlow("id: 01JA00000000000000000000T7\nnodes:\n  - id: ok\n    type: assert\n    check: \"1 == 1\"\n"))
+
+	// Act
+	code, out, errOut := e.run(context.Background(), "run", "--all", "--fail-fast", "--env", "local")
+
+	// Assert
+	if code != 1 {
+		t.Fatalf("exit %d, want 1\n%s\n%s", code, out, errOut)
+	}
+	ran, total, notPassed := flowsRan(t, errOut)
+	if ran >= total || notPassed != 1 || strings.Contains(out, "✓ ok") {
+		t.Errorf("got %d of %d ran, %d not passed; the run should stop at the failing flow, before b-quiet:\n%s", ran, total, notPassed, out)
 	}
 }
 

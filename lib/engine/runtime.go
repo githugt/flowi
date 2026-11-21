@@ -51,7 +51,7 @@ func (rt *nodeRuntime) Request(ctx context.Context, c nodes.RequestCall) nodes.O
 		rt.r.addCaptured(masked)
 		rt.r.emit(RecordCaptured{RunID: rt.r.runID, Path: rt.path, Node: rt.node.ID, Depth: rt.f.depth, Record: masked})
 	}
-	return nodes.Outcome{Outputs: nodeOutputs(inner), Status: requestNodeStatus(inner), Diags: inner.diags, Outcomes: inner.outcomes}
+	return nodes.Outcome{Outputs: nodeOutputs(inner), Status: requestNodeStatus(inner), Diags: inner.diags, Outcomes: inner.outcomes, Checks: inner.checks}
 }
 
 // requestNodeStatus maps an execution's status to the node's (plan

@@ -62,6 +62,7 @@ func TestEnvVM_turning_a_secret_off_unsets_the_vault_value(t *testing.T) {
 
 	env.SetRows(rows)
 	env.Save(false)
+	env.Save(false) // the first Save asks to confirm that the stored value goes
 	w.Wait()
 
 	if !b.Called("DiscardSecret staging/password") || b.SavedEnvs[0].Vars[1].Value != "plain-now" {
@@ -77,6 +78,7 @@ func TestEnvVM_removing_a_secret_variable_discards_its_vault_value(t *testing.T)
 
 	env.SetRows(rows[:1])
 	env.Save(false)
+	env.Save(false) // the first Save asks to confirm that the stored value goes
 	w.Wait()
 
 	if !b.Called("DiscardSecret staging/password") || b.Called("UnsetSecret staging/password") {
@@ -154,6 +156,20 @@ func TestEnvVM_Given_a_colour_is_chosen_When_saved_Then_the_file_carries_it(t *t
 
 	if !dirty || env.Colour() != "red" || b.SavedEnvs[0].Colour != "red" {
 		t.Fatalf("dirty %v colour %q saved %+v", dirty, env.Colour(), b.SavedEnvs)
+	}
+}
+
+func TestEnvVM_Given_protection_is_turned_on_When_saved_Then_the_file_carries_it(t *testing.T) {
+	env, b, w := newEnvVM(t)
+
+	// Before: nothing marked an environment as one that needs a second look before a write is sent.
+	env.SetProtected(true)
+	dirty := env.Dirty()
+	env.Save(false)
+	w.Wait()
+
+	if !dirty || !env.Protected() || !b.SavedEnvs[0].Protected {
+		t.Fatalf("dirty %v protected %v saved %+v", dirty, env.Protected(), b.SavedEnvs)
 	}
 }
 
@@ -257,5 +273,69 @@ func TestEnvVM_Given_a_file_with_typed_variables_When_loaded_Then_rows_carry_the
 
 	if rows := env.Rows(); len(rows) != 1 || rows[0].Kind != model.VarNumber {
 		t.Fatalf("rows %+v", rows)
+	}
+}
+
+func TestEnvVM_Given_a_renamed_secret_When_saved_Then_the_stored_value_is_kept_until_the_user_confirms(t *testing.T) {
+	// Before: Save removed the vault value of the old name at once and stored nothing under the new name.
+	env, b, w := newEnvVM(t)
+	rows := env.Rows()
+	rows[1].Name = "passphrase"
+
+	env.SetRows(rows)
+	env.Save(false)
+	w.Wait()
+
+	if b.Called("DiscardSecret staging/password") || len(b.SavedEnvs) != 0 {
+		t.Fatalf("the first Save went on: calls %v", b.Calls)
+	}
+	if !strings.Contains(env.Err(), "password") || !env.Dirty() {
+		t.Fatalf("err %q dirty %v", env.Err(), env.Dirty())
+	}
+	env.Save(false)
+	w.Wait()
+	if !b.Called("DiscardSecret staging/password") {
+		t.Fatalf("the confirmed Save did not go on: %v", b.Calls)
+	}
+}
+
+func TestEnvVM_Given_a_confirmation_When_the_rows_change_Then_it_is_asked_again(t *testing.T) {
+	env, b, w := newEnvVM(t)
+	rows := env.Rows()
+	env.SetRows(rows[:1])
+	env.Save(false)
+
+	env.SetRows(rows[:1]) // an edit after the question
+	env.Save(false)
+	w.Wait()
+
+	if b.Called("DiscardSecret staging/password") {
+		t.Fatalf("a changed edit was confirmed by the old answer: %v", b.Calls)
+	}
+}
+
+func TestEnvVM_Given_bad_variable_names_When_saved_Then_nothing_is_written_and_the_row_is_named(t *testing.T) {
+	// Before: blank, invalid and repeated names were written as they were.
+	cases := []struct {
+		name string
+		rows func(base []vm.EnvVarRow) []vm.EnvVarRow
+		want string
+	}{
+		{"blank", func(b []vm.EnvVarRow) []vm.EnvVarRow { return append(b, vm.EnvVarRow{}) }, "row 3 has no name"},
+		{"invalid", func(b []vm.EnvVarRow) []vm.EnvVarRow { return append(b, vm.EnvVarRow{Name: "1st", Value: "x"}) }, `row 3: "1st" is not a variable name`},
+		{"repeated", func(b []vm.EnvVarRow) []vm.EnvVarRow { return append(b, vm.EnvVarRow{Name: "base_url", Value: "x"}) }, `row 3: "base_url" is already used by row 1`},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			env, b, w := newEnvVM(t)
+
+			env.SetRows(c.rows(env.Rows()))
+			env.Save(false)
+			w.Wait()
+
+			if len(b.SavedEnvs) != 0 || !strings.Contains(env.Err(), c.want) {
+				t.Fatalf("saved %d, err %q, want %q", len(b.SavedEnvs), env.Err(), c.want)
+			}
+		})
 	}
 }

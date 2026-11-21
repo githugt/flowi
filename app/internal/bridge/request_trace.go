@@ -27,6 +27,16 @@ type MessageView struct {
 	Key       string `json:"key,omitempty"`
 	Kind      string `json:"kind,omitempty"` // json, text or binary; empty for a message with no body
 	Type      string `json:"type,omitempty"` // the protocol's name for the message: an SSE event name, a WebSocket frame kind
+	// Where a broker put the message and what came with it: a Kafka partition and offset, a JetStream sequence,
+	// and the message headers. Zero and empty for a protocol with no word for them.
+	Partition int32  `json:"partition,omitempty"`
+	Offset    int64  `json:"offset,omitempty"`
+	Sequence  uint64 `json:"sequence,omitempty"`
+	Headers   []Pair `json:"headers,omitempty"`
+	// Size is the body's size in bytes, which for a binary body is not the length of Body (a note saying so), and Hex
+	// is a dump of a binary body's first bytes: the bytes are not text, so the Hex view has nothing else to show.
+	Size int64  `json:"size,omitempty"`
+	Hex  string `json:"hex,omitempty"`
 }
 
 // PipelineRowView is a line of the pipeline: the hooks and the request, in
@@ -60,10 +70,17 @@ func messagesOf(in []engine.RecordMessage) []MessageView {
 			body = jsonText(m.Body.JSON)
 		}
 		kind := messageKind(m.Body)
+		hex := ""
 		if kind == "binary" {
 			body = fmt.Sprintf("(binary, %d bytes)", m.Body.Size) // the bytes are not text; say what is there
+			hex = vm.BodyHex(m.Body)
 		}
-		out = append(out, MessageView{Direction: m.Direction, At: m.At.Local().Format(time.TimeOnly), Body: body, Key: m.Key, Kind: kind, Type: m.Type})
+		var headers []Pair
+		for _, h := range m.Headers {
+			headers = append(headers, Pair{Key: h.Name, Value: h.Value})
+		}
+		out = append(out, MessageView{Direction: m.Direction, At: m.At.Local().Format(time.TimeOnly), Body: body, Key: m.Key, Kind: kind, Type: m.Type,
+			Partition: m.Partition, Offset: m.Offset, Sequence: m.Sequence, Headers: headers, Size: m.Body.Size, Hex: hex})
 	}
 	return out
 }

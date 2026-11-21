@@ -60,6 +60,15 @@ type Outcome struct {
 	// Outcomes are the names of the outcomes a request ended with (success, failure, the ones its version
 	// names); empty for a step that is not a request, whose outcome follows its status.
 	Outcomes []string
+	// Checks are what each assert line of a request said (passed, failed or error), in order.
+	Checks []Check
+}
+
+// Check is what one assert line said about a response.
+type Check struct {
+	Line    string
+	Verdict string // passed, failed or error; "unknown" from a check tried without a send
+	Note    string // for a failed check what it saw; for an errored one why it could not be evaluated
 }
 
 // Runtime is what the engine does for nodes: everything that needs the

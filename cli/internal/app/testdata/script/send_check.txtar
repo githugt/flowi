@@ -1,0 +1,58 @@
+# send --check tests the connection and sends nothing.
+# Before: a wrong database path or broker address showed only after a full send or a timeout.
+exec flowi workspace mount ./shop
+
+# A database that is not there is a refusal of the service: exit 4, the verdict on stderr, nothing on stdout.
+! exec flowi send customers/list --check
+! stdout .
+stderr 'FAILED'
+stderr 'missing.db'
+! exists shop/missing.db
+
+# A broker nobody listens on is the same.
+! exec flowi send orders/placed --check
+! stdout .
+stderr 'FAILED'
+
+# An HTTP request has no connection test; that is told as a usage error (exit 2).
+server-url shop/environments/local.yaml
+! exec flowi send ping --check --env local
+stderr 'no connection test'
+! stdout .
+
+-- shop/flowi.yaml --
+format: 1
+id: 01JA00000000000000000000S1
+name: Shop
+-- shop/environments/local.yaml --
+id: 01JA00000000000000000000S2
+vars:
+  base_url: SERVER_URL
+-- shop/requests/customers/list.req.yaml --
+id: 01JA00000000000000000000S3
+name: List customers
+versions:
+  "1":
+    dataset:
+      driver: sqlite
+      server: missing.db
+      query: SELECT 1
+-- shop/requests/orders/placed.req.yaml --
+id: 01JA00000000000000000000S4
+name: Orders
+versions:
+  "1":
+    async:
+      protocol: mqtt
+      server: mqtt://127.0.0.1:1
+      channel: orders
+      send:
+        body:
+          json: "{}"
+-- shop/requests/ping.req.yaml --
+id: 01JA00000000000000000000S5
+name: Ping
+versions:
+  "1":
+    method: GET
+    url: "{{env.base_url}}/ping"

@@ -61,7 +61,7 @@ func PreviewSend(d Deps, in SendInput, includeSecrets bool) Preview {
 	}
 	in2 := buildInput{
 		version: x.version, scope: x.scope(false), empty: x.cfg.empty, label: x.c.request.Path,
-		root: x.c.collection.Root, secretVars: x.env.secrets, missingSecret: x.r.secrets.isMissing(x.env.name),
+		root: x.c.collection.Root, secretVars: x.env.secrets, envValues: x.env.values, missingSecret: x.r.secrets.isMissing(x.env.name),
 		memo: x.memo, secret: x.r.secrets.derived, verbatim: true, defaults: x.r.defaultHeaders(x.cfg),
 	}
 	return x.exchange().preview(in2, includeSecrets)

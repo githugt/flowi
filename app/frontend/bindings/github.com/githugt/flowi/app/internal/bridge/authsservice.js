@@ -18,7 +18,7 @@ import * as $models from "./models.js";
 
 /**
  * Create adds an authentication called name to collection, with the scheme
- * ("scheme:<type>") and no parameters yet.
+ * ("scheme:<type>") and no parameters yet. A refusal comes back as the error.
  * @param {string} collection
  * @param {string} name
  * @param {string} scheme
@@ -35,6 +35,15 @@ export function Create(collection, name, scheme) {
  */
 export function Delete(key) {
     return $Call.ByID(1474908855, key);
+}
+
+/**
+ * ForgetToken drops a token, so the next send that needs it signs in again. A refusal comes back as the error.
+ * @param {string} id
+ * @returns {$CancellablePromise<void>}
+ */
+export function ForgetToken(id) {
+    return $Call.ByID(4095350794, id);
 }
 
 /**
@@ -61,7 +70,7 @@ export function Rename(key, name) {
 
 /**
  * Save writes the description, scheme and parameter values of an
- * authentication; an empty value leaves the parameter out.
+ * authentication; an empty value leaves the parameter out. A refusal comes back as the error.
  * @param {string} key
  * @param {string} description
  * @param {string} scheme
@@ -83,5 +92,18 @@ export function State() {
     }));
 }
 
+/**
+ * Tokens lists the OAuth tokens the app holds: the sign-ins a person approved (kept in the vault) and the ones got
+ * since it opened. It reads the vault, so it runs off the actor and may wait for the passphrase.
+ * @returns {$CancellablePromise<$models.TokenView[]>}
+ */
+export function Tokens() {
+    return $Call.ByID(2703090046).then(/** @type {($result: any) => any} */(($result) => {
+        return $$createType2($result);
+    }));
+}
+
 // Private type creation functions
 const $$createType0 = $models.AuthsView.createFrom;
+const $$createType1 = $models.TokenView.createFrom;
+const $$createType2 = $Create.Array($$createType1);

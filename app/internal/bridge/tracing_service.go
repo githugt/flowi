@@ -74,6 +74,14 @@ func (s *TracingService) Save(endpoint string, headers []string, propagate bool)
 	s.app.actor.Do(func() { s.vm.Save(endpoint, headers, propagate) })
 }
 
+// TraceURL is the address of a run's trace in the person's tracing tool (the otel.trace_url setting), or "" when
+// none is set. The run id is a saved run's id from the Runs tab.
+func (s *TracingService) TraceURL(runID string) string {
+	var u string
+	s.app.actor.Do(func() { u = s.vm.TraceURL(runID) })
+	return u
+}
+
 // ClearHeaders removes the stored collector headers.
 func (s *TracingService) ClearHeaders() { s.app.actor.Do(s.vm.ClearHeaders) }
 

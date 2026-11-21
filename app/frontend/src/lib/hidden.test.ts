@@ -36,3 +36,24 @@ describe('revealHidden', () => {
     expect(revealHidden('a​b')).toBe('a⟨U+200B⟩b')
   })
 })
+
+describe('joiners that belong in the text', () => {
+  // Before: every zero-width joiner and non-joiner was flagged, and "Remove them" changed the word.
+  const persian = 'می\u200cخواهم' // "I want", with the non-joiner Persian spells it with
+  const family = '👨\u200d👩\u200d👧' // an emoji sequence
+
+  it('leaves a Persian non-joiner and an emoji joiner alone', () => {
+    expect(findHidden(persian)).toEqual([])
+    expect(findHidden(family)).toEqual([])
+    expect(stripHidden(persian)).toBe(persian)
+    expect(revealHidden(family)).toBe(family)
+  })
+  it('still flags a joiner between Latin letters or at an end', () => {
+    expect(findHidden('a\u200db').map((h) => h.code)).toEqual(['U+200D'])
+    expect(findHidden('\u200cabc').map((h) => h.code)).toEqual(['U+200C'])
+    expect(stripHidden('a\u200db')).toBe('ab')
+  })
+  it('still flags a zero-width space inside Persian text', () => {
+    expect(findHidden('می\u200bخواهم').map((h) => h.code)).toEqual(['U+200B'])
+  })
+})

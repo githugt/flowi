@@ -162,3 +162,69 @@ func TestSendRequest_Given_a_dataset_request_Then_no_row_value_is_written_to_the
 		t.Fatalf("a row value is in %v", leaks)
 	}
 }
+
+func TestTestConnection_Given_a_sqlite_request_Then_it_connects_without_running_the_saved_statement(t *testing.T) {
+	// Before: a wrong database path showed only after the whole request ran.
+	w := demoWorkspace(t)
+	c := w.Collections()[0]
+	db, err := sql.Open("sqlite", filepath.Join(c.Root, "shop.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.ExecContext(t.Context(), "CREATE TABLE customers (id INTEGER)"); err != nil {
+		t.Fatal(err)
+	}
+	_ = db.Close()
+	target, err := w.NewDatasetRequest(c.Manifest.ID, "customers/wipe", model.DriverSQLite)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, r, _ := w.requestFor(target)
+	v := r.Versions[0]
+	v.Dataset.Server, v.Dataset.Query, v.Dataset.Params, v.Dataset.Writes = "shop.db", "DROP TABLE customers", nil, true
+
+	got, err := w.TestConnection(t.Context(), target, v, SendOptions{Env: "local"})
+	rows := sqliteRowCount(t, filepath.Join(c.Root, "shop.db"))
+
+	if err != nil || got.Status != engine.ProbeOK || got.Target != "shop.db" {
+		t.Fatalf("probe %+v err %v", got, err)
+	}
+	if rows != 0 {
+		t.Fatalf("the table is gone or changed: %d", rows)
+	}
+}
+
+func sqliteRowCount(t *testing.T, file string) int {
+	t.Helper()
+	db, err := sql.Open("sqlite", file)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	var n int
+	if err := db.QueryRowContext(t.Context(), "SELECT count(*) FROM customers").Scan(&n); err != nil {
+		t.Fatal(err)
+	}
+	return n
+}
+
+func TestTestConnection_Given_a_missing_sqlite_file_Then_it_fails_and_does_not_create_it(t *testing.T) {
+	w := demoWorkspace(t)
+	c := w.Collections()[0]
+	target, err := w.NewDatasetRequest(c.Manifest.ID, "customers/list", model.DriverSQLite)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, r, _ := w.requestFor(target)
+	v := r.Versions[0]
+	v.Dataset.Server = "nope.db"
+
+	got, err := w.TestConnection(t.Context(), target, v, SendOptions{Env: "local"})
+
+	if err != nil || got.Status != engine.ProbeFailed {
+		t.Fatalf("probe %+v err %v", got, err)
+	}
+	if _, statErr := os.Stat(filepath.Join(c.Root, "nope.db")); statErr == nil {
+		t.Fatal("the test created the database file")
+	}
+}

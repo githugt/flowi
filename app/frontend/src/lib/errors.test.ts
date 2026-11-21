@@ -35,3 +35,18 @@ describe('reportUnhandled', () => {
     expect(shown).toEqual(want)
   })
 })
+
+describe('frontendReport', () => {
+  it('carries the message and the stack of an error, and skips a cancellation', async () => {
+    // Before: a caught failure showed a toast and left nothing in the log.
+    const { frontendReport, mayReport, REPORT_LIMIT } = await import('./errors')
+    const e = new Error('boom')
+    expect(frontendReport('error', e)).toEqual({ kind: 'error', message: 'boom', stack: e.stack ?? '' })
+    const cancelled = new Error('x')
+    cancelled.name = 'CancelError'
+    expect(frontendReport('rejection', cancelled)).toBeNull()
+    expect(frontendReport('rejection', 'plain text')?.stack).toBe('')
+    expect(mayReport(REPORT_LIMIT - 1)).toBe(true)
+    expect(mayReport(REPORT_LIMIT)).toBe(false)
+  })
+})

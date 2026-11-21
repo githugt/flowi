@@ -1,4 +1,9 @@
 <script lang="ts">
+  import Checkbox from './Checkbox.svelte'
+  import IconButton from './IconButton.svelte'
+  import Button from './Button.svelte'
+  import { radiogroup } from './lib/radiogroup'
+  import { debounced } from './lib/debounce'
   // The named ways a request can end, in order. success and failure are built in (the request and its hooks
   // passed, or failed); any other row is a name and a rule over the response. A send has every outcome whose
   // rule holds, and the arrows on the canvas follow the outcomes they name. Rows can be reordered, switched off
@@ -58,11 +63,23 @@
   })
   let box = $state<HTMLDivElement>()
   function leave(e: FocusEvent) {
-    if (!box?.contains(e.relatedTarget as Node | null)) within = false
+    if (!box?.contains(e.relatedTarget as Node | null)) {
+      commitSoon.flush() // what was typed is written before the list is read back
+      within = false
+    }
   }
 
   const clean = (r: Row): Row => ({ ...r, Color: r.Color || '', Description: r.Description || '' })
-  const commit = () => onchange(local.map(clean))
+  const send = () => onchange(local.map(clean))
+  // Typing in a name, a rule or a description writes once the person pauses: each write is an edit of the flow or the
+  // request, and half a rule is not worth one. Everything else (a switch, a move, a removal) writes at once and takes
+  // the pending text with it. Before: every keystroke was an edit, and an undo went back one letter.
+  const commitSoon = debounced(send, 400)
+  const commit = () => {
+    commitSoon.cancel()
+    send()
+  }
+  $effect(() => () => commitSoon.flush()) // leaving the screen with an edit waiting writes it
   // The row whose description and colour are showing as fields; the others show them as text.
   let opened = $state<number | null>(null)
   function reorder(from: number, to: number) {
@@ -132,11 +149,11 @@
 
 <div bind:this={box} class="outcomes" onfocusin={() => (within = true)} onfocusout={leave} role="group" aria-label="Outcomes">
   <p class="muted">
-    Ways this request can end. A send has <strong>every</strong> outcome whose rule holds, so a 404 can be both <code>failure</code> and <code>not-found</code>. The arrows on the flow canvas follow the outcomes they name; the order here is the order of the ports on the card.
+    Name the ways this request can end, such as <code>expired-token</code> or <code>not-found</code>. A send has <strong>every</strong> outcome whose rule holds, so a 404 can be both <code>failure</code> and <code>not-found</code>. In a flow, each outcome is an exit on the step's card that you can connect to the next step. The order here is the order of the exits.
     {#if !written}Success and failure are the defaults; change anything and the list is written down.{/if}
   </p>
   <div class="actions top">
-    <button onclick={add}><Icon name="plus" size={13} /> Add outcome</button>
+    <Button onclick={add}><Icon name="plus" size={13} /> Add outcome</Button>
     <ExprHelp context={helpContext} />
     <span class="hint">New outcomes go first, above the defaults.</span>
   </div>
@@ -148,32 +165,30 @@
         <button class="grip" aria-label={`Move ${r.Name || 'outcome'}`} title="Drag to reorder (or use the up and down arrows)" onpointerdown={(e) => grab(e, i)} onpointermove={drag} onpointerup={drop} onpointercancel={drop} onkeydown={(e) => gripKeys(e, i)}>
           <svg width="10" height="16" viewBox="0 0 10 16" aria-hidden="true">{#each [3, 8, 13] as y}<circle cx="2.5" cy={y} r="1.3" /><circle cx="7.5" cy={y} r="1.3" />{/each}</svg>
         </button>
-        <label class="on" title={r.Disabled ? 'Switched off: it never matches' : 'Switched on'}>
-          <input type="checkbox" checked={!r.Disabled} onchange={(e) => { r.Disabled = !e.currentTarget.checked; commit() }} />
-        </label>
+        <span class="on"><Checkbox checked={!r.Disabled} label={`Match ${r.Name || 'outcome'}`} title={r.Disabled ? 'Switched off: it never matches' : 'Switched on'} onchange={(v) => { r.Disabled = !v; commit() }} /></span>
         {#if builtin}
           <span class="name built" style:color={tone(r)}>{r.Name}</span>
         {:else}
-          <input class="name" style:width={`${Math.max(r.Name.length, 4) + 3}ch`} class:bad={!!problem} placeholder="name" bind:value={r.Name} oninput={() => !nameProblem(r, i) && commit()} spellcheck="false" aria-label="Outcome name" title={problem} />
+          <input class="name" style:width={`${Math.max(r.Name.length, 4) + 3}ch`} class:bad={!!problem} placeholder="name" bind:value={r.Name} oninput={() => !nameProblem(r, i) && commitSoon()} spellcheck="false" aria-label="Outcome name" title={problem} />
         {/if}
         <span class="grow"></span>
-        <button class="x" aria-label={`Remove ${r.Name || 'outcome'}`} title={local.length === 1 ? 'A request has at least one outcome' : 'Remove'} disabled={local.length === 1} onclick={() => remove(i)}>×</button>
+        <IconButton icon="close" size={12} danger label={`Remove ${r.Name || 'outcome'}`} hint={local.length === 1 ? 'A request has at least one outcome' : 'Remove'} disabled={local.length === 1} onclick={() => remove(i)} />
       </div>
       {#if builtin}
         <p class="said">{said[r.Name]}</p>
       {:else}
-        <input class="rule" placeholder={example} bind:value={r.When} oninput={() => commit()} spellcheck="false" aria-label={`Rule of ${r.Name || 'the outcome'}`} title={r.When} />
+        <input class="rule" placeholder={example} bind:value={r.When} oninput={() => commitSoon()} spellcheck="false" aria-label={`Rule of ${r.Name || 'the outcome'}`} title={r.When} />
       {/if}
       {#if opened === i}
-        <input class="desc" placeholder="What this outcome means (optional)" bind:value={r.Description} oninput={() => commit()} aria-label={`Description of ${r.Name || 'the outcome'}`} />
-        <div class="swatches" role="radiogroup" aria-label={`Colour of ${r.Name || 'the outcome'}`}>
+        <input class="desc" placeholder="What this outcome means (optional)" bind:value={r.Description} oninput={() => commitSoon()} aria-label={`Description of ${r.Name || 'the outcome'}`} />
+        <div class="swatches" role="radiogroup" use:radiogroup aria-label={`Colour of ${r.Name || 'the outcome'}`}>
           {#each COLOUR_NAMES as c (c)}
             <button class="swatch" class:chosen={colourOf(r) === c} style:background={`var(--c-${c})`} role="radio" aria-checked={colourOf(r) === c} aria-label={c} title={c} onclick={() => { r.Color = c; commit() }}></button>
           {/each}
         </div>
       {/if}
       <button class="more" aria-expanded={opened === i} onclick={() => (opened = opened === i ? null : i)}>
-        <span class="chev" aria-hidden="true">{opened === i ? '▾' : '▸'}</span>
+        <span class="chev" aria-hidden="true"><Icon name={opened === i ? 'chevd' : 'chevr'} size={12} /></span>
         {#if opened === i}Hide description and colour{:else if r.Description}<span class="said">{r.Description}</span>{:else}Description and colour{/if}
       </button>
       {#if problem}<p class="problem">{problem}</p>{/if}
@@ -192,40 +207,37 @@
   .muted { color: var(--muted); font-size: var(--fs-md); margin: 0 0 4px; line-height: 1.45; }
   .small { font-size: var(--fs-sm); margin-top: 6px; }
   .hint { color: var(--muted); font-size: var(--fs-sm); }
-  .card { border: 1px solid var(--line); border-left: 4px solid var(--tone); border-radius: 8px; background: var(--panel); padding: 6px 8px 8px; display: flex; flex-direction: column; gap: 6px; }
+  .card { border: 1px solid var(--line); border-left: 4px solid var(--tone); border-radius: var(--r-lg); background: var(--panel); padding: 6px 8px 8px; display: flex; flex-direction: column; gap: 6px; }
   .head { display: flex; align-items: center; gap: 8px; }
   .grow { flex: 1; }
   .card.off .name, .card.off .rule, .card.off .desc, .card.off .said { opacity: 0.45; }
-  .grip { all: unset; box-sizing: border-box; display: grid; place-items: center; padding: 4px 3px; border-radius: 4px; color: var(--muted); fill: currentColor; cursor: grab; touch-action: none; }
+  .grip { all: unset; box-sizing: border-box; display: grid; place-items: center; padding: 4px 3px; border-radius: var(--r-sm); color: var(--muted); fill: currentColor; cursor: grab; touch-action: none; }
   .grip:hover { color: var(--text); background: var(--tint-hover); }
   .grip:focus-visible { outline: 2px solid var(--accent); }
-  .card.lifted { box-shadow: 0 6px 18px rgb(0 0 0 / 0.35); }
+  .card.lifted { box-shadow: var(--shadow-lift); }
   .card.lifted .grip { cursor: grabbing; }
-  .more { all: unset; box-sizing: border-box; display: flex; align-items: center; gap: 6px; min-width: 0; cursor: pointer; color: var(--muted); font-size: var(--fs-sm); border-radius: 4px; padding: 1px 2px; }
+  .more { all: unset; box-sizing: border-box; display: flex; align-items: center; gap: 6px; min-width: 0; cursor: pointer; color: var(--muted); font-size: var(--fs-sm); border-radius: var(--r-sm); padding: 1px 2px; }
   .more:hover { color: var(--text); }
   .more:focus-visible { outline: 2px solid var(--accent); }
   .more .said { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .chev { flex: none; width: 10px; font-size: 9px; }
+  .chev { display: inline-flex; flex: none; width: 12px; }
   .on { display: flex; align-items: center; }
-  input.name, input.rule, input.desc { min-width: 0; width: 100%; box-sizing: border-box; background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: 6px; padding: 5px 8px; font-size: var(--fs-md); }
+  input.name, input.rule, input.desc { min-width: 0; width: 100%; box-sizing: border-box; background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); padding: 5px 8px; font-size: var(--fs-md); }
   /* The name is a pill in the outcome's colour, the same as the built-in ones, and grows with what is typed. */
-  input.name { width: auto; max-width: 260px; font-weight: 600; color: var(--tone); background: color-mix(in srgb, var(--tone) 16%, transparent); border-color: transparent; border-radius: 6px; padding: 3px 8px; }
+  input.name { width: auto; max-width: 260px; font-weight: 600; color: var(--tone); background: color-mix(in srgb, var(--tone) 16%, transparent); border-color: transparent; border-radius: var(--r-md); padding: 3px 8px; }
   input.name::placeholder { color: var(--muted); font-weight: 400; }
   input.name, input.rule { font-family: var(--mono, ui-monospace, monospace); }
   input.desc { font-size: var(--fs-sm); }
   input.bad { border-color: var(--fail) !important; }
-  .built { font-weight: 600; padding: 3px 8px; border-radius: 6px; background: color-mix(in srgb, var(--tone) 16%, transparent); }
+  .built { font-weight: 600; padding: 3px 8px; border-radius: var(--r-md); background: color-mix(in srgb, var(--tone) 16%, transparent); }
   .said { color: var(--muted); font-size: var(--fs-sm); margin: 0; }
   .swatches { display: flex; gap: 7px; flex-wrap: wrap; align-items: center; }
   .swatch { all: unset; box-sizing: border-box; width: 18px; height: 18px; border-radius: 50%; cursor: pointer; border: 2px solid transparent; }
   .swatch:hover { transform: scale(1.12); }
   .swatch.chosen { border-color: var(--text); }
-  .x { all: unset; cursor: pointer; padding: 0 6px; color: var(--muted); font-size: var(--fs-lg); }
-  .x:hover:not(:disabled) { color: var(--fail); }
-  .x:disabled { opacity: 0.3; cursor: default; }
   .problem { margin: 0; color: var(--fail); font-size: var(--fs-sm); }
   .actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 2px; }
-  .actions button { display: inline-flex; gap: 5px; align-items: center; background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: 8px; padding: 5px 10px; cursor: pointer; font-size: var(--fs-md); }
+  .actions button { display: inline-flex; gap: 5px; align-items: center; background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); padding: 5px 10px; cursor: pointer; font-size: var(--fs-md); }
   .actions button:hover { background: var(--tint-hover); }
   .actions .quiet { color: var(--muted); border-style: dashed; }
 </style>

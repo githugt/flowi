@@ -238,3 +238,17 @@ func TestRun_should_name_the_frame_kind_of_what_it_receives_and_sends(t *testing
 		t.Fatalf("sent type %q", res.Sent.Type)
 	}
 }
+
+func TestProbe_should_make_the_handshake_and_say_when_it_is_refused(t *testing.T) {
+	// Before: a server that refused the handshake showed only after a full send.
+	open := serve(t, func(ctx context.Context, c *websocket.Conn, _ *http.Request) { waitClosed(ctx, c) })
+	refusing := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { http.Error(w, "no", http.StatusUnauthorized) }))
+	t.Cleanup(refusing.Close)
+
+	good := transport.Probe(t.Context(), ws.New(), transport.Operation{Server: open, Send: &transport.Message{Body: []byte("x")}})
+	bad := transport.Probe(t.Context(), ws.New(), transport.Operation{Server: "ws" + strings.TrimPrefix(refusing.URL, "http")})
+
+	if good != nil || bad == nil || !strings.Contains(bad.Error(), "401") {
+		t.Fatalf("good %v, bad %v", good, bad)
+	}
+}

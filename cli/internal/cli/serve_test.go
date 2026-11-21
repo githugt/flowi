@@ -41,3 +41,37 @@ func TestServeFlags_Given_forward_flags_Then_they_reach_the_serve_options(t *tes
 		t.Fatalf("options %+v", got)
 	}
 }
+
+func TestServeFlags_Given_health_flags_Then_they_reach_the_serve_options(t *testing.T) {
+	// Before: the only health route was on the trigger endpoint and could not be asked for on its own.
+	cmd := newServeCommand(nil)
+	if err := cmd.ParseFlags([]string{"--health-addr", "0.0.0.0:8527", "--metrics"}); err != nil {
+		t.Fatal(err)
+	}
+	f := serveFlags{healthAddr: "0.0.0.0:8527", metrics: true}
+
+	got := f.options(cmd, flowi.ServeOptions{})
+	off := serveFlags{}.options(newServeCommand(nil), flowi.ServeOptions{})
+
+	if got.HealthAddr != "0.0.0.0:8527" || !got.Metrics {
+		t.Fatalf("options %+v", got)
+	}
+	if off.HealthAddr != "" || off.Metrics {
+		t.Fatalf("health is off by default: %+v", off)
+	}
+}
+
+func TestServeFlags_Given_tls_flags_Then_they_reach_the_serve_options(t *testing.T) {
+	// Before: the trigger endpoint could not serve HTTPS, and a wide bind only produced a note.
+	cmd := newServeCommand(nil)
+	if err := cmd.ParseFlags([]string{"--tls-cert", "c.pem", "--tls-key", "k.pem", "--insecure-listen"}); err != nil {
+		t.Fatal(err)
+	}
+	f := serveFlags{tlsCert: "c.pem", tlsKey: "k.pem", insecureListen: true}
+
+	got := f.options(cmd, flowi.ServeOptions{})
+
+	if got.TLSCert != "c.pem" || got.TLSKey != "k.pem" || !got.InsecureListen {
+		t.Fatalf("options %+v", got)
+	}
+}

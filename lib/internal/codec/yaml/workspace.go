@@ -66,6 +66,7 @@ func (m *mapping) schedules() []model.Schedule {
 		out = append(out, model.Schedule{
 			Name: sm.str("name"), Flow: sm.str("flow"), Collection: sm.str("collection"), Cron: sm.str("cron"),
 			Env: sm.str("env"), Inputs: sm.keyValues("inputs"), TZ: sm.str("tz"), Disabled: sm.boolean("disabled"),
+			OnFailure: sm.str("on_failure"), OnSuccess: sm.str("on_success"),
 		})
 		sm.closeStrict()
 	}
@@ -84,6 +85,8 @@ func encodeSchedules(list []model.Schedule) []any {
 		so.put("inputs", keyValues(s.Inputs))
 		so.put("tz", s.TZ)
 		so.put("disabled", s.Disabled)
+		so.put("on_failure", s.OnFailure)
+		so.put("on_success", s.OnSuccess)
 		out = append(out, so.items)
 	}
 	return out

@@ -43,3 +43,13 @@ export function describeProblems(raw: string): Problem[] {
 export function codeParts(text: string): { text: string; code: boolean }[] {
   return text.split('`').map((t, i) => ({ text: t, code: i % 2 === 1 })).filter((p) => p.text !== '')
 }
+
+/**
+ * The hosts a "would send a secret to" problem (FLW-SEC-005) names, so each can be allowed with one click.
+ * Before: the message said to run a command; a person in the app had to leave it to let the secret go to their own API.
+ */
+export function secretHostsOf(p: Problem): string[] {
+  if (p.code !== 'FLW-SEC-005') return []
+  const m = /would send a secret to "([^"]+)"/.exec(p.text)
+  return m ? m[1].split(',').map((h) => h.trim()).filter(Boolean) : []
+}

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { guessLang, highlight } from './highlight'
+import { guessLang, highlight, HIGHLIGHT_LIMIT } from './highlight'
 
 const classOf = (text: string, lang: Parameters<typeof highlight>[1], part: string) =>
   highlight(text, lang).find((s) => s.text.includes(part))?.cls ?? ''
@@ -160,5 +160,36 @@ LIMIT 5`
     const got = highlight(sql, 'sql').map((s) => s.text).join('')
 
     expect(got).toBe(sql)
+  })
+})
+
+describe('highlight of a large text', () => {
+  it('joins into the text it was given and merges neighbours of one class', () => {
+    const text = JSON.stringify({ a: 'x'.repeat(50_000), b: [1, 2, 3], c: '{{token}}' })
+
+    const segments = highlight(text, 'json')
+
+    expect(segments.map((s) => s.text).join('')).toBe(text)
+    expect(segments.some((s) => s.cls === 'tok-template' && s.text === '{{token}}')).toBe(true)
+    for (let i = 1; i < segments.length; i++) expect(segments[i].cls === segments[i - 1].cls).toBe(false)
+  })
+
+  it('colours a body of 150 000 characters in well under a second', () => {
+    // Before: one string cell and one concatenation per character.
+    const text = JSON.stringify(Array.from({ length: 6000 }, (_, i) => ({ id: i, name: 'item ' + i, ok: true })))
+    const t0 = performance.now()
+
+    const segments = highlight(text, 'json')
+
+    expect(text.length).toBeGreaterThan(100_000)
+    expect(segments.map((s) => s.text).join('')).toBe(text)
+    expect(performance.now() - t0).toBeLessThan(1500)
+  })
+
+  it('shows a text above the limit plain, whole, in one piece', () => {
+    const text = '{"a":1}'.repeat(HIGHLIGHT_LIMIT / 7 + 10)
+
+    expect(highlight(text, 'json')).toEqual([{ text, cls: '' }])
+    expect(highlight('', 'json')).toEqual([])
   })
 })

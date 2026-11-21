@@ -8,6 +8,8 @@ package bridge
 
 import (
 	"context"
+	"log/slog"
+	"runtime/debug"
 	"sync"
 )
 
@@ -22,6 +24,10 @@ type Actor struct {
 	queue  []func()
 	wake   chan struct{}
 	stop   <-chan struct{}
+
+	// OnPanic, when set, is called (on the actor) with the value of a panic that a queued function raised. Set it
+	// before the first Post.
+	OnPanic func(recovered any)
 }
 
 // NewActor starts an actor that runs until ctx is done.
@@ -43,9 +49,23 @@ func (a *Actor) loop() {
 		case <-a.wake:
 		}
 		for f := a.next(); f != nil; f = a.next() {
-			f()
+			a.run(f)
 		}
 	}
+}
+
+// run calls f and keeps the actor alive when f panics. Before: no panic was recovered, so one bad view-model call
+// ended the process and the person lost every unsaved edit. The panic is logged with its stack and handed to OnPanic.
+func (a *Actor) run(f func()) {
+	defer func() {
+		if r := recover(); r != nil {
+			slog.Error("a function on the UI actor panicked", "panic", r, "stack", string(debug.Stack()))
+			if a.OnPanic != nil {
+				a.OnPanic(r)
+			}
+		}
+	}()
+	f()
 }
 
 func (a *Actor) next() func() {

@@ -22,6 +22,9 @@ type KeyValue struct {
 	// Description says what the entry is for; only requests keep it (query,
 	// headers, variables).
 	Description string
+	// Disabled keeps the row in the file but out of what is sent: a query parameter or header switched off to try
+	// a request without it. Only query parameters and headers of a request carry it.
+	Disabled bool
 }
 
 // Field is an ordered key with an arbitrary YAML value: string, bool,

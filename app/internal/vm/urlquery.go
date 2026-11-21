@@ -3,6 +3,7 @@
 package vm
 
 import (
+	"slices"
 	"strings"
 
 	"github.com/githugt/flowi/lib/model"
@@ -10,11 +11,12 @@ import (
 
 // URLWithQuery is what the URL bar shows: the request's URL followed by its
 // query parameters. Parameters without a name are not shown (a new empty
-// row in the Params panel does not touch the URL).
+// row in the Params panel does not touch the URL), nor are switched-off ones:
+// the bar shows what is sent.
 func URLWithQuery(base string, query []model.KeyValue) string {
 	var pairs []string
 	for _, q := range query {
-		if q.Key != "" {
+		if q.Key != "" && !q.Disabled {
 			pairs = append(pairs, q.Key+"="+q.Value)
 		}
 	}
@@ -31,11 +33,13 @@ func URLWithQuery(base string, query []model.KeyValue) string {
 // SplitURL is the inverse of URLWithQuery for text typed in the URL bar: the
 // part before the first ? (outside {{ }}) is the URL, the rest becomes the
 // query parameters. A parameter that was in old keeps its description. A
-// fragment stays with the last parameter's value.
+// fragment stays with the last parameter's value. Switched-off parameters are
+// not in the bar, so they are kept after the typed ones (unless the text names
+// the same parameter again).
 func SplitURL(text string, old []model.KeyValue) (string, []model.KeyValue) {
 	at := indexOutsideTemplate(text, '?')
 	if at < 0 {
-		return text, nil
+		return text, switchedOff(old, nil)
 	}
 	var query []model.KeyValue
 	for _, pair := range splitOutsideTemplate(text[at+1:], '&') {
@@ -48,7 +52,18 @@ func SplitURL(text string, old []model.KeyValue) (string, []model.KeyValue) {
 		}
 		query = append(query, model.KeyValue{Key: key, Value: value, Description: describedAs(old, key)})
 	}
-	return text[:at], query
+	return text[:at], append(query, switchedOff(old, query)...)
+}
+
+// switchedOff is the switched-off rows of old that typed does not name again.
+func switchedOff(old, typed []model.KeyValue) []model.KeyValue {
+	var out []model.KeyValue
+	for _, kv := range old {
+		if kv.Disabled && !slices.ContainsFunc(typed, func(t model.KeyValue) bool { return t.Key == kv.Key }) {
+			out = append(out, kv)
+		}
+	}
+	return out
 }
 
 func describedAs(list []model.KeyValue, key string) string {

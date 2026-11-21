@@ -1,4 +1,7 @@
 <script lang="ts">
+  import Button from './Button.svelte'
+  import Icon from './Icon.svelte'
+  import { isEnter } from './lib/enterkey'
   // The open flow's breakpoints, and while a debug session is paused, a bar to continue, step or stop it and to change
   // a variable the next part starts with. Breakpoints belong to the open flow, not to the file.
   import { FlowService } from '../bindings/github.com/githugt/flowi/app/internal/bridge'
@@ -26,9 +29,9 @@
   <div class="bar" role="region" aria-label="Debugger">
     <div class="line">
       <strong>Paused before {debug.paused}</strong>
-      <button class="primary" onclick={() => FlowService.Continue(node)} title="Run to the next breakpoint, or to the end">Continue</button>
-      <button onclick={() => FlowService.Step(node)} title="Run this step, then pause before the next">Step</button>
-      <button onclick={() => FlowService.StopDebugging(node)}>Stop</button>
+      <Button small variant="go" onclick={() => FlowService.Continue(node)} title="Run to the next breakpoint, or to the end">Continue</Button>
+      <Button small onclick={() => FlowService.Step(node)} title="Run this step, then pause before the next">Step</Button>
+      <Button small onclick={() => FlowService.StopDebugging(node)}>Stop</Button>
       <span class="hint">Change a variable, then continue: the next steps start with it.</span>
     </div>
     <div class="vars">
@@ -39,15 +42,15 @@
             value={editing[v.name] ?? v.value}
             spellcheck="false"
             oninput={(e) => (editing[v.name] = e.currentTarget.value)}
-            onkeydown={(e) => e.key === 'Enter' && setVar(v.name, editing[v.name] ?? v.value)}
+            onkeydown={(e) => isEnter(e) && setVar(v.name, editing[v.name] ?? v.value)}
             onblur={() => editing[v.name] !== undefined && editing[v.name] !== v.value && setVar(v.name, editing[v.name])}
           />
         </label>
       {/each}
       <span class="var new">
         <input placeholder="new variable" bind:value={name} spellcheck="false" aria-label="Name of a new variable" />
-        <input placeholder="value (7, true, text)" bind:value={text} spellcheck="false" aria-label="Its value" onkeydown={(e) => e.key === 'Enter' && setVar(name, text)} />
-        <button disabled={!name} onclick={() => setVar(name, text)}>Set</button>
+        <input placeholder="value (7, true, text)" bind:value={text} spellcheck="false" aria-label="Its value" onkeydown={(e) => isEnter(e) && setVar(name, text)} />
+        <Button small disabled={!name} onclick={() => setVar(name, text)}>Set</Button>
       </span>
     </div>
   </div>
@@ -55,9 +58,9 @@
   <div class="strip" role="region" aria-label="Breakpoints">
     <span>{debug.breaks.length} breakpoint{debug.breaks.length > 1 ? 's' : ''}:</span>
     {#each debug.breaks as id (id)}
-      <button class="chip" title="Remove this breakpoint" onclick={() => FlowService.ToggleBreak(node, id)}>{id} ×</button>
+      <button class="chip" title="Remove this breakpoint" onclick={() => FlowService.ToggleBreak(node, id)}>{id} <Icon name="close" size={10} /></button>
     {/each}
-    <span class="hint">Run ▾ → Debug pauses before each.</span>
+    <span class="hint">Choose Debug in the Run menu to pause before each.</span>
   </div>
 {/if}
 
@@ -70,9 +73,8 @@
   .var.new input { width: 130px; }
   .hint { color: var(--muted); font-size: var(--fs-xs); }
   button { background: var(--raised); color: var(--text); border: 0; box-shadow: inset 0 0 0 1px var(--line); border-radius: var(--r-md); padding: 0 12px; min-height: var(--ctl-h-sm); font: inherit; font-weight: 500; }
-  button:disabled { opacity: 0.4; }
+  button:disabled { opacity: var(--op-disabled); }
   button:hover:not(:disabled) { background: var(--raised-3); }
-  .primary { background: var(--send-fill); color: var(--on-send); border: 0; font-weight: 600; box-shadow: var(--send-edge), 0 4px 14px var(--send-glow); }
   .strip { flex: none; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; padding: 4px 12px; border-bottom: 1px solid var(--line); font-size: var(--fs-sm); color: var(--muted); }
   .chip { border-radius: var(--r-pill); padding: 0 10px; font-size: var(--fs-xs); color: var(--fail); border-color: var(--fail); }
 </style>

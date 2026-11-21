@@ -1,0 +1,8 @@
+id: 01JA003M4N5P6Q7R8S9T0VWXYZ
+name: Default
+schedules:
+  - name: nightly-smoke
+    flow: user-creation
+    cron: 0 3 * * *
+    on_failure: env:SLACK_HOOK
+    on_success: https://hooks.example/ok

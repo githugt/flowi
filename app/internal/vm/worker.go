@@ -2,7 +2,11 @@
 
 package vm
 
-import "sync"
+import (
+	"log/slog"
+	"runtime/debug"
+	"sync"
+)
 
 // Poster runs a function on the UI goroutine (the app posts it to its UI thread; tests
 // may run it directly).
@@ -35,6 +39,13 @@ func Run[R any](w *Worker, work func() R, done func(R)) {
 		return
 	}
 	w.wg.Go(func() {
+		// Before: a panic in work ended the process. It is logged with its stack, and done is not called, so the
+		// screen keeps the state it had.
+		defer func() {
+			if p := recover(); p != nil {
+				slog.Error("a background call panicked", "panic", p, "stack", string(debug.Stack()))
+			}
+		}()
 		r := work()
 		w.post(func() { done(r) })
 	})

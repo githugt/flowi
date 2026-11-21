@@ -37,7 +37,7 @@
     },
     "edit": {
       "$ref": "#/$defs/version",
-      "description": "The one dirty edit: an autosaved working copy, never read by runs, serve or the CLI."
+      "description": "Deprecated: earlier releases kept the dirty edit (the autosaved working copy) here, where a commit carried it. It is now kept in the workspace data directory; a file that still has one is read, the edit is moved there, and the next write of the file leaves it out. Never read by runs, serve or the CLI."
     },
     "edit_base": {
       "type": "string",
@@ -134,11 +134,34 @@
             }
           }
         },
+        "disabled": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "Names of the query parameters and headers kept in the file but not sent.",
+          "properties": {
+            "query": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "headers": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        },
         "assert": {
           "type": "array",
           "items": {
             "type": "string"
           }
+        },
+        "expect": {
+          "type": ["string", "integer"],
+          "description": "The HTTP status the request is meant to answer with: 401, 400-499, 4xx or a list such as \"200, 404\". The default 'fail unless 2xx' hook stands aside when this is set."
         },
         "settings": {
           "$ref": "common.schema.json#/$defs/settings"

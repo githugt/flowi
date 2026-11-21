@@ -35,6 +35,7 @@ type RunStarted struct {
 	FlowID        string
 	FlowPath, Env string
 	Overlay       string // the run-level flowi overlay, if any
+	Trigger       string // what started the run, if said
 	Seed          uint64
 	At            time.Time
 }
@@ -47,6 +48,9 @@ type NodeStarted struct {
 	RunID, Path, Parent, Lane string
 	Node, Type, Name          string
 	Depth                     int
+	// At is when the instance began, by the run's clock: with a finished instance's Duration it places the node on a
+	// timeline of the run.
+	At time.Time
 }
 
 // NodeFinished reports a node instance's outcome. Outputs are masked and
@@ -64,6 +68,14 @@ type NodeFinished struct {
 	// Reason says why a node was skipped by the person ("skipped by you");
 	// "" otherwise, including a node skipped by its when.
 	Reason string
+	// Tries is how many times the node ran; more than 1 only for a node with retries that failed at first.
+	Tries int
+	// Outcomes are the names of the outcomes the node ended with, in list order: success or failure for most nodes,
+	// the request's own named outcomes (expired-token, not-found) when it has some. Nil for a node that was skipped
+	// or cancelled. Before: the window could not say which exit of a step a run took.
+	Outcomes []string
+	// Checks are what each assert line of a request node said, in order; nil for any other node.
+	Checks []CheckEval
 }
 
 // RecordCaptured carries the record of a request node's call: the request as

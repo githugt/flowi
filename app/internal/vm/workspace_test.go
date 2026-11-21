@@ -4,6 +4,7 @@ package vm_test
 
 import (
 	"context"
+	"errors"
 	"slices"
 	"strings"
 	"testing"
@@ -57,6 +58,40 @@ func TestWorkspaceVM_should_build_tree_from_collections(t *testing.T) {
 	}
 	if ws.Node(roots[1]).Kind != vm.NodeMissing {
 		t.Fatalf("missing node %+v", ws.Node(roots[1]))
+	}
+}
+
+// Before: a request or flow file with merge conflict markers dropped out of the tree as if it had been deleted.
+func TestWorkspaceVM_should_keep_a_file_that_cannot_be_read_in_the_tree_marked_with_why(t *testing.T) {
+	c := vmtest.SampleCollection()
+	c.Broken = []model.BrokenFile{
+		{File: "/shop/requests/auth/refresh.req.yaml", Path: "auth/refresh", Kind: "request", Code: "FLW-FILE-003", Message: "unresolved git merge conflict (line 14)"},
+		{File: "/shop/flows/checkout.arazzo.yaml", Path: "checkout", Kind: "flow", Code: "FLW-IMPORT-002", Message: "not valid YAML"},
+	}
+	b := &vmtest.Backend{Cols: []model.Collection{c}}
+
+	ws, _ := loadedWorkspace(t, b)
+
+	var found []vm.TreeNode
+	var walk func(ids []string)
+	walk = func(ids []string) {
+		for _, id := range ids {
+			if n := ws.Node(id); n.Kind == vm.NodeBroken {
+				found = append(found, n)
+			}
+			walk(ws.Children(id))
+		}
+	}
+	walk(ws.Children(""))
+	if len(found) != 2 {
+		t.Fatalf("broken rows: %+v", found)
+	}
+	req, flow := found[0], found[1]
+	if req.Tree != "requests" {
+		req, flow = flow, req
+	}
+	if req.Label != "refresh" || req.Detail != "unresolved git merge conflict (line 14)" || req.Path != "auth/refresh" || req.Tree != "requests" || flow.Label != "checkout" || flow.Tree != "flows" {
+		t.Fatalf("request row %+v flow row %+v", req, flow)
 	}
 }
 
@@ -121,6 +156,27 @@ func TestWorkspaceVM_rewatch_restarts_the_watch(t *testing.T) {
 
 	if got := b.WatchCalls(); got != 2 {
 		t.Fatalf("watch started %d times", got)
+	}
+}
+
+// Before: a watcher that failed to start made watch return at once, so live reload was off and the person was never told.
+func TestWorkspaceVM_Given_watch_fails_Then_reports_once_and_retries(t *testing.T) {
+	b := &vmtest.Backend{Cols: []model.Collection{vmtest.SampleCollection()}, WatchErr: errors.New("too many open files")}
+	ws, w := loadedWorkspace(t, b)
+	ws.SetWatchRetry(time.Millisecond)
+	problems := make(chan error, 8)
+	ws.OnWatchProblem(func(err error) { problems <- err })
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	ws.Watch(ctx)
+	w.Wait()
+
+	if got := b.WatchCalls(); got != vm.WatchRetries+1 {
+		t.Fatalf("watch started %d times, want %d", got, vm.WatchRetries+1)
+	}
+	if len(problems) != 1 {
+		t.Fatalf("reported %d times, want once", len(problems))
 	}
 }
 
@@ -208,6 +264,31 @@ func TestWorkspaceVM_VariableNames_should_list_the_selected_environments_variabl
 	}
 }
 
+func TestWorkspaceVM_VariableNames_Given_an_environment_that_builds_on_another_Then_inherited_names_count(t *testing.T) {
+	// Before: only the selected environment's own rows counted, so an inherited variable showed as "not set".
+	c := vmtest.SampleCollection()
+	c.Environments = []model.Environment{
+		{Meta: model.Meta{Name: "base"}, File: "/c/environments/base.yaml", Vars: []model.EnvVar{{Name: "base_url", Value: "https://b"}, {Name: "region", Value: "eu"}, {Name: "token", Secret: true}}},
+		{Meta: model.Meta{Name: "prod"}, File: "/c/environments/prod.yaml", Extends: "base", Vars: []model.EnvVar{{Name: "base_url", Value: "https://p"}, {Name: "token", Value: "plain-here"}}},
+	}
+	b := &vmtest.Backend{Cols: []model.Collection{c}, Values: map[string]any{"defaults.environment": "prod"}}
+	w := vmtest.SyncWorker()
+	ws := vm.NewWorkspace(b, w)
+	ws.Load()
+	w.Wait()
+
+	vars, secrets := ws.VariableNames()
+	chain := ws.SelectedChain()
+
+	slices.Sort(vars)
+	if !slices.Equal(vars, []string{"base_url", "region", "token"}) || len(secrets) != 0 {
+		t.Fatalf("vars %v secrets %v: region is inherited, and prod's plain token overrides the base secret", vars, secrets)
+	}
+	if !slices.Equal(chain, []string{"base", "prod"}) {
+		t.Fatalf("chain %v", chain)
+	}
+}
+
 // Review finding 9: renaming a draft while typing must not rebuild the
 // workspace (and re-validate it) on every keystroke.
 func TestWorkspaceVM_SetLabel_should_redraw_the_tree_without_a_workspace_change(t *testing.T) {
@@ -275,5 +356,23 @@ func TestWorkspace_tree_should_follow_the_order_of_a_folder(t *testing.T) {
 
 	if strings.Join(labels, ",") != "Gamma,Alpha,Beta" {
 		t.Fatalf("labels %v", labels)
+	}
+}
+
+func TestWorkspaceVM_ProtectedEnvs_should_list_the_environments_that_ask_first(t *testing.T) {
+	c := vmtest.SampleCollection()
+	c.Environments = []model.Environment{
+		{Meta: model.Meta{Name: "staging"}, File: "/c/environments/staging.yaml"},
+		{Meta: model.Meta{Name: "prod"}, File: "/c/environments/prod.yaml", Protected: true},
+		{Meta: model.Meta{Name: "live"}, File: "/c/environments/live.yaml", Protected: true},
+	}
+	b := &vmtest.Backend{Cols: []model.Collection{c}}
+	w := vmtest.SyncWorker()
+	ws := vm.NewWorkspace(b, w)
+	ws.Load()
+	w.Wait()
+
+	if got := ws.ProtectedEnvs(); !slices.Equal(got, []string{"live", "prod"}) {
+		t.Fatalf("protected %v, want live and prod", got)
 	}
 }

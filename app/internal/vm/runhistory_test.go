@@ -112,3 +112,25 @@ func TestRunHistory_Given_a_report_that_cannot_be_read_Then_the_comparison_says_
 		t.Fatal("a run whose report is gone must be reported, not shown as no difference")
 	}
 }
+
+func TestRunLabel_Given_a_run_with_steps_Then_the_label_counts_them(t *testing.T) {
+	// Before: the label gave the time but not the number of steps, so a run that stopped early looked like a quick one.
+	one := flowi.RunSummary{Status: "passed", Duration: 3200 * time.Millisecond, Nodes: []flowi.RunNodeSummary{node("a", "passed", time.Second)}}
+	many := flowi.RunSummary{Status: "failed", Duration: time.Second, Env: "local", Nodes: []flowi.RunNodeSummary{node("a", "passed", 0), node("b", "failed", 0)}}
+
+	if got := vm.RunLabel(one); got != "passed · 3.2s · 1 step" {
+		t.Fatalf("one step: %q", got)
+	}
+	if got := vm.RunLabel(many); got != "failed · 1s · 2 steps · local" {
+		t.Fatalf("two steps: %q", got)
+	}
+}
+
+func TestRunLabel_Given_a_run_with_a_trigger_Then_the_label_says_who_started_it(t *testing.T) {
+	// Before: the list did not say who started a run, so a failure from the HTTP trigger looked like one of your own.
+	s := flowi.RunSummary{Status: "passed", Duration: time.Second, Trigger: "trigger"}
+
+	if got := vm.RunLabel(s); got != "passed · 1s · by trigger" {
+		t.Fatalf("%q", got)
+	}
+}

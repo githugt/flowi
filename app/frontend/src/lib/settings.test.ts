@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { labelOf, matches, sectionOf } from './settings'
+import { labelOf, matches, modifiedFields, sectionOf } from './settings'
 
 describe('sectionOf', () => {
   it.each([
@@ -46,5 +46,37 @@ describe('matches', () => {
     expect(matches(f, 'follow')).toBe(true)
     expect(matches(f, 'proxy')).toBe(false)
     expect(matches(f, '  ')).toBe(true)
+  })
+})
+
+describe('the name of a setting named in a hint', () => {
+  it('is the label the Settings screen shows, in the section it is in', () => {
+    // Before: hints said "schemas.infer" while the Settings screen showed "Infer".
+    expect(labelOf('schemas.infer')).toBe('Learn schemas from sends')
+    expect(sectionOf('schemas.infer')).toBe('Requests')
+  })
+})
+
+describe('modifiedFields', () => {
+  it('keeps the settings the person changed', () => {
+    const fields = [
+      { name: 'timeout', userSet: true },
+      { name: 'http.max_redirects', userSet: false },
+      { name: 'appearance.theme', userSet: true },
+    ]
+
+    // Before: nothing could list the changed settings.
+    expect(modifiedFields(fields).map((f) => f.name)).toEqual(['timeout', 'appearance.theme'])
+    expect(modifiedFields([])).toEqual([])
+  })
+})
+
+describe('the Security section', () => {
+  // Before: these settings were in Appearance, Requests and Network.
+  it.each(['ui.snippet_exclude_secrets', 'datasets.allow_writes', 'http.redirect_credentials', 'http.redirect_keep_headers', 'secrets.host_check', 'secrets.allowed_hosts', 'tls.ca_files'])('holds %s', (name) => {
+    expect(sectionOf(name)).toBe('Security')
+  })
+  it('leaves the other http settings in Network', () => {
+    expect(sectionOf('http.follow_redirects')).toBe('Network')
   })
 })

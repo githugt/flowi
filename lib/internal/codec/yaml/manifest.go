@@ -18,7 +18,7 @@ func (c *Codec) DecodeManifest(file string, data []byte) (model.Manifest, diag.L
 	if !ok {
 		return model.Manifest{File: file}, d.diags
 	}
-	man := model.Manifest{Format: int(m.integer("format")), Meta: m.meta(), File: file}
+	man := model.Manifest{Format: int(m.integer("format")), Meta: m.meta(), MinVersion: m.str("min_version"), File: file}
 	man.DependsOn = m.dependencies()
 	man.Variables = m.keyValues("variables")
 	man.Settings = c.settingsChild(d, m, settings.LayerCollection)
@@ -53,6 +53,7 @@ func (c *Codec) EncodeManifest(man model.Manifest) ([]byte, error) {
 	var o omap
 	o.putAlways("format", int64(man.Format))
 	putMeta(&o, man.Meta)
+	o.put("min_version", man.MinVersion)
 	o.put("depends_on", encodeDependencies(man.DependsOn))
 	o.put("variables", keyValues(man.Variables))
 	o.put("settings", c.encodeSettings(man.Settings))

@@ -35,8 +35,8 @@ func (p runText) render(run *engine.Run) engine.RunResult {
 
 // live shows the Bubble Tea tree, then prints the plain record of what it
 // showed, so the scrollback matches non-terminal output.
-func (p runText) live(run *engine.Run, console Console) engine.RunResult {
-	seen, err := tui.RunFlow(watchPrompts(run.Events(), openBrowser), p.out, tui.Options{Color: !console.NoColor})
+func (p runText) live(run *engine.Run, color bool) engine.RunResult {
+	seen, err := tui.RunFlow(watchPrompts(run.Events(), openBrowser), p.out, tui.Options{Color: color})
 	if err != nil {
 		drainRun(run) // the live view failed; the run still has to finish
 		p.line(p.err, "warning: %v", err)

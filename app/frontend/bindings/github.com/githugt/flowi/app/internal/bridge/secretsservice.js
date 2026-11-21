@@ -29,6 +29,22 @@ export function Declare(environment, name, value) {
 }
 
 /**
+ * LockVault forgets the vault's key now. The window shows the new state from the "secrets" event.
+ * @returns {$CancellablePromise<void>}
+ */
+export function LockVault() {
+    return $Call.ByID(1196053347);
+}
+
+/**
+ * RefreshVault reads the vault's state again (the countdown to its auto-lock) without opening it.
+ * @returns {$CancellablePromise<void>}
+ */
+export function RefreshVault() {
+    return $Call.ByID(1968035527);
+}
+
+/**
  * Reveal returns one stored value for the window to show for a moment; it is the only call that sends a
  * value to the window, and it sends one. The window asks the passphrase first (PassphraseService.Unlock),
  * so this never waits for the user. The reveal is logged, without the value.
@@ -41,7 +57,8 @@ export function Reveal(environment, name) {
 }
 
 /**
- * Set stores a value in the vault. It is never read back.
+ * Set stores a value in the vault. It is never read back. A refusal comes back as the error, so the window can say so
+ * and keep what was typed. Before: the outcome was dropped, and the screen said "Stored" whatever the vault did.
  * @param {string} environment
  * @param {string} name
  * @param {string} value
@@ -62,7 +79,8 @@ export function State() {
 }
 
 /**
- * Unset removes the stored value.
+ * Unset removes the stored value; a failure comes back as the error. Before: it was hidden, and the row looked unchanged
+ * with no word why.
  * @param {string} environment
  * @param {string} name
  * @returns {$CancellablePromise<void>}

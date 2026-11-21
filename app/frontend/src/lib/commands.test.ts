@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { commandList, filterCommands, type Command, type PaletteContext } from './commands'
+import { commandList, filterCommands, itemCommands, type Command, type PaletteContext } from './commands'
 
 const run = () => {}
 const cmd = (id: string, title: string, keys = ''): Command => ({ id, title, keys, icon: '', run })
@@ -50,6 +50,22 @@ describe('commandList', () => {
     expect(titles(ctx())).not.toContain('Theme: dark')
   })
 
+  // Before: nothing hid a credential on screen, so a talk or a screenshot showed the Authorization header whole.
+  it('offers to blur secrets, and to show them again once they are', () => {
+    const calls: boolean[] = []
+    const set = (on: boolean) => calls.push(on)
+
+    const off = commandList(() => {}, ctx({ hideSensitive: false, setHideSensitive: set })).find((x) => x.id === 'hide-sensitive')
+    const on = commandList(() => {}, ctx({ hideSensitive: true, setHideSensitive: set })).find((x) => x.id === 'hide-sensitive')
+    off?.run()
+    on?.run()
+
+    expect(off?.title).toMatch(/Blur secrets/)
+    expect(on?.title).toMatch(/Show secrets/)
+    expect(calls).toEqual([true, false])
+    expect(titles(ctx())).not.toContain('Blur secrets on screen (talk or screenshot mode)')
+  })
+
   it('offers sending only when a request is open', () => {
     expect(titles(ctx())).toContain('Send the request')
     expect(titles(ctx({ canSend: false }))).not.toContain('Send the request')
@@ -64,5 +80,45 @@ describe('commandList', () => {
     list.find((c) => c.title === 'Send the request')!.run()
     expect(ran).toEqual(['env:prod', 'theme:light', 'env:'])
     expect(sent).toContain('send')
+  })
+})
+
+describe('itemCommands', () => {
+  const tree = [
+    {
+      id: 'c:shop', label: 'Shop', kind: 'collection', children: [
+        { id: 'f:shop:pets', label: 'Pets', kind: 'folder', children: [{ id: 'r:shop:get', label: 'Get pet', kind: 'request', method: 'GET' }] },
+        { id: 'f:shop:checkout', label: 'Checkout', kind: 'flow' },
+      ],
+    },
+    { id: 'e:dev', label: 'dev', kind: 'environment' },
+  ]
+
+  it('lists requests, flows and environments, not the folders', () => {
+    const got = itemCommands(tree, [], () => {})
+
+    expect(got.map((c) => c.id)).toEqual(['item:r:shop:get', 'item:f:shop:checkout', 'item:e:dev'])
+  })
+
+  it('names a request with its method and where it lives', () => {
+    const [first] = itemCommands(tree, [], () => {})
+
+    expect(first.title).toBe('GET Get pet')
+    expect(first.detail).toBe('Shop › Pets')
+  })
+
+  it('puts the open tabs first, in their order', () => {
+    const got = itemCommands(tree, ['e:dev', 'f:shop:checkout'], () => {})
+
+    expect(got.map((c) => c.id)).toEqual(['item:e:dev', 'item:f:shop:checkout', 'item:r:shop:get'])
+  })
+
+  it('opens the node when run, and is found by where it lives', () => {
+    let opened = ''
+    const got = itemCommands(tree, [], (n) => (opened = n.id))
+
+    filterCommands(got, 'pets')[0].run()
+
+    expect(opened).toBe('r:shop:get')
   })
 })

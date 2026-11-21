@@ -1,14 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { CARD, categoryToken, clipText, colourToken, outcomeColour, portLine, portToken, toneToken } from './card'
-
-describe('clipText', () => {
-  it('leaves short text alone', () => expect(clipText('/health', 40)).toBe('/health'))
-  it('cuts long text with an ellipsis at the limit', () => {
-    const cut = clipText('x'.repeat(80), 40)
-    expect(cut).toHaveLength(40)
-    expect(cut.endsWith('…')).toBe(true)
-  })
-})
+import { CARD, categoryToken, colourToken, outcomeColour, portLine, portToken, toneToken } from './card'
 
 describe('toneToken', () => {
   it('maps each tone to a colour token and unknown ones to muted', () => {

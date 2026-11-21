@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/githugt/flowi/app/internal/vm"
+	"github.com/githugt/flowi/lib/template"
 )
 
 func TestExpressionHelp_should_describe_every_context_with_names_and_examples(t *testing.T) {
@@ -68,5 +69,43 @@ func TestExpressionHelp_for_outcome_rules_should_explain_matching_and_list_in_an
 				t.Fatalf("help %+v, tools %s", h, tools)
 			}
 		})
+	}
+}
+
+// Before: the help left out sum, max, matches and the date helpers, although the engine has them, so a user who needed
+// them wrote a longer expression or gave up.
+func TestExpressionHelp_should_document_only_functions_the_engine_evaluates(t *testing.T) {
+	probes := map[string]string{
+		"sum": `{{sum([1, 2, 3])}}`, "mean": `{{mean([1, 2, 3])}}`, "max": `{{max([1, 5, 3])}}`, "min": `{{min([1, 5, 3])}}`,
+		"abs": `{{abs(-2)}}`, "round": `{{round(2.6)}}`, "first": `{{first([4, 5])}}`, "last": `{{last([4, 5])}}`,
+		"sort": `{{sort([3, 1, 2])}}`, "uniq": `{{uniq([1, 1, 2])}}`, "concat": `{{concat([1], [2])}}`,
+		"keys": `{{keys({"a": 1})}}`, "values": `{{values({"a": 1})}}`, "now": `{{now()}}`,
+		"date": `{{date("2024-01-02")}}`, "duration": `{{duration("90s")}}`,
+		"toBase64": `{{toBase64("hi")}}`, "fromBase64": `{{fromBase64("aGk=")}}`,
+		"matches": `{{"abc" matches "^a"}}`, "startsWith": `{{"abc" startsWith "a"}}`, "endsWith": `{{"abc" endsWith "c"}}`,
+	}
+	tools := ""
+	for _, item := range vm.ExpressionHelp(vm.ExprFlowCheck).Tools {
+		tools += item.Name + "\n"
+	}
+	offered := map[string]bool{}
+	for _, s := range vm.ExpressionVocabulary(vm.ExprFlowCheck) {
+		offered[s.Insert] = true
+	}
+	for name, src := range probes {
+		tpl, err := template.Parse(src)
+		if err == nil {
+			_, err = tpl.Render(template.Scope{})
+		}
+
+		if err != nil {
+			t.Errorf("%s: the engine rejects %s: %v", name, src, err)
+		}
+		if !strings.Contains(tools, name) {
+			t.Errorf("%s is not in the help", name)
+		}
+		if !offered[name+"("] && !offered[name] {
+			t.Errorf("%s is not offered as you type", name)
+		}
 	}
 }

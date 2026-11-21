@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 	"time"
+	"unicode/utf8"
 
 	"github.com/githugt/flowi/lib/engine"
 	"github.com/githugt/flowi/lib/model"
@@ -55,6 +56,22 @@ func TestFlowRun_should_keep_the_last_record_of_a_node_and_count_instances(t *te
 
 	d, ok := r.Detail("a")
 	if !ok || d.Record == nil || d.Record.Status != 404 || d.Instances != 2 {
+		t.Fatalf("detail %+v", d)
+	}
+}
+
+func TestFlowRun_should_keep_the_tries_and_outcomes_of_the_last_instance(t *testing.T) {
+	events := []engine.Event{
+		engine.NodeStarted{Path: "a", Node: "a"},
+		engine.NodeFinished{Path: "a", Node: "a", Status: engine.StatusFailed, Tries: 3, Outcomes: []string{"failure"}},
+		engine.RunFinished{Status: engine.StatusFailed},
+	}
+	r, _, w, _ := runFixture(t, events)
+
+	r.Run("staging", nil)
+	w.Wait()
+
+	if d, _ := r.Detail("a"); d.Tries != 3 || len(d.Outcomes) != 1 || d.Outcomes[0] != "failure" {
 		t.Fatalf("detail %+v", d)
 	}
 }
@@ -151,6 +168,27 @@ func TestOutputParts_should_show_status_headers_body_and_timings_or_the_outputs(
 	}
 }
 
+// Before: the Data tab showed what a step produced and not how it ended or on which try.
+func TestOutputParts_should_say_which_outcome_the_step_ended_as_and_on_which_try(t *testing.T) {
+	request := model.Node{ID: "login", Type: "request", Retries: 2, Request: &model.RequestCall{}}
+	other := model.Node{ID: "pick", Type: "set"}
+
+	retried := vm.OutputParts(request, vm.NodeDetail{Status: "failed", Record: sampleRecord(), Tries: 3, Outcomes: []string{"expired-token", "failure"}}, vm.ViewJSON)
+	plain := partTexts(vm.OutputParts(request, vm.NodeDetail{Status: "passed", Record: sampleRecord(), Tries: 1, Outcomes: []string{"success"}}, vm.ViewJSON))
+	quiet := partTexts(vm.OutputParts(other, vm.NodeDetail{Status: "passed", Outputs: map[string]any{"a": "b"}, Tries: 1, Outcomes: []string{"success"}}, vm.ViewJSON))
+	skipped := partTexts(vm.OutputParts(request, vm.NodeDetail{Status: "skipped"}, vm.ViewJSON))
+
+	if len(retried) < 2 || retried[1].Heading != "Outcome" || retried[1].Lines[0] != "Ended as expired-token, failure · try 3 of 3" {
+		t.Fatalf("retried: %+v", retried)
+	}
+	if !strings.Contains(plain, "Outcome|Ended as success|") || strings.Contains(plain, "try 1") {
+		t.Fatalf("a request that ran once names its outcome and no try: %s", plain)
+	}
+	if strings.Contains(quiet, "Outcome") || strings.Contains(skipped, "Outcome") {
+		t.Fatalf("a set step's lone success and a skipped step say nothing: %q %q", quiet, skipped)
+	}
+}
+
 func TestTestRows_should_list_an_assert_node_and_a_request_nodes_failed_assertions(t *testing.T) {
 	assert := model.Node{ID: "chk", Type: "assert", Params: []model.Field{{Key: "check", Value: "status == 200"}}}
 	request := model.Node{ID: "login", Type: "request", Request: &model.RequestCall{}}
@@ -237,5 +275,90 @@ func TestOutputParts_Given_a_dataset_step_that_failed_Then_the_status_line_has_n
 
 	if !strings.Contains(got, "error · 2ms") || strings.Contains(got, "rows") {
 		t.Fatalf("status line wrong in:\n%s", got)
+	}
+}
+
+func TestOutputParts_Given_a_failed_grpc_call_Then_the_status_line_has_the_server_message_and_the_trailers_show(t *testing.T) {
+	// Before: the call showed "NOT_FOUND · 12ms", and the message and trailers the engine recorded were never shown.
+	request := model.Node{ID: "get", Type: "request", Request: &model.RequestCall{}}
+	rec := engine.Record{Kind: engine.KindGRPC, GRPCCode: "NOT_FOUND", GRPCMessage: "order 17\nnot found", Timings: engine.Timings{Total: 12 * time.Millisecond},
+		Trailers: []engine.Header{{Name: "x-request-id", Value: "abc"}}}
+
+	got := partTexts(vm.OutputParts(request, vm.NodeDetail{Status: "failed", Record: &rec}, vm.ViewJSON))
+
+	if !strings.Contains(got, "NOT_FOUND · order 17 not found · 12ms") {
+		t.Fatalf("message missing in:\n%s", got)
+	}
+	if !strings.Contains(got, "Trailers") || !strings.Contains(got, "x-request-id") {
+		t.Fatalf("trailers missing in:\n%s", got)
+	}
+}
+
+func TestOutputParts_Given_a_grpc_call_with_no_message_Then_the_status_line_is_as_before(t *testing.T) {
+	request := model.Node{ID: "get", Type: "request", Request: &model.RequestCall{}}
+	rec := engine.Record{Kind: engine.KindGRPC, GRPCCode: "OK", Timings: engine.Timings{Total: 3 * time.Millisecond}}
+
+	got := partTexts(vm.OutputParts(request, vm.NodeDetail{Status: "passed", Record: &rec}, vm.ViewJSON))
+
+	if !strings.Contains(got, "OK · 3ms") || strings.Contains(got, "Trailers") {
+		t.Fatalf("wrong output:\n%s", got)
+	}
+}
+
+func TestRenderBody_Given_json_text_Then_the_json_view_keeps_the_servers_key_order_and_characters(t *testing.T) {
+	// Before: the view was a re-serialisation of the parsed map: keys were sorted and & and < were written as & and <.
+	text := `{"next":"https://api/x?page=2&per=50","b":1,"a":"<ok>"}`
+	body := engine.Body{Text: text, JSON: map[string]any{"next": "https://api/x?page=2&per=50", "b": 1.0, "a": "<ok>"}}
+
+	got, lang, ok := vm.RenderBody(body, vm.ViewJSON)
+
+	if !ok || lang != vm.LangJSON {
+		t.Fatalf("ok %v lang %q", ok, lang)
+	}
+	if strings.Contains(got, "\\u0026") || strings.Contains(got, "\\u003c") {
+		t.Fatalf("characters were escaped:\n%s", got)
+	}
+	if strings.Index(got, `"next"`) > strings.Index(got, `"b"`) || strings.Index(got, `"b"`) > strings.Index(got, `"a"`) {
+		t.Fatalf("the key order changed:\n%s", got)
+	}
+}
+
+func TestRenderBody_Given_only_a_parsed_value_Then_it_is_indented_without_escaping(t *testing.T) {
+	body := engine.Body{JSON: map[string]any{"url": "a?b=1&c=2"}}
+
+	got, _, ok := vm.RenderBody(body, vm.ViewJSON)
+
+	if !ok || !strings.Contains(got, `"a?b=1&c=2"`) {
+		t.Fatalf("got %q (ok %v)", got, ok)
+	}
+}
+
+func TestRenderBody_Given_a_long_text_with_multibyte_characters_Then_the_cut_does_not_split_one(t *testing.T) {
+	// Before: s[:bodyShowLimit] could end in the middle of a UTF-8 character.
+	line := strings.Repeat("é", 49) + "\n" // 99 bytes per line
+	text := strings.Repeat(line, 4000)     // about 396 KB, over the 256 KiB limit
+
+	got, _, _ := vm.RenderBody(engine.Body{Text: text}, vm.ViewText)
+
+	if !utf8.ValidString(got) {
+		t.Fatal("the cut text is not valid UTF-8")
+	}
+	if !strings.Contains(got, "more bytes left out") {
+		t.Fatal("the cut is not announced")
+	}
+	body := got[:strings.LastIndex(got, "\n…")]
+	if !strings.HasSuffix(text[:len(body)+1], "\n") && !strings.HasSuffix(body, "é") {
+		t.Fatalf("the cut did not fall on a line end: ...%q", body[len(body)-5:])
+	}
+}
+
+func TestRecordSize_Given_a_thousand_bytes_Then_it_is_counted_in_the_same_units_as_the_response_pane(t *testing.T) {
+	// Before: the dock counted in 1024 and wrote "1000 B" where the response pane wrote "1.0 KB" for the same body.
+	rec := engine.Record{Body: engine.Body{Size: 1000}}
+
+	got := vm.RecordSize(vm.NodeDetail{Record: &rec})
+
+	if got != "1.0 KB" || got != vm.SizeText(1000) {
+		t.Fatalf("size %q", got)
 	}
 }

@@ -53,6 +53,12 @@ func Check(s model.Schedule) []Problem {
 	for _, detail := range inputProblems(s.Inputs) {
 		add("inputs", detail)
 	}
+	if d := hookProblem(s.OnFailure); d != "" {
+		add("on_failure", d)
+	}
+	if d := hookProblem(s.OnSuccess); d != "" {
+		add("on_success", d)
+	}
 	return out
 }
 

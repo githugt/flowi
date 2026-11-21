@@ -13,6 +13,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -603,5 +604,69 @@ func TestRecordFolder_Then_it_is_a_path_of_plain_names(t *testing.T) {
 		if _, err := recordFolder(bad); err == nil {
 			t.Errorf("%q accepted", bad)
 		}
+	}
+}
+
+func TestServe_Given_a_health_address_Then_probes_and_metrics_answer_without_a_token(t *testing.T) {
+	// Before: the only health route sat on the trigger endpoint, which is off without a token and has no readiness
+	// probe or metrics.
+	w := demoWorkspace(t)
+	s := serveOnFreePorts(t, w, func(o *ServeOptions) { o.NoTriggers, o.HealthAddr, o.Metrics, o.MaxRuns = true, "127.0.0.1:0", true, 4 })
+	base := "http://" + s.HealthAddr()
+
+	live, _, _ := call(t, http.MethodGet, base+"/healthz", "", "")
+	ready, _, readyBody := call(t, http.MethodGet, base+"/readyz", "", "")
+	_, _, before := call(t, http.MethodGet, base+"/metrics", "", "")
+	call(t, http.MethodGet, "http://"+s.ReplayAddr()+"/__flowi/routes", "", "")
+	_, header, after := call(t, http.MethodGet, base+"/metrics", "", "")
+
+	if s.HealthAddr() == "" || live != http.StatusOK || ready != http.StatusOK || !strings.Contains(readyBody, "ready") {
+		t.Fatalf("addr %q, healthz %d, readyz %d %s", s.HealthAddr(), live, ready, readyBody)
+	}
+	for _, want := range []string{"flowi_up 1", "flowi_ready 1", "flowi_runs_max 4", "flowi_runs_in_flight 0"} {
+		if !strings.Contains(before, want) {
+			t.Errorf("metrics miss %q:\n%s", want, before)
+		}
+	}
+	if !strings.HasPrefix(header.Get("Content-Type"), "text/plain") || strings.Count(after, "flowi_replay_calls_total") < 2 {
+		t.Errorf("metrics after a replayed call: %q\n%s", header.Get("Content-Type"), after)
+	}
+}
+
+func TestServe_Given_no_health_address_Then_nothing_listens_for_probes(t *testing.T) {
+	w := demoWorkspace(t)
+	s := serveOnFreePorts(t, w, func(o *ServeOptions) { o.NoTriggers = true })
+
+	if s.HealthAddr() != "" {
+		t.Fatalf("health addr %q", s.HealthAddr())
+	}
+}
+
+func TestServe_Given_metrics_without_a_health_address_or_a_bad_one_Then_it_is_refused(t *testing.T) {
+	w := demoWorkspace(t)
+	for name, mutate := range map[string]func(*ServeOptions){
+		"metrics alone": func(o *ServeOptions) { o.Metrics = true },
+		"bad address":   func(o *ServeOptions) { o.HealthAddr = "nonsense" },
+	} {
+		o := ServeOptions{ReplayAddr: "127.0.0.1:0", NoTriggers: true, ShutdownTimeout: time.Second}
+		mutate(&o)
+
+		_, err := w.Serve(context.Background(), o)
+
+		if !errors.Is(err, ErrInvalidServeOptions) {
+			t.Errorf("%s: %v", name, err)
+		}
+	}
+}
+
+func TestServe_Given_a_health_address_open_to_the_network_Then_a_note_says_so(t *testing.T) {
+	w := demoWorkspace(t)
+
+	s := serveOnFreePorts(t, w, func(o *ServeOptions) { o.NoTriggers, o.HealthAddr = true, "0.0.0.0:0" })
+
+	if !slices.ContainsFunc(s.Notes(), func(n string) bool {
+		return strings.Contains(n, "the health endpoint listens on all network interfaces")
+	}) {
+		t.Fatalf("notes %v", s.Notes())
 	}
 }

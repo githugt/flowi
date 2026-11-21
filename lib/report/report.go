@@ -14,7 +14,9 @@ type Run struct {
 	Collection string `json:"collection,omitempty"`
 	Env        string `json:"env,omitempty"`
 	// Overlay is the run-level flowi overlay the run was started with, if any.
-	Overlay  string        `json:"overlay,omitempty"`
+	Overlay string `json:"overlay,omitempty"`
+	// Trigger is what started the run: "app", "cli" or "trigger" (the HTTP trigger server); empty when not said.
+	Trigger  string        `json:"trigger,omitempty"`
 	Status   string        `json:"status"`
 	Seed     uint64        `json:"seed"`
 	Started  time.Time     `json:"started,omitzero"`
@@ -50,13 +52,33 @@ type Node struct {
 	Status      string         `json:"status"`
 	Handled     bool           `json:"handled,omitempty"` // failed, but on_error let the run continue
 	Reason      string         `json:"reason,omitempty"`  // why a skipped node was skipped, when the person chose it
+	Tries       int            `json:"tries,omitempty"`   // how many times it ran, when it ran more than once (it has retries)
+	Flaky       bool           `json:"flaky,omitempty"`   // it passed, but only after a retry
 	Started     time.Time      `json:"started,omitzero"`
 	Duration    time.Duration  `json:"-"`
 	Outputs     map[string]any `json:"outputs,omitempty"`
 	Diagnostics []Diagnostic   `json:"diagnostics,omitempty"`
+	Checks      []Check        `json:"checks,omitempty"` // what each assert line of a request said, in order
 	Attempts    []Attempt      `json:"attempts,omitempty"`
 	Hooks       []Hook         `json:"hooks,omitempty"`
 	Lanes       []Lane         `json:"lanes,omitempty"`
+}
+
+// Check is what one assert line of a request said about its response.
+type Check struct {
+	Line    string `json:"line"`
+	Verdict string `json:"verdict"`        // passed, failed or error
+	Note    string `json:"note,omitempty"` // what a failed check saw, or why an errored one could not be evaluated
+}
+
+// ChecksPassed counts the checks of a node that passed and all it ran.
+func (n Node) ChecksPassed() (passed, total int) {
+	for _, c := range n.Checks {
+		if c.Verdict == "passed" {
+			passed++
+		}
+	}
+	return passed, len(n.Checks)
 }
 
 // Hook is one API hook step of a request node.

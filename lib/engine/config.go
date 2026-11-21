@@ -28,10 +28,12 @@ type config struct {
 	empty           template.EmptyPolicy
 	httpVersion     string
 	follow          bool
+	reuse           bool // http.reuse_connections: the requests of a flow run share connections
 	maxRedirects    int
 	redirectCreds   string   // strip | same_site | keep
 	redirectKeep    []string // header names forwarded on any redirect
 	compression     string
+	graphqlErrors   string // warn | fail | ignore
 	streamThreshold int64
 	proxy           string
 	caFiles         []string
@@ -41,12 +43,17 @@ type config struct {
 	defaultEnv      string
 	maxConcurrency  int
 	grace           time.Duration
+	keepRuns        int    // run.keep: saved reports kept per flow (0: all)
+	keepFailed      int    // run.keep_failed: failed reports kept beyond keepRuns
 	cookies         string // isolated | shared | off (lane jars)
 	defaultHeaders  []string
-	userAgent       string // "" → the client's own
-	datasetWrites   bool   // datasets.allow_writes
-	datasetReadOnly bool   // datasets.read_only
-	defaultAuth     string // auth.default
+	userAgent       string   // "" → the client's own
+	datasetWrites   bool     // datasets.allow_writes
+	datasetOutside  bool     // datasets.allow_outside_collection
+	datasetReadOnly bool     // datasets.read_only
+	defaultAuth     string   // auth.default
+	secretHosts     string   // secrets.host_check: off | warn | block
+	secretAllowed   []string // secrets.allowed_hosts
 }
 
 // newConfig reads the settings the engine uses. Every key has a validated
@@ -58,10 +65,10 @@ func newConfig(r settings.Resolved) config {
 	}
 	return config{
 		timeout: setting[time.Duration](r, "timeout"), save: setting[string](r, "responses.save"), pin: setting[string](r, "responses.pin"), schemas: setting[bool](r, "schemas.infer"), empty: empty,
-		httpVersion: setting[string](r, "http.version"), follow: setting[bool](r, "http.follow_redirects"),
+		httpVersion: setting[string](r, "http.version"), follow: setting[bool](r, "http.follow_redirects"), reuse: setting[bool](r, "http.reuse_connections"),
 		maxRedirects:  int(setting[int64](r, "http.max_redirects")),
 		redirectCreds: setting[string](r, "http.redirect_credentials"), redirectKeep: setting[[]string](r, "http.redirect_keep_headers"),
-		compression:     setting[string](r, "http.request_compression"),
+		compression: setting[string](r, "http.request_compression"), graphqlErrors: setting[string](r, "requests.graphql_errors"),
 		streamThreshold: setting[int64](r, "downloads.stream_threshold_bytes"),
 		proxy:           setting[string](r, "proxy.http"), caFiles: setting[[]string](r, "tls.ca_files"),
 		retry: httpx.RetryPolicy{
@@ -71,9 +78,11 @@ func newConfig(r settings.Resolved) config {
 		nested: setting[bool](r, "hooks.nested"), maxDepth: int(setting[int64](r, "hooks.max_depth")),
 		defaultEnv:     setting[string](r, "defaults.environment"),
 		maxConcurrency: int(setting[int64](r, "run.max_concurrency")), grace: setting[time.Duration](r, "run.grace"),
+		keepRuns: int(setting[int64](r, "run.keep")), keepFailed: int(setting[int64](r, "run.keep_failed")),
 		cookies:        setting[string](r, "http.cookies"),
 		defaultHeaders: setting[[]string](r, "http.default_headers"), userAgent: setting[string](r, "http.user_agent"),
-		datasetWrites: setting[bool](r, "datasets.allow_writes"), datasetReadOnly: setting[bool](r, "datasets.read_only"), defaultAuth: setting[string](r, "auth.default"),
+		datasetWrites: setting[bool](r, "datasets.allow_writes"), datasetOutside: setting[bool](r, "datasets.allow_outside_collection"), datasetReadOnly: setting[bool](r, "datasets.read_only"), defaultAuth: setting[string](r, "auth.default"),
+		secretHosts: setting[string](r, "secrets.host_check"), secretAllowed: setting[[]string](r, "secrets.allowed_hosts"),
 	}
 }
 
@@ -120,8 +129,12 @@ func (x *execution) clientOptions(b built) httpx.Options {
 // baseOptions are the client options every call of the run shares: the
 // resolved settings, the cookie jar and the run's HTTP limits.
 func (r *runner) baseOptions(cfg config, jar *httpx.Jar, downloadDir string) httpx.Options {
+	var pool *httpx.Pool
+	if cfg.reuse {
+		pool = r.pool // nil outside a flow run: a send starts cold
+	}
 	return httpx.Options{
-		Transport: r.deps.Transport, Version: cfg.httpVersion, FollowRedirects: cfg.follow, MaxRedirects: cfg.maxRedirects,
+		Pool: pool, Transport: r.deps.Transport, Version: cfg.httpVersion, FollowRedirects: cfg.follow, MaxRedirects: cfg.maxRedirects,
 		RedirectCredentials: cfg.redirectCreds, RedirectKeepHeaders: cfg.redirectKeep, Timeout: cfg.timeout,
 		Proxy: settings.ProxyConfig(cfg.proxy, r.deps.Environ), CAFiles: cfg.caFiles, RequestCompression: cfg.compression,
 		Jar: cookieJarOf(jar), StreamThreshold: cfg.streamThreshold, Retry: cfg.retry, Clock: r.deps.Clock,
@@ -167,6 +180,7 @@ type environment struct {
 	name    string
 	id      model.ID
 	scope   model.ID        // vault scope; empty means the collection
+	shipped bool            // the collection's own file, with no vault entries (see model.Environment.Shipped)
 	values  map[string]any  // non-secret variables
 	secrets map[string]bool // names of secret variables
 }
@@ -189,7 +203,7 @@ func selectEnvironment(c model.Collection, name, fallback string) (environment, 
 		return env, diag.List{diag.New(diag.CodeRequestEnvExtends, diag.Location{}, map[string]string{"env": name, "detail": err.Error()})}
 	}
 	own := chain[len(chain)-1]
-	env.name, env.id, env.scope = own.Name, own.ID, own.Scope
+	env.name, env.id, env.scope, env.shipped = own.Name, own.ID, own.Scope, own.Shipped
 	for _, e := range chain {
 		if err := applyEnvironment(&env, e, e.Name == own.Name); err != nil {
 			return env, diag.List{diag.New(diag.CodeRequestEnvExtends, diag.Location{File: e.File}, map[string]string{"env": name, "detail": err.Error()})}

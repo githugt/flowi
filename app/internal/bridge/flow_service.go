@@ -7,8 +7,10 @@ import (
 	"slices"
 	"strings"
 
+	flowi "github.com/githugt/flowi/lib"
 	"github.com/githugt/flowi/lib/analysis"
 	"github.com/githugt/flowi/lib/model"
+	"github.com/githugt/flowi/lib/schemainfer"
 
 	"github.com/githugt/flowi/app/internal/canvas"
 	"github.com/githugt/flowi/app/internal/card"
@@ -18,6 +20,7 @@ import (
 // Card is what a canvas unit shows.
 type Card struct {
 	Title    string     `json:"title"`
+	Tip      string     `json:"tip"` // the tooltip of the title: the step's id and its description, which a name hides
 	Subtitle string     `json:"subtitle"`
 	Hooks    []HookTick `json:"hooks"`              // a request step: the hooks that run around it, and how each went
 	Face     card.Card  `json:"face"`               // what the card shows: badge, sub-line, summary rows, ports
@@ -29,27 +32,34 @@ type Card struct {
 
 // FlowView is an open flow as the canvas shows it.
 type FlowView struct {
-	Rev       int             `json:"rev"`       // bumped by every change to the flow
-	Selected  string          `json:"selected"`  // the selected step id, "" for none
-	Selection []string        `json:"selection"` // every selected step, the primary last
-	Chips     []ChipView      `json:"chips"`
-	Form      Form            `json:"form"`
-	Palette   []PaletteEntry  `json:"palette"`
-	Steps     []StepChoice    `json:"steps"`   // what the step popup offers
-	Start     card.Card       `json:"start"`   // the flow's inputs, drawn as the first card
-	Inputs    []IOView        `json:"inputs"`  // what the Start card's rows open
-	Outputs   []IOView        `json:"outputs"` // what the End card's rows open
-	End       *card.Card      `json:"end"`     // its outputs, drawn as the last card; nil without outputs
-	Run       RunView         `json:"run"`
-	Skips     SkipView        `json:"skips"`
-	Debug     DebugView       `json:"debug"`
-	Vars      VarsView        `json:"vars"`
-	Node      string          `json:"node"` // the workspace tree node it was opened from
-	Name      string          `json:"name"`
-	Dirty     bool            `json:"dirty"`
-	OnDisk    bool            `json:"onDisk"`
-	NeedsDrop bool            `json:"needsDrop"`
-	CanUndo   bool            `json:"canUndo"`
+	// Path and Collection name the flow as `flowi run <path> --collection <name>` does: the saved file's path (without
+	// flows/ and .arazzo.yaml) and the collection's name.
+	Path       string         `json:"path"`
+	Collection string         `json:"collection"`
+	Rev        int            `json:"rev"`       // bumped by every change to the flow
+	Selected   string         `json:"selected"`  // the selected step id, "" for none
+	Selection  []string       `json:"selection"` // every selected step, the primary last
+	Chips      []ChipView     `json:"chips"`
+	Form       Form           `json:"form"`
+	Palette    []PaletteEntry `json:"palette"`
+	Steps      []StepChoice   `json:"steps"`   // what the step popup offers
+	Start      card.Card      `json:"start"`   // the flow's inputs, drawn as the first card
+	Inputs     []IOView       `json:"inputs"`  // what the Start card's rows open
+	Outputs    []IOView       `json:"outputs"` // what the End card's rows open
+	End        *card.Card     `json:"end"`     // its outputs, drawn as the last card; nil without outputs
+	Run        RunView        `json:"run"`
+	Skips      SkipView       `json:"skips"`
+	Debug      DebugView      `json:"debug"`
+	Vars       VarsView       `json:"vars"`
+	Node       string         `json:"node"` // the workspace tree node it was opened from
+	Name       string         `json:"name"`
+	Dirty      bool           `json:"dirty"`
+	OnDisk     bool           `json:"onDisk"`
+	NeedsDrop  bool           `json:"needsDrop"`
+	CanUndo    bool           `json:"canUndo"`
+	// UndoLabel and RedoLabel say what the buttons would do: "Undo: delete 3 steps".
+	UndoLabel string          `json:"undoLabel"`
+	RedoLabel string          `json:"redoLabel"`
 	CanRedo   bool            `json:"canRedo"`
 	Error     string          `json:"error,omitempty"`
 	Diagram   canvas.Diagram  `json:"diagram"`
@@ -71,6 +81,12 @@ type openFlow struct {
 	history  *vm.RunHistory
 	selected string   // the step the inspector shows
 	also     []string // other selected steps (shift-click)
+	// drift is the last drift check, kept so the person can accept what it found without running the flow again;
+	// driftFail is the kinds that fail it, driftEnv the environment it ran in and accepted the requests accepted since.
+	drift     *flowi.DriftReport
+	driftFail []schemainfer.DriftKind
+	driftEnv  string
+	accepted  map[string]bool
 }
 
 // FlowService is the set of flow documents open in the window.
@@ -107,15 +123,33 @@ func (s *FlowService) open(node string) (FlowView, error) {
 		doc := vm.NewFlowDoc(s.app.backend, s.app.worker, c, f)
 		doc.UseGraphView()
 		o := &openFlow{doc: doc, run: vm.NewFlowRun(s.app.backend, s.app.worker, doc), history: vm.NewRunHistory(s.app.backend, s.app.worker, doc)}
-		doc.OnChange(func() { s.app.emit("flow", s.view(node, o)) })
+		// Before: a closed tab's late events (a run, an autosave) still reached the page and created the flow again.
+		open := func() bool { return s.docs[node] == o }
+		doc.OnChange(func() {
+			if open() {
+				s.app.emit("flow", s.view(node, o))
+			}
+		})
 		o.run.OnPrompt(s.app.promptPerson)
-		o.run.OnStatus(func(string, string) { s.app.emit("flowrun", FlowRunEvent{Node: node, Run: runViewOf(o)}) })
+		o.run.OnStatus(func(string, string) {
+			if open() {
+				s.app.emit("flowrun", FlowRunEvent{Node: node, Run: runViewOf(o)})
+			}
+		})
 		// The hook ticks on the cards are part of the flow view, so a run's change publishes both.
 		o.run.OnChange(func() {
+			if !open() {
+				return
+			}
 			s.app.emit("flowrun", FlowRunEvent{Node: node, Run: runViewOf(o)})
 			s.app.emit("flow", s.view(node, o))
 		})
-		o.history.OnChange(func() { s.app.emit("flowhistory", HistoryEvent{Node: node, Runs: historyOf(o.history)}) })
+		o.history.OnChange(func() {
+			if open() {
+				trend := vm.RunTrendOf(o.history.Runs())
+				s.app.emit("flowhistory", HistoryEvent{Node: node, Runs: historyOf(o.history), Trend: trend.Text(), SlowNote: trend.SlowNote()})
+			}
+		})
 		s.docs[node] = o
 		doc.RestoreKept(func(bool) {}) // edits kept at the last quit come back as unsaved changes
 		return s.view(node, o), nil
@@ -132,9 +166,38 @@ func (s *FlowService) adopt(row string, doc *vm.FlowDoc) {
 	s.docs[row] = o
 }
 
-// Close forgets the open flow of a tree node, discarding unsaved edits.
+// Close forgets the open flow of a tree node, discarding unsaved edits. A run that is still going stops first: it
+// sends real requests, and with the tab gone the user could no longer cancel it.
 func (s *FlowService) Close(node string) {
-	s.app.actor.Do(func() { delete(s.docs, node) })
+	s.app.actor.Do(func() {
+		if o, ok := s.docs[node]; ok {
+			o.run.Cancel()
+		}
+		delete(s.docs, node)
+	})
+}
+
+// cancelRuns stops every run that is still going; the app calls it before it quits.
+func (s *FlowService) cancelRuns() {
+	s.app.actor.Do(func() {
+		for _, o := range s.docs {
+			o.run.Cancel()
+		}
+	})
+}
+
+// Running lists the nodes whose flow is running, so the window can ask before it closes them.
+func (s *FlowService) Running() []string {
+	var nodes []string
+	s.app.actor.Do(func() {
+		for node, o := range s.docs {
+			if o.run.Running() {
+				nodes = append(nodes, node)
+			}
+		}
+	})
+	slices.Sort(nodes)
+	return nodes
 }
 
 // SetPosition records where the user dropped a unit.
@@ -181,7 +244,8 @@ func (s *FlowService) view(node string, o *openFlow) FlowView {
 	start, end := startEndOf(o)
 	return FlowView{
 		Rev:  rev,
-		Node: node, Name: d.Draft().Name, Dirty: d.Dirty(), OnDisk: d.ChangedOnDisk(), NeedsDrop: d.NeedsDropConfirm(), CanUndo: d.CanUndo(), CanRedo: d.CanRedo(),
+		Path: d.SavedPath(), Collection: d.CollectionName(),
+		Node: node, Name: d.Draft().Name, Dirty: d.Dirty(), OnDisk: d.ChangedOnDisk(), NeedsDrop: d.NeedsDropConfirm(), CanUndo: d.CanUndo(), CanRedo: d.CanRedo(), UndoLabel: d.UndoLabel(), RedoLabel: d.RedoLabel(),
 		Error: d.Err(), Diagram: diagram, Cards: s.cardsOf(o, diagram), Data: dataEdgesOf(d, diagram), Selection: o.selection(), Chips: chipsOf(d),
 		Selected: o.selected, Form: s.formOf(d, o.run, o.selected), Palette: paletteOf(), Steps: stepsOf(),
 		Run: runViewOf(o), Skips: skipsOf(o), Debug: debugOf(o), Vars: varsOf(o), Start: start, End: end, Inputs: inputViewsOf(d.Draft()), Outputs: outputViewsOf(d.Draft()),
@@ -214,7 +278,7 @@ func (s *FlowService) cardsOf(o *openFlow, g canvas.Diagram) map[string]Card {
 	for _, u := range g.Units {
 		n, _ := o.doc.Node(u.Nodes[u.Core]) // the request of a block with attached actions, else the only or first node
 		skipped, note := skipMark(skips, u.Nodes)
-		cards[u.ID] = Card{Title: unitTitle(u, n, selected), Subtitle: unitSubtitle(u, n), Hooks: nonNilTicks(s.hookTicksOf(o, n)), Face: faceOf(o.doc, n), Color: n.Color, Skipped: skipped, SkipNote: note, Break: slices.ContainsFunc(u.Nodes, func(id string) bool { return slices.Contains(debug.Breaks, id) })}
+		cards[u.ID] = Card{Title: unitTitle(u, n, selected), Tip: unitTip(u, n, selected), Subtitle: unitSubtitle(u, n), Hooks: nonNilTicks(s.hookTicksOf(o, n)), Face: faceOf(o.doc, n), Color: n.Color, Skipped: skipped, SkipNote: note, Break: slices.ContainsFunc(u.Nodes, func(id string) bool { return slices.Contains(debug.Breaks, id) })}
 	}
 	return cards
 }
@@ -241,8 +305,27 @@ func unitTitle(u canvas.Unit, n model.Node, selected []string) string {
 		return fmt.Sprintf("%d actions", len(u.Nodes))
 	case u.Kind == canvas.KindStrip:
 		return strings.Join(markSelected(u.Nodes, selected), " · ")
+	case n.Name != "":
+		// Before: the Name the Inspector offers was drawn nowhere, and a large flow read "request-17, set-9, condition-4".
+		return n.Name
 	}
 	return n.ID
+}
+
+// unitTip is the tooltip of a card's title. A step with a name keeps its id there: expressions refer to it as
+// nodes.<id>. The description follows.
+func unitTip(u canvas.Unit, n model.Node, selected []string) string {
+	tip := unitTitle(u, n, selected)
+	if u.Collapsed || u.Kind == canvas.KindStrip {
+		return tip
+	}
+	if n.Name != "" {
+		tip += " (" + n.ID + ")"
+	}
+	if n.Description != "" {
+		tip += "\n" + n.Description
+	}
+	return tip
 }
 
 // markSelected brackets the selected action of a strip: "set · [log] · note".
@@ -274,6 +357,11 @@ func unitSubtitle(u canvas.Unit, n model.Node) string {
 // Revert reloads the flow from disk, dropping edits.
 func (s *FlowService) Revert(node string) {
 	_ = s.edit(node, func(o *openFlow) error { o.doc.Revert(); return nil })
+}
+
+// KeepMine lets the next save overwrite a change made to the file outside Flowi.
+func (s *FlowService) KeepMine(node string) {
+	_ = s.edit(node, func(o *openFlow) error { o.doc.KeepMine(); return nil })
 }
 
 // SaveDroppingComments saves although the file's comments are lost.

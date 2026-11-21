@@ -28,6 +28,9 @@ type Query struct {
 	Limit int
 	// Root is the directory a relative file path (sqlite) is resolved against.
 	Root string
+	// AllowOutsideRoot lets a file path leave Root (an absolute path, or one that climbs out with ../). Off is the
+	// default, so a collection cannot make a query read the person's other files.
+	AllowOutsideRoot bool
 	// AllowWrites lets the statement change data: the read-only guards are off. Off is the default.
 	AllowWrites bool
 	// Timeout bounds connecting and running together; 0 means DefaultTimeout.

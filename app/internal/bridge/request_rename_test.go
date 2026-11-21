@@ -41,16 +41,17 @@ func TestRequestService_SaveTo_Given_the_same_collection_and_a_new_name_When_sav
 	}
 }
 
-// Before: the "Leave secrets out" toggle of a code snippet started on whatever ui.snippet_exclude_secrets said.
+// Before: the "Leave secrets out" toggle of a code snippet started on whatever ui.snippet_exclude_secrets said, and
+// that setting was off by default, so "Copy as curl" put live secrets on the clipboard.
 func TestRequestService_Open_Given_the_snippet_setting_When_a_request_opens_Then_the_toggle_starts_as_the_setting(t *testing.T) {
 	_, byDefault, _, _, _ := openLoginOptions(t)
-	b := &vmtest.Backend{Cols: []model.Collection{vmtest.SampleCollection()}, Values: map[string]any{"ui.snippet_exclude_secrets": true}}
+	b := &vmtest.Backend{Cols: []model.Collection{vmtest.SampleCollection()}, Values: map[string]any{"ui.snippet_exclude_secrets": false}}
 	app := bridge.NewApp(b, bridge.NewInlineActor(), (&published{}).emit)
 	app.Start(t.Context())
 
-	turnedOn, err := app.Requests().Open("r:C1:R1")
+	turnedOff, err := app.Requests().Open("r:C1:R1")
 
-	if err != nil || byDefault.Snippet.Exclude || !turnedOn.Snippet.Exclude {
-		t.Fatalf("err %v, by default %v, turned on %v", err, byDefault.Snippet.Exclude, turnedOn.Snippet.Exclude)
+	if err != nil || !byDefault.Snippet.Exclude || turnedOff.Snippet.Exclude {
+		t.Fatalf("err %v, by default %v, turned off %v", err, byDefault.Snippet.Exclude, turnedOff.Snippet.Exclude)
 	}
 }

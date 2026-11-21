@@ -86,6 +86,16 @@
         "timeout": {
           "type": "string"
         },
+        "retries": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 10,
+          "description": "How many more times a failed request, fetch, webhook or subflow step runs before it counts as failed. A step that passes only after a retry is reported as flaky."
+        },
+        "retry_wait": {
+          "type": "string",
+          "description": "The pause before each retry, such as 2s."
+        },
         "attach": {
           "type": "string",
           "description": "The id of a request or subflow node right next to this one that the canvas draws it with; a view only."

@@ -4,6 +4,7 @@ package vm
 
 import (
 	"reflect"
+	"slices"
 	"strings"
 
 	flowi "github.com/githugt/flowi/lib"
@@ -173,10 +174,22 @@ func (s *Snippet) fetchActual(t flowi.RequestTarget, v model.RequestVersion, o f
 	})
 }
 
+// Formats are the ones that can say the request as it is now: the HTTP tools for an HTTP request, the tool of the
+// protocol for a gRPC call, a message or a query.
+func (s *Snippet) Formats() []snippet.Format { return snippet.FormatsFor(s.masked) }
+
 func (s *Snippet) render() {
 	req := s.masked
 	if !s.exclude && s.actual != nil {
 		req = *s.actual
+	}
+	formats := snippet.FormatsFor(req)
+	if len(formats) == 0 {
+		s.text, s.err = "", "No common command-line tool speaks this kind of request."
+		return
+	}
+	if !slices.Contains(formats, s.format) {
+		s.format = formats[0] // the kind changed, or the first preview came: the format of the old kind does not fit
 	}
 	text, err := snippet.Generate(s.format, req)
 	if err != nil {

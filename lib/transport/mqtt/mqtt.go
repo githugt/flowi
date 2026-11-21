@@ -245,3 +245,9 @@ func dialWebSocket(ctx context.Context, op transport.Operation) (net.Conn, error
 	}
 	return websocket.NetConn(context.WithoutCancel(ctx), c, websocket.MessageBinary), nil
 }
+
+// Probe connects (and signs in) and disconnects; nothing is subscribed or published.
+func (t Transport) Probe(ctx context.Context, op transport.Operation) error {
+	_, err := t.Run(ctx, op)
+	return err
+}

@@ -21,3 +21,16 @@ func TestWorker_should_run_off_the_posting_goroutine_and_post_the_result(t *test
 		t.Fatalf("got %d, posted %d times", got, posted.Load())
 	}
 }
+
+// Before: a panic in the background work ended the process; now it is logged and the result is not posted.
+func TestRun_should_survive_a_panic_in_the_work(t *testing.T) {
+	w := vm.NewWorker(func(f func()) { f() })
+	posted := false
+
+	vm.Run(w, func() int { panic("boom") }, func(int) { posted = true })
+	w.Wait()
+
+	if posted {
+		t.Fatal("the result of a panicking call was posted")
+	}
+}

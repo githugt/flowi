@@ -1,4 +1,6 @@
 <script lang="ts">
+  import Banner from './Banner.svelte'
+  import Button from './Button.svelte'
   // Says before a send what it would lack: variables the selected environment
   // does not define. A send still goes (the person may mean it); this only warns.
   import { RequestService } from '../bindings/github.com/githugt/flowi/app/internal/bridge'
@@ -22,14 +24,19 @@
     return () => (stale = true)
   })
 
+  // The chip in the tab strip warns only when this request needs an environment that is not chosen. Cleared when
+  // the editor goes, so a flow or a screen never inherits the last request's warning.
+  $effect(() => {
+    app.envWanted = missing.vars.length > 0 && !missing.environment
+    return () => (app.envWanted = false)
+  })
+
   const addable = $derived(missing.vars.filter((v) => v.name))
   const label = (v: { expr: string; name: string; secret: boolean }) => (v.name ? v.name : v.expr) + (v.secret ? ' (secret)' : '')
 </script>
 
 {#if missing.vars.length}
-  <div class="bar" role="status">
-    <span class="icon" aria-hidden="true">⚠</span>
-    <span class="text">
+  <Banner tone="warn" icon="⚠">
       {#if missing.environment}
         Not set in <strong>{missing.environment}</strong>:
       {:else if app.tree?.environments.length}
@@ -38,21 +45,17 @@
         This request needs an environment for:
       {/if}
       {#each missing.vars as v, i}<code class:fn={!v.name}>{label(v)}</code>{i < missing.vars.length - 1 ? ', ' : ''}{/each}
-    </span>
-    {#if missing.environment && addable.length}
-      <button onclick={() => app.addEnvironmentRows(missing.environment, addable)}>Set in {missing.environment}…</button>
-    {:else if !missing.environment && !app.tree?.environments.length}
-      <button onclick={promptNewEnvironment}>New environment…</button>
-    {/if}
-  </div>
+    {#snippet actions()}
+      {#if missing.environment && addable.length}
+        <Button small onclick={() => app.addEnvironmentRows(missing.environment, addable)}>Set in {missing.environment}…</Button>
+      {:else if !missing.environment && !app.tree?.environments.length}
+        <Button small onclick={promptNewEnvironment}>New environment…</Button>
+      {/if}
+    {/snippet}
+  </Banner>
 {/if}
 
 <style>
-  .bar { display: flex; align-items: center; gap: var(--sp-2); padding: 5px 12px; font-size: var(--fs-sm); background: color-mix(in srgb, var(--warn) 12%, transparent); border-bottom: 1px solid var(--line); }
-  .icon { color: var(--warn); }
-  .text { flex: 1; min-width: 0; }
   code { font-family: var(--mono); }
   code.fn { color: var(--fail); }
-  button { background: var(--raised); color: var(--text); border: 0; box-shadow: inset 0 0 0 1px var(--line); border-radius: var(--r-md); padding: 0 10px; min-height: var(--ctl-h-sm); font: inherit; font-weight: 500; white-space: nowrap; }
-  button:hover { background: var(--raised-3); }
 </style>

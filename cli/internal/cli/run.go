@@ -27,20 +27,23 @@ import (
 type runFlags struct {
 	collection, env, prefer, tag, bundle, overlay string
 	matrix                                        []string
+	data                                          string
 	inputs, reports                               []string
 	seed                                          uint64
 	grace                                         time.Duration
-	quiet                                         bool
+	quiet, all, failFast                          bool
 }
 
 func newRunCommand(i do.Injector) *cobra.Command {
 	var f runFlags
 	cmd := &cobra.Command{
-		Use:   "run <flow> | --tag <tag>",
-		Short: "Run a flow, or every flow with a tag",
+		Use:   "run <flow> | --tag <tag> | --all",
+		Short: "Run a flow, every flow with a tag, or every flow",
 		Long: "Run a flow (by path, e.g. user-creation, or id) and show each node as it finishes.\n\n" +
 			"With --tag, run every flow that carries the tag (its own `tags:` or its folder's), one after\n" +
-			"the other; the exit code is the worst of their outcomes. --report writes one file per flow,\n" +
+			"the other; the exit code is the worst of their outcomes. With --all, run every flow in the workspace\n" +
+			"(or in the --collection); --fail-fast stops after the first flow that does not pass. A line at the end\n" +
+			"counts the flows by outcome. --report writes one file per flow,\n" +
 			"with the flow's path added to the name (out.xml becomes out-user-creation.xml).\n\n" +
 			"Exit codes: 0 passed, 1 a node failed, 2 bad usage or input, 3 cancelled or aborted,\n" +
 			"4 a transport or system failure (including a report that could not be written).\n" +
@@ -56,12 +59,15 @@ func newRunCommand(i do.Injector) *cobra.Command {
 	fl.StringVar(&f.bundle, "bundle", "", "also write the run as a bundle (.flowi-run): the flow, seed, inputs and every call, secrets masked; `flowi run <bundle>` plays it back offline")
 	fl.StringVar(&f.overlay, "overlay", "", "lay this flowi overlay (or a stack, vip+slow) over every request step that names none of its own")
 	fl.StringArrayVar(&f.matrix, "matrix", nil, "run the flow once for every combination, as dimension=value,value: env, overlay or input.<name> (repeatable); prints a grid of passes and failures")
+	fl.StringVar(&f.data, "data", "", "run the flow once for each row of this CSV (header line, one column per flow input) or JSON array of objects; prints the result of each row")
 	fl.StringVar(&f.tag, "tag", "", "run every flow that carries this tag instead of naming one")
 	fl.StringVar(&f.prefer, "prefer-version", "", "run this version of each request that has it")
 	fl.StringArrayVar(&f.inputs, "input", nil, "value for a flow input, as name=value (a template; repeatable)")
 	fl.Uint64Var(&f.seed, "seed", 0, "seed for generated values (default: random, printed)")
 	fl.DurationVar(&f.grace, "grace", 0, "how long a cancelled run may take to stop (default: the run.grace setting)")
-	fl.StringArrayVar(&f.reports, "report", nil, "also write the report, as format=path: junit, json, markdown, text, mermaid (a sequence diagram) or har (repeatable)")
+	fl.StringArrayVar(&f.reports, "report", nil, "also write the report, as format=path: junit, json, markdown, text, html (one page to share), mermaid (a sequence diagram) or har (repeatable)")
+	fl.BoolVar(&f.all, "all", false, "run every flow instead of naming one")
+	fl.BoolVar(&f.failFast, "fail-fast", false, "with --tag or --all, stop after the first flow that does not pass")
 	fl.BoolVar(&f.quiet, "quiet", false, "print only the final status line")
 	return cmd
 }
@@ -77,6 +83,9 @@ func runRun(cmd *cobra.Command, i do.Injector, args []string, f runFlags) error 
 	s, err := session(cmd, i)
 	if err != nil {
 		return err
+	}
+	if f.all {
+		return runAll(cmd, i, s, opts, reports, f)
 	}
 	if f.tag != "" {
 		return runTagged(cmd, i, s, opts, reports, f)
@@ -94,20 +103,29 @@ func runRun(cmd *cobra.Command, i do.Injector, args []string, f runFlags) error 
 	if len(f.matrix) > 0 {
 		return runMatrix(cmd, s, target, opts, reports, f)
 	}
+	if f.data != "" {
+		return runData(cmd, s, target, opts, reports, f, do.MustInvoke[Env](i).Cwd)
+	}
 	return runOne(cmd, i, s, target, opts, reports, f.bundle, f)
 }
 
 // checkTarget wants a flow or a tag, not both and not neither, and a matrix only for one flow of its own.
 func (f runFlags) checkTarget(args []string) error {
 	switch {
+	case f.all && (f.tag != "" || len(args) == 1 || len(f.matrix) > 0):
+		return &UsageError{Err: errors.New("--all runs every flow; leave out the flow name, --tag and --matrix")}
+	case f.failFast && f.tag == "" && !f.all:
+		return &UsageError{Err: errors.New("--fail-fast needs --tag or --all")}
 	case len(f.matrix) > 0 && (f.tag != "" || len(args) == 1 && (flowi.IsArazzoRef(args[0]) || flowi.IsBundleRef(args[0]))):
 		return &UsageError{Err: errors.New("--matrix runs one saved flow; it does not combine with --tag, an Arazzo file or a bundle")}
+	case f.data != "" && (f.tag != "" || f.all || len(f.matrix) > 0 || len(args) == 1 && (flowi.IsArazzoRef(args[0]) || flowi.IsBundleRef(args[0]))):
+		return &UsageError{Err: errors.New("--data runs one saved flow; it does not combine with --tag, --all, --matrix, an Arazzo file or a bundle")}
 	case len(f.matrix) > 0 && (f.env != "" || f.overlay != ""):
 		return &UsageError{Err: errors.New("--matrix sets the environment and the overlay itself; leave --env and --overlay out, or list them as dimensions")}
 	case len(args) == 1 && f.tag != "":
 		return &UsageError{Err: errors.New("name a flow or use --tag, not both")}
-	case len(args) == 0 && f.tag == "":
-		return &UsageError{Err: errors.New("run wants a flow or --tag <tag>")}
+	case len(args) == 0 && f.tag == "" && !f.all:
+		return &UsageError{Err: errors.New("run wants a flow, --tag <tag> or --all")}
 	}
 	return nil
 }
@@ -115,7 +133,7 @@ func (f runFlags) checkTarget(args []string) error {
 // runBundle plays a bundled run back from its recording. It decides the environment, seed and inputs itself,
 // so options that would change them are refused rather than ignored.
 func runBundle(cmd *cobra.Command, i do.Injector, s *Session, file string, reports []reportSpec, f runFlags) error {
-	for flag, set := range map[string]bool{"--env": f.env != "", "--seed": f.seed != 0, "--input": len(f.inputs) > 0, "--prefer-version": f.prefer != "", "--bundle": f.bundle != "", "--overlay": f.overlay != "", "--matrix": len(f.matrix) > 0} {
+	for flag, set := range map[string]bool{"--env": f.env != "", "--seed": f.seed != 0, "--input": len(f.inputs) > 0, "--prefer-version": f.prefer != "", "--bundle": f.bundle != "", "--overlay": f.overlay != "", "--matrix": len(f.matrix) > 0, "--data": f.data != ""} {
 		if set {
 			return &UsageError{Err: fmt.Errorf("%s does not apply to a replay: it uses the recorded environment, seed and inputs, and a replay is not bundled again", flag)}
 		}
@@ -164,15 +182,26 @@ func runTagged(cmd *cobra.Command, i do.Injector, s *Session, opts flowi.RunOpti
 	return runTargets(cmd, i, s, targets, opts, reports, f, true)
 }
 
+// runAll runs every flow.
+func runAll(cmd *cobra.Command, i do.Injector, s *Session, opts flowi.RunOptions, reports []reportSpec, f runFlags) error {
+	targets, err := s.Workspace.FindAllFlows(f.collection)
+	if err != nil {
+		return err
+	}
+	return runTargets(cmd, i, s, targets, opts, reports, f, true)
+}
+
 // runTargets runs the flows one after the other and ends with the worst exit code, so one failure
 // does not hide behind a later pass. nameReports adds each flow's path to its report file names.
 func runTargets(cmd *cobra.Command, i do.Injector, s *Session, targets []flowi.FlowTarget, opts flowi.RunOptions, reports []reportSpec, f runFlags, nameReports bool) error {
 	worst := ExitOK
+	ran, notPassed := 0, 0
 	for _, target := range targets {
 		specs := reports
 		if nameReports {
 			specs = reportsFor(reports, flowPath(s, target))
 		}
+		ran++
 		err := runOne(cmd, i, s, target, opts, specs, bundlePathFor(f.bundle, flowPath(s, target), nameReports), f)
 		if err == nil {
 			continue
@@ -182,6 +211,14 @@ func runTargets(cmd *cobra.Command, i do.Injector, s *Session, targets []flowi.F
 			return err
 		}
 		worst = max(worst, exit.Code)
+		notPassed++
+		// Before: every flow ran even when the first one had failed, so a broken build took the whole suite's time.
+		if f.failFast {
+			break
+		}
+	}
+	if len(targets) > 1 {
+		cmd.PrintErrf("%d of %d flows ran, %d did not pass\n", ran, len(targets), notPassed)
 	}
 	if worst != ExitOK {
 		return Exit(worst)
@@ -267,7 +304,7 @@ func (f runFlags) options() (flowi.RunOptions, []reportSpec, error) {
 	if f.grace < 0 {
 		return flowi.RunOptions{}, nil, &UsageError{Err: errors.New("--grace must not be negative")}
 	}
-	return flowi.RunOptions{Env: f.env, PreferVersion: f.prefer, Inputs: inputs, Seed: f.seed, Grace: f.grace, Overlay: f.overlay}, reports, nil
+	return flowi.RunOptions{Env: f.env, PreferVersion: f.prefer, Inputs: inputs, Seed: f.seed, Grace: f.grace, Overlay: f.overlay, Trigger: "cli"}, reports, nil
 }
 
 func parsePairs(flag string, pairs []string) (map[string]string, error) {
@@ -288,7 +325,7 @@ type reportSpec struct{ format, path string }
 func reportWriters() map[string]func(io.Writer, report.Run) error {
 	return map[string]func(io.Writer, report.Run) error{
 		"junit": report.WriteJUnit, "json": report.WriteJSON, "markdown": report.WriteMarkdown, "text": report.WriteText,
-		"mermaid": report.WriteMermaid,
+		"mermaid": report.WriteMermaid, "html": report.WriteHTML,
 	}
 }
 
@@ -302,7 +339,7 @@ func parseReports(flags []string) ([]reportSpec, error) {
 	for _, f := range flags {
 		format, path, ok := strings.Cut(f, "=")
 		if _, known := writers[format]; !ok || (!known && format != harFormat) || path == "" {
-			return nil, &UsageError{Err: fmt.Errorf("--report wants format=path with format junit, json, markdown, text, mermaid or har, got %q", f)}
+			return nil, &UsageError{Err: fmt.Errorf("--report wants format=path with format junit, json, markdown, text, html, mermaid or har, got %q", f)}
 		}
 		out = append(out, reportSpec{format: format, path: path})
 	}
@@ -348,7 +385,7 @@ func renderRun(cmd *cobra.Command, i do.Injector, run *engine.Run, f runFlags) e
 		}
 		return res
 	case tui.RendererLive:
-		return p.live(run, console)
+		return p.live(run, console.UseColor(g.Color))
 	}
 	return p.render(run)
 }
@@ -358,8 +395,18 @@ func finishRun(cmd *cobra.Command, i do.Injector, res engine.RunResult, reportEr
 	g := do.MustInvoke[*GlobalOptions](i)
 	if g.Output != OutputJSON {
 		failures := slices.DeleteFunc(slices.Clone(res.Diags), func(d diag.Diagnostic) bool { return d.Severity != diag.SeverityError })
-		if err := PrintDiagnostics(cmd.ErrOrStderr(), OutputText, do.MustInvoke[Env](i).Cwd, failures); err != nil {
+		env := do.MustInvoke[Env](i)
+		if err := PrintDiagnostics(cmd.ErrOrStderr(), OutputText, env.Cwd, failures); err != nil {
 			return err
+		}
+		// Before: a failed run in a pull request left only a log to read. Annotations put each failure on the file.
+		if wantsAnnotations(g.Output, env.Environ) {
+			if err := PrintDiagnostics(cmd.ErrOrStderr(), OutputGitHub, env.Cwd, failures); err != nil {
+				return err
+			}
+		}
+		if err := writeStepSummary(env.Environ, res, env.Cwd, failures); err != nil {
+			cmd.PrintErrf("warning: %v\n", err)
 		}
 	}
 	code := runExitCode(res)

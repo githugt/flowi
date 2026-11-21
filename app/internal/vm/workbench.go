@@ -47,12 +47,12 @@ func (r *Request) Configured(s Section) bool {
 	}
 	switch s {
 	case SectionParams:
-		return len(v.Query) > 0
+		return slices.ContainsFunc(v.Query, func(kv model.KeyValue) bool { return !kv.Disabled })
 	case SectionHeaders:
 		if v.Async != nil && !AsyncHeadersAreConnection(v.Async.Protocol) {
 			return v.Async.Send != nil && len(v.Async.Send.Headers) > 0
 		}
-		return slices.ContainsFunc(v.Headers, func(kv model.KeyValue) bool { return !strings.EqualFold(kv.Key, authHeader) })
+		return slices.ContainsFunc(v.Headers, func(kv model.KeyValue) bool { return !kv.Disabled && !strings.EqualFold(kv.Key, authHeader) })
 	case SectionBody:
 		return bodyHasContent(v.Body)
 	case SectionAuth:

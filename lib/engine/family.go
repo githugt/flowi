@@ -18,6 +18,8 @@ type exchange interface {
 	view() map[string]any
 	// preview renders the request without sending it.
 	preview(in buildInput, includeSecrets bool) Preview
+	// probe tests the connection without sending anything (see ProbeSend).
+	probe(ctx context.Context) Probe
 }
 
 // exchange is the exchange of the family of the version being run.

@@ -99,8 +99,12 @@ func (v *Vault) createKey() (key []byte, env envelope, err error) {
 			return key, envelope{Version: fileVersion, KeySource: sourceChain}, nil
 		}
 	}
-	if v.opts.Passphrase != nil {
-		phrase, err := v.opts.Passphrase()
+	ask := v.opts.NewPassphrase
+	if ask == nil {
+		ask = v.opts.Passphrase
+	}
+	if ask != nil {
+		phrase, err := ask()
 		if err != nil {
 			return nil, envelope{}, &LockedError{Reason: "no passphrase: " + err.Error()}
 		}

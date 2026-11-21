@@ -96,6 +96,7 @@ type ImportWizard struct {
 	choices     []CollectionChoice
 	kind        flowi.ImportKind
 	file, paste string
+	detected    string // what the source was recognised as, for the screen; "" when not
 	overlay     string // overlay files or URLs, separated by ";"
 	collection  model.ID
 	plan        *flowi.ImportPlan
@@ -155,12 +156,26 @@ func (iw *ImportWizard) Err() string { return iw.err }
 // Done says what the last import wrote, or "".
 func (iw *ImportWizard) Done() string { return iw.done }
 
-// SetKind chooses the document kind; it discards the preview.
-func (iw *ImportWizard) SetKind(k flowi.ImportKind) { iw.choose(func() { iw.kind = k }) }
+// SetKind chooses the document kind; it discards the preview and the note of what was detected.
+func (iw *ImportWizard) SetKind(k flowi.ImportKind) {
+	iw.choose(func() { iw.kind, iw.detected = k, "" })
+}
+
+// SetDetected sets the kind to what the source was recognised as, with the words that say what it is ("OpenAPI 3.1.0"),
+// which the screen shows so the change of kind is not a surprise.
+func (iw *ImportWizard) SetDetected(k flowi.ImportKind, label string) {
+	iw.kind, iw.detected = k, label
+	iw.changed()
+}
+
+// Detected says what the source was recognised as, "" when it was not or the person chose the kind.
+func (iw *ImportWizard) Detected() string { return iw.detected }
 
 // SetFile chooses the document (a folder for Bruno); it discards the
 // preview.
-func (iw *ImportWizard) SetFile(path string) { iw.choose(func() { iw.file = path }) }
+func (iw *ImportWizard) SetFile(path string) {
+	iw.choose(func() { iw.file, iw.detected = path, "" })
+}
 
 // SupportsOverlay reports whether a kind can take OpenAPI Overlay documents.
 func SupportsOverlay(kind flowi.ImportKind) bool {
@@ -174,7 +189,9 @@ func (iw *ImportWizard) SetOverlay(refs string) { iw.choose(func() { iw.overlay 
 
 // SetPaste sets pasted text, used instead of the file when not empty (for
 // kinds whose SourceMode allows it); it discards the preview.
-func (iw *ImportWizard) SetPaste(text string) { iw.choose(func() { iw.paste = text }) }
+func (iw *ImportWizard) SetPaste(text string) {
+	iw.choose(func() { iw.paste, iw.detected = text, "" })
+}
 
 // Paste is the pasted text.
 func (iw *ImportWizard) Paste() string { return iw.paste }

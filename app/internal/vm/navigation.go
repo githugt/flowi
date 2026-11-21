@@ -252,7 +252,11 @@ func joinPath(dir, name string) string {
 // shows the tree without them and calls removed with the node ids that
 // went. It stops at the first failure: removed gets those already gone and
 // fail the error. Other kinds of rows are ignored.
-func (ws *Workspace) Delete(ids []string, removed func(nodeIDs []string), fail func(error)) {
+//
+// A request or flow goes to the trash, not away for good: kept (when not nil) gets what went there, so the window
+// can offer Undo. An environment is removed for good.
+// Before: every delete was permanent, so each one had to ask first and a slip lost the file.
+func (ws *Workspace) Delete(ids []string, removed func(nodeIDs []string), kept func([]flowi.TrashedItem), fail func(error)) {
 	var nodes []TreeNode
 	for _, n := range ws.nodesOf(ids) {
 		if isLeaf(n) {
@@ -260,15 +264,21 @@ func (ws *Workspace) Delete(ids []string, removed func(nodeIDs []string), fail f
 		}
 	}
 	type outcome struct {
-		gone []string
-		err  error
-		snap snapshot
+		gone  []string
+		items []flowi.TrashedItem
+		err   error
+		snap  snapshot
 	}
 	Run(ws.w, func() outcome {
 		var o outcome
 		for _, n := range nodes {
-			if o.err = ws.deleteNode(n); o.err != nil {
+			item, err := ws.deleteNode(n)
+			if err != nil {
+				o.err = err
 				break
+			}
+			if item.ID != "" {
+				o.items = append(o.items, item)
 			}
 			o.gone = append(o.gone, n.ID)
 		}
@@ -279,23 +289,26 @@ func (ws *Workspace) Delete(ids []string, removed func(nodeIDs []string), fail f
 		if len(o.gone) > 0 && removed != nil {
 			removed(o.gone)
 		}
+		if len(o.items) > 0 && kept != nil {
+			kept(o.items)
+		}
 		if o.err != nil && fail != nil {
 			fail(o.err)
 		}
 	})
 }
 
-// deleteNode runs off the UI goroutine.
-func (ws *Workspace) deleteNode(n TreeNode) error {
+// deleteNode runs off the UI goroutine. It returns the trash item of a request or flow.
+func (ws *Workspace) deleteNode(n TreeNode) (flowi.TrashedItem, error) {
 	switch n.Kind {
 	case NodeRequest:
-		return ws.b.DeleteRequest(flowi.RequestTarget{Collection: n.Collection, Request: n.Request})
+		return ws.b.DeleteRequestToTrash(flowi.RequestTarget{Collection: n.Collection, Request: n.Request})
 	case NodeFlow:
-		return ws.b.DeleteFlow(flowi.FlowTarget{Collection: n.Collection, Flow: n.Flow})
+		return ws.b.DeleteFlowToTrash(flowi.FlowTarget{Collection: n.Collection, Flow: n.Flow})
 	case NodeEnvironment:
-		return ws.b.DeleteEnvironment(n.File)
+		return flowi.TrashedItem{}, ws.b.DeleteEnvironment(n.File)
 	}
-	return nil
+	return flowi.TrashedItem{}, nil
 }
 
 // DuplicateRequest copies request t to path, then calls open with the
@@ -347,7 +360,7 @@ func (ws *Workspace) FlowFromRequests(collection model.ID, path string, requestN
 			return "", err
 		}
 		f := model.Flow{Meta: model.Meta{Name: name}, Nodes: chainOf(requests)}
-		if err := ws.b.SaveFlow(t, f, false); err != nil {
+		if err := ws.b.SaveFlow(t, f, false, ""); err != nil {
 			// Do not leave the empty flow behind; the save error is the one to show.
 			_ = ws.b.DeleteFlow(t)
 			return "", err

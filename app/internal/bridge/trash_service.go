@@ -20,6 +20,8 @@ type TrashItemView struct {
 	Name string `json:"name"`
 	Path string `json:"path"` // where it was in the Drafts
 	At   string `json:"at"`   // when it was moved, local time
+	// Deleted: it was deleted from a collection (Restore puts it back there), not swept from the Drafts.
+	Deleted bool `json:"deleted"`
 }
 
 // TrashView is the trash screen.
@@ -43,7 +45,7 @@ func (s *TrashService) view(problem string) TrashView {
 		v.Error = vm.ErrorText(err)
 	}
 	for _, it := range list {
-		v.Items = append(v.Items, TrashItemView{ID: it.ID, Kind: it.Kind, Name: it.Name, Path: it.Path, At: it.TrashedAt.Local().Format("2006-01-02 15:04")})
+		v.Items = append(v.Items, TrashItemView{ID: it.ID, Kind: it.Kind, Name: it.Name, Path: it.Path, At: it.TrashedAt.Local().Format("2006-01-02 15:04"), Deleted: it.Collection != ""})
 	}
 	return v
 }
@@ -95,7 +97,7 @@ func (s *TrashService) Sweep(open []string) int {
 	return len(moved)
 }
 
-// Restore puts an item back into the Drafts and returns the path it got.
+// Restore puts an item back (where a delete took it from, or into the Drafts) and returns the path it got.
 func (s *TrashService) Restore(id string) (string, error) {
 	path, err := s.app.backend.RestoreFromTrash(id)
 	s.changed()

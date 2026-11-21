@@ -20,6 +20,7 @@ import (
 	"github.com/goccy/go-yaml/token"
 
 	"github.com/githugt/flowi/lib/diag"
+	"github.com/githugt/flowi/lib/internal/mergeconflict"
 	"github.com/githugt/flowi/lib/settings"
 )
 
@@ -50,6 +51,11 @@ func (c *Codec) parse(file string, data []byte) (*decoder, ast.Node, bool) {
 	// Duplicate keys are detected while walking so they get their own code.
 	f, err := parser.ParseBytes(data, 0, parser.AllowDuplicateMapKey())
 	if err != nil {
+		if line, ok := mergeconflict.Find(data); ok {
+			// The syntax error is a symptom: say what is actually wrong.
+			d.diags = append(d.diags, diag.New(diag.CodeFileConflict, diag.Location{File: file, Pos: diag.Position{Line: line, Column: 1}}, nil))
+			return d, nil, false
+		}
 		d.diags = append(d.diags, syntaxDiagnostic(file, err))
 		return d, nil, false
 	}

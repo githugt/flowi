@@ -77,6 +77,13 @@ func (l *Log) Add(e Entry) {
 	}
 }
 
+// Total is how many entries were ever added, the ones no longer kept included.
+func (l *Log) Total() int {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return l.next
+}
+
 // Entries returns a copy of the kept entries, oldest first.
 func (l *Log) Entries() []Entry {
 	l.mu.Lock()

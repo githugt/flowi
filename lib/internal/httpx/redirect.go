@@ -10,6 +10,8 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/githugt/flowi/lib/internal/credname"
+
 	"golang.org/x/net/publicsuffix"
 )
 
@@ -128,17 +130,9 @@ func effectivePort(u *url.URL) string {
 	return "80"
 }
 
-// credentialHeaderParts are name fragments that mark a header as carrying
-// a credential. Matching on fragments catches custom headers (X-Api-Key,
-// X-Auth-Token) that a fixed list would miss. The cost is that a harmless
-// header such as Idempotency-Key is also dropped on a cross-origin
-// redirect, which is the safe side to err on; http.redirect_keep_headers
-// lists the ones to keep.
-func credentialHeaderParts() []string {
-	return []string{"auth", "token", "key", "secret", "passw", "credential", "signature", "session", "cookie"}
-}
-
-func isCredentialHeader(name string) bool {
-	lower := strings.ToLower(name)
-	return slices.ContainsFunc(credentialHeaderParts(), func(part string) bool { return strings.Contains(lower, part) })
-}
+// isCredentialHeader matches on name fragments, which catches custom headers
+// (X-Api-Key, X-Auth-Token) that a fixed list would miss. The cost is that a
+// harmless header such as Idempotency-Key is also dropped on a cross-origin
+// redirect, the safe side to err on; http.redirect_keep_headers lists the ones
+// to keep.
+func isCredentialHeader(name string) bool { return credname.SensitiveAnywhere(name) }

@@ -1,12 +1,17 @@
 <script lang="ts">
+  import ScreenPage from './ScreenPage.svelte'
+  import Button from './Button.svelte'
+  import EmptyState from './EmptyState.svelte'
+  import { errorText } from './lib/errors'
   import { onMount } from 'svelte'
   import { live } from './lib/live'
   import { BlueprintsService } from '../bindings/github.com/githugt/flowi/app/internal/bridge'
   import { ui } from './lib/ui.svelte'
   import type { BlueprintsView } from './lib/types'
-  import { typeIcon } from './lib/card'
+  import { typeIcon, typeLabel } from './lib/card'
   import Icon from './Icon.svelte'
   import CodeEditor from './CodeEditor.svelte'
+  import Select from './Select.svelte'
 
   type Blueprint = BlueprintsView['blueprints'][number]
 
@@ -21,7 +26,7 @@
     try {
       editing = { key, text: await BlueprintsService.Source(key), problems: '' }
     } catch (e) {
-      ui.toast(String(e), 'error')
+      ui.fail(e)
     }
   }
 
@@ -32,7 +37,7 @@
       if (problems) editing.problems = problems
       else editing = null
     } catch (e) {
-      if (editing) editing.problems = String(e)
+      if (editing) editing.problems = errorText(e)
     }
   }
 
@@ -48,7 +53,7 @@
         try {
           await edit(await BlueprintsService.New(collection, name, phase || 'post'))
         } catch (e) {
-          ui.toast(String(e), 'error')
+          ui.fail(e)
         }
       },
     })
@@ -73,7 +78,7 @@
     try {
       await edit(await BlueprintsService.Customize(key, collection))
     } catch (e) {
-      ui.toast(String(e), 'error')
+      ui.fail(e)
     }
   }
 
@@ -86,22 +91,22 @@
   const of = (group: Blueprint['group']) => view.blueprints.filter((b) => b.group === group && !replaced(b))
 </script>
 
-<div class="page">
+<ScreenPage>
   <div class="head">
     <p class="note">Blueprints are flow templates and reusable hooks kept in a collection's blueprints folder.</p>
     {#if view.collections.length > 1}
-      <select aria-label="Collection that new and edited blueprints go to" value={collection} onchange={(e) => (target = e.currentTarget.value)}>
+      <Select label="Collection that new and edited blueprints go to" value={collection} onchange={(e) => (target = e.currentTarget.value)}>
         {#each view.collections as c}<option value={c.id}>{c.label}</option>{/each}
-      </select>
+      </Select>
     {/if}
-    <button class="primary" disabled={!view.collections.length} title={view.collections.length ? undefined : 'Open a collection first'} onclick={create}>New blueprint…</button>
+    <Button variant="primary" disabled={!view.collections.length} title={view.collections.length ? undefined : 'Open a collection first'} onclick={create}>New blueprint…</Button>
   </div>
   <p class="note">New requests start with the built-in hooks of their kind. Edit one and the collection keeps its own version, which its new requests use from then on; Reset brings the built-in back. The setting <code>requests.seed_blueprint</code> can name other blueprints, or turn this off.</p>
   {#each sections as s (s.group)}
     {@const list = of(s.group)}
     <h2 style:--tone={`var(${s.tone})`}><span class="sicon"><Icon name={s.icon} size={15} /></span>{s.title}<span class="count">{list.length}</span></h2>
     <p class="note">{s.note}</p>
-    {#if !list.length}<p class="note">None yet.</p>{/if}
+    {#if !list.length}<EmptyState icon={s.icon} title="None yet" hint="Edit a built-in one above, or make one from a flow's menu, and it shows here." compact />{/if}
     {#each list as b (b.key)}
       <div class="card" style:--tone={`var(${s.tone})`}>
         <div class="top"><strong>{b.name}</strong>
@@ -110,14 +115,14 @@
           <span class="spacer"></span>
           {#if b.builtIn}
             <!-- Shipped with Flowi, so it has no file: Edit makes the collection's own copy. -->
-            <button disabled={!collection} title={collection ? undefined : 'Open a collection first'} onclick={() => customize(b.key)}>Edit…</button>
+            <Button disabled={!collection} title={collection ? undefined : 'Open a collection first'} onclick={() => customize(b.key)}>Edit…</Button>
           {:else if b.replacesDefault}
             <!-- It is already what new requests of its kind start with. -->
-          {:else if b.kind === 'flow'}<button onclick={() => (ui.blueprint = { collection: b.collection, folder: '', blueprint: b.key })}>New flow from this…</button>
-          {:else}<button onclick={() => BlueprintsService.UseAsDefault(b.key)}>Use for new requests</button>{/if}
-          {#if !b.builtIn}<button onclick={() => edit(b.key)}>Edit…</button>{/if}
-          {#if b.replacesDefault}<button onclick={() => ui.confirm('Reset to the built-in', `Delete ${b.collectionName}'s own version of this default? Its new requests start with the built-in again; requests made already keep their hooks.`, () => BlueprintsService.Delete(b.key), 'Reset')}>Reset…</button>
-          {:else if !b.builtIn}<button onclick={() => ui.confirm('Delete blueprint', `Delete the blueprint ${b.name}? Flows made from it are not affected.`, () => BlueprintsService.Delete(b.key))}>Delete…</button>{/if}
+          {:else if b.kind === 'flow'}<Button onclick={() => (ui.blueprint = { collection: b.collection, folder: '', blueprint: b.key })}>New flow from this…</Button>
+          {:else}<Button onclick={() => BlueprintsService.UseAsDefault(b.key)}>Use for new requests</Button>{/if}
+          {#if !b.builtIn}<Button onclick={() => edit(b.key)}>Edit…</Button>{/if}
+          {#if b.replacesDefault}<Button onclick={() => ui.confirm('Reset to the built-in', `Delete ${b.collectionName}'s own version of this default? Its new requests start with the built-in again; requests made already keep their hooks.`, () => BlueprintsService.Delete(b.key), 'Reset')}>Reset…</Button>
+          {:else if !b.builtIn}<Button onclick={() => ui.confirm('Delete blueprint', `Delete the blueprint ${b.name}? Flows made from it are not affected.`, () => BlueprintsService.Delete(b.key))}>Delete…</Button>{/if}
         </div>
         {#if b.description}<p class="muted">{b.description}</p>{/if}
         {#if b.params.length}
@@ -129,24 +134,23 @@
           <div class="actions">
             <span class="muted">Give it <code>params</code> and it becomes a flow template; <code>phase: pre</code> makes its steps pre-request hooks.</span>
             <span class="spacer"></span>
-            <button onclick={() => (editing = null)}>Cancel</button><button class="primary" onclick={save}>Save</button>
+            <Button onclick={() => (editing = null)}>Cancel</Button><Button variant="primary" onclick={save}>Save</Button>
           </div>
         {/if}
         <details>
           <summary>{b.nodes} {b.nodes === 1 ? 'step' : 'steps'}</summary>
           <ol>
             {#each b.steps as step}
-              <li><span class="type" style:--tone={`var(${stepTone(step.type)})`}><Icon name={typeIcon(step.type)} size={12} />{step.type}</span><span class="name">{step.name}</span>{#if step.detail}<code title={step.detail}>{step.detail}</code>{/if}</li>
+              <li><span class="type" style:--tone={`var(${stepTone(step.type)})`}><Icon name={typeIcon(step.type)} size={12} />{typeLabel(step.type)}</span><span class="name">{step.name}</span>{#if step.detail}<code title={step.detail}>{step.detail}</code>{/if}</li>
             {/each}
           </ol>
         </details>
       </div>
     {/each}
   {/each}
-</div>
+</ScreenPage>
 
 <style>
-  .page { position: absolute; inset: 0; overflow: auto; padding: 28px 32px 56px; max-width: 820px; }
   h2 { display: flex; align-items: center; gap: var(--sp-2); margin: 24px 0 2px; font-size: var(--fs-lg); font-weight: 600; }
   h2 .count { margin-left: 0; }
   .sicon { display: grid; place-items: center; width: 24px; height: 24px; border-radius: var(--r-md); background: color-mix(in srgb, var(--tone) 16%, transparent); color: var(--tone); }
@@ -156,7 +160,6 @@
   .top { display: flex; align-items: center; gap: 10px; min-height: var(--ctl-h); }
   .top strong { white-space: nowrap; }
   .top .muted { min-width: 0; margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .top button { flex: none; }
   .spacer { flex: 1; }
   .head { display: flex; align-items: flex-start; gap: var(--sp-3); }
   .head .note { flex: 1; }
@@ -164,15 +167,11 @@
   .editor :global(.cm-editor) { height: 100%; }
   .problems { margin: 0 0 var(--sp-2); padding: var(--sp-2); border-radius: var(--r-md); background: var(--fail-t); color: var(--fail); font: var(--fs-sm) var(--mono); white-space: pre-wrap; }
   .actions { display: flex; align-items: center; gap: var(--sp-2); margin-bottom: var(--sp-2); }
-  button.primary { background: var(--primary-fill); color: var(--on-primary); box-shadow: none; }
-  button.primary:hover:not(:disabled) { background: var(--primary-fill); filter: brightness(1.08); }
-  button:disabled { opacity: .55; }
   .tag { flex: none; white-space: nowrap; font-size: var(--fs-xs); border: 1px solid var(--line); border-radius: var(--r-pill); padding: 0 8px; color: var(--text); }
   .builtin { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 45%, transparent); }
   .phase { color: var(--ok); border-color: transparent; background: var(--ok-t); }
   .phase.pre { color: var(--info); background: var(--info-t); }
   .edited { color: var(--dirty); border-color: color-mix(in srgb, var(--dirty) 45%, transparent); }
-  .head select { flex: none; height: var(--ctl-h); }
   .params { display: flex; flex-wrap: wrap; gap: var(--sp-1); margin: var(--sp-1) 0; }
   code { font: var(--fs-xs) var(--mono); }
   summary { color: var(--muted); font-size: var(--fs-sm); cursor: pointer; width: fit-content; }
@@ -182,6 +181,4 @@
   .type { flex: none; display: inline-flex; align-items: center; gap: 5px; min-width: 64px; box-sizing: border-box; border-radius: var(--r-sm); padding: 0 7px; background: color-mix(in srgb, var(--tone) 16%, transparent); color: var(--tone); font: 600 var(--fs-xs)/18px var(--mono); }
   .name { flex: none; }
   li code { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); }
-  button { background: var(--raised); color: var(--text); border: 0; box-shadow: inset 0 0 0 1px var(--line); border-radius: var(--r-md); padding: 0 12px; min-height: var(--ctl-h); font: inherit; font-weight: 500; }
-  button:hover:not(:disabled) { background: var(--raised-3); }
 </style>

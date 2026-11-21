@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { sectionCounts } from './tabcounts'
+import { sectionConfigured, sectionCounts } from './tabcounts'
 import type { RequestView } from './types'
 
 const kv = (key: string) => ({ Key: key, Value: 'x', Description: '' })
@@ -38,5 +38,44 @@ describe('sectionCounts', () => {
 
     expect(sectionCounts(sends).Headers).toBe(2)
     expect(sectionCounts(connection).Headers).toBe(1)
+  })
+})
+
+describe('sectionConfigured', () => {
+  // Before: the Receive, Binding, Proto and Settings tabs never showed the green dot.
+  it('shows the dot for what an async request waits for and its bindings', () => {
+    const waiting = viewWith({ async: { block: { Receive: { Count: 3, Timeout: 0, Match: '' }, Binding: [kv('group')] } } })
+    const empty = viewWith({ async: { block: { Receive: { Count: 0, Timeout: 0, Match: '' }, Binding: null } } })
+
+    expect(sectionConfigured(waiting, 'Receive')).toBe(true)
+    expect(sectionConfigured(waiting, 'Binding')).toBe(true)
+    expect(sectionConfigured(empty, 'Receive')).toBe(false)
+    expect(sectionConfigured(empty, 'Binding')).toBe(false)
+  })
+  it('shows the dot for gRPC proto files and for what a gRPC request waits for', () => {
+    const grpc = viewWith({ grpc: { block: { Proto: ['a.proto'], Import: null, Receive: { Count: 0, Timeout: 5, Match: '' } } } })
+
+    expect(sectionConfigured(grpc, 'Proto')).toBe(true)
+    expect(sectionConfigured(grpc, 'Receive')).toBe(true)
+    expect(sectionConfigured(viewWith({ grpc: { block: { Proto: null, Import: null, Receive: null } } }), 'Proto')).toBe(false)
+  })
+  it('shows the dot for send settings', () => {
+    expect(sectionConfigured(viewWith({ current: { Settings: { timeout: '5s' } } }), 'Settings')).toBe(true)
+    expect(sectionConfigured(viewWith({ current: { Settings: {} } }), 'Settings')).toBe(false)
+    expect(sectionConfigured(viewWith({ current: {} }), 'Settings')).toBe(false)
+  })
+})
+
+describe('rows switched off', () => {
+  it('should not count a switched-off parameter or header, and show no dot when all are off', () => {
+    // Before: every row counted, so the badge promised entries the request did not send.
+    const some = viewWith({ current: { Query: [kv('a'), { ...kv('b'), Disabled: true }], Headers: [kv('h'), { ...kv('i'), Disabled: true }] } })
+    const none = viewWith({ current: { Query: [{ ...kv('a'), Disabled: true }], Headers: [{ ...kv('h'), Disabled: true }] } })
+
+    expect(sectionCounts(some)).toMatchObject({ Params: 1, Headers: 1 })
+    expect(sectionCounts(none)).toMatchObject({ Params: 0, Headers: 0 })
+    expect(sectionConfigured(none, 'Params')).toBe(false)
+    expect(sectionConfigured(none, 'Headers')).toBe(false)
+    expect(sectionConfigured(some, 'Params')).toBe(true)
   })
 })

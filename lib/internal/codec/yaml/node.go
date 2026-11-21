@@ -50,6 +50,8 @@ func (m *mapping) flowNode() model.Node {
 		Concurrent:     m.boolean("concurrent"),
 		OnError:        m.str("on_error"),
 		Timeout:        m.duration("timeout"),
+		Retries:        int(m.integer("retries")),
+		RetryWait:      m.duration("retry_wait"),
 		Attach:         m.str("attach"),
 		AttachAt:       m.str("attach_at"),
 		Color:          m.str("color"),
@@ -213,6 +215,12 @@ func encodeNode(n model.Node) any {
 	o.put("color", n.Color)
 	if n.Timeout > 0 {
 		o.put("timeout", formatDuration(n.Timeout))
+	}
+	if n.Retries > 0 {
+		o.put("retries", int64(n.Retries))
+	}
+	if n.RetryWait > 0 {
+		o.put("retry_wait", formatDuration(n.RetryWait))
 	}
 	encodeRequestCall(&o, n.Request)
 	encodeSubflowCall(&o, n.Subflow)

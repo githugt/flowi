@@ -27,6 +27,18 @@ func (s *FlowService) Select(node, step string) {
 	})
 }
 
+// TargetOf is the tree node id of the request or flow a step calls, or "" when it calls neither: what "Open request"
+// opens.
+func (s *FlowService) TargetOf(node, step string) string {
+	var id string
+	s.app.actor.Do(func() {
+		if o, ok := s.docs[node]; ok {
+			id = o.doc.TargetOf(step)
+		}
+	})
+	return id
+}
+
 // ToggleSelect adds a step to the selection, or takes it out (shift-click).
 func (s *FlowService) ToggleSelect(node, step string) {
 	s.app.actor.Do(func() {
@@ -56,10 +68,28 @@ func (s *FlowService) DeleteSelected(node string) {
 	})
 }
 
+// DeleteImpactView is what deleting some steps would take with it.
+type DeleteImpactView struct {
+	Steps  int      `json:"steps"`  // steps that go, the ones inside a container included
+	ReadBy []string `json:"readBy"` // other steps whose templates or tests read their results
+}
+
+// DeleteImpact says what deleting the steps would take with it, for the question before the Delete key acts.
+func (s *FlowService) DeleteImpact(node string, ids []string) DeleteImpactView {
+	v := DeleteImpactView{ReadBy: []string{}}
+	s.with(node, func(d *vm.FlowDoc) {
+		gone, readBy := d.DeleteImpact(ids...)
+		v.Steps = gone
+		v.ReadBy = append(v.ReadBy, readBy...)
+	})
+	return v
+}
+
 // Connect makes the unit `to` wait for the unit `from`: its first step gets
-// the last step of `from` in its needs (dragging from a port to a step).
-func (s *FlowService) Connect(node, from, to string) {
-	_ = s.edit(node, func(o *openFlow) error {
+// the last step of `from` in its needs (dragging from a port to a step). It is refused, with the reason, when the
+// layout could not draw the arrow: the steps are in different lists, or `to` comes before `from`.
+func (s *FlowService) Connect(node, from, to string) error {
+	return s.edit(node, func(o *openFlow) error {
 		g := o.doc.Diagram()
 		src, ok1 := g.Unit(from)
 		dst, ok2 := g.Unit(to)
@@ -67,6 +97,9 @@ func (s *FlowService) Connect(node, from, to string) {
 			return nil
 		}
 		first, need := dst.Nodes[0], src.Nodes[len(src.Nodes)-1]
+		if ok, why := o.doc.CanWait(need, first); !ok {
+			return errors.New(why)
+		}
 		if _, ok := o.doc.Node(first); ok && !o.doc.AddNeed(first, need) {
 			s.app.emit("notice", Notice{Level: "info", Text: redundantNeedText(first, need, o.doc.Previous(first) == need)})
 		}
@@ -111,7 +144,7 @@ func (s *FlowService) edit(node string, f func(o *openFlow) error) error {
 }
 
 // SetText sets a text field of the selected step, or of the flow when none
-// is selected. Fields: name, description, when, timeout, version, overlay, open, over,
+// is selected. Fields: name, description, when, timeout, retries, retryWait, version, overlay, open, over,
 // preferVersion, maxConcurrency, rateLimit.
 func (s *FlowService) SetText(node, field, value string) error {
 	return s.edit(node, func(o *openFlow) error {
@@ -126,6 +159,18 @@ func (s *FlowService) SetText(node, field, value string) error {
 				return errors.New("timeout must be a duration like 5s or 1m")
 			}
 			d.EditNodeMerged(merge, id, func(n *model.Node) { n.Timeout = dur })
+		case "retries":
+			n, err := strconv.Atoi(value)
+			if value != "" && (err != nil || n < 0 || n > 10) {
+				return errors.New("retries must be a whole number from 0 to 10")
+			}
+			d.EditNodeMerged(merge, id, func(node *model.Node) { node.Retries = n })
+		case "retryWait":
+			dur, err := time.ParseDuration(value)
+			if value != "" && (err != nil || dur < 0) {
+				return errors.New("the wait between retries must be a duration like 2s")
+			}
+			d.EditNodeMerged(merge, id, func(node *model.Node) { node.RetryWait = dur })
 		case "flowName", "flowDescription", "preferVersion", "rateLimit":
 			d.EditFlowMerged("flow/"+field, func(f *model.Flow) { setFlowText(f, field, value) })
 		case "maxConcurrency":
@@ -626,6 +671,16 @@ func (s *FlowService) RemoveLane(node string, i int) {
 	})
 }
 
+// MoveCase moves case i of the selected condition one place earlier (delta -1) or later (+1).
+func (s *FlowService) MoveCase(node string, i, delta int) {
+	_ = s.edit(node, func(o *openFlow) error {
+		if n, ok := o.doc.Node(o.selected); ok && n.Type == "condition" {
+			o.doc.MoveCase(o.selected, i, delta)
+		}
+		return nil
+	})
+}
+
 // SetCaseWhen sets the condition of case i of the selected condition.
 func (s *FlowService) SetCaseWhen(node string, i int, when string) {
 	_ = s.edit(node, func(o *openFlow) error {
@@ -833,6 +888,36 @@ func (s *FlowService) AddStep(node, typ string, x, y int64, snap float64, placed
 	return id
 }
 
+// AddRequestStep adds a step that sends the request with the given id (one of the flow's choices), after the
+// selected step or at the end, selects it and returns its id. Before, the only way to put a request in a flow was an
+// empty request step and a flat select.
+func (s *FlowService) AddRequestStep(node, request string) (string, error) {
+	var id string
+	err := s.edit(node, func(o *openFlow) error {
+		d := o.doc
+		var choice *Choice
+		for _, c := range s.requestChoices(d.Collection()) {
+			if c.ID == request {
+				choice = &c
+				break
+			}
+		}
+		if choice == nil {
+			return fmt.Errorf("the flow cannot call request %q: it is not in the flow's collection or its dependencies", request)
+		}
+		list, index := "$.nodes", len(d.Draft().Nodes)
+		if l, i, ok := d.Locate(o.selected); o.selected != "" && ok {
+			list, index = l, i+1
+		}
+		ref := model.Ref{Collection: choice.Dep, ID: model.ID(choice.ID), Path: choice.Path}
+		id = d.Insert("request", list, index, func(n *model.Node) { n.Request = &model.RequestCall{Request: ref} })
+		o.selected = id
+		s.app.emit("flow", s.view(node, o))
+		return nil
+	})
+	return id, err
+}
+
 // AddStepNear adds a step of type typ right before or right after step, in
 // the same list, selects it and returns its id. The canvas has a + on each
 // side of a card: AddStep put every new step after the selected one, so a
@@ -855,6 +940,24 @@ func (s *FlowService) AddStepNear(node, typ, step string, before bool) string {
 		return nil
 	})
 	return id
+}
+
+// AddStepInto adds a step of type typ at the end of a lane of the container step (lane 0 is a loop's body, a case
+// or branch by its number, and after the last case the else), selects it and returns its id.
+func (s *FlowService) AddStepInto(node, typ, container string, lane int) (string, error) {
+	var id string
+	err := s.edit(node, func(o *openFlow) error {
+		d := o.doc
+		list, ok := d.LanePath(container, lane)
+		if !ok {
+			return fmt.Errorf("%s has no lane %d", container, lane)
+		}
+		id = d.Insert(model.NodeType(typ), list, len(d.NodesAt(list)), nil)
+		o.selected = id
+		s.app.emit("flow", s.view(node, o))
+		return nil
+	})
+	return id, err
 }
 
 // initialStep fills what a new step of type typ should not start without: a
@@ -935,4 +1038,24 @@ func (s *FlowService) SaveAsBlueprint(node, path, name string) {
 			func(err error) { s.app.emit("notice", Notice{Level: "error", Text: vm.ErrorText(err)}) })
 		return nil
 	})
+}
+
+// WireTargetView says whether a wire may end on a step, and why not.
+type WireTargetView struct {
+	ID     string `json:"id"`
+	OK     bool   `json:"ok"`
+	Reason string `json:"reason"`
+}
+
+// WireTargets lists, for every step, whether a wire from step `from` may end there: kind is "wait" for an arrow (a
+// port dragged to a step) and "data" for a value wire. The canvas calls it when a drag starts, to dim the steps that
+// would be refused and say why on hover; Connect, ConnectOutcome and ConnectData still refuse the same drops.
+func (s *FlowService) WireTargets(node, from, kind string) []WireTargetView {
+	out := []WireTargetView{}
+	s.with(node, func(d *vm.FlowDoc) {
+		for _, t := range d.WireTargets(from, kind) {
+			out = append(out, WireTargetView{ID: t.ID, OK: t.OK, Reason: t.Reason})
+		}
+	})
+	return out
 }

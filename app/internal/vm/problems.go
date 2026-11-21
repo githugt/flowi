@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"slices"
+	"strings"
 
 	flowi "github.com/githugt/flowi/lib"
 	"github.com/githugt/flowi/lib/diag"
@@ -61,7 +62,7 @@ func (p *Problems) problemOf(d diag.Diagnostic) Problem {
 	if hint != "" {
 		msg += " (" + hint + ")"
 	}
-	where := filepath.Base(d.File)
+	where := p.placeOf(d.File)
 	if d.Pos.Line > 0 {
 		where += fmt.Sprintf(":%d:%d", d.Pos.Line, d.Pos.Column)
 	}
@@ -72,12 +73,32 @@ func (p *Problems) problemOf(d diag.Diagnostic) Problem {
 	return Problem{Severity: sev, Code: string(d.Code), Message: msg, File: d.File, Where: where, Node: p.nodeFor(d.File)}
 }
 
-// nodeFor finds the tree node showing file: a request or an environment.
+// placeOf names a file the way a person finds it: the collection, then the path inside it. Before, only the base
+// name showed, so two login.req.yaml in different folders looked the same. A file outside every collection keeps
+// its base name.
+func (p *Problems) placeOf(file string) string {
+	for _, c := range p.ws.Collections() {
+		rel, err := filepath.Rel(c.Root, file)
+		if c.Root == "" || err != nil || strings.HasPrefix(rel, "..") {
+			continue
+		}
+		return c.Manifest.Name + " › " + filepath.ToSlash(rel)
+	}
+	return filepath.Base(file)
+}
+
+// nodeFor finds the tree node showing file: a request, a flow or an environment.
 func (p *Problems) nodeFor(file string) string {
 	for _, c := range p.ws.Collections() {
 		for _, r := range c.Requests {
 			if r.File == file {
 				return "r:" + string(c.Manifest.ID) + ":" + string(r.ID)
+			}
+		}
+		// Before: a validation error in a flow file was a dead row.
+		for _, f := range c.Flows {
+			if f.File == file {
+				return "f:" + string(c.Manifest.ID) + ":" + string(f.ID)
 			}
 		}
 	}

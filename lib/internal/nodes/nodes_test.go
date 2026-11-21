@@ -167,6 +167,29 @@ func TestExtract_from_body_jsonpath_header_cookie_status_and_regex(t *testing.T)
 	}
 }
 
+// Before: a query that can match many rows gave a bare value when it matched exactly one, so a list function failed
+// only when the API returned a single row.
+func TestExtract_should_give_a_list_for_a_many_query_even_with_one_match(t *testing.T) {
+	resp := &Response{Body: map[string]any{"items": []any{map[string]any{"id": 7.0}}}}
+	tests := []struct {
+		path string
+		want any
+	}{
+		{"$.items[*].id", []any{7.0}},
+		{"$.items[?@.id > 1].id", []any{7.0}},
+		{"$.items[0].id", 7.0},
+	}
+	for _, tt := range tests {
+		t.Run(tt.path, func(t *testing.T) {
+			got, err := Extract(model.Extraction{From: "body", Path: tt.path}, resp, nil)
+
+			if err != nil || !reflect.DeepEqual(got, tt.want) {
+				t.Fatalf("got %#v, %v", got, err)
+			}
+		})
+	}
+}
+
 func TestSet_Given_a_response_value_with_no_match_Then_FLW_RUN_005(t *testing.T) {
 	s, _ := newState(PhasePost)
 	s.Response = sampleResponse()
@@ -328,10 +351,34 @@ func TestAssert_Given_false_and_a_templated_message_When_run_Then_the_message_ha
 	diags := run(t, node("assert", "check", "status == 0", "message", "got {{status}}"), s)
 	unknown := run(t, node("assert", "check", "status == 0", "message", "got {{nope}}"), s)
 
-	if len(diags) != 1 || !strings.HasSuffix(diags[0].Args["message"], want) || want == "got " {
+	if len(diags) != 1 || !strings.Contains(diags[0].Args["message"], want) || want == "got " {
 		t.Fatalf("message %q, want %q", diags[0].Args["message"], want)
 	}
-	if len(unknown) != 1 || unknown[0].Code != diag.CodeRunAssertFailed || !strings.HasSuffix(unknown[0].Args["message"], "got {{nope}}") {
+	if len(unknown) != 1 || unknown[0].Code != diag.CodeRunAssertFailed || !strings.Contains(unknown[0].Args["message"], "got {{nope}}") {
 		t.Fatalf("a message that cannot be rendered hid the failure: %v", unknown)
+	}
+}
+
+// Before: a failed assertion showed the rule (status == 200) and nothing it had read, so the reader had to send the
+// request again to see the value.
+func TestAssert_Given_false_Then_the_failure_says_what_the_check_read(t *testing.T) {
+	s, _ := newState(PhasePost)
+	s.Response = sampleResponse()
+
+	diags := run(t, node("assert", "check", "status == 200 or response.body.data.token == 'nope'"), s)
+
+	got := diags[0].Args["message"]
+	if len(diags) != 1 || !strings.Contains(got, "status = 201") || !strings.Contains(got, `body.data.token = "t-1"`) {
+		t.Fatalf("message %q", got)
+	}
+}
+
+func TestSaw_should_never_show_a_secret(t *testing.T) {
+	scope := template.Scope{Values: map[string]any{"secret": map[string]any{"token": "s3cret"}, "status": 500}}
+
+	got := Saw("secret.token == 'x' and status == 200", scope)
+
+	if strings.Contains(got, "s3cret") || strings.Contains(got, "secret.token") || !strings.Contains(got, "status = 500") {
+		t.Fatalf("saw %q", got)
 	}
 }

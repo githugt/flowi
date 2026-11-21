@@ -19,6 +19,7 @@ import (
 	yamlcodec "github.com/githugt/flowi/lib/internal/codec/yaml"
 	"github.com/githugt/flowi/lib/internal/ids"
 	"github.com/githugt/flowi/lib/model"
+	"github.com/githugt/flowi/lib/serve/tokens"
 	"github.com/githugt/flowi/lib/settings"
 	"github.com/githugt/flowi/lib/store"
 	"github.com/githugt/flowi/lib/vault"
@@ -63,12 +64,19 @@ type WorkspaceOptions struct {
 	// Passphrase asks the user for the vault passphrase; nil when no
 	// prompt is possible (FLOWI_VAULT_KEY is the alternative).
 	Passphrase func() (string, error)
+	// NewPassphrase asks for the passphrase of a vault being made, so the window can ask twice; nil: Passphrase asks.
+	NewPassphrase func() (string, error)
 	// Observe receives every event of every run and send, as the engine
 	// emits it; it must return quickly (see engine.Deps.Observe). The otel
 	// package's Exporter plugs in here.
 	Observe func(engine.Event)
 	// UserAgent is the client's User-Agent ("Flowi-UI/1.2"); "" sends "Flowi".
 	UserAgent string
+	// Now is the clock of the vault's idle lock; nil uses time.Now.
+	Now func() time.Time
+	// Version is the release that is running ("1.4.0"), checked against a collection's min_version; "" or a name that
+	// is not a release number ("dev") reads every collection.
+	Version string
 	// Traceparent names the trace context sent with outgoing requests (see
 	// engine.Deps.Traceparent); nil sends none.
 	Traceparent func(runID, path string) string
@@ -89,6 +97,12 @@ type Workspace struct {
 
 	vaultOnce sync.Once
 	vault     *vault.Vault
+
+	exampleMu sync.Mutex    // guards example
+	example   *exampleState // the example collection and demo server this workspace opened, nil when none
+
+	tokensOnce sync.Once
+	tokens     *tokens.Store // the named trigger tokens
 
 	// authTokens keeps OAuth 2.0 tokens between sends for as long as the
 	// workspace is open.
@@ -129,8 +143,10 @@ func OpenWorkspace(ctx context.Context, o WorkspaceOptions) (*Workspace, diag.Li
 	codec := yamlcodec.New(schema)
 	w := &Workspace{
 		opts: o, schema: schema, codec: codec, store: store.New(codec),
-		ids: ids.NewSource(time.Now, rand.Reader), authTokens: authx.NewTokenCache(),
+		ids: ids.NewSource(time.Now, rand.Reader),
 	}
+	w.authTokens = authx.NewPersistentTokenCache(vaultTokens{w})
+	w.store.SetRunning(o.Version)
 	ws, diags, err := workspace.LoadOrCreate(o.Paths, o.Name, codec, w.ids)
 	if err != nil {
 		return nil, nil, fmt.Errorf("opening workspace %q: %w", o.Name, err)
@@ -213,11 +229,11 @@ func (w *Workspace) loadGlobalEnvironments() (diag.List, error) {
 	return diags, nil
 }
 
-// withGlobalEnvironments gives c the workspace's environments. Environments
-// are global: any a collection holds are not used.
+// withGlobalEnvironments gives c the workspace's environments, and after them the ones c ships in its own folder that
+// the workspace lacks by name (see withShipped).
 func (w *Workspace) withGlobalEnvironments(c model.Collection) model.Collection {
-	c.Environments = slices.Clone(w.globalEnvs)
-	return c
+	c.Environments = withShipped(w.globalEnvs, c.Environments)
+	return w.withEdits(c)
 }
 
 func notCollection(dir string) diag.Diagnostic {
@@ -403,7 +419,7 @@ func (w *Workspace) Reload(ch Change) (diag.List, error) {
 		return nil, err
 	}
 	// A reloaded file may be a (no longer used) environment of the collection.
-	next.Environments = slices.Clone(w.globalEnvs)
+	next = w.withGlobalEnvironments(next)
 	w.collections[i] = next
 	w.replaceLoadDiags(func(file string) bool { return file == ch.File }, diags)
 	return w.positioned(diags), nil

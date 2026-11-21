@@ -11,10 +11,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"regexp"
-	"slices"
 	"strings"
 
 	"github.com/githugt/flowi/lib/diag"
+	"github.com/githugt/flowi/lib/internal/credname"
 	"github.com/githugt/flowi/lib/model"
 )
 
@@ -103,36 +103,10 @@ func SecretName(name string) string {
 	return strings.Trim(nonSecretName.ReplaceAllString(strings.ToLower(name), "_"), "_")
 }
 
-// credentialWords are fragments that make a name a credential, matched
-// in the name lower-cased with separators removed (accessToken,
-// access_token and X-Access-Token all become "accesstoken").
-func credentialWords() []string {
-	return []string{"token", "secret", "passw", "pwd", "apikey", "session", "auth", "credential", "jwt", "cookie", "signature"}
-}
-
-// notCredentials are names that contain a credential word but are not
-// one.
-func notCredentials() []string {
-	return []string{"author", "authors", "authority", "authored", "authorname"}
-}
-
-var nameSeparators = regexp.MustCompile(`[^a-z0-9]+`)
-
 // SensitiveHeader reports names (headers, variables, JSON keys, form
-// fields, query parameters) that carry credentials: any name containing
-// a credential word, or ending in "key" (privateKey, x-api-key). Erring
-// towards redaction is deliberate: a redacted value is visible and fixed
-// by hand, a leaked one ends up in git.
-func SensitiveHeader(name string) bool {
-	compact := nameSeparators.ReplaceAllString(strings.ToLower(name), "")
-	if compact == "" || slices.Contains(notCredentials(), compact) {
-		return false
-	}
-	if strings.HasSuffix(compact, "key") {
-		return true
-	}
-	return slices.ContainsFunc(credentialWords(), func(w string) bool { return strings.Contains(compact, w) })
-}
+// fields, query parameters) that carry credentials. The rule is shared with
+// the redirect code in internal/credname.
+func SensitiveHeader(name string) bool { return credname.Sensitive(name) }
 
 // StripUserinfo removes user:password@ from a URL, reporting whether
 // there was any. Text that is not an absolute URL is returned as is.

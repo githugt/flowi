@@ -23,8 +23,8 @@ func TestSchema_should_have_unique_names_and_valid_defaults(t *testing.T) {
 		}
 	}
 
-	if len(seen) != 79 {
-		t.Fatalf("got %d keys, want 79", len(seen))
+	if len(seen) != 90 {
+		t.Fatalf("got %d keys, want 90", len(seen))
 	}
 }
 
@@ -71,5 +71,15 @@ func TestParseValue_Given_string_list_with_enum_When_element_not_allowed_Then_er
 	}
 	if errOK != nil || !reflect.DeepEqual(got, []string{"429", "timeout"}) {
 		t.Fatalf("got %v, %v", got, errOK)
+	}
+}
+
+// Before: ui.snippet_exclude_secrets defaulted to false, so "Copy as curl" put live secret values on the clipboard
+// unless the person had found the setting.
+func TestSchema_should_leave_secrets_out_of_code_snippets_by_default(t *testing.T) {
+	k, ok := Lookup(Schema(), "ui.snippet_exclude_secrets")
+
+	if !ok || k.Default != true {
+		t.Fatalf("got %+v, %v", k, ok)
 	}
 }

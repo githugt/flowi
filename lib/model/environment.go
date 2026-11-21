@@ -72,12 +72,19 @@ type Environment struct {
 	// Colour marks the environment wherever it is chosen, so that one is not mistaken for another.
 	// It is one of EnvColours(), or empty for the default; an unknown name is shown as the default.
 	Colour string
+	// Protected asks the apps to confirm before a request that changes data is sent with this environment.
+	// The CLI does not ask; it runs unattended.
+	Protected bool
 	// Extends names the environment this one builds on: its plain variables apply unless this one sets the same name.
 	// Secrets are not inherited, because a secret's value lives in the vault under the environment that declares it.
 	Extends string
 	// Scope is the vault scope of this environment's secrets. Empty means
 	// the owning collection; global environments carry the workspace scope.
 	Scope ID
+	// Shipped marks an environment that comes from a collection's own environments folder and that the workspace has no
+	// copy of. The workspace sets it when it loads one; it is never read from a file. A shipped environment has no vault
+	// entries, so its secrets come from FLOWI_SECRET_<ENV>_<NAME>.
+	Shipped bool
 }
 
 // EnvColours are the colours an environment can be marked with.

@@ -3,8 +3,10 @@
 package bridge
 
 import (
+	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/githugt/flowi/lib/model"
 
@@ -52,16 +54,64 @@ func (s *AuthsService) State() AuthsView {
 	return v
 }
 
-// Create adds an authentication called name to collection, with the scheme
-// ("scheme:<type>") and no parameters yet.
-func (s *AuthsService) Create(collection, name, scheme string) {
+// settle runs start on the actor and waits for the outcome it reports, as an error with a message for people.
+// Before: the screen sent each of these and moved on at once, so a refusal came as a notice somewhere else and the form
+// had already been closed or cleared.
+func (s *AuthsService) settle(start func(done func(error))) error {
+	out := make(chan error, 1)
 	s.app.actor.Do(func() {
+		start(func(err error) {
+			if err != nil {
+				err = errors.New(vm.ErrorText(err))
+			}
+			out <- err
+		})
+	})
+	return <-out
+}
+
+var errNoAuthName = errors.New("give the authentication a name: requests use it by that name")
+
+var errAuthGone = errors.New("that authentication is gone")
+
+// TokenView is an OAuth token the app holds. It never carries the token.
+type TokenView struct {
+	ID      string `json:"id"`
+	Label   string `json:"label"`   // what it is for: the grant, the token endpoint's host, the client id and the scope
+	Status  string `json:"status"`  // "Signed in until 14:32", "Expired: renews by itself" or "Expired: sign in again"
+	Expired bool   `json:"expired"` // for the colour
+	Stored  bool   `json:"stored"`  // kept across restarts
+	Expires string `json:"expires"` // RFC 3339
+}
+
+// Tokens lists the OAuth tokens the app holds: the sign-ins a person approved (kept in the vault) and the ones got
+// since it opened. It reads the vault, so it runs off the actor and may wait for the passphrase.
+func (s *AuthsService) Tokens() []TokenView {
+	out := []TokenView{}
+	for _, t := range s.app.backend.AuthTokens() {
+		out = append(out, TokenView{ID: t.ID, Label: t.Label, Status: vm.TokenStatus(t), Expired: t.Expired, Stored: t.Stored, Expires: t.Expires.Format(time.RFC3339)})
+	}
+	return out
+}
+
+// ForgetToken drops a token, so the next send that needs it signs in again. A refusal comes back as the error.
+func (s *AuthsService) ForgetToken(id string) error {
+	if err := s.app.backend.ForgetAuthToken(id); err != nil {
+		return errors.New(vm.ErrorText(err))
+	}
+	return nil
+}
+
+// Create adds an authentication called name to collection, with the scheme
+// ("scheme:<type>") and no parameters yet. A refusal comes back as the error.
+func (s *AuthsService) Create(collection, name, scheme string) error {
+	return s.settle(func(done func(error)) {
 		name = strings.TrimSpace(name)
 		if name == "" {
-			s.fail(fmt.Errorf("give the authentication a name: requests use it by that name"))
+			done(errNoAuthName)
 			return
 		}
-		s.app.workspace.CreateNamedAuth(model.ID(collection), name, "", model.Auth{Type: schemeType(scheme)}, nil, s.fail)
+		s.app.workspace.CreateNamedAuth(model.ID(collection), name, "", model.Auth{Type: schemeType(scheme)}, func() { done(nil) }, done)
 	})
 }
 
@@ -76,7 +126,7 @@ func (s *AuthsService) FromRequest(node, name string) {
 		case !ok:
 			return
 		case name == "":
-			s.fail(fmt.Errorf("give the authentication a name: requests use it by that name"))
+			s.fail(errNoAuthName)
 			return
 		}
 		a := o.req.Current().Auth
@@ -92,46 +142,44 @@ func (s *AuthsService) FromRequest(node, name string) {
 }
 
 // Save writes the description, scheme and parameter values of an
-// authentication; an empty value leaves the parameter out.
-func (s *AuthsService) Save(key, description, scheme string, values map[string]string) {
-	s.app.actor.Do(func() {
+// authentication; an empty value leaves the parameter out. A refusal comes back as the error.
+func (s *AuthsService) Save(key, description, scheme string, values map[string]string) error {
+	return s.settle(func(done func(error)) {
 		a, ok := s.find(key)
 		if !ok {
-			s.app.emit("notice", Notice{Level: "error", Text: "that authentication is gone"})
+			done(errAuthGone)
 			return
 		}
 		a.Description = description
 		a.Auth = model.Auth{Type: schemeType(scheme), Params: vm.OrderedAuthParams(schemeType(scheme), values)}
-		s.app.workspace.SaveNamedAuth(a, func() {
-			s.app.emit("notice", Notice{Level: "info", Text: "Saved " + a.Name + "."})
-		}, s.fail)
+		s.app.workspace.SaveNamedAuth(a, func() { done(nil) }, done)
 	})
 }
 
 // Rename gives an authentication another name. The requests that use it are changed to the new name.
-func (s *AuthsService) Rename(key, name string) {
-	s.app.actor.Do(func() {
+func (s *AuthsService) Rename(key, name string) error {
+	return s.settle(func(done func(error)) {
 		a, ok := s.find(key)
-		if !ok {
-			s.app.emit("notice", Notice{Level: "error", Text: "that authentication is gone"})
-			return
+		switch {
+		case !ok:
+			done(errAuthGone)
+		case strings.TrimSpace(name) == "":
+			done(errNoAuthName)
+		default:
+			s.app.workspace.RenameNamedAuth(a, name, func() { done(nil) }, done)
 		}
-		if strings.TrimSpace(name) == "" {
-			s.fail(fmt.Errorf("give the authentication a name: requests use it by that name"))
-			return
-		}
-		s.app.workspace.RenameNamedAuth(a, name, func() {
-			s.app.emit("notice", Notice{Level: "info", Text: "Renamed " + a.Name + " to " + strings.TrimSpace(name) + "."})
-		}, s.fail)
 	})
 }
 
 // Delete removes an authentication. Requests that use it keep naming it.
-func (s *AuthsService) Delete(key string) {
-	s.app.actor.Do(func() {
-		if a, ok := s.find(key); ok {
-			s.app.workspace.DeleteNamedAuth(a, nil, s.fail)
+func (s *AuthsService) Delete(key string) error {
+	return s.settle(func(done func(error)) {
+		a, ok := s.find(key)
+		if !ok {
+			done(nil) // already gone: nothing to do
+			return
 		}
+		s.app.workspace.DeleteNamedAuth(a, func() { done(nil) }, done)
 	})
 }
 

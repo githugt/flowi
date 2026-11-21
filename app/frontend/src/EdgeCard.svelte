@@ -4,7 +4,8 @@
   // editing, a Start row can be dragged to a new place in the list and each card ends in an Add row.
   import Icon from './Icon.svelte'
   import type { Face } from './lib/types'
-  import { CARD, clipText } from './lib/card'
+  import { CARD } from './lib/card'
+  import { clipWidth } from './lib/measure'
   import { dropIndex, type Placed } from './lib/edgecards'
 
   let {
@@ -79,7 +80,7 @@
         <rect class="badge" x="14" y="4" width={badgeW} height="19" rx="5" />
         <text class="badgetext" x={14 + badgeW / 2} y="17.5" text-anchor="middle">{face.badge}</text>
       {/if}
-      <text class="subtext" x={14 + (face.badge ? badgeW + 8 : 0)} y="18">{clipText(face.subline, 28)}<title>{face.subline}</title></text>
+      <text class="subtext" x={14 + (face.badge ? badgeW + 8 : 0)} y="18">{clipWidth(face.subline, 28)}<title>{face.subline}</title></text>
     </g>
 
     {#each rows as row, i (row.key)}
@@ -90,7 +91,7 @@
         <title>{row.summary}</title>
         <rect class="rowhit" x="6" {y} width={place.w - 12} height={CARD.row} rx="8" />
         <g class="rowicon" transform={`translate(16 ${y + 9})`}><Icon name={row.icon || 'variables'} size={16} /></g>
-        <text class="rowtext" x="42" y={y + 22}>{clipText(row.summary, Math.floor((place.w - 42 - 34) / 7.2))}</text>
+        <text class="rowtext" x="42" y={y + 22}>{clipWidth(row.summary, Math.floor((place.w - 42 - 34) / 7.2))}</text>
         {#if isStart && editable}<text class="grip" x={place.w - 24} y={y + 22}>⋮⋮</text>{/if}
       </g>
     {/each}
@@ -112,27 +113,27 @@
 {/if}
 
 <style>
-  .body { fill: var(--panel); stroke: var(--line); stroke-width: 1.2; filter: drop-shadow(0 2px 8px rgb(0 0 0 / 0.28)); }
+  .body { fill: var(--panel); stroke: var(--line); stroke-width: 1.2; filter: var(--float); }
   .tile { stroke: none; }
   .tileicon { color: var(--on-tile); pointer-events: none; }
-  .title { fill: var(--text); font-size: 14px; font-weight: 600; pointer-events: none; }
+  .title { fill: var(--text); font-size: var(--cv-lg); font-weight: 600; pointer-events: none; }
   .badge { fill: color-mix(in srgb, var(--accent) 24%, transparent); }
-  .badgetext { fill: var(--accent); font-size: 11px; font-weight: 700; letter-spacing: 0.04em; pointer-events: none; }
-  .subtext { fill: var(--muted); font-size: 13px; pointer-events: none; }
+  .badgetext { fill: var(--accent); font-size: var(--cv-xs); font-weight: 700; letter-spacing: 0.04em; pointer-events: none; }
+  .subtext { fill: var(--muted); font-size: var(--cv-md); pointer-events: none; }
   .row { cursor: pointer; }
   .row.lifted { opacity: 0.85; }
   .rowhit { fill: transparent; }
   .row:hover .rowhit, .row.lifted .rowhit { fill: var(--tint-hover); }
   .rowicon { color: var(--muted); pointer-events: none; }
-  .rowtext { fill: var(--text); font-size: 13.5px; pointer-events: none; }
+  .rowtext { fill: var(--text); font-size: var(--cv-md); pointer-events: none; }
   .add .rowtext { fill: var(--muted); }
-  .grip { fill: var(--muted); font-size: 12px; opacity: 0; pointer-events: none; }
+  .grip { fill: var(--muted); font-size: var(--cv-sm); opacity: 0; pointer-events: none; }
   .row:hover .grip { opacity: 1; }
   .drop { stroke: var(--accent); stroke-width: 2.4; stroke-linecap: round; pointer-events: none; }
   .port { fill: var(--bg); stroke: var(--muted); stroke-width: 2; pointer-events: none; }
   .ghost { cursor: pointer; }
   .ghost rect { fill: transparent; stroke: var(--line); stroke-width: 1.4; stroke-dasharray: 5 4; }
-  .ghost text { fill: var(--muted); font-size: 13.5px; font-weight: 600; pointer-events: none; }
+  .ghost text { fill: var(--muted); font-size: var(--cv-md); font-weight: 600; pointer-events: none; }
   .ghost:hover rect { stroke: var(--accent); }
   .ghost:hover text { fill: var(--text); }
 </style>

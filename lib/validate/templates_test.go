@@ -50,3 +50,24 @@ func TestValidate_Given_bad_template_Then_FLW_TPL_002_at_field_position(t *testi
 		})
 	}
 }
+
+func TestValidate_Given_an_undeclared_collection_variable_Then_FLW_TPL_001_names_the_declared_ones(t *testing.T) {
+	// Before: a typo such as {{collection_var.regoin}} was found only when the request was sent.
+	f := newFixture(t)
+	c := f.collection("c")
+	f.request(&c, "r", "1")
+	c.Manifest.Variables = []model.KeyValue{{Key: "region", Value: "eu"}}
+	c.Requests[0].Versions[0].URL = "http://x/{{collection_var.regoin}}/{{collection_var.region}}/{{collection_var.nope ?? 'a'}}"
+
+	got := Validate(Target{Collections: []model.Collection{c}})
+
+	var hits []diag.Diagnostic
+	for _, d := range got {
+		if d.Code == diag.CodeTemplateUndefined {
+			hits = append(hits, d)
+		}
+	}
+	if len(hits) != 1 || hits[0].Args["name"] != "collection_var.regoin" || hits[0].Args["hint"] != " (the collection declares: region)" {
+		t.Fatalf("got %+v", hits)
+	}
+}

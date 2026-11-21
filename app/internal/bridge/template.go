@@ -4,6 +4,7 @@ package bridge
 
 import (
 	"slices"
+	"strings"
 	"unicode/utf16"
 
 	"github.com/githugt/flowi/app/internal/vm"
@@ -64,6 +65,48 @@ func (s *RequestService) URLSpans(node, text string) []SpanView {
 			out = append(out, SpanView{Text: sp.Text, Part: sp.Part.String(), Pair: sp.Pair})
 		}
 	})
+	return out
+}
+
+// TemplateSpans colours text that is not a URL (a header, a query or form value, a topic): plain text, with each
+// {{variable}} marked as defined or unknown. URLSpans would colour the same text as scheme, host and path.
+func (s *RequestService) TemplateSpans(node, text string) []SpanView {
+	out := []SpanView{}
+	s.with(node, func(*openRequest) {
+		vars, secrets := s.app.workspace.VariableNames()
+		known := vm.NewNameChecker(vars, secrets)
+		for _, sp := range vm.TemplateSpans(text, known) {
+			out = append(out, SpanView{Text: sp.Text, Part: sp.Part.String(), Pair: sp.Pair})
+		}
+	})
+	return out
+}
+
+// VariableHintView is what hovering a {{variable}} chip shows, and what clicking an unset one would add.
+type VariableHintView struct {
+	Text string `json:"text"` // "base_url → https://api.example.com (from environment staging)"; a secret is ••••
+	// Known is false for a name nothing defines.
+	Known bool `json:"known"`
+	// Environment is where a click would set it: the selected environment; "" when there is nothing to set.
+	Environment string `json:"environment"`
+	// Name and Secret are the row a click adds to that environment (as MissingVar holds them).
+	Name   string `json:"name"`
+	Secret bool   `json:"secret"`
+}
+
+// VariableHint describes the variable between the braces of a chip (expr, as written: env.base_url): its value in
+// the selected environment and where that comes from, never a secret's value. For one that is not set it also says
+// which row a click would add, to the selected environment.
+func (s *RequestService) VariableHint(expr string) VariableHintView {
+	h := s.app.workspace.DescribeVariable(expr)
+	out := VariableHintView{Text: h.Text, Known: h.Known, Environment: h.Environment}
+	if !h.Known && h.Environment != "" {
+		m := missingVarOf(strings.TrimSpace(expr))
+		out.Name, out.Secret = m.Name, m.Secret
+		if m.Name == "" {
+			out.Environment = ""
+		}
+	}
 	return out
 }
 

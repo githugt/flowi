@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	flowi "github.com/githugt/flowi/lib"
@@ -48,6 +49,8 @@ type ScheduleRunner struct {
 	upcoming []UpcomingRun
 	trigger  string
 	cancel   context.CancelFunc
+	restart  bool // Restart was asked while running: start again when the stop is done
+	closed   atomic.Bool
 	onChange []func()
 }
 
@@ -80,7 +83,7 @@ func (r *ScheduleRunner) TriggerAddr() string { return r.trigger }
 
 // Start starts the schedules. Starting twice, or while stopping, does nothing.
 func (r *ScheduleRunner) Start() {
-	if r.state != ScheduleStopped {
+	if r.state != ScheduleStopped || r.closed.Load() {
 		return
 	}
 	r.err = ""
@@ -126,6 +129,22 @@ func (r *ScheduleRunner) stopped(err error) {
 		r.err = ErrorText(err)
 	}
 	r.changed()
+	if r.restart {
+		r.restart = false
+		r.Start()
+	}
+}
+
+// Restart makes a running runner pick up what changed: it stops (runs in progress finish first) and starts again.
+// Before, the jobs and the trigger token were fixed when the server started, so removing, editing or adding a
+// schedule changed the rows and not what fired, and a token made after a leak did not revoke the old one. A runner
+// that is not running stays as it is.
+func (r *ScheduleRunner) Restart() {
+	if r.state != ScheduleRunning {
+		return
+	}
+	r.restart = true
+	r.Stop()
 }
 
 // Stop asks the runner to stop; runs in progress finish first.
@@ -141,6 +160,7 @@ func (r *ScheduleRunner) Stop() {
 // Close stops the runner and waits for it; the app calls it on shutdown, off
 // the UI goroutine.
 func (r *ScheduleRunner) Close() {
+	r.closed.Store(true) // a restart that is waiting for the stop must not start a server nobody will close
 	if c := r.cancel; c != nil {
 		c()
 	}

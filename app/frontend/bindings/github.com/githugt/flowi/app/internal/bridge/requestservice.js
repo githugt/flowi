@@ -43,12 +43,33 @@ export function BreakingChanges(node) {
 }
 
 /**
+ * BugReport writes the request of the last send and its response as Markdown (a cURL line, the headers, and the
+ * bodies cut to a few KB) with every credential-named header, query parameter and JSON field masked.
+ * @param {string} node
+ * @returns {$CancellablePromise<$models.BugReportView>}
+ */
+export function BugReport(node) {
+    return $Call.ByID(4191931978, node).then(/** @type {($result: any) => any} */(($result) => {
+        return $$createType1($result);
+    }));
+}
+
+/**
  * Cancel stops a send in progress.
  * @param {string} node
  * @returns {$CancellablePromise<void>}
  */
 export function Cancel(node) {
     return $Call.ByID(1739939576, node);
+}
+
+/**
+ * CancelMatrix stops the matrix running for the node, if any; the grid so far comes back from RunMatrix.
+ * @param {string} node
+ * @returns {$CancellablePromise<void>}
+ */
+export function CancelMatrix(node) {
+    return $Call.ByID(1853805153, node);
 }
 
 /**
@@ -71,13 +92,49 @@ export function Close(node) {
 }
 
 /**
+ * CompareDisk lists what differs between the file on disk and the edits in the editor.
+ * @param {string} node
+ * @returns {$CancellablePromise<$models.DiskDiffView>}
+ */
+export function CompareDisk(node) {
+    return $Call.ByID(1412538376, node).then(/** @type {($result: any) => any} */(($result) => {
+        return $$createType2($result);
+    }));
+}
+
+/**
+ * ComparePrevious compares the response the request shows with the one sent before it (the same request and
+ * version, from this session's history): the status, the headers, and the body by JSON path or by line.
+ * @param {string} node
+ * @returns {$CancellablePromise<$models.ResponseDiffView>}
+ */
+export function ComparePrevious(node) {
+    return $Call.ByID(20618868, node).then(/** @type {($result: any) => any} */(($result) => {
+        return $$createType3($result);
+    }));
+}
+
+/**
  * Cookies lists the cookies of the request's collection.
  * @param {string} node
  * @returns {$CancellablePromise<$models.CookiesView>}
  */
 export function Cookies(node) {
     return $Call.ByID(1377379633, node).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType1($result);
+        return $$createType4($result);
+    }));
+}
+
+/**
+ * DataTables lists the tables, columns and row counts of the files the selected data file request reads, for the chip
+ * row above its statement. The files are read off the actor. A server with a template, a missing path or a database
+ * request gives no tables and a note, never an error: the chips are help, not a requirement.
+ * @param {string} node
+ * @returns {$CancellablePromise<$models.DataTablesView>}
+ */
+export function DataTables(node) {
+    return $Call.ByID(611725607, node).then(/** @type {($result: any) => any} */(($result) => {
+        return $$createType5($result);
     }));
 }
 
@@ -166,6 +223,34 @@ export function Edit(node, v) {
 }
 
 /**
+ * EvalChecks tries the given checks on the response the request shows, with no request sent: a check being
+ * written is judged at once, and a POST that creates data does not create another record to try it.
+ * @param {string} node
+ * @param {string[]} lines
+ * @returns {$CancellablePromise<$models.CheckEvalsView>}
+ */
+export function EvalChecks(node, lines) {
+    return $Call.ByID(1899359005, node, lines).then(/** @type {($result: any) => any} */(($result) => {
+        return $$createType6($result);
+    }));
+}
+
+/**
+ * ExampleTaken says whether pinning the response shown (stored "" ) or the saved response (version and stored name) as
+ * example (empty: its status) would replace an example that is already there, so the screen can ask first.
+ * 
+ * Before: pinning wrote over an example of the same name without a word.
+ * @param {string} node
+ * @param {string} version
+ * @param {string} stored
+ * @param {string} example
+ * @returns {$CancellablePromise<boolean>}
+ */
+export function ExampleTaken(node, version, stored, example) {
+    return $Call.ByID(1837314955, node, version, stored, example);
+}
+
+/**
  * ExportFlowiOverlay writes the flowi overlay name as OpenAPI Overlays for the
  * specs the collection keeps (nothing is saved; see SaveSpecExport).
  * @param {string} node
@@ -174,7 +259,7 @@ export function Edit(node, v) {
  */
 export function ExportFlowiOverlay(node, name) {
     return $Call.ByID(1183129753, node, name).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType2($result);
+        return $$createType7($result);
     }));
 }
 
@@ -186,7 +271,7 @@ export function ExportFlowiOverlay(node, name) {
  */
 export function ExpressionNames(node) {
     return $Call.ByID(433467096, node).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType4($result);
+        return $$createType9($result);
     }));
 }
 
@@ -224,7 +309,7 @@ export function FillFromPaste(node, kind, text) {
  */
 export function FlowiOverlayDiff(node) {
     return $Call.ByID(1743977768, node).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType5($result);
+        return $$createType10($result);
     }));
 }
 
@@ -241,6 +326,22 @@ export function FlowiOverlayText(node, name) {
 }
 
 /**
+ * FlowiOverlayUses lists the flows of the request's collection that have a step laying the flowi overlay name over a
+ * request, by flow path, so the delete dialog can say what will stop finding it.
+ * 
+ * Before: the dialog said only that responses stay in the data folder; the flows that name the overlay found out when
+ * they next ran.
+ * @param {string} node
+ * @param {string} name
+ * @returns {$CancellablePromise<string[]>}
+ */
+export function FlowiOverlayUses(node, name) {
+    return $Call.ByID(3105480267, node, name).then(/** @type {($result: any) => any} */(($result) => {
+        return $$createType0($result);
+    }));
+}
+
+/**
  * GenerateRequests makes a gRPC request for each loaded method, in the
  * request's collection under grpc/, with its server and schema files.
  * @param {string} node
@@ -248,7 +349,7 @@ export function FlowiOverlayText(node, name) {
  */
 export function GenerateRequests(node) {
     return $Call.ByID(3536890955, node).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType6($result);
+        return $$createType11($result);
     }));
 }
 
@@ -293,7 +394,7 @@ export function MakeJSONRPC(node) {
  */
 export function MatrixChoices(node) {
     return $Call.ByID(1769827061, node).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType7($result);
+        return $$createType12($result);
     }));
 }
 
@@ -307,7 +408,7 @@ export function MatrixChoices(node) {
  */
 export function Missing(node) {
     return $Call.ByID(3886754734, node).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType8($result);
+        return $$createType13($result);
     }));
 }
 
@@ -329,7 +430,7 @@ export function NewVersion(node, label) {
  */
 export function Open(node) {
     return $Call.ByID(4108184050, node).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType9($result);
+        return $$createType14($result);
     }));
 }
 
@@ -342,6 +443,22 @@ export function Open(node) {
  */
 export function OverlayYAML(node, chosen) {
     return $Call.ByID(1876381177, node, chosen);
+}
+
+/**
+ * PastedSecrets are the secret variables a fill from text of the given kind would reference in place of a
+ * credential in the text ("{{secret.authorization}}"), without the credential itself: the window says so before
+ * the fill and points to Secrets for the value. Nil for text that holds none, or that cannot fill.
+ * Before: the credential was dropped and the request got a reference to a secret that had no value, with only a
+ * hint about a command line tool in the diagnostics that the window did not show.
+ * @param {string} kind
+ * @param {string} text
+ * @returns {$CancellablePromise<string[]>}
+ */
+export function PastedSecrets(kind, text) {
+    return $Call.ByID(1479416136, kind, text).then(/** @type {($result: any) => any} */(($result) => {
+        return $$createType0($result);
+    }));
 }
 
 /**
@@ -440,7 +557,7 @@ export function PrettyJSON(text) {
  */
 export function PreviewOverlay(node) {
     return $Call.ByID(538770798, node).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType10($result);
+        return $$createType15($result);
     }));
 }
 
@@ -455,14 +572,15 @@ export function Revert(node) {
 
 /**
  * RunMatrix sends the saved request once for every combination of the dimensions' values (env, overlay or
- * with.<name>) and returns the grid. The responses are not saved.
+ * with.<name>) and returns the grid. The responses are not saved. Progress arrives as the "matrix" event, and
+ * CancelMatrix stops it with the cells that ran so far returned (Cancelled set).
  * @param {string} node
  * @param {$models.MatrixDimView[]} dims
  * @returns {$CancellablePromise<$models.MatrixView>}
  */
 export function RunMatrix(node, dims) {
     return $Call.ByID(4177743998, node, dims).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType11($result);
+        return $$createType16($result);
     }));
 }
 
@@ -580,7 +698,7 @@ export function SaveToOverlay(node, chosen) {
  */
 export function Schemas(node) {
     return $Call.ByID(208416882, node).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType13($result);
+        return $$createType18($result);
     }));
 }
 
@@ -750,6 +868,18 @@ export function SetDocs(node, docs) {
 }
 
 /**
+ * SetExpect sets the HTTP status the selected version is meant to answer with ("401", "400-499", "4xx", "200, 404";
+ * "" for none, which keeps the usual rule that a 2xx passes). It returns what is wrong with the text, "" when it
+ * was saved: a text that is not a status is not saved.
+ * @param {string} node
+ * @param {string} expect
+ * @returns {$CancellablePromise<string>}
+ */
+export function SetExpect(node, expect) {
+    return $Call.ByID(2078934719, node, expect);
+}
+
+/**
  * SetExtract replaces the values taken from the response.
  * @param {string} node
  * @param {model$0.Extraction[]} rows
@@ -914,7 +1044,7 @@ export function SetSnippetExclude(node, exclude) {
 }
 
 /**
- * SetSnippetFormat picks curl, wget, powershell or xh.
+ * SetSnippetFormat picks one of the formats the snippet offers for this kind of request.
  * @param {string} node
  * @param {string} format
  * @returns {$CancellablePromise<void>}
@@ -952,7 +1082,7 @@ export function SetVersionDetails(node, name, docs) {
  */
 export function Settings(node) {
     return $Call.ByID(2559697551, node).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType14($result);
+        return $$createType19($result);
     }));
 }
 
@@ -996,7 +1126,7 @@ export function ShowStored(node, version, name) {
  */
 export function SpecOrigin(node) {
     return $Call.ByID(255391863, node).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType15($result);
+        return $$createType20($result);
     }));
 }
 
@@ -1008,7 +1138,7 @@ export function SpecOrigin(node) {
  */
 export function StoredResponses(node) {
     return $Call.ByID(137001887, node).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType17($result);
+        return $$createType22($result);
     }));
 }
 
@@ -1023,7 +1153,7 @@ export function StoredResponses(node) {
  */
 export function Suggest(node, text, caret) {
     return $Call.ByID(3675986336, node, text, caret).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType18($result);
+        return $$createType23($result);
     }));
 }
 
@@ -1047,6 +1177,29 @@ export function SuggestSavePath(node) {
 }
 
 /**
+ * TemplateSpans colours text that is not a URL (a header, a query or form value, a topic): plain text, with each
+ * {{variable}} marked as defined or unknown. URLSpans would colour the same text as scheme, host and path.
+ * @param {string} node
+ * @param {string} text
+ * @returns {$CancellablePromise<$models.SpanView[]>}
+ */
+export function TemplateSpans(node, text) {
+    return $Call.ByID(5657029, node, text).then(/** @type {($result: any) => any} */(($result) => {
+        return $$createType25($result);
+    }));
+}
+
+/**
+ * TestConnection connects and signs in as the request would, without sending, publishing or reading anything; the
+ * "request" event delivers the result.
+ * @param {string} node
+ * @returns {$CancellablePromise<void>}
+ */
+export function TestConnection(node) {
+    return $Call.ByID(1620422638, node);
+}
+
+/**
  * URLSpans colours a URL as typed: parts of the URL and which variables
  * are defined (for the selected environment, and the request's own).
  * @param {string} node
@@ -1055,7 +1208,7 @@ export function SuggestSavePath(node) {
  */
 export function URLSpans(node, text) {
     return $Call.ByID(4003298604, node, text).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType20($result);
+        return $$createType25($result);
     }));
 }
 
@@ -1066,30 +1219,49 @@ export function URLSpans(node, text) {
  */
 export function UsedBy(node) {
     return $Call.ByID(3438422550, node).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType21($result);
+        return $$createType26($result);
+    }));
+}
+
+/**
+ * VariableHint describes the variable between the braces of a chip (expr, as written: env.base_url): its value in
+ * the selected environment and where that comes from, never a secret's value. For one that is not set it also says
+ * which row a click would add, to the selected environment.
+ * @param {string} expr
+ * @returns {$CancellablePromise<$models.VariableHintView>}
+ */
+export function VariableHint(expr) {
+    return $Call.ByID(1651662155, expr).then(/** @type {($result: any) => any} */(($result) => {
+        return $$createType27($result);
     }));
 }
 
 // Private type creation functions
 const $$createType0 = $Create.Array($Create.Any);
-const $$createType1 = $models.CookiesView.createFrom;
-const $$createType2 = $models.SpecExportView.createFrom;
-const $$createType3 = $models.SuggestionView.createFrom;
-const $$createType4 = $Create.Array($$createType3);
-const $$createType5 = $models.FlowiOverlayDiffView.createFrom;
-const $$createType6 = $models.GeneratedView.createFrom;
-const $$createType7 = $models.RequestMatrixChoices.createFrom;
-const $$createType8 = $models.MissingView.createFrom;
-const $$createType9 = $models.RequestView.createFrom;
-const $$createType10 = $models.OverlayPreviewView.createFrom;
-const $$createType11 = $models.MatrixView.createFrom;
-const $$createType12 = $models.SchemaView.createFrom;
-const $$createType13 = $Create.Array($$createType12);
-const $$createType14 = $models.RequestSettingsView.createFrom;
-const $$createType15 = $models.SpecOriginView.createFrom;
-const $$createType16 = $models.StoredView.createFrom;
-const $$createType17 = $Create.Array($$createType16);
-const $$createType18 = $models.SuggestView.createFrom;
-const $$createType19 = $models.SpanView.createFrom;
-const $$createType20 = $Create.Array($$createType19);
-const $$createType21 = $models.UsedByView.createFrom;
+const $$createType1 = $models.BugReportView.createFrom;
+const $$createType2 = $models.DiskDiffView.createFrom;
+const $$createType3 = $models.ResponseDiffView.createFrom;
+const $$createType4 = $models.CookiesView.createFrom;
+const $$createType5 = $models.DataTablesView.createFrom;
+const $$createType6 = $models.CheckEvalsView.createFrom;
+const $$createType7 = $models.SpecExportView.createFrom;
+const $$createType8 = $models.SuggestionView.createFrom;
+const $$createType9 = $Create.Array($$createType8);
+const $$createType10 = $models.FlowiOverlayDiffView.createFrom;
+const $$createType11 = $models.GeneratedView.createFrom;
+const $$createType12 = $models.RequestMatrixChoices.createFrom;
+const $$createType13 = $models.MissingView.createFrom;
+const $$createType14 = $models.RequestView.createFrom;
+const $$createType15 = $models.OverlayPreviewView.createFrom;
+const $$createType16 = $models.MatrixView.createFrom;
+const $$createType17 = $models.SchemaView.createFrom;
+const $$createType18 = $Create.Array($$createType17);
+const $$createType19 = $models.RequestSettingsView.createFrom;
+const $$createType20 = $models.SpecOriginView.createFrom;
+const $$createType21 = $models.StoredView.createFrom;
+const $$createType22 = $Create.Array($$createType21);
+const $$createType23 = $models.SuggestView.createFrom;
+const $$createType24 = $models.SpanView.createFrom;
+const $$createType25 = $Create.Array($$createType24);
+const $$createType26 = $models.UsedByView.createFrom;
+const $$createType27 = $models.VariableHintView.createFrom;

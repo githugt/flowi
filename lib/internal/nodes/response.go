@@ -51,10 +51,13 @@ func fromBody(x model.Extraction, resp *Response) (any, error) {
 		return nil, fmt.Errorf("invalid JSONPath %s: %w", x.Path, err)
 	}
 	found := p.Select(resp.Body)
-	switch len(found) {
-	case 0:
+	if len(found) == 0 {
 		return nil, fmt.Errorf("%w at %s", errNothing, x.Path)
-	case 1:
+	}
+	// Before: one match was always unwrapped, so $.items[*].id was a list for two rows and a bare value for one, and
+	// len(), map() and batch over broke only when the API returned a single row. Only a query that can match at
+	// most once ($.a.b, $.items[0]) gives the value; every other query gives a list, whatever its length.
+	if p.Query().Singular() != nil {
 		return found[0], nil
 	}
 	return []any(found), nil

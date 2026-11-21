@@ -73,7 +73,7 @@ func (w *Workspace) DeclareSecret(env, name, value string) error {
 	envs := w.Environments()
 	i := slices.IndexFunc(envs, func(e model.Environment) bool { return e.Name == env })
 	if i < 0 {
-		return diagErr(diag.CodeRequestEnvUnknown, map[string]string{"env": env})
+		return w.envNotInWorkspace(env)
 	}
 	e := envs[i]
 	switch j := slices.IndexFunc(e.Vars, func(v model.EnvVar) bool { return v.Name == name }); {
@@ -105,7 +105,7 @@ func (w *Workspace) DiscardSecret(env, name string) error {
 	envs := w.Environments()
 	i := slices.IndexFunc(envs, func(e model.Environment) bool { return e.Name == env })
 	if i < 0 {
-		return diagErr(diag.CodeRequestEnvUnknown, map[string]string{"env": env})
+		return w.envNotInWorkspace(env)
 	}
 	return vaultErr(w.secrets().Unset(vault.Entry{Collection: vault.WorkspaceScope, Environment: envs[i].ID, Name: name}))
 }
@@ -149,11 +149,102 @@ func (w *Workspace) secretEntry(env, name string) (vault.Entry, error) {
 	envs := w.Environments()
 	i := slices.IndexFunc(envs, func(e model.Environment) bool { return e.Name == env })
 	if i < 0 {
-		return vault.Entry{}, diagErr(diag.CodeRequestEnvUnknown, map[string]string{"env": env})
+		return vault.Entry{}, w.envNotInWorkspace(env)
 	}
 	e := envs[i]
 	if !slices.ContainsFunc(e.Vars, func(v model.EnvVar) bool { return v.Name == name && v.Secret }) {
 		return vault.Entry{}, diagErr(diag.CodeSecretUndeclared, map[string]string{"name": name, "env": env})
 	}
 	return vault.Entry{Collection: vault.WorkspaceScope, Environment: e.ID, Name: name}, nil
+}
+
+// OrphanSecret is a value in the vault that no environment declares as a secret any more: its environment was deleted,
+// or the variable was removed or made plain. It carries no value.
+type OrphanSecret struct {
+	// Environment is the environment's name, or its id when the environment itself is gone.
+	Environment string
+	Name        string
+	// EnvironmentGone says the whole environment is gone, not only the variable.
+	EnvironmentGone bool
+}
+
+// declaresSecret says whether some environment still declares the entry as a secret variable.
+func declaresSecret(envs []model.Environment, e vault.Entry) bool {
+	return slices.ContainsFunc(envs, func(env model.Environment) bool {
+		return env.ID == e.Environment && slices.ContainsFunc(env.Vars, func(v model.EnvVar) bool { return v.Name == e.Name && v.Secret })
+	})
+}
+
+// keepSecret is the rule of Prune: secrets of other scopes are not judged here, and a workspace secret stays while its
+// environment declares it.
+func keepSecret(envs []model.Environment) func(vault.Entry) bool {
+	return func(e vault.Entry) bool { return e.Collection != vault.WorkspaceScope || declaresSecret(envs, e) }
+}
+
+func orphanOf(envs []model.Environment, e vault.Entry) OrphanSecret {
+	if i := slices.IndexFunc(envs, func(x model.Environment) bool { return x.ID == e.Environment }); i >= 0 {
+		return OrphanSecret{Environment: envs[i].Name, Name: e.Name}
+	}
+	return OrphanSecret{Environment: string(e.Environment), Name: e.Name, EnvironmentGone: true}
+}
+
+// OrphanSecrets lists the stored secrets nothing declares any more, so they can be looked at before PruneSecrets
+// removes them. Only the workspace's own secrets are judged.
+func (w *Workspace) OrphanSecrets() ([]OrphanSecret, error) {
+	stored, err := w.secrets().Stored()
+	if err != nil {
+		return nil, vaultErr(err)
+	}
+	envs, keep := w.Environments(), keepSecret(w.Environments())
+	var out []OrphanSecret
+	for _, e := range stored {
+		if !keep(e) {
+			out = append(out, orphanOf(envs, e))
+		}
+	}
+	return out, nil
+}
+
+// PruneSecrets removes the stored secrets nothing declares any more and returns what went. It never touches a secret
+// an environment still declares.
+func (w *Workspace) PruneSecrets() ([]OrphanSecret, error) {
+	envs := w.Environments()
+	gone, err := w.secrets().Prune(keepSecret(envs))
+	if err != nil {
+		return nil, vaultErr(err)
+	}
+	out := make([]OrphanSecret, 0, len(gone))
+	for _, e := range gone {
+		out = append(out, orphanOf(envs, e))
+	}
+	return out, nil
+}
+
+// EnvImpact is what deleting an environment takes with it or leaves hanging.
+type EnvImpact struct {
+	// Secrets are the names of the secret variables the environment declares: their stored values go with it.
+	Secrets []string
+	// Dependents are the environments that build on it (extends); they would lose what it gives them.
+	Dependents []string
+}
+
+// EnvironmentImpact says what deleting the environment file would affect. An unknown file is FLW-REQ-004.
+func (w *Workspace) EnvironmentImpact(file string) (EnvImpact, error) {
+	envs := w.Environments()
+	i := slices.IndexFunc(envs, func(e model.Environment) bool { return e.File == file })
+	if i < 0 {
+		return EnvImpact{}, diagErr(diag.CodeRequestEnvUnknown, map[string]string{"env": file})
+	}
+	out := EnvImpact{Secrets: []string{}, Dependents: []string{}}
+	for _, v := range envs[i].Vars {
+		if v.Secret {
+			out.Secrets = append(out.Secrets, v.Name)
+		}
+	}
+	for _, e := range envs {
+		if e.Extends != "" && e.Extends == envs[i].Name {
+			out.Dependents = append(out.Dependents, e.Name)
+		}
+	}
+	return out, nil
 }

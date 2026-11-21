@@ -112,7 +112,8 @@ func (t *secretTracker) isMissing(env string) func(string) bool {
 // problems reports the secrets a render needed but could not read:
 // FLW-SEC-001 for each unset one, or one FLW-SEC-002 when the vault is
 // locked.
-func (t *secretTracker) problems(env string, needed []string) diag.List {
+func (t *secretTracker) problems(e environment, needed []string) diag.List {
+	env := e.name
 	if len(needed) == 0 {
 		return nil
 	}
@@ -124,6 +125,11 @@ func (t *secretTracker) problems(env string, needed []string) diag.List {
 	}
 	out := make(diag.List, 0, len(needed))
 	for _, name := range needed {
+		if e.shipped {
+			// A shipped environment (the collection's own file) has no vault entry: its secrets come from the process environment.
+			out = append(out, diag.New(diag.CodeSecretShipped, diag.Location{}, map[string]string{"name": name, "env": env, "var": vault.OverrideName(env, name)}))
+			continue
+		}
 		out = append(out, diag.New(diag.CodeSecretMissing, diag.Location{}, map[string]string{"name": name, "env": env}))
 	}
 	return out

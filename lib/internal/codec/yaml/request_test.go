@@ -124,8 +124,9 @@ func TestDecodeRequest_should_round_trip_operation(t *testing.T) {
 	}
 }
 
-func TestRequest_should_round_trip_the_dirty_edit(t *testing.T) {
-	data := []byte(requestHeader + "versions:\n  \"1\":\n    method: GET\n    url: http://x\nedit:\n  method: POST\n  url: http://y\nedit_base: \"1\"\n")
+func TestRequest_should_still_read_an_edit_in_the_request_file_but_never_write_one_there(t *testing.T) {
+	// Before: the edit was written into the request file, so a commit carried half-typed edits.
+	data := []byte(requestHeader + "versions:\n  \"1\":\n    method: GET\n    url: http://x\nedit:\n  method: POST\n  url: http://y\nedit_base: \"1\"\nedit_overlay: vip\n")
 	c := newCodec()
 
 	r, diags := c.DecodeRequest("r.req.yaml", "r", data)
@@ -135,27 +136,42 @@ func TestRequest_should_round_trip_the_dirty_edit(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if r.Edit == nil || r.Edit.URL != "http://y" || r.Edit.Method != "POST" || r.EditBase != "1" {
-		t.Fatalf("edit not decoded: %+v base %q", r.Edit, r.EditBase)
+	if r.Edit == nil || r.Edit.URL != "http://y" || r.Edit.Method != "POST" || r.EditBase != "1" || r.EditOverlay != "vip" {
+		t.Fatalf("edit not decoded: %+v base %q overlay %q", r.Edit, r.EditBase, r.EditOverlay)
 	}
-	if !bytes.Equal(out, data) {
-		t.Fatalf("round trip differs:\n--- got\n%s\n--- want\n%s", out, data)
+	if bytes.Contains(out, []byte("edit")) {
+		t.Fatalf("the request file carries the edit:\n%s", out)
 	}
 }
 
-func TestRequest_should_round_trip_the_overlay_an_edit_was_made_with(t *testing.T) {
+func TestEdit_should_round_trip_through_its_own_file_with_the_base_and_the_overlay(t *testing.T) {
 	// Arrange
-	data := []byte(requestHeader + "versions:\n  \"1\":\n    method: GET\n    url: http://x\nedit:\n  method: GET\n  url: http://y\nedit_base: \"1\"\nedit_overlay: vip\n")
+	want := []byte("edit:\n  method: POST\n  url: http://y\nedit_base: \"1\"\nedit_overlay: vip\n")
 	c := newCodec()
 
 	// Act
-	r, diags := c.DecodeRequest("r.req.yaml", "r", data)
+	v, base, overlay, diags := c.DecodeEdit("e.yaml", want)
 	requireNoDiagnostics(t, diags)
-	out, err := c.EncodeRequest(r)
+	got, err := c.EncodeEdit(model.Request{Edit: v, EditBase: base, EditOverlay: overlay})
+	none, noneErr := c.EncodeEdit(model.Request{})
 
 	// Assert
-	if err != nil || r.EditOverlay != "vip" || !bytes.Equal(out, data) {
-		t.Fatalf("err %v overlay %q, output:\n%s", err, r.EditOverlay, out)
+	if err != nil || v == nil || v.URL != "http://y" || base != "1" || overlay != "vip" || !bytes.Equal(got, want) {
+		t.Fatalf("err %v edit %+v base %q overlay %q\n%s", err, v, base, overlay, got)
+	}
+	if noneErr != nil || none != nil {
+		t.Fatalf("no edit must give no file: %q %v", none, noneErr)
+	}
+}
+
+func TestDecodeEdit_Given_unknown_keys_or_bad_yaml_Then_diagnostics(t *testing.T) {
+	c := newCodec()
+
+	_, _, _, unknown := c.DecodeEdit("e.yaml", []byte("edit:\n  method: GET\nsurprise: 1\n"))
+	_, _, _, broken := c.DecodeEdit("e.yaml", []byte("edit: [unclosed\n"))
+
+	if len(unknown) == 0 || len(broken) == 0 {
+		t.Fatalf("unknown %v broken %v", unknown, broken)
 	}
 }
 
@@ -606,5 +622,100 @@ func TestFile_Given_a_file_version_Then_it_round_trips_as_its_own_block_with_wri
 	}
 	if !strings.Contains(string(out), "file:") || strings.Contains(string(out), "dataset:") || !strings.Contains(string(out), "writes: true") || !f.Writes {
 		t.Fatalf("output:\n%s", out)
+	}
+}
+
+func TestRequest_Given_disabled_rows_Then_they_are_disabled_and_written_back_by_name(t *testing.T) {
+	// Before: a row could only be deleted to try a request without it.
+	data := []byte(requestHeader + `versions:
+  "1":
+    method: GET
+    url: http://x
+    query:
+      page: "1"
+      tag: a
+    headers:
+      X-Trace: abc
+      X-Debug: "1"
+    disabled:
+      query:
+        - tag
+        - nothing
+      headers:
+        - X-Debug
+`)
+	c := newCodec()
+
+	r, diags := c.DecodeRequest("r.req.yaml", "r", data)
+	requireNoDiagnostics(t, diags)
+	out, err := c.EncodeRequest(r)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+	v := r.Versions[0]
+	if v.Query[0].Disabled || !v.Query[1].Disabled || v.Headers[0].Disabled || !v.Headers[1].Disabled {
+		t.Fatalf("version %+v", v)
+	}
+	// A name that matches no row is dropped; the others come back as they were.
+	if !strings.Contains(string(out), "disabled:\n      query:\n        - tag\n      headers:\n        - X-Debug\n") {
+		t.Fatalf("encoded:\n%s", out)
+	}
+	again, diags := c.DecodeRequest("r.req.yaml", "r", out)
+	requireNoDiagnostics(t, diags)
+	if !reflect.DeepEqual(again.Versions, r.Versions) {
+		t.Fatalf("re-read differs:\n%+v\n%+v", again.Versions, r.Versions)
+	}
+}
+
+func TestRequest_Given_no_row_disabled_Then_no_disabled_key_is_written(t *testing.T) {
+	r, diags := newCodec().DecodeRequest("r.req.yaml", "r", []byte(requestHeader+"versions:\n  \"1\":\n    method: GET\n    url: http://x\n    headers:\n      A: b\n"))
+	requireNoDiagnostics(t, diags)
+
+	out, _ := newCodec().EncodeRequest(r)
+
+	if strings.Contains(string(out), "disabled:") {
+		t.Fatalf("encoded:\n%s", out)
+	}
+}
+
+func TestDecodeRequest_Given_a_bad_disabled_entry_Then_it_is_a_type_error_and_an_unknown_table_is_refused(t *testing.T) {
+	text := requestHeader + "versions:\n  \"1\":\n    method: GET\n    url: http://x\n    query:\n      a: b\n    disabled:\n      query:\n        - [1]\n"
+	other := requestHeader + "versions:\n  \"1\":\n    method: GET\n    url: http://x\n    disabled:\n      body: [1]\n"
+
+	_, typeDiags := newCodec().DecodeRequest("r.req.yaml", "r", []byte(text))
+	_, unknownDiags := newCodec().DecodeRequest("r.req.yaml", "r", []byte(other))
+
+	if !hasCode(typeDiags, diag.CodeYAMLType) || !hasCode(unknownDiags, diag.CodeYAMLUnknownKey) {
+		t.Fatalf("type %v unknown %v", typeDiags, unknownDiags)
+	}
+}
+
+// Before: a version had no expect:, so `expect: 401` was an unknown key.
+func TestDecodeRequest_should_read_expect_as_a_number_a_class_or_a_list_and_write_it_back(t *testing.T) {
+	c := newCodec()
+	for in, want := range map[string]string{"401": "401", `"4xx"`: "4xx", `"200, 404"`: "200, 404"} {
+		data := []byte(requestHeader + "versions:\n  1:\n    method: POST\n    url: http://x\n    expect: " + in + "\n")
+
+		r, diags := c.DecodeRequest("login.req.yaml", "login", data)
+		requireNoDiagnostics(t, diags)
+		out, err := c.EncodeRequest(r)
+		again, diagsAgain := c.DecodeRequest("login.req.yaml", "login", out)
+
+		requireNoDiagnostics(t, diagsAgain)
+		if err != nil || r.Versions[0].Expect != want || again.Versions[0].Expect != want {
+			t.Errorf("%s: read %q, again %q, err %v\n%s", in, r.Versions[0].Expect, again.Versions[0].Expect, err, out)
+		}
+	}
+}
+
+// Before: a request file with merge markers gave a YAML syntax error about indentation.
+func TestDecodeRequest_Given_unresolved_merge_markers_Then_the_conflict_is_reported_at_its_line(t *testing.T) {
+	data := []byte(requestHeader + "versions:\n  1:\n    method: GET\n<<<<<<< HEAD\n    url: http://x\n=======\n    url: http://y\n>>>>>>> topic\n")
+
+	_, diags := newCodec().DecodeRequest("login.req.yaml", "login", data)
+
+	if len(diags) != 1 || diags[0].Code != diag.CodeFileConflict || diags[0].Pos.Line != 6 {
+		t.Fatalf("%+v", diags)
 	}
 }

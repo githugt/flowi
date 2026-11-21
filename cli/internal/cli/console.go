@@ -26,7 +26,7 @@ type Console struct {
 	InTTY  bool
 	OutTTY bool
 	ErrTTY bool
-	// NoColor is set when NO_COLOR is present in the environment.
+	// NoColor is set when NO_COLOR is in the environment with a value (no-color.org: an empty value does not count).
 	NoColor bool
 	// Done is closed when the command is cancelled (Ctrl-C); a prompt
 	// waiting on the terminal then gives up.
@@ -41,8 +41,20 @@ func NewConsole(in io.Reader, out, errOut io.Writer, environ []string, done <-ch
 	return Console{
 		In: in, Err: errOut, Done: done,
 		InTTY: isTerminal(in), OutTTY: isTerminal(out), ErrTTY: isTerminal(errOut),
-		NoColor: hasEnvVar(environ, "NO_COLOR"),
+		NoColor: hasEnvValue(environ, "NO_COLOR"),
 	}
+}
+
+// UseColor says whether live progress is drawn in colour for a --color mode: always and never decide, auto follows
+// NO_COLOR.
+func (c Console) UseColor(mode string) bool {
+	switch mode {
+	case ColorAlways:
+		return true
+	case ColorNever:
+		return false
+	}
+	return !c.NoColor
 }
 
 func isTerminal(s any) bool {
@@ -50,9 +62,11 @@ func isTerminal(s any) bool {
 	return ok && term.IsTerminal(int(f.Fd())) //nolint:gosec // file descriptors fit in int
 }
 
-func hasEnvVar(environ []string, name string) bool {
+// hasEnvValue says if name is set to something. Before: a variable that was present but empty counted as set, against
+// no-color.org, so `NO_COLOR=` in a shell profile or in the sample .env turned colour off.
+func hasEnvValue(environ []string, name string) bool {
 	for _, kv := range environ {
-		if strings.HasPrefix(kv, name+"=") {
+		if value, ok := strings.CutPrefix(kv, name+"="); ok && value != "" {
 			return true
 		}
 	}

@@ -302,3 +302,16 @@ func consumerConfig(op transport.Operation, durable string) (jetstream.ConsumerC
 	}
 	return cfg, nil
 }
+
+// Probe connects and signs in; nothing is subscribed or published, and a JetStream stream is not looked up.
+func (Transport) Probe(_ context.Context, op transport.Operation) error { // bounded by connectTimeout, not by ctx
+	nc, err := natsgo.Connect(op.Server, connectOptions(op)...)
+	if err != nil {
+		return fmt.Errorf("connecting to %s: %w", op.Server, err)
+	}
+	defer nc.Close()
+	if err := nc.FlushTimeout(connectTimeout); err != nil { // a server that refuses the sign-in says so on the first round trip
+		return fmt.Errorf("talking to %s: %w", op.Server, err)
+	}
+	return nil
+}

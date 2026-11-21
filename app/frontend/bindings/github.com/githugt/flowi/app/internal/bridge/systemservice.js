@@ -16,6 +16,17 @@ import { Call as $Call, CancellablePromise as $CancellablePromise, Create as $Cr
 import * as $models from "./models.js";
 
 /**
+ * Diagnostics is the text the About screen copies for a bug report: version, system, workspace folder and counts.
+ * It contains no secret and no values from any environment or request.
+ * 
+ * Before: the About screen showed a version and nothing else a report needs.
+ * @returns {$CancellablePromise<string>}
+ */
+export function Diagnostics() {
+    return $Call.ByID(1238036098);
+}
+
+/**
  * ExpressionHelp says what can be written in the expression field of the
  * given context (see vm.ExprContext: flow.when, request.check …).
  * @param {string} context
@@ -74,6 +85,20 @@ export function Quit() {
  */
 export function QuitKeeping() {
     return $Call.ByID(2142848036);
+}
+
+/**
+ * ReportFrontendError writes an error the window caught (an uncaught exception or a rejected promise nobody
+ * awaited) to the app's log, so a crash leaves evidence beyond the toast. kind is "error" or "rejection".
+ * The text is cut to a fixed length and its line breaks are kept out of the log line.
+ * Before: the window showed a toast and nothing was kept; a report of "it said something went wrong" had no trace.
+ * @param {string} kind
+ * @param {string} message
+ * @param {string} stack
+ * @returns {$CancellablePromise<void>}
+ */
+export function ReportFrontendError(kind, message, stack) {
+    return $Call.ByID(3304734130, kind, message, stack);
 }
 
 // Private type creation functions

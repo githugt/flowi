@@ -3,9 +3,13 @@
 package bridge_test
 
 import (
+	"errors"
 	"slices"
+	"strings"
 	"testing"
+	"time"
 
+	flowi "github.com/githugt/flowi/lib"
 	"github.com/githugt/flowi/lib/model"
 
 	"github.com/githugt/flowi/app/internal/bridge"
@@ -45,7 +49,9 @@ func TestAuthsService_State_Given_a_collection_with_a_named_auth_When_read_Then_
 func TestAuthsService_Create_Given_a_name_and_a_scheme_When_created_Then_the_backend_is_asked_and_the_screen_shows_it(t *testing.T) {
 	app, b, pub := authsFixture(t)
 
-	app.Auths().Create("C1", " admin ", "scheme:digest")
+	if err := app.Auths().Create("C1", " admin ", "scheme:digest"); err != nil {
+		t.Fatal(err)
+	}
 
 	if !b.Called("NewNamedAuth admin digest") {
 		t.Fatal("the backend was not asked")
@@ -57,14 +63,24 @@ func TestAuthsService_Create_Given_a_name_and_a_scheme_When_created_Then_the_bac
 }
 
 // Before: n/a (a new guard): a nameless authentication cannot be used by any request.
-func TestAuthsService_Create_Given_no_name_When_created_Then_an_error_notice_and_nothing_is_written(t *testing.T) {
-	app, b, pub := authsFixture(t)
+func TestAuthsService_Create_Given_no_name_When_created_Then_the_error_comes_back_and_nothing_is_written(t *testing.T) {
+	app, b, _ := authsFixture(t)
 
-	app.Auths().Create("C1", "  ", "scheme:digest")
+	err := app.Auths().Create("C1", "  ", "scheme:digest")
 
-	n, ok := pub.last["notice"].(bridge.Notice)
-	if !ok || n.Level != "error" || b.Called("NewNamedAuth  digest") {
-		t.Fatalf("notice %+v", pub.last["notice"])
+	// Before: the refusal was a notice and the screen had already cleared the form.
+	if err == nil || b.Called("NewNamedAuth  digest") {
+		t.Fatalf("err %v", err)
+	}
+}
+
+func TestAuthsService_Save_Given_a_key_that_is_gone_Then_it_says_so_as_the_error(t *testing.T) {
+	app, _, _ := authsFixture(t)
+
+	err := app.Auths().Save("C1/NOPE", "", "scheme:digest", nil)
+
+	if err == nil || err.Error() != "that authentication is gone" {
+		t.Fatalf("err %v", err)
 	}
 }
 
@@ -73,7 +89,7 @@ func TestAuthsService_Save_Given_a_new_scheme_and_values_When_saved_Then_the_par
 	app, _, _ := authsFixture(t)
 	svc := app.Auths()
 
-	svc.Save("C1/A1", "Now digest", "scheme:digest", map[string]string{"password": "{{secret.pw}}", "username": "ada", "realm": ""})
+	_ = svc.Save("C1/A1", "Now digest", "scheme:digest", map[string]string{"password": "{{secret.pw}}", "username": "ada", "realm": ""})
 
 	a := svc.State().Auths[0]
 	if a.Description != "Now digest" || a.Scheme != "scheme:digest" || len(a.Fields) != 2 || a.Fields[0].Value != "ada" || a.Fields[1].Value != "{{secret.pw}}" {
@@ -85,7 +101,7 @@ func TestAuthsService_Save_Given_a_new_scheme_and_values_When_saved_Then_the_par
 func TestAuthsService_Delete_Given_a_named_auth_When_deleted_Then_it_is_gone_and_the_request_says_its_auth_is_missing(t *testing.T) {
 	app, b, _ := authsFixture(t)
 
-	app.Auths().Delete("C1/A1")
+	_ = app.Auths().Delete("C1/A1")
 
 	if !b.Called("DeleteNamedAuth A1") || len(app.Auths().State().Auths) != 0 {
 		t.Fatalf("auths %+v", app.Auths().State().Auths)
@@ -96,7 +112,7 @@ func TestAuthsService_Delete_Given_a_named_auth_When_deleted_Then_it_is_gone_and
 func TestAuthsService_Rename_Given_a_new_name_When_renamed_Then_the_backend_is_asked_and_the_screen_shows_it(t *testing.T) {
 	app, b, pub := authsFixture(t)
 
-	app.Auths().Rename("C1/A1", " partner ")
+	_ = app.Auths().Rename("C1/A1", " partner ")
 
 	if !b.Called("RenameNamedAuth A1 partner") {
 		t.Fatal("the backend was not asked")
@@ -133,5 +149,32 @@ func TestAuthsService_FromRequest_Given_a_request_with_its_own_scheme_When_kept_
 	view, _ = app.Requests().Open(node)
 	if !b.Called("NewNamedAuth partner apikey") || view.Auth.Use != "partner" {
 		t.Fatalf("auth %+v", view.Auth)
+	}
+}
+
+// Before: a sign-in a person approved could be neither seen nor dropped from the window.
+func TestAuthsService_Tokens_should_list_the_saved_sign_ins_and_ForgetToken_should_drop_one(t *testing.T) {
+	b := &vmtest.Backend{Cols: []model.Collection{vmtest.SampleCollection()}, Tokens: []flowi.AuthToken{
+		{ID: "aaaa1111", Label: "device_code · auth.example.com · client tv", Expires: time.Date(2026, 3, 4, 14, 32, 0, 0, time.UTC), Stored: true},
+		{ID: "bbbb2222", Label: "authorization_code · idp · client web", Expired: true, HasRefresh: true},
+	}}
+	app := bridge.NewApp(b, bridge.NewInlineActor(), (&published{}).emit)
+	app.Start(t.Context())
+	auths := app.Auths()
+
+	before := auths.Tokens()
+	err := auths.ForgetToken("bbbb")
+	after := auths.Tokens()
+	b.ForgetTokenErr = errors.New("no saved token has the id \"zz\"")
+	refused := auths.ForgetToken("zz")
+
+	if len(before) != 2 || before[0].ID != "aaaa1111" || !before[0].Stored || before[1].Status != "Expired: renews by itself on the next send" {
+		t.Fatalf("before %+v", before)
+	}
+	if err != nil || len(after) != 1 || after[0].ID != "aaaa1111" || !slices.Equal(b.ForgottenTokens, []string{"bbbb"}) {
+		t.Fatalf("after %+v err %v forgotten %v", after, err, b.ForgottenTokens)
+	}
+	if refused == nil || !strings.Contains(refused.Error(), "no saved token") {
+		t.Fatalf("refused %v", refused)
 	}
 }

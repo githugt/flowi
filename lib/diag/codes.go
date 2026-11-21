@@ -13,9 +13,13 @@ const (
 
 	CodeFormatTooNew  Code = "FLW-FMT-001"
 	CodeFormatMissing Code = "FLW-FMT-002"
+	// CodeFormatNeedsNewer: flowi.yaml names a minimum Flowi release newer than the one running.
+	CodeFormatNeedsNewer Code = "FLW-FMT-003"
 
 	CodeFileUnrecognised Code = "FLW-FILE-001"
 	CodeFileUnreadable   Code = "FLW-FILE-002"
+	// CodeFileConflict: the file still has the markers git leaves where a merge could not decide.
+	CodeFileConflict Code = "FLW-FILE-003"
 
 	CodeIDDuplicate Code = "FLW-ID-001"
 	CodeIDInvalid   Code = "FLW-ID-002"
@@ -92,6 +96,7 @@ const (
 
 	CodeServeSchedule     Code = "FLW-SERVE-001"
 	CodeServeScheduleFlow Code = "FLW-SERVE-002"
+	CodeServeToken        Code = "FLW-SERVE-003"
 
 	CodeBlueprintParamType   Code = "FLW-BP-001"
 	CodeBlueprintParamName   Code = "FLW-BP-002"
@@ -104,6 +109,7 @@ const (
 	CodeAuthInvalid  Code = "FLW-AUTH-001"
 	CodeAuthUnknown  Code = "FLW-AUTH-002"
 	CodeAuthNotFound Code = "FLW-AUTH-003"
+	CodeAuthToken    Code = "FLW-AUTH-004"
 
 	CodeOverlayInvalid    Code = "FLW-OVL-001"
 	CodeOverlayNotFound   Code = "FLW-OVL-002"
@@ -115,6 +121,7 @@ const (
 	CodeWriteRequestPath   Code = "FLW-WRITE-002"
 	CodeWriteEditNone      Code = "FLW-WRITE-003"
 	CodeWriteEditLabel     Code = "FLW-WRITE-004"
+	CodeWriteChangedOnDisk Code = "FLW-WRITE-005"
 
 	CodeContractBroken  Code = "FLW-CONTRACT-001"
 	CodeContractInput   Code = "FLW-CONTRACT-002"
@@ -124,6 +131,7 @@ const (
 	CodeFlowNotFound  Code = "FLW-FLOW-002"
 	CodeFlowAmbiguous Code = "FLW-FLOW-003"
 	CodeFlowTagEmpty  Code = "FLW-FLOW-004"
+	CodeFlowNone      Code = "FLW-FLOW-005"
 
 	CodeCycleNeeds   Code = "FLW-CYC-001"
 	CodeCycleSubflow Code = "FLW-CYC-002"
@@ -131,6 +139,9 @@ const (
 	CodeLintWhitespace Code = "FLW-LINT-001"
 	CodeLintControl    Code = "FLW-LINT-002"
 	CodeLintInvisible  Code = "FLW-LINT-003"
+	CodeLintLiteralKey Code = "FLW-LINT-004"
+	CodeLintPlainKey   Code = "FLW-LINT-005"
+	CodeLintPlainGRPC  Code = "FLW-LINT-006"
 
 	CodeWSMissing           Code = "FLW-WS-001"
 	CodeWSAlreadyMounted    Code = "FLW-WS-002"
@@ -146,12 +157,15 @@ const (
 	CodeTemplateSyntax    Code = "FLW-TPL-002"
 	CodeTemplateEmpty     Code = "FLW-TPL-003"
 	CodeTemplateGenerator Code = "FLW-TPL-004"
+	CodeTemplateShadow    Code = "FLW-TPL-005"
 
 	// Diagnostic code names, not credentials (gosec G101 matches "Secret").
 	CodeSecretMissing         Code = "FLW-SEC-001" //nolint:gosec // see above
 	CodeSecretLocked          Code = "FLW-SEC-002" //nolint:gosec // see above
 	CodeSecretUndeclared      Code = "FLW-SEC-003" //nolint:gosec // see above
 	CodeSecretFromEnvironment Code = "FLW-SEC-004" //nolint:gosec // see above
+	CodeSecretHost            Code = "FLW-SEC-005" //nolint:gosec // see above
+	CodeSecretShipped         Code = "FLW-SEC-006" //nolint:gosec // see above
 
 	CodeRequestNotFound    Code = "FLW-REQ-001"
 	CodeRequestAmbiguous   Code = "FLW-REQ-002"
@@ -163,6 +177,7 @@ const (
 	CodeRequestEnvExtends  Code = "FLW-REQ-008"
 	CodeRequestMethod      Code = "FLW-REQ-009"
 	CodeRequestMethodCase  Code = "FLW-REQ-010"
+	CodeRequestEnvShipped  Code = "FLW-REQ-011"
 
 	CodeRunAssertFailed   Code = "FLW-RUN-001"
 	CodeRunAssertWarning  Code = "FLW-RUN-002"
@@ -191,6 +206,12 @@ const (
 	CodeRunNotProblem     Code = "FLW-RUN-025"
 	CodeRunNoResponse     Code = "FLW-RUN-026"
 	CodeRunDeprecated     Code = "FLW-RUN-027"
+	CodeRunEnvMissing     Code = "FLW-RUN-028"
+	CodeRunFlaky          Code = "FLW-RUN-029"
+	CodeRunGraphQLError   Code = "FLW-RUN-030"
+	CodeRunGraphQLWarning Code = "FLW-RUN-031"
+	CodeRunExpectFailed   Code = "FLW-RUN-032"
+	CodeExpectInvalid     Code = "FLW-EXPECT-001"
 
 	CodeHTTPFailed  Code = "FLW-HTTP-001"
 	CodeHTTPTimeout Code = "FLW-HTTP-002"
@@ -211,21 +232,23 @@ const hintMarker = " — hint: "
 func codeTable() map[Code]codeInfo {
 	e, w := SeverityError, SeverityWarning
 	return map[Code]codeInfo{
-		CodeYAMLSyntax:       {e, "YAML syntax error: {detail}"},
-		CodeYAMLUnknownKey:   {e, `unknown key "{key}"`},
-		CodeYAMLDuplicateKey: {e, `duplicate key "{key}"`},
-		CodeYAMLType:         {e, `"{key}" must be {expected}, got {got}`},
-		CodeYAMLEmpty:        {e, "file is empty"},
+		CodeFileConflict:     {e, "unresolved git merge conflict: a marker (<<<<<<<, ======= or >>>>>>>) is left in the file" + hintMarker + "open it, keep the lines you want, delete the three marker lines, then run `flowi validate`; `git checkout --conflict=merge <file>` brings the markers back if you want to start over"},
+		CodeYAMLSyntax:       {e, "YAML syntax error: {detail} — hint: check the indentation and the quotes near the line it names"},
+		CodeYAMLUnknownKey:   {e, `unknown key "{key}" — hint: check the spelling; flowi schema <kind> prints the keys a file may have`},
+		CodeYAMLDuplicateKey: {e, `duplicate key "{key}" — hint: keep one of them`},
+		CodeYAMLType:         {e, `"{key}" must be {expected}, got {got} — hint: change the value to the expected type`},
+		CodeYAMLEmpty:        {e, "file is empty — hint: write its content, or delete the file"},
 
-		CodeFormatTooNew:  {e, "format {got} is newer than supported {max}; upgrade Flowi"},
-		CodeFormatMissing: {e, `missing "format" in flowi.yaml`},
+		CodeFormatTooNew:     {e, "format {got} is newer than supported {max}; upgrade Flowi"},
+		CodeFormatMissing:    {e, `missing "format" in flowi.yaml`},
+		CodeFormatNeedsNewer: {e, "this collection needs Flowi {min} or newer; this is {have} — hint: install a newer release, or lower min_version in flowi.yaml if the collection does not need it"},
 
 		CodeFileUnrecognised: {w, `unrecognised file "{name}" (expected *.req.yaml / *.arazzo.yaml / _folder.yaml)`},
 		CodeFileUnreadable:   {w, `cannot read "{name}": {detail}`},
 
-		CodeIDDuplicate: {e, "duplicate id {id}"},
-		CodeIDInvalid:   {e, `invalid id "{id}" (must be a ULID)`},
-		CodeIDMissing:   {e, "missing id"},
+		CodeIDDuplicate: {e, "duplicate id {id} — hint: give one of the two a new id"},
+		CodeIDInvalid:   {e, `invalid id "{id}" (must be a ULID) — hint: use a 26-character ULID; a new request or flow gets a valid one`},
+		CodeIDMissing:   {e, "missing id — hint: add an id: line with a ULID"},
 
 		CodeVersionInvalid:       {e, `invalid version label "{label}"`},
 		CodeVersionDuplicate:     {e, `version "{label}" duplicates "{other}"`},
@@ -233,15 +256,15 @@ func codeTable() map[Code]codeInfo {
 		CodeVersionPinnedAbsent:  {e, `pinned version "{label}" does not exist on request {request}`},
 		CodeVersionNone:          {e, "request has no versions"},
 
-		CodeRefUnknownRequest: {e, "unknown request id {id}"},
-		CodeRefUnknownFlow:    {e, "unknown flow id {id}"},
-		CodeRefUndeclared:     {e, `collection "{collection}" is not declared in depends_on`},
+		CodeRefUnknownRequest: {e, "unknown request id {id} — hint: the request was deleted or its id changed: pick another one in the step"},
+		CodeRefUnknownFlow:    {e, "unknown flow id {id} — hint: the flow was deleted or its id changed: pick another one"},
+		CodeRefUndeclared:     {e, `collection "{collection}" is not declared in depends_on — hint: add it to depends_on in the collection file`},
 		CodeRefNotMounted:     {e, `collection "{collection}" is not mounted` + hintMarker + `clone {repo} and run "flowi workspace mount"`},
 		CodeRefStalePath:      {w, `path hint "{got}" is out of date, should be "{want}" (run "flowi fmt")`},
 
-		CodeNodeUnknownType:  {e, `unknown node type "{type}"`},
+		CodeNodeUnknownType:  {e, `unknown node type "{type}" — hint: use one of the step types offered when you add a step`},
 		CodeNodeRemovedType:  {e, `node type "{type}" no longer exists` + hintMarker + "use {use}"},
-		CodeNodeDuplicateID:  {e, `duplicate node id "{node}" in flow`},
+		CodeNodeDuplicateID:  {e, `duplicate node id "{node}" in flow — hint: rename one of the steps`},
 		CodeNodeNeedsSibling: {e, `needs "{target}" is not a sibling node` + hintMarker + "needs can only reference nodes in the same list"},
 		CodeNodeMissingField: {e, `node type "{type}" requires "{field}"`},
 		CodeNodeParam:        {e, `invalid {field} of node "{node}": {detail}`},
@@ -294,12 +317,14 @@ func codeTable() map[Code]codeInfo {
 
 		CodeExportLossy:       {w, `node "{node}" ({type}) has no Arazzo equivalent and was left out`},
 		CodeServeSchedule:     {e, `schedule "{name}": {detail}`},
+		CodeServeToken:        {e, "trigger token: {detail} — hint: flowi serve tokens ls lists the tokens; flowi serve tokens new <name> makes one"},
 		CodeServeScheduleFlow: {w, `schedule "{name}" cannot run: {detail}` + hintMarker + "it is skipped until the flow can be found"},
 		CodeExportValue:       {w, `{what} of "{node}" is {value}, which has no Arazzo equivalent, and was left out`},
 
 		CodeAuthInvalid:       {e, "auth: {detail}"},
 		CodeAuthUnknown:       {e, `auth uses "{name}", but the collection has no authentication with that name` + hintMarker + "add auths/{name}.auth.yaml, or pick another one"},
 		CodeAuthNotFound:      {e, `no authentication named "{name}"`},
+		CodeAuthToken:         {e, `{detail}` + hintMarker + "run `flowi auth tokens` to see the saved tokens and their ids"},
 		CodeOverlayInvalid:    {e, "flowi overlay is not valid: {detail}"},
 		CodeOverlayNotFound:   {e, `no flowi overlay named "{name}"` + hintMarker + "list them with: flowi overlay ls"},
 		CodeOverlayNotFitting: {w, `flowi overlay "{overlay}": {detail} was left out: {reason}`},
@@ -318,6 +343,7 @@ func codeTable() map[Code]codeInfo {
 		CodeWriteRequestPath:   {e, `cannot create request "{path}": {detail}`},
 		CodeWriteEditNone:      {e, "request {request} has no edit to {action}" + hintMarker + "make an edit first"},
 		CodeWriteEditLabel:     {e, `cannot save the edit as version "{label}": {detail}` + hintMarker + "choose a version label that does not exist yet"},
+		CodeWriteChangedOnDisk: {e, "{file} changed on disk since it was opened, so saving would overwrite that change" + hintMarker + "load the file again, or save with the overwrite option to keep your version"},
 
 		CodeContractBroken:  {w, "{reader} reads {read} from {request} version {version}, which {source} does not contain"},
 		CodeContractInput:   {w, `node "{node}" does not fill input "{name}" that {request} version {version} needs`},
@@ -326,14 +352,18 @@ func codeTable() map[Code]codeInfo {
 		CodeFlowOption:    {e, "invalid {field}: {detail}"},
 		CodeFlowNotFound:  {e, `no flow matches "{ref}"`},
 		CodeFlowTagEmpty:  {e, `no flow carries the tag "{tag}"` + hintMarker + "add `tags: [{tag}]` to a flow, or to its folder's _folder.yaml"},
+		CodeFlowNone:      {e, "there is no flow to run" + hintMarker + "add a flow, or check --collection"},
 		CodeFlowAmbiguous: {e, `"{ref}" matches flows in {count} collections` + hintMarker + "use --collection"},
 
-		CodeCycleNeeds:   {e, "dependency cycle: {cycle}"},
-		CodeCycleSubflow: {e, "subflow cycle: {cycle}"},
+		CodeCycleNeeds:   {e, "dependency cycle: {cycle} — hint: remove one needs link to break the loop"},
+		CodeCycleSubflow: {e, "subflow cycle: {cycle} — hint: make one of the flows stop calling the other"},
 
 		CodeLintWhitespace: {w, "leading or trailing whitespace in {field}"},
 		CodeLintControl:    {w, "newline or tab in single-line {field}"},
 		CodeLintInvisible:  {w, "invisible character {char} in {field}"},
+		CodeLintPlainGRPC:  {w, "the gRPC call to {host} is not encrypted: {server} is plaintext" + hintMarker + "write grpcs:// to use TLS, unless this host is on a network you trust"},
+		CodeLintPlainKey:   {w, "{field} sends a credential over {scheme} to {host}, which is not encrypted" + hintMarker + "use https (or wss), unless this host is on a network you trust"},
+		CodeLintLiteralKey: {w, "{field} holds a credential typed in directly" + hintMarker + "keep it as a secret and write {{secret.name}} here, so it does not reach git"},
 
 		CodeWSMissing:           {e, "collection {id} not found at {path}" + hintMarker + `run "flowi workspace locate"`},
 		CodeWSAlreadyMounted:    {e, "{path} is already mounted"},
@@ -351,15 +381,19 @@ func codeTable() map[Code]codeInfo {
 		CodeTemplateSyntax:    {e, "invalid expression in {field}: {detail}"},
 		CodeTemplateEmpty:     {e, "{field} is empty (empty: error)"},
 		CodeTemplateGenerator: {e, "unknown generator ${name}"},
+		CodeTemplateShadow:    {w, "{{{name}}} reads the flow {kind} {name}, which hides the environment variable {name} of {envs}" + hintMarker + "write {{env.{name}}} for the environment's value, or rename the {kind}"},
 
 		CodeSecretMissing:         {e, `secret "{name}" is not set for environment "{env}"` + hintMarker + "set it with `flowi secret set {env} {name}`"},
 		CodeSecretLocked:          {e, "cannot unlock the vault: {detail}"},
+		CodeSecretHost:            {e, `{request} would send a secret to "{host}", which is not trusted with secrets in environment "{env}"` + hintMarker + "if {host} is the right place, allow it with `flowi secret allow-host {host}`, or in the app under Settings > Secrets (your own settings: a collection cannot allow it), or point a variable of the environment at it"},
+		CodeSecretShipped:         {e, `secret "{name}" is not set for environment "{env}", which the collection ships` + hintMarker + "set {var} in the environment of the run (CI), or run `flowi env import {env}` and then `flowi secret set {env} {name}` to keep it in the vault"},
 		CodeSecretFromEnvironment: {e, `secret "{name}" of environment "{env}" is provided by an environment variable, not stored` + hintMarker + "read it from where that variable is set"},
 		CodeSecretUndeclared:      {e, `"{name}" is not a secret variable of environment "{env}"` + hintMarker + "declare it as `{name}: { secret: true }` in environments/{env}.yaml"},
 
 		CodeRequestNotFound:    {e, `no request matches "{ref}"`},
 		CodeRequestAmbiguous:   {e, `"{ref}" matches requests in {count} collections` + hintMarker + "use --collection"},
 		CodeRequestFileOutside: {e, `file "{path}" is outside the collection`},
+		CodeRequestEnvShipped:  {e, `environment "{env}" comes with the collection "{collection}" and is not in the workspace yet` + hintMarker + "copy it with `flowi env import {env}`, then try again"},
 		CodeRequestEnvUnknown:  {e, `environment "{env}" not found` + hintMarker + "see `flowi env ls`"},
 		CodeRequestHeader:      {e, "invalid header {name}: {detail}"},
 		CodeRequestFileRead:    {e, `file "{path}" cannot be read: {detail}`},
@@ -382,6 +416,11 @@ func codeTable() map[Code]codeInfo {
 		CodeRunBatchOver:      {e, `over of batch "{node}" is not a list: {detail}`},
 		CodeRunExtractNoResp:  {e, `set "{node}" reads a response, but none is in reach` + hintMarker + "outside post-hooks read an earlier step: from: expr with {{nodes.<id>.body.…}}"},
 		CodeRunDigestTarget:   {e, `digest "{node}" cannot summarise "{of}": it is unknown or has not finished`},
+		CodeRunFlaky:          {w, `node "{node}" passed on try {try} of {tries}` + hintMarker + "a step that needs a retry to pass is flaky: find out why, or the retries only hide it"},
+		CodeRunGraphQLError:   {e, `the GraphQL response of "{request}" carries {count}: {detail}` + hintMarker + "a GraphQL server answers 200 even when the query failed: the errors are in the body (requests.graphql_errors: warn or ignore stops this)"},
+		CodeRunGraphQLWarning: {w, `the GraphQL response of "{request}" carries {count}: {detail}` + hintMarker + "a GraphQL server answers 200 even when the query failed: assert on response.body.errors, or set requests.graphql_errors to fail so the step fails, or to ignore"},
+		CodeRunExpectFailed:   {e, `"{request}" expected {expected}, got {status}` + hintMarker + "if {status} is right, change expect: in the request (a list or a range such as 4xx works); if not, the server answers differently than the test assumes"},
+		CodeExpectInvalid:     {e, "expect: {detail}" + hintMarker + "write the status the request should answer with: 401, a range 400-499, a class 4xx or a list 200, 404"},
 		CodeRunHandled:        {w, `node "{node}" failed; continuing (on_error: {on_error})`},
 		CodeRunBackground:     {w, `background webhook "{node}" failed: {detail}`},
 		CodeRunFileName:       {e, `node "{node}" cannot write "{name}": not a plain file name`},
@@ -393,13 +432,14 @@ func codeTable() map[Code]codeInfo {
 		CodeRunNotProblem:     {e, `"{node}" expects "{step}" to have received a problem details document (RFC 9457), but {problems}` + hintMarker + "an error response should be application/problem+json with the standard members used as the RFC says"},
 		CodeRunDeprecated:     {w, `{request} is announced as going away: {notice}` + hintMarker + "the server sent a Deprecation or Sunset header; move to the successor before the sunset date"},
 		CodeRunNoResponse:     {e, `"{node}" checks "{step}", but "{step}" has no response in this run` + hintMarker + "name an earlier request step of the same flow"},
-		CodeRunAssertNoSchema: {e, `"{node}" checks the schema of "{step}", but no response schema is kept for what "{step}" received` + hintMarker + "send the request once with schemas.infer on, or import an OpenAPI document, so a schema is kept"},
+		CodeRunAssertNoSchema: {e, `"{node}" checks the schema of "{step}", but no response schema is kept for what "{step}" received` + hintMarker + "send the request once with schemas.infer on (Settings → Requests → Learn schemas from sends), or import an OpenAPI document, so a schema is kept"},
+		CodeRunEnvMissing:     {w, `flow "{flow}" reads {what}, but environment "{env}" {problem}` + hintMarker + "add it to the environment (`flowi env`), set the secret (`flowi secret set`), or run with another environment"},
 		CodeRunSkipRead:       {e, `"{reader}" reads {reads}, which "{skipped}" would have made, and "{skipped}" is skipped` + hintMarker + "keep its last values (hold), skip \"{reader}\" too, or add a default with ??"},
 
-		CodeHTTPFailed:  {e, "request failed: {detail}"},
-		CodeHTTPTimeout: {e, "request timed out after {timeout}"},
+		CodeHTTPFailed:  {e, "request failed: {detail} — hint: check the address and the network, then send again"},
+		CodeHTTPTimeout: {e, "request timed out after {timeout} — hint: raise the timeout in the request settings, or check the server"},
 
-		CodeCycleHooks: {e, "hook flows call each other in a cycle: {cycle}"},
+		CodeCycleHooks: {e, "hook flows call each other in a cycle: {cycle} — hint: make one of the hook flows stop calling the other"},
 	}
 }
 

@@ -20,17 +20,18 @@ import (
 )
 
 type serveFlags struct {
-	replayAddr, triggerAddr, record                string
+	replayAddr, triggerAddr, healthAddr, record    string
 	recordTo, recordFolder, recordHAR, passThrough string
 	forward, forwardTo, forwardEnv                 string
 	forwardOnly                                    []string
-	valkeyAddr                                     string
+	valkeyAddr, tlsCert, tlsKey                    string
 	latency, shutdown                              time.Duration
 	faultError, faultDrop                          float64
 	faultStatus                                    int
 	faultJitter                                    time.Duration
-	sequence, cors, quiet                          bool
+	sequence, cors, quiet, metrics                 bool
 	noReplay, noTriggers, noSchedules              bool
+	insecureListen                                 bool
 }
 
 func newServeCommand(i do.Injector) *cobra.Command {
@@ -43,8 +44,12 @@ func newServeCommand(i do.Injector) *cobra.Command {
 			"             (default 127.0.0.1:8525). Steer it with request headers: X-Flowi-Status, X-Flowi-Example,\n" +
 			"             X-Flowi-Request, X-Flowi-Version, X-Flowi-Latency, X-Flowi-Fault (none, drop, error or error:<status>). GET /__flowi/routes lists what it knows.\n" +
 			"  Triggers   POST /flows/<flow>/run starts a flow (default 127.0.0.1:8526). Needs a bearer token:\n" +
-			"             create one with `flowi serve token`, or set FLOWI_SECRET_SERVE_TRIGGER_TOKEN.\n" +
+			"             make a named one, limited to flows, environments and a time, with `flowi serve tokens new`, or the single\n" +
+			"             full-power one with `flowi serve token`, or set FLOWI_SECRET_SERVE_TRIGGER_TOKEN. Plain HTTP: on an address\n" +
+			"             other machines can reach it needs --tls-cert and --tls-key, or --insecure-listen behind a TLS proxy.\n" +
 			"  Schedules  runs the cron schedules of workspace.yaml (see `flowi schedule`).\n\n" +
+			"With --health-addr it also answers GET /healthz (alive) and GET /readyz (200, or 503 while it drains or every run slot\n" +
+			"is taken) with no token, and with --metrics GET /metrics, for an orchestrator or a monitor.\n\n" +
 			"All listeners bind to localhost unless you say otherwise. Ctrl-C (or SIGTERM) stops accepting calls,\n" +
 			"lets running requests and flows finish for up to --shutdown-timeout, then cancels what is left.\n" +
 			"Exit codes: 0 stopped cleanly, 3 work had to be cancelled at the timeout, 2 bad options, 4 a system failure.",
@@ -54,6 +59,11 @@ func newServeCommand(i do.Injector) *cobra.Command {
 	fl := cmd.Flags()
 	fl.StringVar(&f.replayAddr, "replay-addr", "", "replayer address (default: the serve.replay_addr setting)")
 	fl.StringVar(&f.triggerAddr, "trigger-addr", "", "trigger address (default: the serve.trigger_addr setting)")
+	fl.StringVar(&f.tlsCert, "tls-cert", "", "PEM certificate chain the trigger endpoint serves HTTPS with (with --tls-key)")
+	fl.StringVar(&f.tlsKey, "tls-key", "", "PEM private key for --tls-cert")
+	fl.BoolVar(&f.insecureListen, "insecure-listen", false, "allow the trigger endpoint on a network-reachable address without TLS, when a proxy in front terminates TLS")
+	fl.StringVar(&f.healthAddr, "health-addr", "", "serve /healthz and /readyz (no token) on this address, host:port, for an orchestrator's probes; off by default")
+	fl.BoolVar(&f.metrics, "metrics", false, "with --health-addr: also serve /metrics in the Prometheus text format")
 	fl.DurationVar(&f.latency, "latency", 0, "delay added to every replayed answer (default: the serve.latency setting)")
 	fl.Float64Var(&f.faultError, "fault-error", 0, "share of replayed calls (0 to 1) answered with an error on purpose, to try retries and error handling")
 	fl.IntVar(&f.faultStatus, "fault-status", 0, "status of an injected error (default 503)")
@@ -76,7 +86,7 @@ func newServeCommand(i do.Injector) *cobra.Command {
 	fl.DurationVar(&f.shutdown, "shutdown-timeout", 0, "how long to let running work finish at shutdown (default: the serve.shutdown_timeout setting)")
 	fl.StringVar(&f.valkeyAddr, "valkey-addr", "", "share run records and schedule ticks with other instances through this Valkey/Redis server, host:port (default: the serve.valkey_addr setting)")
 	fl.BoolVar(&f.quiet, "quiet", false, "do not print each replayed call")
-	cmd.AddCommand(newServeTokenCommand(i), newServeValkeyPasswordCommand(i))
+	cmd.AddCommand(newServeTokenCommand(i), newServeTokensCommand(i), newServeValkeyPasswordCommand(i))
 	return cmd
 }
 
@@ -98,12 +108,14 @@ func (f serveFlags) options(cmd *cobra.Command, base flowi.ServeOptions) flowi.S
 	if changed("shutdown-timeout") {
 		base.ShutdownTimeout = f.shutdown
 	}
+	base.HealthAddr, base.Metrics = f.healthAddr, f.metrics
 	base.Faults = replay.Faults{ErrorRate: f.faultError, ErrorStatus: f.faultStatus, DropRate: f.faultDrop, Jitter: f.faultJitter}
 	base.Sequence, base.CORS, base.Record, base.RecordTo, base.RecordHAR = f.sequence, f.cors, f.record, f.recordTo, f.recordHAR
 	base.RecordFolder = f.recordFolder
 	base.PassThrough = f.passThrough
 	base.Forward, base.ForwardTo, base.ForwardOnly, base.ForwardEnv = f.forward, f.forwardTo, f.forwardOnly, f.forwardEnv
 	base.NoReplay, base.NoTriggers, base.NoSchedules = f.noReplay, f.noTriggers, f.noSchedules
+	base.TLSCert, base.TLSKey, base.InsecureListen = f.tlsCert, f.tlsKey, f.insecureListen
 	return base
 }
 
@@ -155,7 +167,14 @@ func printServing(w io.Writer, srv *flowi.Server, ws *flowi.Workspace) {
 		fmt.Fprintf(w, "Replayer   http://%s\n", a)
 	}
 	if a := srv.TriggerAddr(); a != "" {
-		fmt.Fprintf(w, "Triggers   http://%s  (bearer token required)\n", a)
+		scheme := "http"
+		if srv.TriggerTLS() {
+			scheme = "https"
+		}
+		fmt.Fprintf(w, "Triggers   %s://%s  (bearer token required)\n", scheme, a)
+	}
+	if a := srv.HealthAddr(); a != "" {
+		fmt.Fprintf(w, "Health     http://%s/healthz  http://%s/readyz\n", a, a)
 	}
 	for _, u := range srv.Upcoming() {
 		fmt.Fprintf(w, "Schedule   %s  next %s\n", u.Name, u.At.Format("2006-01-02 15:04 MST"))

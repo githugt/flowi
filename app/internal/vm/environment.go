@@ -4,7 +4,11 @@ package vm
 
 import (
 	"errors"
+	"fmt"
+	"maps"
+	"regexp"
 	"slices"
+	"strings"
 
 	flowi "github.com/githugt/flowi/lib"
 	"github.com/githugt/flowi/lib/diag"
@@ -34,10 +38,13 @@ type Environment struct {
 	rows     []EnvVarRow
 	colour   string
 	extends  string
+	protect  bool
 	dirty    bool
 	onDisk   bool
 	confirm  bool
 	err      string
+	stored   map[string]bool // the secrets the vault holds a value for, by name
+	losing   []string        // the stored values the last Save refused to remove until it is asked again
 	onChange []func()
 	onDrop   []func()
 	onSaved  []func()
@@ -62,6 +69,7 @@ func (e *Environment) load(envs []model.Environment) {
 	e.disk = envs[i]
 	e.colour = e.disk.Colour
 	e.extends = e.disk.Extends
+	e.protect = e.disk.Protected
 	e.rows = make([]EnvVarRow, len(e.disk.Vars))
 	for j, v := range e.disk.Vars {
 		e.rows[j] = EnvVarRow{Name: v.Name, Value: v.Value, Secret: v.Secret, Kind: v.Kind}
@@ -77,6 +85,15 @@ func (e *Environment) loadSecrets() {
 		}
 		return infos
 	}, func(infos []flowi.SecretInfo) {
+		stored := map[string]bool{}
+		for _, info := range infos {
+			if info.Environment == e.disk.Name && info.Set {
+				stored[info.Name] = true
+			}
+		}
+		if !maps.Equal(stored, e.stored) { // a write only when something changed: two answers in flight must not race
+			e.stored = stored
+		}
 		for i, r := range e.rows {
 			j := slices.IndexFunc(infos, func(s flowi.SecretInfo) bool { return s.Environment == e.disk.Name && s.Name == r.Name })
 			if j >= 0 {
@@ -150,6 +167,16 @@ func (e *Environment) SetColour(colour string) {
 	e.changed()
 }
 
+// Protected says the apps confirm before a request that changes data is sent with this environment.
+func (e *Environment) Protected() bool { return e.protect }
+
+// SetProtected turns the confirmation on or off. It is an edit like a variable's: Save writes it.
+func (e *Environment) SetProtected(on bool) {
+	e.protect = on
+	e.dirty = true
+	e.changed()
+}
+
 // Extends is the name of the environment this one builds on, or "".
 func (e *Environment) Extends() string { return e.extends }
 
@@ -191,6 +218,7 @@ func extendsEnvironment(envs []model.Environment, name, base string) bool {
 // SetRows replaces the variables.
 func (e *Environment) SetRows(rows []EnvVarRow) {
 	e.rows = slices.Clone(rows)
+	e.losing = nil // the confirmation was for the earlier rows
 	e.dirty = true
 	e.changed()
 }
@@ -202,6 +230,7 @@ func (e *Environment) Save(dropComments bool) {
 	env := e.disk
 	env.Colour = e.colour
 	env.Extends = e.extends
+	env.Protected = e.protect
 	env.Vars = make([]model.EnvVar, 0, len(e.rows))
 	for _, r := range e.rows {
 		v := model.EnvVar{Name: r.Name, Value: r.Value, Secret: r.Secret, Kind: r.Kind}
@@ -210,13 +239,58 @@ func (e *Environment) Save(dropComments bool) {
 		}
 		env.Vars = append(env.Vars, v)
 	}
+	if err := checkEnvNames(e.rows); err != nil {
+		e.err = err.Error()
+		e.changed()
+		return
+	}
 	if err := checkKinds(env.Vars); err != nil {
 		e.err = err.Error()
 		e.changed()
 		return
 	}
 	rows, wasSecret := slices.Clone(e.rows), e.secretNames()
+	// Before: renaming a secret row, or clearing its Secret box, removed the stored value on Save and kept nothing
+	// under the new name. The first Save now says what would be removed; the same Save again confirms it.
+	if lost := e.storedLost(wasSecret, rows); len(lost) > 0 && !slices.Equal(lost, e.losing) {
+		e.losing = lost
+		e.err = fmt.Sprintf("Saving removes the stored value of %s. A renamed variable does not keep its value. Save again to remove it, or put the name back.", strings.Join(lost, ", "))
+		e.changed()
+		return
+	}
+	e.losing = nil
 	Run(e.w, func() error { return e.write(env, rows, wasSecret, dropComments) }, func(err error) { e.saved(env, err) })
+}
+
+// storedLost names the secrets whose vault value this Save would remove: no longer secret rows that hold a value.
+func (e *Environment) storedLost(wasSecret map[string]bool, rows []EnvVarRow) []string {
+	var out []string
+	for _, name := range noLongerSecret(wasSecret, rows) {
+		if e.stored[name] {
+			out = append(out, name)
+		}
+	}
+	return out
+}
+
+var envVarName = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
+
+// checkEnvNames refuses a blank, invalid or repeated variable name, naming the row. Before, such rows were written
+// as they were, and a blank secret row called SetSecret with an empty name.
+func checkEnvNames(rows []EnvVarRow) error {
+	seen := map[string]int{}
+	for i, r := range rows {
+		switch {
+		case strings.TrimSpace(r.Name) == "":
+			return fmt.Errorf("row %d has no name: give it a name or remove it", i+1)
+		case !envVarName.MatchString(r.Name):
+			return fmt.Errorf("row %d: %q is not a variable name: use letters, digits and underscores, not starting with a digit", i+1, r.Name)
+		case seen[r.Name] > 0:
+			return fmt.Errorf("row %d: %q is already used by row %d", i+1, r.Name, seen[r.Name])
+		}
+		seen[r.Name] = i + 1
+	}
+	return nil
 }
 
 func (e *Environment) secretNames() map[string]bool {

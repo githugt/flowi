@@ -333,3 +333,44 @@ func TestPassphraseService_Given_a_cancel_Then_later_asks_fail_at_once_until_Unl
 		t.Fatalf("while declined %v, after Unlock answered %q", whileDeclined, afterUnlock)
 	}
 }
+
+// Before: one question served both, so the window could not tell a vault being made (ask twice, warn that the passphrase
+// cannot be recovered) from one being unlocked.
+func TestPassphraseService_Given_a_new_vault_Then_the_event_says_create_and_an_existing_one_says_unlock(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		name string
+		ask  func(*bridge.PassphraseService) (string, error)
+		want string
+	}{
+		{"new vault", (*bridge.PassphraseService).AskNew, "create"},
+		{"existing vault", (*bridge.PassphraseService).Ask, "unlock"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			modes := make(chan any, 1)
+			emit := func(name string, data any) {
+				if name == "passphrase" {
+					select {
+					case modes <- data:
+					default:
+					}
+				}
+			}
+			b := &vmtest.Backend{Cols: []model.Collection{vmtest.SampleCollection()}}
+			svc := bridge.NewApp(b, bridge.NewInlineActor(), emit).Passphrase()
+			got := make(chan string, 1)
+
+			go func() {
+				phrase, _ := tc.ask(svc)
+				got <- phrase
+			}()
+			mode := <-modes
+			svc.Answer("typed")
+
+			if mode != tc.want || <-got != "typed" {
+				t.Fatalf("the event carried %v, want %q", mode, tc.want)
+			}
+		})
+	}
+}

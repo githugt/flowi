@@ -1,5 +1,6 @@
 <script lang="ts">
   import XmlNode from './XmlNode.svelte'
+  import Icon from './Icon.svelte'
   import type { XmlElement } from './lib/xml'
 
   let {
@@ -26,7 +27,7 @@
 {#if matches(el)}
   <div class="node">
     <div class="row" class:sel={selected === path} style:padding-left={`${depth * 14}px`}>
-      <button class="twist" onclick={() => (open = !open)} disabled={!hasChildren} aria-label={open ? 'Collapse' : 'Expand'}>{hasChildren ? (shown ? '▾' : '▸') : ''}</button>
+      <button class="twist" onclick={() => (open = !open)} disabled={!hasChildren} aria-label={open ? 'Collapse' : 'Expand'}>{#if hasChildren}<Icon name={shown ? 'chevd' : 'chevr'} size={12} />{/if}</button>
       <button class="label" onclick={() => onpick(path)}>
         <span class="tag">&lt;{el.name}</span>{#each el.attrs as a}<span class="attr"> {a.name}=<span class="aval">"{a.value}"</span></span>{/each}<span class="tag">{hasChildren || el.text ? '>' : '/>'}</span>
         {#if el.text}<span class="text">{el.text}</span>{/if}
@@ -43,9 +44,9 @@
 
 <style>
   .row { display: flex; align-items: baseline; gap: 2px; border-radius: var(--r-sm); }
-  .row.sel { background: color-mix(in srgb, var(--accent) 25%, transparent); }
+  .row.sel { background: var(--tint-sel); }
   button { background: none; border: 0; color: inherit; font: inherit; padding: 0; text-align: left; }
-  .twist { width: 14px; color: var(--muted); font-size: var(--fs-xs); }
+  .twist { display: inline-flex; align-items: center; justify-content: center; width: 14px; color: var(--muted); }
   .label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .tag { color: var(--accent); }
   .attr { color: var(--muted); }

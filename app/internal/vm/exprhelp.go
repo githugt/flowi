@@ -86,6 +86,11 @@ func commonTools() []HelpItem {
 		{"upper  lower  trim  split  join  replace", "Work on text.", `upper(vars.code)`},
 		{"a contains b   hasPrefix(a, b)   hasSuffix(a, b)", "Look inside text.", `headers["content-type"] contains "json"`},
 		{"int  float  string  toJSON  fromJSON", "Convert values.", "int(vars.page) + 1"},
+		{"sum  mean  max  min  abs  round", "Work on numbers. sum, mean, max and min take a list.", "sum(map(nodes.cart.body.items, .price))"},
+		{"first  last  sort  uniq  concat  keys  values", "Pick from, order or join lists and maps.", "first(nodes.list.body.items).id"},
+		{"a matches \"regex\"   startsWith  endsWith", "Match text against a pattern, or look at its ends.", `body.email matches "^[^@]+@[^@]+$"`},
+		{"now()  date(text)  duration(text)", "Dates and times. date reads a date or date-time; a duration is written \"90s\" or \"2h\".", `date(body.expires_at) > now()`},
+		{"toBase64  fromBase64", "Encode text as Base64, or decode it.", `toBase64(secret.user + ":" + secret.pass)`},
 	}
 }
 

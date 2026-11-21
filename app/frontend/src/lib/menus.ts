@@ -1,8 +1,11 @@
 // The tree's context menu: the entries come from Go; this runs them, asking first where they say to.
-import { BlueprintsService, WorkspaceService } from '../../bindings/github.com/githugt/flowi/app/internal/bridge'
+import { BlueprintsService, FlowService, WorkspaceService } from '../../bindings/github.com/githugt/flowi/app/internal/bridge'
 import { app } from './app.svelte'
 import { ui, type MenuItem } from './ui.svelte'
 import type { MenuEntry } from './types'
+import { addToFlowTargets, requestOfRow } from './addtoflow'
+import { errorText } from './errors'
+import { plural } from './plural'
 
 const needsTabsClosed = ['rename', 'delete', 'discardDraft']
 
@@ -17,13 +20,29 @@ export async function rowMenu(id: string): Promise<MenuItem[]> {
     const where = (await BlueprintsService.Where(ids[0])) as unknown as { collection: string; folder: string }
     items.splice(at + 1, 0, { label: 'New flow from blueprint…', run: () => (ui.blueprint = where) })
   }
+  // A request can go into an open flow of its collection as a step.
+  const req = ids.length === 1 ? requestOfRow(ids[0]) : null
+  if (req) {
+    const at = items.findIndex((_, i) => entries[i].action === 'rename')
+    const adds = addToFlowTargets(ids[0], app.tabs).map((t) => ({ label: `Add to flow “${t.label}”`, run: () => addToFlow(t.node, req.id) }))
+    items.splice(at >= 0 ? at : items.length, 0, ...adds)
+  }
   return items
+}
+
+async function addToFlow(flow: string, request: string) {
+  try {
+    await FlowService.AddRequestStep(flow, request)
+    app.active = flow
+  } catch (e) {
+    ui.toast(errorText(e), 'error')
+  }
 }
 
 async function run(e: MenuEntry, ids: string[]) {
   // A rename or delete closes the tabs of its rows, so it says first when that loses unsaved edits.
   const unsaved = e.guard === 'dirty' ? (await tabsAffected(ids)).filter((id) => app.isDirty(id)).length : 0
-  const lost = unsaved ? `Unsaved edits in ${unsaved} open ${unsaved === 1 ? 'tab' : 'tabs'} will be lost.` : ''
+  const lost = unsaved ? `Unsaved edits in ${plural(unsaved, 'open tab')} will be lost.` : ''
   const go = async (text = '', protocol = '') => {
     if (needsTabsClosed.includes(e.action)) await app.closeAll(await tabsAffected(ids))
     await WorkspaceService.Do(e.action, ids, text, protocol)
@@ -58,7 +77,27 @@ export async function tabsAffected(ids: string[]): Promise<string[]> {
 }
 
 // The "New" menu: quick starts and creation in a chosen collection or folder.
-export function newMenu(): MenuItem[] {
+// Before: one flat list of 17 items, six of them the same six kinds again "in a collection…". Now the first list
+// has the quick starts and one "New in a collection…" that opens the second, so the menu is ten items and two rules.
+export function newMenu(at?: { x: number; y: number }): MenuItem[] {
+  return [
+    { label: 'New request', run: () => WorkspaceService.NewScratchRequest() },
+    { label: 'New flow', run: () => WorkspaceService.NewScratchFlow() },
+    { label: 'New message request', run: newScratchMessage },
+    { label: 'New gRPC request', run: () => WorkspaceService.NewAt('grpc', '', '', '') },
+    { label: 'New database query', run: newScratchDataset },
+    { label: 'New data file query', run: newScratchFileQuery },
+    { separator: true, label: '', run: () => {} },
+    { label: 'New in a collection…', run: () => ui.openMenu(at?.x ?? 80, at?.y ?? 80, newInCollectionMenu()) },
+    { label: 'New flow from blueprint…', run: () => (ui.blueprint = { collection: '', folder: '' }) },
+    { separator: true, label: '', run: () => {} },
+    { label: 'New environment…', run: promptNewEnvironment },
+    { label: 'New collection…', run: () => app.openScreen('screen:manager', 'Collections') },
+  ]
+}
+
+/** The second list: the same kinds made in a collection or folder you choose. */
+export function newInCollectionMenu(): MenuItem[] {
   const ask = (kind: string, title: string, tree: 'requests' | 'flows', label: string, withProtocol = false, choices = protocols, choiceLabel?: string) => () => {
     ui.place = {
       title,
@@ -72,23 +111,12 @@ export function newMenu(): MenuItem[] {
     }
   }
   return [
-    { label: 'New request', run: () => WorkspaceService.NewScratchRequest() },
-    { label: 'New flow', run: () => WorkspaceService.NewScratchFlow() },
-    { label: 'New message request', run: newScratchMessage },
-    { label: 'New gRPC request', run: () => WorkspaceService.NewAt('grpc', '', '', '') },
-    { label: 'New database query', run: newScratchDataset },
-    { label: 'New data file query', run: newScratchFileQuery },
-    { separator: true, label: '', run: () => {} },
-    { label: 'New request in a collection…', run: ask('request', 'New request', 'requests', 'Name or path (for example users/create)') },
-    { label: 'New message request in a collection…', run: ask('async', 'New message request', 'requests', 'Name or path (for example orders/placed)', true) },
-    { label: 'New gRPC request in a collection…', run: ask('grpc', 'New gRPC request', 'requests', 'Name or path (for example shop/get-order)') },
-    { label: 'New database query in a collection…', run: ask('dataset', 'New database query', 'requests', 'Name or path (for example customers/by-id)', true, databases, 'Database') },
-    { label: 'New data file query in a collection…', run: ask('dataset', 'New data file query', 'requests', 'Name or path (for example reports/sales)', true, dataFiles, 'File type') },
-    { label: 'New flow in a collection…', run: ask('flow', 'New flow', 'flows', 'Name or path (for example journeys/signup)') },
-    { label: 'New flow from blueprint…', run: () => (ui.blueprint = { collection: '', folder: '' }) },
-    { separator: true, label: '', run: () => {} },
-    { label: 'New environment…', run: promptNewEnvironment },
-    { label: 'New collection…', run: () => app.openScreen('screen:manager', 'Collections') },
+    { label: 'Request…', run: ask('request', 'New request', 'requests', 'Name or path (for example users/create)') },
+    { label: 'Message request…', run: ask('async', 'New message request', 'requests', 'Name or path (for example orders/placed)', true) },
+    { label: 'gRPC request…', run: ask('grpc', 'New gRPC request', 'requests', 'Name or path (for example shop/get-order)') },
+    { label: 'Database query…', run: ask('dataset', 'New database query', 'requests', 'Name or path (for example customers/by-id)', true, databases, 'Database') },
+    { label: 'Data file query…', run: ask('dataset', 'New data file query', 'requests', 'Name or path (for example reports/sales)', true, dataFiles, 'File type') },
+    { label: 'Flow…', run: ask('flow', 'New flow', 'flows', 'Name or path (for example journeys/signup)') },
   ]
 }
 

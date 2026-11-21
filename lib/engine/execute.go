@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"maps"
 	"net/http"
+	"slices"
 	"sync"
 
 	"github.com/githugt/flowi/lib/diag"
@@ -33,7 +34,7 @@ type execution struct {
 	record  *Record
 	status  Status
 
-	// mu guards view and diags: nodes of a hook flow run in their own
+	// mu guards checks, view and diags: nodes of a hook flow run in their own
 	// goroutines (and in parallel inside parallel/batch hook nodes).
 	mu   sync.Mutex
 	view map[string]any // the request as hooks see it
@@ -41,6 +42,8 @@ type execution struct {
 	// (messages, count, outcome, body, headers); nil before and for HTTP.
 	async map[string]any
 	diags diag.List
+	// checks are what each of the version's assert lines said, in order, for the checks that ran.
+	checks []CheckEval
 	// messageHooks run for each message a message request keeps (see sendAsync).
 	messageHooks []HookRef
 }
@@ -81,7 +84,9 @@ func (x *execution) sendHTTP(ctx context.Context, post []HookRef) {
 	x.observe(b, resp)
 	x.warnIfDeprecated()
 	x.extractOutputs()
+	x.checkExpect()
 	x.checkAssertions()
+	x.checkGraphQLErrors(b.bodyText)
 	x.runPhase(ctx, post, nodes.PhasePost)
 	if ctx.Err() == nil {
 		x.save()
@@ -190,6 +195,9 @@ func (x *execution) renderWith() (map[string]any, diag.List) {
 // request of its own collection cannot recurse.
 func (x *execution) hookChain() (HookChain, bool) {
 	chain := ChainFor(x.c.collection, x.c.request, x.version).Filter(x.c.hooks)
+	if x.version.Expect != "" {
+		chain = chain.withoutStatusHook()
+	}
 	if x.c.depth == 0 {
 		return chain, true
 	}
@@ -252,7 +260,7 @@ func (x *execution) requestVariables() map[string]any {
 // their overrides. Missing secrets are reported together.
 func (x *execution) build() (built, bool) {
 	b, diags := x.render(false)
-	diags = append(diags, x.r.secrets.problems(x.env.name, b.missingSecrets)...)
+	diags = append(diags, x.r.secrets.problems(x.env, b.missingSecrets)...)
 	if diags.HasErrors() {
 		x.fail(StatusError, diags)
 		return built{}, false
@@ -263,7 +271,7 @@ func (x *execution) build() (built, bool) {
 func (x *execution) render(lenient bool) (built, diag.List) {
 	b, diags := build(buildInput{
 		version: x.version, scope: x.scope(lenient), empty: x.cfg.empty, label: x.c.request.Path,
-		root: x.c.collection.Root, secretVars: x.env.secrets, missingSecret: x.r.secrets.isMissing(x.env.name), memo: x.memo,
+		root: x.c.collection.Root, secretVars: x.env.secrets, envValues: x.env.values, missingSecret: x.r.secrets.isMissing(x.env.name), memo: x.memo,
 		secret: x.r.secrets.derived, defaults: x.r.defaultHeaders(x.cfg),
 	})
 	applyNodeHeaders(&b, x.c.headers)
@@ -320,6 +328,9 @@ func (x *execution) send(ctx context.Context, b built) (*httpx.Response, bool) {
 	if !ok {
 		return nil, false
 	}
+	if !x.checkHTTPSecretDestination(b) {
+		return nil, false
+	}
 	opts, ok := x.clientOptionsFor(b)
 	if !ok {
 		return nil, false
@@ -354,7 +365,7 @@ func transportDiag(err error) diag.Diagnostic {
 	if errors.As(err, &te) {
 		return diag.New(diag.CodeHTTPTimeout, diag.Location{}, map[string]string{"timeout": te.After.String()})
 	}
-	return diag.New(diag.CodeHTTPFailed, diag.Location{}, map[string]string{"detail": err.Error()})
+	return diag.New(diag.CodeHTTPFailed, diag.Location{}, map[string]string{"detail": httpHint(err.Error())})
 }
 
 func (x *execution) newRecord(b built, attempts []httpx.Attempt) *Record {
@@ -399,17 +410,29 @@ func (x *execution) extractOutputs() {
 	}
 }
 
-// checkAssertions runs the version's assert: list.
+func (x *execution) recordCheck(c CheckEval) {
+	x.mu.Lock()
+	defer x.mu.Unlock()
+	x.checks = append(x.checks, c)
+}
+
+// checkAssertions runs the version's assert: list, and keeps what each check said: the engine used to say only
+// which failed, so a request with six passing checks could not say "6/6".
 func (x *execution) checkAssertions() {
 	for _, check := range x.version.Assert {
 		ok, _, err := template.Check(check, x.scope(false))
 		if err != nil {
+			x.recordCheck(CheckEval{Line: check, Verdict: CheckError, Note: err.Error()})
 			x.fail(StatusFailed, templateFailure("assert "+check+" of "+x.c.request.Path, err))
 			continue
 		}
 		if !ok {
-			x.fail(StatusFailed, nodes.Failed("assert", check, "", false, emitter{x}))
+			saw := nodes.Saw(check, x.scope(false))
+			x.recordCheck(CheckEval{Line: check, Verdict: CheckFailed, Note: saw})
+			x.fail(StatusFailed, nodes.Failed("assert", check, saw, false, emitter{x}))
+			continue
 		}
+		x.recordCheck(CheckEval{Line: check, Verdict: CheckPassed})
 	}
 }
 
@@ -453,7 +476,7 @@ func rank(s Status) int {
 func (x *execution) outcome() outcome {
 	x.mu.Lock()
 	defer x.mu.Unlock()
-	return outcome{status: x.status, record: x.record, vars: x.state.Vars.Snapshot(), diags: x.diags}
+	return outcome{status: x.status, record: x.record, vars: x.state.Vars.Snapshot(), diags: x.diags, checks: slices.Clone(x.checks)}
 }
 
 // emitter adapts node output to run events.

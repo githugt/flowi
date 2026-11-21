@@ -139,3 +139,20 @@ func FuzzParse(f *testing.F) {
 		}
 	})
 }
+
+func TestUpgrade_Given_a_last_seen_version_Then_only_newer_released_notes(t *testing.T) {
+	rs := Parse("## Unreleased\n\n### Features\n- wip\n\n## [1.2.0] - 2026-02-01\n\n### Features\n- b\n\n## [1.1.0] - 2026-01-01\n\n### Features\n- a\n\n## [1.0.0] - 2025-12-01\n\n### Features\n- first\n")
+
+	got := Upgrade(rs, "1.0.0")
+	unknown := Upgrade(rs, "0.0.1-dev")
+
+	if len(got) != 2 || got[0].Version != "1.2.0" || got[1].Version != "1.1.0" {
+		t.Fatalf("got %+v, want 1.2.0 and 1.1.0 without Unreleased", got)
+	}
+	if len(unknown) != 1 || unknown[0].Version != "1.2.0" {
+		t.Fatalf("unknown last seen gave %+v, want the newest release only", unknown)
+	}
+	if len(Upgrade(rs, "1.2.0")) != 0 {
+		t.Fatal("nothing is new when the last seen version is the newest released")
+	}
+}

@@ -12,9 +12,9 @@ import (
 
 // StoreEdit replaces the request's one dirty edit with v, started from the
 // version labelled base. Saved versions are untouched, and runs, serve and
-// the CLI never read the edit. Problems are as for SaveRequest; autosave
-// should leave o.DropComments false so a commented file is refused
-// (FLW-WRITE-001) instead of silently losing its comments.
+// the CLI never read the edit. The edit is kept in the workspace's data
+// directory, not in the request file (see edit_store.go), so the file is not
+// written and o has no effect: a commented file is no problem for an autosave.
 func (w *Workspace) StoreEdit(t RequestTarget, base string, v model.RequestVersion, o SaveOptions) error {
 	return w.StoreEditUnder(t, base, "", v, o)
 }
@@ -30,7 +30,7 @@ func (w *Workspace) StoreEditUnder(t RequestTarget, base, overlay string, v mode
 	}
 	v.Label = ""
 	r.Edit, r.EditBase, r.EditOverlay = &v, base, overlay
-	return w.SaveRequest(t, r, o)
+	return w.keepEdit(t.Collection, r)
 }
 
 // PromoteEdit turns the edit into a saved version and clears the slot in
@@ -60,7 +60,7 @@ func (w *Workspace) DiscardEdit(t RequestTarget, o SaveOptions) error {
 		return err
 	}
 	r.Edit, r.EditBase, r.EditOverlay = nil, "", ""
-	return w.SaveRequest(t, r, o)
+	return w.keepEdit(t.Collection, r)
 }
 
 // withPromotedEdit returns r with its edit moved into the versions; r's own

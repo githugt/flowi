@@ -1,0 +1,57 @@
+# `flowi serve` on Kubernetes: a Deployment with probes, and a Service for the replayer and the triggers.
+# Create the Secret first (do not commit real values):
+#
+#   kubectl create secret generic flowi --from-literal=vault-key=... --from-literal=trigger-token=...
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: flowi
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: flowi }
+  template:
+    metadata:
+      labels: { app: flowi }
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8527"
+        prometheus.io/path: /metrics
+    spec:
+      # A few seconds more than serve.shutdown_timeout.
+      terminationGracePeriodSeconds: 45
+      containers:
+        - name: flowi
+          image: flowi-serve:latest
+          ports:
+            - { name: replay, containerPort: 8525 }
+            - { name: trigger, containerPort: 8526 }
+            - { name: health, containerPort: 8527 }
+          env:
+            - name: FLOWI_VAULT_KEY
+              valueFrom: { secretKeyRef: { name: flowi, key: vault-key } }
+            - name: FLOWI_SECRET_SERVE_TRIGGER_TOKEN
+              valueFrom: { secretKeyRef: { name: flowi, key: trigger-token } }
+          livenessProbe:
+            httpGet: { path: /healthz, port: health }
+            periodSeconds: 10
+            failureThreshold: 3
+          readinessProbe:
+            # 503 while it drains or every run slot is in use: the Service stops sending it work.
+            httpGet: { path: /readyz, port: health }
+            periodSeconds: 5
+          volumeMounts:
+            - { name: data, mountPath: /data }
+      volumes:
+        - name: data
+          persistentVolumeClaim: { claimName: flowi-data }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: flowi
+spec:
+  selector: { app: flowi }
+  ports:
+    - { name: replay, port: 8525, targetPort: replay }
+    - { name: trigger, port: 8526, targetPort: trigger }

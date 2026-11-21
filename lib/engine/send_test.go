@@ -596,6 +596,26 @@ func TestPinExample_should_write_status_headers_body_masked(t *testing.T) {
 	}
 }
 
+// Before: a pinned login response kept its access_token, refresh_token and Set-Cookie, and they were committed to git;
+// only values of known vault secrets were masked.
+func TestPinExample_should_redact_credentials_the_server_issued(t *testing.T) {
+	rec := Record{Status: 200,
+		Header: []Header{{Name: "Set-Cookie", Value: "sid=abc123; HttpOnly"}, {Name: "Content-Type", Value: "application/json"}},
+		Body:   Body{JSON: map[string]any{"access_token": "tok-live", "user": map[string]any{"name": "Ana", "refreshToken": "ref-live"}}}}
+	reqFile := filepath.Join(t.TempDir(), "requests", "login.req.yaml")
+
+	file, err := PinExample(rec, reqFile, "")
+
+	data, _ := os.ReadFile(file)
+	text := string(data)
+	if err != nil || strings.Contains(text, "tok-live") || strings.Contains(text, "ref-live") || strings.Contains(text, "abc123") {
+		t.Fatalf("a credential was pinned: %s (err %v)", text, err)
+	}
+	if !strings.Contains(text, "Ana") || !strings.Contains(text, "application/json") {
+		t.Fatalf("what is not a credential was lost: %s", text)
+	}
+}
+
 func TestPinExample_should_record_the_version(t *testing.T) {
 	f := newFixture(t)
 	r := f.addRequest("auth/login", get("/echo-secret"))

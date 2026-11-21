@@ -34,6 +34,10 @@
       "type": "string",
       "description": "The environment this one builds on. Its plain variables apply unless this one sets the same name; secrets are not inherited."
     },
+    "protected": {
+      "type": "boolean",
+      "description": "The apps ask for confirmation before they send a request that changes data (anything but GET, HEAD or OPTIONS) with this environment."
+    },
     "vars": {
       "type": "object",
       "additionalProperties": {

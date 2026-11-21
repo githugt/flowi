@@ -36,3 +36,11 @@ describe('renderMarkdown', () => {
     expect(html).toBe('<ul>\n<li>a</li>\n</ul>\n<ol>\n<li>b</li>\n</ol>')
   })
 })
+
+describe('renderMarkdown link titles', () => {
+  it('says in the title which host a link goes to', () => {
+    const html = renderMarkdown('[docs.example.com](https://evil.test/a?x=1&y=2)')
+    expect(html).toContain('title="Opens evil.test in your browser"')
+    expect(html).toContain('data-href="https://evil.test/a?x=1&amp;y=2"')
+  })
+})

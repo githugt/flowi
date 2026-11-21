@@ -124,6 +124,25 @@ func Since(rs []Release, version string) ([]Release, bool) {
 	return nil, false
 }
 
+// Upgrade returns the released versions newer than lastSeen, newest first, for the note shown after an upgrade.
+// A lastSeen the changelog does not know (a dev build, a trimmed file) gives the newest release only, which is
+// more use than all of them or none. Unreleased work is left out: it is not what the person upgraded to.
+//
+// Before: "what's new" showed once on first launch, so after an upgrade nothing said what had changed.
+func Upgrade(rs []Release, lastSeen string) []Release {
+	newer, ok := Since(rs, lastSeen)
+	if !ok {
+		return Latest(rs, 1)
+	}
+	var out []Release
+	for _, r := range newer {
+		if !r.Unreleased {
+			out = append(out, r)
+		}
+	}
+	return out
+}
+
 func (r Release) heading() string {
 	if r.Date.IsZero() {
 		return r.Version

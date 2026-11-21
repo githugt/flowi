@@ -31,6 +31,7 @@ func (c *Codec) DecodeEnvironment(file string, data []byte) (model.Environment, 
 	env.Meta = m.meta()
 	env.Colour = m.str("colour")
 	env.Extends = m.str("extends")
+	env.Protected = m.boolean("protected")
 	env.Vars = m.envVars()
 	m.closeStrict()
 	return env, d.diags
@@ -104,6 +105,7 @@ func (c *Codec) EncodeEnvironment(env model.Environment) ([]byte, error) {
 	putMeta(&o, env.Meta)
 	o.put("colour", env.Colour)
 	o.put("extends", env.Extends)
+	o.put("protected", env.Protected)
 	var vars yaml.MapSlice
 	for _, v := range env.Vars {
 		vars = append(vars, yaml.MapItem{Key: v.Name, Value: envVarValue(v)})

@@ -405,6 +405,34 @@ func TestRequestVM_AvailableSettings_should_list_what_a_request_may_set_with_def
 	}
 }
 
+// Before: the Settings tab of a gRPC request listed redirects, cookies and the HTTP version.
+func TestRequestVM_AvailableSettings_should_hide_http_only_settings_for_other_kinds(t *testing.T) {
+	http, _ := newRequestVM(t, sampleBackend())
+	grpc, _ := asyncRequestVM(t, grpcBackend())
+	msg := cloudRequest(t)
+	keys := func(r *vm.Request) map[string]bool {
+		out := map[string]bool{}
+		for _, s := range r.AvailableSettings() {
+			out[s.Key] = true
+		}
+		return out
+	}
+
+	h, g, m := keys(http), keys(grpc), keys(msg)
+
+	if !h["http.cookies"] || !h["http.follow_redirects"] {
+		t.Fatalf("an HTTP request must still be offered the HTTP settings: %v", h)
+	}
+	for _, k := range []string{"http.cookies", "http.follow_redirects", "http.version", "downloads.stream_threshold_bytes"} {
+		if g[k] || m[k] {
+			t.Fatalf("%s offered to a gRPC (%v) or message (%v) request", k, g[k], m[k])
+		}
+	}
+	if !g["timeout"] || !m["timeout"] {
+		t.Fatal("settings that apply to every kind must stay")
+	}
+}
+
 func TestRequestVM_AddSetting_should_add_a_row_with_the_default_and_mark_it_set(t *testing.T) {
 	r, _ := newRequestVM(t, sampleBackend())
 

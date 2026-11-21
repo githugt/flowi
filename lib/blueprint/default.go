@@ -4,6 +4,23 @@ package blueprint
 
 import "github.com/githugt/flowi/lib/model"
 
+// StatusCheck is the check of the seeded hook that fails a request unless its status is 2xx.
+const StatusCheck = "response.status >= 200 && response.status < 300"
+
+// IsStatusCheck reports whether n is that seeded node. A request that says what status it expects (`expect:`)
+// runs without it; a hook the user wrote or edited is never matched.
+func IsStatusCheck(n model.Node) bool {
+	if n.Type != "assert" || n.ID != "is-success" {
+		return false
+	}
+	for _, f := range n.Params {
+		if f.Key == "check" {
+			return f.Value == StatusCheck
+		}
+	}
+	return false
+}
+
 // Default is the blueprint new requests are seeded with. Its nodes become the
 // request's inline post hooks, which see the response: they write its status
 // to the run log and fail the request unless the status is 2xx. Redirects
@@ -18,7 +35,7 @@ func Default() model.Blueprint {
 				{Key: "value", Value: "Response {{response.status}}"},
 			}},
 			{ID: "is-success", Type: "assert", Params: []model.Field{
-				{Key: "check", Value: "response.status >= 200 && response.status < 300"},
+				{Key: "check", Value: StatusCheck},
 				{Key: "message", Value: "Expected a 2xx response, got {{response.status}}"},
 			}},
 		}},

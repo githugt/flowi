@@ -157,9 +157,9 @@ func (im *importer) request(it item, folders []string, inherited *auth, scope st
 		path = im.taken.Unique(path)
 		rep.Name = path
 		v := im.version(&rep, req, inherited, scope)
+		translateScripts(&rep, &v, it.Event)
 		im.result.Requests = append(im.result.Requests, model.Request{Meta: model.Meta{Name: it.Name}, Path: path, Versions: []model.RequestVersion{v}})
 		im.examples(&rep, path, it.Response)
-		reportScripts(&rep, "request", it.Event)
 	}
 	im.result.Items = append(im.result.Items, rep)
 }

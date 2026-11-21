@@ -1,9 +1,20 @@
 <script lang="ts">
-  // Rows of model.KeyValue (Key, Value, Description). Rows keep their
+  import Checkbox from './Checkbox.svelte'
+  import Tip from './Tip.svelte'
+  import IconButton from './IconButton.svelte'
+  import Button from './Button.svelte'
+  // Rows of model.KeyValue (Key, Value, Description, Disabled). Rows keep their
   // description when the key or value is edited; blank rows stay in the form
-  // until they get a key.
+  // until they get a key. With `toggle`, each row has a checkbox that switches it off: it stays in the file but is not sent.
+  import { clamp } from './lib/clamp'
   import type { KV } from './lib/types'
+
+  /** What the form hands on: every row says whether it is switched off, as Go's model.KeyValue wants. */
+  type Row = KV & { Disabled: boolean }
+  const settled = (rows: KV[]): Row[] => rows.map((r) => ({ ...r, Disabled: !!r.Disabled }))
   import HiddenChars from './HiddenChars.svelte'
+  import TemplateField from './TemplateField.svelte'
+  import { sensitiveValue } from './lib/sensitive'
   import EmptyState from './EmptyState.svelte'
   import { tick } from 'svelte'
   import { rowsToText, textToRows } from './lib/bulk'
@@ -15,21 +26,32 @@
     keyLabel = 'name',
     valueLabel = 'value',
     describe = false,
+    toggle = false,
     empty,
     marks = {},
     suggestKeys = [],
+    valuesOf = bindingValues,
+    spans,
+    suggest,
   }: {
     rows: KV[] | null
-    onchange: (rows: KV[]) => void
+    onchange: (rows: Row[]) => void
     keyLabel?: string
     valueLabel?: string
     describe?: boolean
+    /** A checkbox on each row: unticked rows are kept but not sent. */
+    toggle?: boolean
     /** With no rows, an EmptyState in place of the bare Add, its button labelled `add`. */
     empty?: { icon: string; title: string; hint: string; add: string }
     /** Rows a spec overlay sets, by key: the tooltip naming the overlay. */
     marks?: Record<string, string>
     /** Names to suggest while typing a key, and (for names with a fixed set of values) the values: in the form's key box and in bulk edit. */
     suggestKeys?: string[]
+    /** The values suggested for a name: the transport options' fixed sets by default. */
+    valuesOf?: (key: string) => string[]
+    /** With these, values are drawn and completed as templates: {{…}} is coloured, an unknown name is marked, and typing {{ offers names. */
+    spans?: (text: string) => Promise<any>
+    suggest?: (text: string, caret: number) => Promise<any>
   } = $props()
   const uid = $props.id()
 
@@ -55,7 +77,7 @@
   }
 
   function commit() {
-    onchange(local.filter((r) => r.Key.trim() !== ''))
+    onchange(settled(local.filter((r) => r.Key.trim() !== '')))
   }
 
   // Bulk edit: the rows as "name: value" lines, for pasting or editing a list in one go. The text is
@@ -65,14 +87,14 @@
   let bulkBase: KV[] = []
   async function startBulk() {
     bulkBase = local.filter((r) => r.Key.trim() !== '')
-    bulkText = rowsToText(bulkBase)
+    bulkText = rowsToText(bulkBase, toggle)
     bulk = true
     await tick()
     box?.querySelector<HTMLTextAreaElement>('textarea')?.focus()
   }
   function bulkInput(text: string) {
     bulkText = text
-    onchange(textToRows(text, bulkBase))
+    onchange(settled(textToRows(text, bulkBase, toggle)))
     showSuggestions()
   }
 
@@ -96,14 +118,14 @@
 
 {#if empty && !local.length && !bulk}
   <EmptyState icon={empty.icon} title={empty.title} hint={empty.hint} compact>
-    <button onclick={addRow}>{empty.add}</button><button onclick={startBulk}>Bulk edit</button>
+    <Button onclick={addRow}>{empty.add}</Button><Button onclick={startBulk}>Bulk edit</Button>
   </EmptyState>
 {/if}
 <div class="rows" bind:this={box} hidden={!!empty && !local.length && !bulk} onfocusin={() => (within = true)} onfocusout={leave}>
   {#if bulk}
     <textarea
       class="bulk"
-      rows={Math.min(Math.max(bulkText.split('\n').length + 1, 6), 24)}
+      rows={clamp(bulkText.split('\n').length + 1, 6, 24)}
       value={bulkText}
       placeholder={`${keyLabel}: ${valueLabel}`}
       spellcheck="false"
@@ -120,33 +142,42 @@
       </div>
     {/if}
     <div class="tools">
-      <span class="hint">One per line: {keyLabel}: {valueLabel}{describe ? ' · descriptions stay with their name' : ''}</span>
-      <button class="add" onclick={() => (bulk = false)}>Key-value edit</button>
+      <span class="hint">One per line: {keyLabel}: {valueLabel}{toggle ? ' · start a line with # to switch it off' : ''}{describe ? ' · descriptions stay with their name' : ''}</span>
+      <Button variant="link" onclick={() => (bulk = false)}>Key-value edit</Button>
     </div>
   {:else}
   {#each local as row, i}
-    <div class="row">
+    <div class="row" class:off={row.Disabled}>
+      {#if toggle}
+        <Checkbox checked={!row.Disabled} label={`Send ${row.Key || 'this row'}`} title={row.Disabled ? 'Switched off: kept, not sent' : 'Sent'} onchange={(v) => { row.Disabled = !v; commit() }} />
+      {/if}
       <input class="k" placeholder={keyLabel} bind:value={row.Key} oninput={commit} spellcheck="false" list={suggestKeys.length ? `${uid}-k` : undefined} />
-      <span class="cell"><input class="v" placeholder={valueLabel} bind:value={row.Value} oninput={commit} spellcheck="false" list={suggestKeys.length && bindingValues(row.Key).length ? `${uid}-v${i}` : undefined} />
-        {#if suggestKeys.length && bindingValues(row.Key).length}<datalist id={`${uid}-v${i}`}>{#each bindingValues(row.Key) as v}<option value={v}></option>{/each}</datalist>{/if}<HiddenChars value={row.Value} onclean={(t) => { row.Value = t; commit() }} /></span>
+      {#if spans && suggest}
+        <span class="cell" class:sensitive={sensitiveValue(row.Key, row.Value)}><TemplateField aria={`${valueLabel} of ${row.Key || 'this row'}`} value={row.Value} placeholder={valueLabel} {spans} {suggest} oninput={(t) => { row.Value = t; commit() }} /></span>
+      {:else}
+      <span class="cell" class:sensitive={sensitiveValue(row.Key, row.Value)}><input class="v" placeholder={valueLabel} bind:value={row.Value} oninput={commit} spellcheck="false" list={suggestKeys.length && valuesOf(row.Key).length ? `${uid}-v${i}` : undefined} />
+        {#if suggestKeys.length && valuesOf(row.Key).length}<datalist id={`${uid}-v${i}`}>{#each valuesOf(row.Key) as v}<option value={v}></option>{/each}</datalist>{/if}<HiddenChars value={row.Value} onclean={(t) => { row.Value = t; commit() }} /></span>
+      {/if}
       {#if describe}
         <input class="d" placeholder="description" bind:value={row.Description} oninput={commit} />
       {/if}
-      {#if marks[row.Key]}<span class="mark" title={marks[row.Key]}>overlay</span>{/if}
-      <button class="x" aria-label="Remove row" onclick={() => { local.splice(i, 1); commit() }}>×</button>
+      {#if marks[row.Key]}<Tip text={marks[row.Key]}><!-- svelte-ignore a11y_no_noninteractive_tabindex --><span class="mark" tabindex="0">overlay</span></Tip>{/if}
+      <IconButton icon="close" size={12} danger label="Remove row" onclick={() => { local.splice(i, 1); commit() }} />
     </div>
   {/each}
   {#if suggestKeys.length}<datalist id={`${uid}-k`}>{#each suggestKeys as n}<option value={n}></option>{/each}</datalist>{/if}
   <!-- A ghost row where the next one goes: one click and the cursor is in its key box. -->
   <button class="ghost" onclick={addRow}>+ {empty?.add ?? 'Add row'}</button>
-  <div class="tools end"><button class="add" onclick={startBulk}>Bulk edit</button></div>
+  <div class="tools end"><Button variant="link" onclick={startBulk}>Bulk edit</Button></div>
   {/if}
 </div>
 
 <style>
   .rows[hidden] { display: none; }
   .rows { display: flex; flex-direction: column; gap: 6px; }
-  .row { display: flex; gap: 6px; }
+  .row { display: flex; gap: 6px; align-items: center; }
+  .row.off .k, .row.off .cell, .row.off .d { opacity: 0.55; }
+  .row.off .k, .row.off .v { text-decoration: line-through; text-decoration-color: var(--muted); }
   input {
     flex: 1;
     min-width: 0;
@@ -166,7 +197,6 @@
   input:focus { border-color: var(--accent); }
   .k { flex: 0 0 30%; }
   button { background: none; border: 0; color: var(--muted); font: inherit; }
-  .add { color: var(--accent); padding: 2px 0; }
   .ghost { min-height: var(--row-h-lg); padding: 4px 10px; border: 1px dashed var(--line); border-radius: var(--r-md); text-align: left; color: var(--muted); }
   .ghost:hover, .ghost:focus-visible { border-color: var(--accent); color: var(--accent); background: var(--tint-hover); }
   .tools { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
@@ -180,7 +210,6 @@
   .suggest { display: flex; flex-wrap: wrap; gap: 4px; }
   .suggest button { border: 1px solid var(--line); border-radius: var(--r-pill); padding: 1px 10px; color: var(--text); font: var(--fs-xs) var(--mono); }
   .suggest button:hover { border-color: var(--accent); color: var(--accent); }
-  .x:hover { color: var(--fail); }
   .mark {
     align-self: center; flex: none; padding: 1px 6px; border-radius: var(--r-sm); font-size: var(--fs-xs);
     color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, transparent); cursor: help;

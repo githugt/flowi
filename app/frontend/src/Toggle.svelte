@@ -16,13 +16,14 @@
   .toggle { display: inline-flex; align-items: center; gap: 8px; background: none; border: 0; padding: 0; font: inherit; color: var(--muted); }
   .toggle.on { color: var(--text); }
   .toggle.ok.on { color: var(--ok); }
-  .toggle:disabled { opacity: 0.4; }
+  .toggle:disabled { opacity: var(--op-disabled); }
   .framed { padding: 0 12px 0 8px; min-height: var(--ctl-h); font-weight: 500; background: var(--raised); border-radius: var(--r-md); box-shadow: inset 0 0 0 1px var(--line); }
   .framed:hover:not(:disabled) { background: var(--raised-3); }
-  .track { flex: none; width: 28px; height: 16px; border-radius: 8px; background: var(--line); display: flex; align-items: center; padding: 2px; box-sizing: border-box; transition: background var(--t-fast) var(--ease-out); }
-  .on .track { background: var(--accent); }
+  .track { flex: none; width: 28px; height: 16px; border-radius: var(--r-pill); background: transparent; box-shadow: inset 0 0 0 1.5px var(--muted); display: flex; align-items: center; padding: 2px; box-sizing: border-box; transition: background var(--t-fast) var(--ease-out); }
+  .on .track { background: var(--accent); box-shadow: none; }
   .ok.on .track { background: var(--ok); }
-  .knob { width: 12px; height: 12px; border-radius: 50%; background: var(--on-accent); transition: transform var(--t-fast) var(--ease-out); }
-  .on .knob { transform: translateX(12px); }
+  .on .knob { background: var(--on-accent); transform: translateX(12px); }
+  @media (forced-colors: active) { .track { box-shadow: none; border: 2px solid ButtonText; } .on .track { background: Highlight; border-color: Highlight; } .knob { background: ButtonText; } .on .knob { background: HighlightText; } }
+  .knob { width: 12px; height: 12px; border-radius: 50%; background: var(--muted); transition: transform var(--t-fast) var(--ease-out); }
   .toggle:focus-visible .track { outline: 2px solid var(--accent); outline-offset: 2px; }
 </style>

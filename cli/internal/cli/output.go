@@ -23,11 +23,12 @@ const (
 // relative to base when they are inside it.
 func PrintDiagnostics(w io.Writer, format, base string, l diag.List) error {
 	writeOne := map[string]func(io.Writer, string, diag.Diagnostic) error{
-		OutputText: printText,
-		OutputJSON: printJSON,
+		OutputText:   printText,
+		OutputJSON:   printJSON,
+		OutputGitHub: printGitHub,
 	}[format]
 	if writeOne == nil {
-		return &UsageError{Err: fmt.Errorf("unknown output format %q (want text or json)", format)}
+		return &UsageError{Err: fmt.Errorf("unknown output format %q (want text, json or github)", format)}
 	}
 	for _, d := range l {
 		if err := writeOne(w, base, d); err != nil {

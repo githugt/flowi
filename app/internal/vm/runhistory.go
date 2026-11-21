@@ -87,8 +87,16 @@ func RunLabel(s flowi.RunSummary) string {
 		label += " · " + s.Started.Local().Format("15:04:05")
 	}
 	label += " · " + s.Duration.Round(10*time.Millisecond).String()
+	// Before: a run in the list showed its time but not how many steps it had, so a run that stopped early looked like a quick one.
+	if n := len(s.Nodes); n > 0 {
+		label += fmt.Sprintf(" · %d %s", n, map[bool]string{true: "step", false: "steps"}[n == 1])
+	}
 	if s.Env != "" {
 		label += " · " + s.Env
+	}
+	// Before: the list did not say who started a run, so a failure from the schedule looked like one of your own.
+	if s.Trigger != "" {
+		label += " · by " + s.Trigger
 	}
 	return label
 }

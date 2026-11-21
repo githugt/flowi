@@ -145,10 +145,12 @@ func newOperation(r model.Request, v model.RequestVersion, id string) operation 
 		}
 	}
 	for _, kv := range v.Query {
-		op.query = appendUnique(op.query, kv.Key)
+		if !kv.Disabled {
+			op.query = appendUnique(op.query, kv.Key)
+		}
 	}
 	for _, kv := range v.Headers {
-		if k := strings.ToLower(kv.Key); k != "content-type" && k != "accept" {
+		if k := strings.ToLower(kv.Key); k != "content-type" && k != "accept" && !kv.Disabled {
 			op.headers = appendUnique(op.headers, kv.Key)
 		}
 	}

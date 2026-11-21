@@ -35,14 +35,23 @@ const (
 type TokenCache struct {
 	mu     sync.Mutex
 	tokens map[string]token
+	store  TokenStore
 }
 
-// NewTokenCache returns an empty cache.
+// NewTokenCache returns an empty cache that keeps its tokens in memory only.
 func NewTokenCache() *TokenCache { return &TokenCache{tokens: map[string]token{}} }
+
+// NewPersistentTokenCache returns a cache that also keeps the tokens a person had to approve in store, so a restart
+// does not ask again. Tokens of the grants that need nobody are kept in memory only: asking again costs nothing.
+func NewPersistentTokenCache(store TokenStore) *TokenCache {
+	return &TokenCache{tokens: map[string]token{}, store: store}
+}
 
 type token struct {
 	access, refresh string
 	expires         time.Time
+	label           string // what the token is for, without secrets: "device_code · auth.example.com · client abc"
+	persist         bool   // a person approved it: keep it in the store
 }
 
 func (c *TokenCache) get(key string) (token, bool) {
@@ -60,8 +69,28 @@ func (c *TokenCache) put(key string, t token) {
 		return
 	}
 	c.mu.Lock()
-	defer c.mu.Unlock()
 	c.tokens[key] = t
+	store := c.store
+	c.mu.Unlock()
+	if store != nil && t.persist {
+		_ = store.Save(key, StoredToken{Label: t.label, Access: t.access, Refresh: t.refresh, Expires: t.expires}) // a token that is not kept is asked for again
+	}
+}
+
+// load is get for a token a person approved: when this process has none, the store may.
+func (c *TokenCache) load(key string) (token, bool) {
+	if t, ok := c.get(key); ok || c == nil || c.store == nil {
+		return t, ok
+	}
+	s, ok := c.store.Load(key)
+	if !ok {
+		return token{}, false
+	}
+	t := token{access: s.Access, refresh: s.Refresh, expires: s.Expires, label: s.Label, persist: true}
+	c.mu.Lock()
+	c.tokens[key] = t
+	c.mu.Unlock()
+	return t, true
 }
 
 // oauth2 gets an access token from the token endpoint (client credentials,
@@ -175,12 +204,22 @@ func (o *oauth2) checkAuthorizationCode(p params) error {
 
 func (o *oauth2) accessToken(ctx context.Context) (string, error) {
 	key := o.key()
-	cached, ok := o.env.Tokens.get(key)
+	var cached token
+	var ok bool
+	if o.needsPerson() {
+		cached, ok = o.env.Tokens.load(key)
+	} else {
+		cached, ok = o.env.Tokens.get(key)
+	}
 	if ok && o.env.now().Before(cached.expires.Add(-tokenSkew)) {
 		return cached.access, nil
 	}
 	if ok && cached.refresh != "" {
 		if t, err := o.fetch(ctx, url.Values{"grant_type": {"refresh_token"}, "refresh_token": {cached.refresh}}); err == nil {
+			if t.refresh == "" {
+				t.refresh = cached.refresh // many servers do not send the refresh token again; the old one still works
+			}
+			t.label, t.persist = o.label(), o.needsPerson()
 			o.env.Tokens.put(key, t)
 			return t.access, nil
 		}
@@ -190,8 +229,28 @@ func (o *oauth2) accessToken(ctx context.Context) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	t.label, t.persist = o.label(), o.needsPerson()
 	o.env.Tokens.put(key, t)
 	return t.access, nil
+}
+
+// needsPerson says whether getting a token afresh asks a person to approve it in a browser.
+func (o *oauth2) needsPerson() bool {
+	return o.grant == "authorization_code" || o.grant == "device_code"
+}
+
+// label says which token this is, with nothing secret in it: the grant, the token endpoint's host, the client id
+// and the scope.
+func (o *oauth2) label() string {
+	host := o.tokenURL
+	if u, err := url.Parse(o.tokenURL); err == nil && u.Host != "" {
+		host = u.Host
+	}
+	parts := []string{o.grant, host, "client " + o.clientID}
+	if o.scope != "" {
+		parts = append(parts, "scope "+o.scope)
+	}
+	return strings.Join(parts, " · ")
 }
 
 // newToken asks for a token afresh: the grants that need a person go through

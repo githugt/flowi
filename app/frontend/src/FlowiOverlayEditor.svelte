@@ -1,11 +1,14 @@
 <script lang="ts">
+  import Modal from './Modal.svelte'
   import Button from './Button.svelte'
   // The flowi overlays of this request's collection: list them, open one to read or edit its file, add
   // one (type it, or paste one brought from elsewhere), delete one. An overlay is a named set of changes
   // laid over a request version when it is sent; this is not the spec overlay of an imported API.
   import { RequestService } from '../bindings/github.com/githugt/flowi/app/internal/bridge'
   import { errorText } from './lib/errors'
+  import { overlayDirty } from './lib/overlaydirty'
   import { ui } from './lib/ui.svelte'
+  import { overlayDeleteText } from './lib/pinexample'
   import type { FlowiOverlayInfo, SpecExport } from './lib/types'
 
   let { node, overlays, current, onclose }: { node: string; overlays: FlowiOverlayInfo[]; current: string; onclose: () => void } = $props()
@@ -15,12 +18,14 @@
   let isNew = $state(false)
   let problem = $state('')
   let loaded = $state('')
+  let savedText = $state('') // what the editor held when it was read or last saved
 
   async function open(n: string) {
     exported = null
     problem = ''
     try {
       text = await RequestService.FlowiOverlayText(node, n)
+      savedText = text
       name = n
       loaded = n
       isNew = false
@@ -31,6 +36,7 @@
   async function create() {
     problem = ''
     text = await RequestService.FlowiOverlayText(node, '')
+    savedText = text
     name = ''
     loaded = ''
     isNew = true
@@ -39,12 +45,20 @@
     problem = (await RequestService.SaveFlowiOverlayText(node, name, text)) as string
     if (!problem) {
       loaded = name
+      savedText = text
       isNew = false
       ui.toast(`Saved the flowi overlay ${name}.`)
     }
   }
-  function remove() {
-    ui.confirm('Delete flowi overlay', `Delete ${name}? Responses kept for it stay in the data folder.`, async () => {
+  async function remove() {
+    let uses: string[] = []
+    try {
+      uses = ((await RequestService.FlowiOverlayUses(node, name)) as string[] | null) ?? []
+    } catch (e) {
+      problem = errorText(e)
+      return
+    }
+    ui.confirm('Delete flowi overlay', overlayDeleteText(name, uses), async () => {
       try {
         await RequestService.DeleteFlowiOverlay(node, name)
         name = ''
@@ -74,6 +88,12 @@
     }
   }
   const editing = $derived(isNew || loaded !== '')
+  const dirty = $derived(overlayDirty(editing, isNew, name, text, savedText))
+  // Going to another overlay asks first when the one open has edits that are not saved.
+  function leave(go: () => void) {
+    if (dirty) ui.confirm('Discard changes?', `${isNew ? 'The new overlay' : loaded} has edits that are not saved.`, go, 'Discard')
+    else go()
+  }
   const nameProblem = $derived(isNew && name && !/^[A-Za-z0-9_-][A-Za-z0-9._-]*$/.test(name) ? 'Use letters, digits, “.”, “_” and “-”.' : '')
 
   $effect(() => {
@@ -81,22 +101,20 @@
   })
 </script>
 
-<div class="scrim" role="presentation" onpointerdown={onclose}>
-  <div class="dialog" role="dialog" aria-label="Flowi overlays" tabindex="-1" onpointerdown={(e) => e.stopPropagation()}>
-    <h3>Flowi overlays</h3>
+<Modal title="Flowi overlays" width={760} maxHeight="86vh" {onclose}>
     <p class="muted">A flowi overlay lays changes over a request version when it is sent: the same request as a VIP customer, a slow one, one with a bad token. Choose one beside the version picker; <code>flowi send --flowi-overlay</code> does the same.</p>
     <div class="cols">
       <ul class="list" aria-label="Overlays">
         {#each overlays as o}
           <li>
-            <button class:on={loaded === o.name && !isNew} onclick={() => open(o.name)} title={o.description}>
-              <strong>{o.name}</strong>
+            <button class:on={loaded === o.name && !isNew} onclick={() => o.name !== loaded && leave(() => open(o.name))} title={o.description}>
+              <strong>{o.name}</strong>{#if dirty && loaded === o.name && !isNew}<span class="dirty" title="Not saved"> ●</span>{/if}
               <span class="muted">{o.shared} shared{o.used ? `, ${o.own} for this request` : ''}</span>
             </button>
           </li>
         {/each}
-        {#if !overlays.length}<li class="muted none">No overlays yet. Edit this request, then Save ▾ → Save as flowi overlay, or add one here.</li>{/if}
-        <li><button class="add" class:on={isNew} onclick={create}>+ New overlay</button></li>
+        {#if !overlays.length}<li class="muted none">No overlays yet. Edit this request, then choose Save as flowi overlay in the Save menu, or add one here.</li>{/if}
+        <li><button class="add" class:on={isNew} onclick={() => leave(create)}>+ New overlay</button></li>
       </ul>
       <div class="edit">
         {#if editing}
@@ -140,20 +158,18 @@
         {/if}
       </div>
     </div>
-    <div class="actions"><span class="grow"></span><Button onclick={onclose}>Close</Button></div>
-  </div>
-</div>
+  {#snippet actions()}<Button onclick={onclose}>Close</Button>{/snippet}
+</Modal>
 
 <style>
-  .scrim { position: fixed; inset: 0; background: rgb(0 0 0 / 0.4); display: grid; place-items: center; z-index: 60; }
-  .dialog { width: 760px; max-width: calc(100vw - 32px); max-height: 86vh; display: flex; flex-direction: column; gap: 10px; padding: 16px; background: var(--panel); border: 1px solid var(--line); border-radius: var(--r-lg); }
-  h3, p { margin: 0; }
+  p { margin: 0; }
   .muted { color: var(--muted); font-size: var(--fs-sm); }
-  .cols { display: flex; gap: 12px; min-height: 280px; flex: 1; min-height: 0; }
+  .dirty { color: var(--warn); }
+  .cols { display: flex; gap: 12px; flex: 1; min-height: 0; }
   .list { list-style: none; margin: 0; padding: 0; width: 210px; flex: none; display: flex; flex-direction: column; gap: 2px; overflow: auto; }
   .list button { width: 100%; display: flex; flex-direction: column; align-items: flex-start; gap: 1px; text-align: left; border: 1px solid transparent; background: transparent; color: var(--text); border-radius: var(--r-md); padding: 5px 8px; font: inherit; }
-  .list button:hover { background: var(--hover); }
-  .list button.on { background: color-mix(in srgb, var(--accent) 14%, transparent); border-color: var(--accent); }
+  .list button:hover { background: var(--tint-hover); }
+  .list button.on { background: var(--tint-sel); border-color: var(--accent); }
   .list .add { color: var(--accent); }
   .none { padding: 6px 8px; }
   .edit { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
@@ -167,10 +183,10 @@
   .help { font-size: var(--fs-xs); color: var(--muted); }
   .help p { margin-top: 4px; line-height: 1.5; }
   code { font-size: var(--fs-xs); }
-  .err { color: var(--fail); font-size: var(--fs-sm); }
   .actions { display: flex; gap: 8px; align-items: center; }
   .grow { flex: 1; }
+  .err { color: var(--fail); font-size: var(--fs-sm); }
   button { background: var(--raised); color: var(--text); border: 0; box-shadow: inset 0 0 0 1px var(--line); border-radius: var(--r-md); padding: 0 12px; min-height: var(--ctl-h); font: inherit; font-weight: 500; }
   button:hover:not(:disabled) { background: var(--raised-3); }
-  button:disabled { opacity: 0.4; }
+  button:disabled { opacity: var(--op-disabled); }
 </style>

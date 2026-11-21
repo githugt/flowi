@@ -136,3 +136,67 @@ func TestCheckDrift_Given_no_schema_was_learned_yet_Then_it_says_so_and_does_not
 		t.Errorf("request %q", rep.Requests[0].Request)
 	}
 }
+
+func TestAcceptDrift_Given_a_drifted_response_Then_the_schema_takes_it_in_and_the_next_check_is_clean(t *testing.T) {
+	// Arrange
+	var answer atomic.Value
+	answer.Store(`{"id": 7, "name": "rex"}`)
+	w, target, _ := driftWorkspace(t, &answer)
+	runToEnd(t, w, target, RunOptions{Env: "local"})
+	answer.Store(`{"id": 7, "name": "rex", "region": "eu"}`)
+	rep, err := w.CheckDrift(context.Background(), target, DriftOptions{Env: "local"})
+	if err != nil || !rep.Has(schemainfer.DriftNew) {
+		t.Fatalf("err %v report %+v", err, rep)
+	}
+
+	// Act
+	changes, err := w.AcceptDrift(rep, nil)
+	again, againErr := w.CheckDrift(context.Background(), target, DriftOptions{Env: "local"})
+
+	// Assert
+	// Before: accepting a new field meant leaving the check, sending with learning on and running again.
+	if err != nil || len(changes) == 0 {
+		t.Fatalf("err %v changes %v", err, changes)
+	}
+	if againErr != nil || again.Has(schemainfer.DriftNew, schemainfer.DriftMissing, schemainfer.DriftChanged) {
+		t.Fatalf("after accepting: err %v report %+v", againErr, again)
+	}
+}
+
+func TestAcceptDrift_Given_a_request_that_is_not_listed_Then_its_schema_is_left_alone(t *testing.T) {
+	// Arrange
+	var answer atomic.Value
+	answer.Store(`{"id": 7}`)
+	w, target, reqTarget := driftWorkspace(t, &answer)
+	runToEnd(t, w, target, RunOptions{Env: "local"})
+	answer.Store(`{"id": 7, "region": "eu"}`)
+	rep, _ := w.CheckDrift(context.Background(), target, DriftOptions{Env: "local"})
+	file, _ := schemaFile(requestOf(t, w, reqTarget).File, "1", SchemaPart{Kind: "response", Status: 200})
+	before, _ := os.ReadFile(file)
+
+	// Act
+	changes, err := w.AcceptDrift(rep, []string{"somewhere/else"})
+
+	// Assert
+	after, _ := os.ReadFile(file)
+	if err != nil || len(changes) != 0 || string(before) != string(after) {
+		t.Fatalf("err %v changes %v\n%s\n%s", err, changes, before, after)
+	}
+}
+
+func TestAcceptDrift_Given_a_response_with_no_schema_yet_Then_one_is_made(t *testing.T) {
+	// Arrange
+	var answer atomic.Value
+	answer.Store(`{"id": 7}`)
+	w, target, reqTarget := driftWorkspace(t, &answer)
+	rep, _ := w.CheckDrift(context.Background(), target, DriftOptions{Env: "local"})
+
+	// Act
+	_, err := w.AcceptDrift(rep, []string{"pet"})
+
+	// Assert
+	file, _ := schemaFile(requestOf(t, w, reqTarget).File, "1", SchemaPart{Kind: "response", Status: 200})
+	if _, statErr := os.Stat(file); err != nil || statErr != nil {
+		t.Fatalf("err %v stat %v", err, statErr)
+	}
+}

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { clipWidth } from './lib/measure'
   // A run drawn as a sequence diagram: Flowi on the left, one lifeline for each host it called, an arrow out and an
   // arrow back for each attempt. Drawn here from data, so it needs no diagram library.
   import type { SequenceView } from './lib/types'
@@ -19,7 +20,7 @@
   </defs>
   {#each columns as name, i}
     <rect class="head" x={x(i) - 70} y="6" width="140" height="26" rx="8" />
-    <text class="headtext" x={x(i)} y="24" text-anchor="middle">{name.length > 22 ? name.slice(0, 21) + '…' : name}<title>{name}</title></text>
+    <text class="headtext" x={x(i)} y="24" text-anchor="middle">{clipWidth(name, 22)}<title>{name}</title></text>
     <line class="life" x1={x(i)} y1="34" x2={x(i)} y2={height - 8} />
   {/each}
   {#each seq.steps as s, i}
@@ -27,14 +28,14 @@
     {#if s.kind === 'note'}
       <g class="note" class:failed={s.failed}>
         <rect x={x(0) - 70} y={y - 14} width={x(seq.hosts.length) - x(0) + 140} height="24" rx="6" />
-        <text x={x(0) - 60} y={y + 3}>{s.text.length > 110 ? s.text.slice(0, 109) + '…' : s.text}<title>{s.text}</title></text>
+        <text x={x(0) - 60} y={y + 3}>{clipWidth(s.text, 110)}<title>{s.text}</title></text>
       </g>
     {:else}
       {@const to = s.kind === 'call' ? x(s.host + 1) : x(0)}
       {@const from = s.kind === 'call' ? x(0) : x(s.host + 1)}
       <g class="arrow" class:reply={s.kind === 'reply'} class:failed={s.failed}>
         <line x1={from} y1={y} x2={to} y2={y} marker-end="url(#seqarrow)" />
-        <text x={(from + to) / 2} y={y - 4} text-anchor="middle">{s.text.length > 40 ? s.text.slice(0, 39) + '…' : s.text}<title>{s.text}</title></text>
+        <text x={(from + to) / 2} y={y - 4} text-anchor="middle">{clipWidth(s.text, 40)}<title>{s.text}</title></text>
       </g>
     {/if}
   {/each}

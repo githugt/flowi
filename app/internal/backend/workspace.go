@@ -13,6 +13,7 @@ import (
 	flowi "github.com/githugt/flowi/lib"
 	"github.com/githugt/flowi/lib/analysis"
 	"github.com/githugt/flowi/lib/announce"
+	"github.com/githugt/flowi/lib/dataset"
 	"github.com/githugt/flowi/lib/diag"
 	"github.com/githugt/flowi/lib/engine"
 	"github.com/githugt/flowi/lib/flowioverlay"
@@ -127,6 +128,18 @@ func (b *Workspace) DeleteRequest(t flowi.RequestTarget) error {
 	return b.ws.DeleteRequest(t)
 }
 
+// DeleteRequestToTrash and DeleteFlowToTrash take the item out of its collection into the trash, where
+// RestoreFromTrash puts it back.
+func (b *Workspace) DeleteRequestToTrash(t flowi.RequestTarget) (flowi.TrashedItem, error) {
+	b.guard.Check("DeleteRequestToTrash")
+	return b.ws.DeleteRequestToTrash(t)
+}
+
+func (b *Workspace) DeleteFlowToTrash(t flowi.FlowTarget) (flowi.TrashedItem, error) {
+	b.guard.Check("DeleteFlowToTrash")
+	return b.ws.DeleteFlowToTrash(t)
+}
+
 func (b *Workspace) DuplicateFlow(t flowi.FlowTarget, path string) (flowi.FlowTarget, error) {
 	b.guard.Check("DuplicateFlow")
 	return b.ws.DuplicateFlow(t, path)
@@ -140,6 +153,11 @@ func (b *Workspace) DeleteFlow(t flowi.FlowTarget) error {
 func (b *Workspace) DeleteEnvironment(file string) error {
 	b.guard.Check("DeleteEnvironment")
 	return b.ws.DeleteEnvironment(file)
+}
+
+func (b *Workspace) EnvironmentImpact(file string) (flowi.EnvImpact, error) {
+	b.guard.Check("EnvironmentImpact")
+	return b.ws.EnvironmentImpact(file)
 }
 
 func (b *Workspace) ExportMermaid(t flowi.FlowTarget) (string, error) {
@@ -188,6 +206,12 @@ func (b *Workspace) GRPCMethods(ctx context.Context, t flowi.RequestTarget, v mo
 	return b.ws.GRPCMethods(ctx, t, v, o)
 }
 
+// TestConnection tests the connection of a message or database version.
+func (b *Workspace) TestConnection(ctx context.Context, t flowi.RequestTarget, v model.RequestVersion, o flowi.SendOptions) (engine.Probe, error) {
+	b.guard.Check("TestConnection")
+	return b.ws.TestConnection(ctx, t, v, o)
+}
+
 func (b *Workspace) SeedRequestHooks(t flowi.RequestTarget) error {
 	b.guard.Check("SeedRequestHooks")
 	return b.ws.SeedRequestHooks(t)
@@ -196,6 +220,11 @@ func (b *Workspace) SeedRequestHooks(t flowi.RequestTarget) error {
 func (b *Workspace) SaveEnvironment(e model.Environment, dropComments bool) error {
 	b.guard.Check("SaveEnvironment")
 	return b.ws.SaveEnvironment(e, flowi.SaveOptions{DropComments: dropComments})
+}
+
+func (b *Workspace) ShareEnvironment(collection model.ID, name string, overwrite bool) (string, bool, []string, error) {
+	b.guard.Check("ShareEnvironment")
+	return b.ws.ShareEnvironment(collection, name, overwrite)
 }
 
 func (b *Workspace) CollectionEnvironments(collection model.ID) ([]model.Environment, diag.List, error) {
@@ -210,6 +239,11 @@ func (b *Workspace) Send(ctx context.Context, t flowi.RequestTarget, o flowi.Sen
 		return nil, err
 	}
 	return s, nil
+}
+
+func (b *Workspace) ExampleTaken(rec engine.Record, name string) (bool, error) {
+	b.guard.Check("ExampleTaken")
+	return b.ws.ExampleTaken(rec, name)
 }
 
 func (b *Workspace) PinExample(rec engine.Record, name string) (string, error) {
@@ -387,6 +421,21 @@ func (b *Workspace) Secrets() ([]flowi.SecretInfo, error) {
 	return b.ws.Secrets()
 }
 
+func (b *Workspace) VaultState() flowi.VaultState {
+	b.guard.Check("VaultState")
+	return b.ws.VaultState()
+}
+
+func (b *Workspace) LockVault() {
+	b.guard.Check("LockVault")
+	b.ws.LockVault()
+}
+
+func (b *Workspace) AutoLockVault() bool {
+	b.guard.Check("AutoLockVault")
+	return b.ws.AutoLockVault()
+}
+
 func (b *Workspace) DeclareSecret(env, name, value string) error {
 	b.guard.Check("DeclareSecret")
 	return b.ws.DeclareSecret(env, name, value)
@@ -429,6 +478,20 @@ func (b *Workspace) OpenArazzo(ctx context.Context, ref string) error {
 	return err
 }
 
+// OpenExample opens the bundled example collection with its own demo server, until the app quits.
+func (b *Workspace) OpenExample() error {
+	b.guard.Check("OpenExample")
+	_, err := b.ws.OpenExample()
+	return err
+}
+
+// AllowSecretHost lets secrets be sent to host, in the person's own settings.
+func (b *Workspace) AllowSecretHost(host string) error {
+	b.guard.Check("AllowSecretHost")
+	_, err := b.ws.AllowSecretHost(host)
+	return err
+}
+
 func (b *Workspace) Coverage(collection model.ID) (analysis.Coverage, error) {
 	b.guard.Check("Coverage")
 	cov, _, err := b.ws.Coverage(collection)
@@ -454,9 +517,19 @@ func (b *Workspace) SpecNames(collection model.ID) []string {
 	return out
 }
 
+func (b *Workspace) LastAccess(t flowi.FlowTarget) (flowi.SavedAccess, bool) {
+	b.guard.Check("LastAccess")
+	return b.ws.LastAccess(t)
+}
+
 func (b *Workspace) CheckAccess(ctx context.Context, t flowi.FlowTarget, o flowi.AccessOptions) (flowi.AccessReport, error) {
 	b.guard.Check("CheckAccess")
 	return b.ws.CheckAccess(ctx, t, o)
+}
+
+func (b *Workspace) AcceptDrift(rep flowi.DriftReport, requests []string) ([]flowi.SchemaChange, error) {
+	b.guard.Check("AcceptDrift")
+	return b.ws.AcceptDrift(rep, requests)
 }
 
 func (b *Workspace) CheckDrift(ctx context.Context, t flowi.FlowTarget, o flowi.DriftOptions) (flowi.DriftReport, error) {
@@ -530,9 +603,45 @@ func (b *Workspace) ApplyImport(p flowi.ImportPlan, o flowi.ApplyOptions) error 
 	return b.ws.ApplyImport(p, o)
 }
 
-func (b *Workspace) SaveFlow(t flowi.FlowTarget, f model.Flow, dropComments bool) error {
+// FlowSum fingerprints the flow's file as it is on disk now.
+func (b *Workspace) FlowSum(t flowi.FlowTarget) (string, error) {
+	b.guard.Check("FlowSum")
+	return b.ws.FlowSum(t)
+}
+
+func (b *Workspace) SecretUses() map[string][]flowi.SecretUse {
+	b.guard.Check("SecretUses")
+	return b.ws.SecretUses()
+}
+
+func (b *Workspace) DataFileTables(ctx context.Context, collection model.ID, driver, server string) ([]dataset.TableInfo, error) {
+	b.guard.Check("DataFileTables")
+	return b.ws.DataFileTables(ctx, collection, driver, server)
+}
+
+func (b *Workspace) PreflightFlow(t flowi.FlowTarget, env string, draft *model.Flow) ([]flowi.Need, error) {
+	b.guard.Check("PreflightFlow")
+	return b.ws.PreflightFlow(t, env, draft)
+}
+
+func (b *Workspace) AuthTokens() []flowi.AuthToken {
+	b.guard.Check("AuthTokens")
+	return b.ws.AuthTokens()
+}
+
+func (b *Workspace) ForgetAuthToken(id string) error {
+	b.guard.Check("ForgetAuthToken")
+	return b.ws.ForgetAuthToken(id)
+}
+
+func (b *Workspace) FlowWrites(t flowi.FlowTarget, draft *model.Flow) ([]flowi.FlowWrite, error) {
+	b.guard.Check("FlowWrites")
+	return b.ws.FlowWrites(t, draft)
+}
+
+func (b *Workspace) SaveFlow(t flowi.FlowTarget, f model.Flow, dropComments bool, expect string) error {
 	b.guard.Check("SaveFlow")
-	return b.ws.SaveFlow(t, f, flowi.SaveOptions{DropComments: dropComments})
+	return b.ws.SaveFlow(t, f, flowi.SaveOptions{DropComments: dropComments, Expect: expect})
 }
 
 func (b *Workspace) NewEnvironment(name string) (string, error) {

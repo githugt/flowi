@@ -124,7 +124,7 @@ func TestWorkspaceVM_Delete_should_remove_the_items_and_report_their_nodes(t *te
 	ws, b, w := shopWorkspace(t)
 	var gone []string
 
-	ws.Delete([]string{"r:C1:R1", "f:C1:F1", "e:/c/environments/local.yaml"}, func(ids []string) { gone = ids }, nil)
+	ws.Delete([]string{"r:C1:R1", "f:C1:F1", "e:/c/environments/local.yaml"}, func(ids []string) { gone = ids }, nil, nil)
 	w.Wait()
 
 	if !slices.Equal(gone, []string{"r:C1:R1", "f:C1:F1", "e:/c/environments/local.yaml"}) {
@@ -135,16 +135,36 @@ func TestWorkspaceVM_Delete_should_remove_the_items_and_report_their_nodes(t *te
 	}
 }
 
+// Before: a delete removed the files for good, so there was nothing to undo.
+func TestWorkspaceVM_Delete_should_send_requests_and_flows_to_the_trash_and_hand_over_what_went_there(t *testing.T) {
+	ws, b, w := shopWorkspace(t)
+	var kept []flowi.TrashedItem
+
+	ws.Delete([]string{"r:C1:R1", "f:C1:F1", "e:/c/environments/local.yaml"}, nil, func(items []flowi.TrashedItem) { kept = items }, nil)
+	w.Wait()
+
+	if len(kept) != 2 || kept[0].Kind != flowi.TrashRequest || kept[1].Kind != flowi.TrashFlow || kept[0].Collection != "C1" {
+		t.Fatalf("kept %+v: an environment is not kept, a request and a flow are", kept)
+	}
+	if !b.Called("DeleteRequestToTrash R1") || !b.Called("DeleteFlowToTrash F1") || b.Called("DeleteRequest R1") {
+		t.Fatalf("calls %v", b.Calls)
+	}
+	trash, _ := b.ListTrash()
+	if len(trash) != 2 {
+		t.Fatalf("trash %+v", trash)
+	}
+}
+
 func TestWorkspaceVM_Delete_Given_a_failure_Then_reports_the_ones_gone_and_stops(t *testing.T) {
 	ws, b, w := shopWorkspace(t)
 	b.FailDeleteAt = 2
 	var failed error
 	var gone []string
 
-	ws.Delete([]string{"r:C1:R1", "r:C1:R2", "r:C1:R3"}, func(ids []string) { gone = ids }, func(err error) { failed = err })
+	ws.Delete([]string{"r:C1:R1", "r:C1:R2", "r:C1:R3"}, func(ids []string) { gone = ids }, nil, func(err error) { failed = err })
 	w.Wait()
 
-	if failed == nil || !slices.Equal(gone, []string{"r:C1:R1"}) || b.Called("DeleteRequest R3") {
+	if failed == nil || !slices.Equal(gone, []string{"r:C1:R1"}) || b.Called("DeleteRequestToTrash R3") {
 		t.Fatalf("failed %v gone %v calls %v", failed, gone, b.Calls)
 	}
 }

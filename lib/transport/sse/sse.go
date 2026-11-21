@@ -140,3 +140,12 @@ func eventType(name string) string {
 	}
 	return name
 }
+
+// Probe opens the event stream, checks that the server accepts it, and closes it without reading an event.
+func (Transport) Probe(ctx context.Context, op transport.Operation) error {
+	resp, err := open(ctx, op) //nolint:bodyclose // closed just below
+	if err != nil {
+		return err
+	}
+	return resp.Body.Close()
+}

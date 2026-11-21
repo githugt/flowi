@@ -16,7 +16,7 @@ import (
 // file declares them (the person drags to reorder), not a step. It shows every
 // input, since each is one row of its own, and never More.
 func StartCard(inputs []model.Input) Card {
-	c := Card{Badge: "MANUAL", Subline: countOf(len(inputs), "input", "inputs"), Rows: []Row{}, More: []Row{}, Ports: []Port{}}
+	c := Card{Badge: "MANUAL", Subline: countOf(len(inputs), "input", "inputs"), Rows: []Row{}, More: []Row{}, Ports: []Port{}, Guards: []Guard{}}
 	if len(inputs) == 0 {
 		c.Subline = "no inputs"
 	}
@@ -41,7 +41,7 @@ func EndCard(outputs []model.Output, run *report.Run) (Card, bool) {
 	if len(outputs) == 0 {
 		return Card{}, false
 	}
-	c := Card{Badge: "RETURNS", Subline: countOf(len(outputs), "value", "values"), Rows: []Row{}, More: []Row{}, Ports: []Port{}}
+	c := Card{Badge: "RETURNS", Subline: countOf(len(outputs), "value", "values"), Rows: []Row{}, More: []Row{}, Ports: []Port{}, Guards: []Guard{}}
 	if run != nil {
 		c.Subline = resultLine(run)
 	}

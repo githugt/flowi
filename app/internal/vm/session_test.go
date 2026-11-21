@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"slices"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -227,5 +228,47 @@ func TestSession_WelcomeShown_should_be_false_until_marked_and_then_stay_true(t 
 
 	if beforeErr != nil || markErr != nil || afterErr != nil || before || !after {
 		t.Fatalf("before %v (%v), mark %v, after %v (%v)", before, beforeErr, markErr, after, afterErr)
+	}
+}
+
+func TestHistory_Export_should_drop_big_bodies_and_the_oldest_over_budget(t *testing.T) {
+	// Before: 50 responses of 1 MiB were all stored, and rewritten on every send.
+	h := vm.NewHistory()
+	add := func(n int) {
+		rec := &engine.Record{Body: engine.Body{Text: strings.Repeat("x", n), Size: int64(n), SHA256: "abc"}}
+		h.Add(flowi.RequestTarget{}, "1", engine.SendResult{Record: rec}, nil)
+	}
+	add(1 << 20)   // oldest, over the one-body limit
+	add(200 << 10) // fits
+	add(100)       // newest
+
+	stored := h.Export() // newest first
+
+	if b := stored[0].Record.Body; b.Text == "" || b.Dropped != "" {
+		t.Fatalf("newest body %+v", b)
+	}
+	big := stored[2].Record.Body
+	if big.Text != "" || big.Dropped == "" || big.Size != 1<<20 || big.SHA256 != "abc" {
+		t.Fatalf("big body %+v: want content gone, size and digest kept", big)
+	}
+	if len(h.Items()[2].Result.Record.Body.Text) != 1<<20 {
+		t.Fatal("the history in memory must keep its body")
+	}
+}
+
+func TestSessionStore_SeenVersion_should_be_empty_first_then_what_was_marked(t *testing.T) {
+	s := vm.NewSessionStore(t.TempDir())
+
+	first, err := s.SeenVersion()
+	if err != nil || first != "" {
+		t.Fatalf("first %q %v", first, err)
+	}
+	if err := s.MarkVersionSeen("1.2.0"); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := s.SeenVersion()
+	if err != nil || got != "1.2.0" {
+		t.Fatalf("got %q %v", got, err)
 	}
 }

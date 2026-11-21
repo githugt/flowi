@@ -27,6 +27,7 @@ const (
 	NodeEnvironment
 	NodeFlowsGroup
 	NodeFlow
+	NodeBroken // a request or flow file that could not be read: unmerged, or not valid YAML
 )
 
 // TreeNode is one row of the workspace tree.
@@ -43,6 +44,7 @@ type TreeNode struct {
 	Scratch    bool     // NodeCollection: the Drafts try-out space, which is not a collection the person made
 	Method     string   // NodeRequest: the verb of its default version
 	Tree       string   // NodeFolder and the two groups: "requests" or "flows"
+	Detail     string   // NodeBroken: why it could not be read, with the line
 }
 
 // snapshot is everything the workspace view-model shows, built off the UI
@@ -62,16 +64,18 @@ type snapshot struct {
 // State changes happen on the UI goroutine only (through the worker's
 // poster); the watch goroutine reads the backend and posts.
 type Workspace struct {
-	b         Backend
-	w         *Worker
-	snap      snapshot
-	env       string
-	onChange  []func()
-	onFile    []func(file string)
-	onLabel   []func()
-	envChosen bool // the user picked an environment: reloads keep it
-	touched   map[string]time.Time
-	labels    map[string]string // display names that replace a node's label (untitled drafts show their URL)
+	b              Backend
+	w              *Worker
+	snap           snapshot
+	env            string
+	onChange       []func()
+	onFile         []func(file string)
+	onWatchProblem []func(error)
+	watchRetry     time.Duration // the first wait before a failed watch is started again
+	onLabel        []func()
+	envChosen      bool // the user picked an environment: reloads keep it
+	touched        map[string]time.Time
+	labels         map[string]string // display names that replace a node's label (untitled drafts show their URL)
 
 	watchCtx  context.Context    // the app's lifetime, from Watch
 	stopWatch context.CancelFunc // stops the current watch; Rewatch replaces it
@@ -79,7 +83,7 @@ type Workspace struct {
 
 // NewWorkspace returns an empty workspace view-model; call Load.
 func NewWorkspace(b Backend, w *Worker) *Workspace {
-	return &Workspace{b: b, w: w, touched: map[string]time.Time{}, labels: map[string]string{}, snap: snapshot{nodes: map[string]TreeNode{}, children: map[string][]string{}}}
+	return &Workspace{b: b, w: w, watchRetry: 2 * time.Second, touched: map[string]time.Time{}, labels: map[string]string{}, snap: snapshot{nodes: map[string]TreeNode{}, children: map[string][]string{}}}
 }
 
 // OnChange registers f to run (on the UI goroutine) after the tree or the
@@ -128,13 +132,46 @@ func (ws *Workspace) startWatch() {
 }
 
 func (ws *Workspace) watch(ctx context.Context) {
+	// Before: a watcher that failed to start (an inotify limit) or ended with an error just returned, so live reload
+	// stopped and nothing told the person. Now the problem is reported once and the watch is retried with a back-off.
+	delay := ws.watchRetry
+	for attempt := 0; ; attempt++ {
+		failed := ws.watchOnce(ctx, attempt == 0)
+		if !failed || ctx.Err() != nil || attempt >= watchRetries {
+			return
+		}
+		select {
+		case <-ctx.Done():
+			return
+		case <-time.After(delay):
+		}
+		delay *= 2
+	}
+}
+
+// watchRetries is how often a failed watch is started again before the workspace gives up.
+const watchRetries = 4
+
+// watchOnce runs one watch until its channel ends. It reports true when the watch failed (it did not start, or it
+// ended with an error) so the caller can try again; first says if the problem is new to the person.
+func (ws *Workspace) watchOnce(ctx context.Context, first bool) (failed bool) {
 	changes, err := ws.b.Watch(ctx)
-	if err != nil || changes == nil {
-		return // no live reload; the tree still refreshes after the GUI's own saves
+	if err != nil {
+		if first {
+			ws.reportWatchProblem(err)
+		}
+		return true
+	}
+	if changes == nil {
+		return false
 	}
 	for ch := range changes {
 		if ch.Err != nil {
-			continue // a failing watcher ends the channel; nothing to reload
+			if first {
+				ws.reportWatchProblem(ch.Err)
+			}
+			failed = true
+			continue // a failing watcher ends the channel
 		}
 		if _, err := ws.b.Reload(ch); err != nil {
 			continue // the Problems panel shows what is wrong with the file
@@ -147,7 +184,21 @@ func (ws *Workspace) watch(ctx context.Context) {
 			}
 		})
 	}
+	return failed
 }
+
+// reportWatchProblem tells the registered listeners, on the UI goroutine, that live reload is not working.
+func (ws *Workspace) reportWatchProblem(err error) {
+	ws.w.Post(func() {
+		for _, f := range ws.onWatchProblem {
+			f(err)
+		}
+	})
+}
+
+// OnWatchProblem registers f to run (on the UI goroutine) when the file watcher fails, so the app can say that
+// changes made outside it will not show up until it recovers.
+func (ws *Workspace) OnWatchProblem(f func(error)) { ws.onWatchProblem = append(ws.onWatchProblem, f) }
 
 func (ws *Workspace) apply(s snapshot) {
 	ws.snap = s
@@ -233,6 +284,19 @@ func (ws *Workspace) EnvColours() map[string]string {
 	return out
 }
 
+// ProtectedEnvs lists the names of the environments that ask for confirmation before a request that changes
+// data is sent, sorted.
+func (ws *Workspace) ProtectedEnvs() []string {
+	out := []string{}
+	for _, e := range ws.snap.environment {
+		if e.Protected {
+			out = append(out, e.Name)
+		}
+	}
+	slices.Sort(out)
+	return out
+}
+
 // SelectedEnv is the environment sends use.
 func (ws *Workspace) SelectedEnv() string { return ws.env }
 
@@ -245,19 +309,47 @@ func (ws *Workspace) SelectEnv(name string) {
 // VariableNames are the variables (and, separately, the secrets) the
 // selected environment defines: what {{env.x}} and {{secret.x}} can name.
 func (ws *Workspace) VariableNames() (vars, secrets []string) {
-	for _, e := range ws.snap.environment {
-		if e.Name != ws.env {
-			continue
-		}
-		for _, v := range e.Vars {
-			if v.Secret {
-				secrets = append(secrets, v.Name)
-			} else {
-				vars = append(vars, v.Name)
+	// Before: only the selected environment's own rows counted, so a variable it inherits from the environment it
+	// "builds on" showed as not set. The nearest environment decides whether a name is a secret.
+	chain := ws.SelectedChain()
+	seen := map[string]bool{}
+	for i := len(chain) - 1; i >= 0; i-- {
+		for _, e := range ws.snap.environment {
+			if e.Name != chain[i] {
+				continue
+			}
+			for _, v := range e.Vars {
+				if seen[v.Name] {
+					continue
+				}
+				seen[v.Name] = true
+				if v.Secret {
+					secrets = append(secrets, v.Name)
+				} else {
+					vars = append(vars, v.Name)
+				}
 			}
 		}
 	}
 	return vars, secrets
+}
+
+// SelectedChain is the names of the selected environment and the ones it builds on, the base first and the
+// selected one last. It is just the selected one when it builds on nothing or its chain is broken (the Problems
+// panel reports that), and empty when none is selected.
+func (ws *Workspace) SelectedChain() []string {
+	if ws.env == "" {
+		return nil
+	}
+	chain, err := model.EnvironmentChain(ws.snap.environment, ws.env)
+	if err != nil {
+		return []string{ws.env}
+	}
+	names := make([]string, len(chain))
+	for i, e := range chain {
+		names[i] = e.Name
+	}
+	return names
 }
 
 // Collection returns a loaded collection.
@@ -412,10 +504,10 @@ func addCollection(add func(string, TreeNode), c model.Collection, draft bool) {
 	add("", TreeNode{ID: root, Label: label, Kind: NodeCollection, Collection: cid, Draft: draft, Scratch: draft && c.Manifest.Name == scratchName})
 	reqs := root + "/requests"
 	add(root, TreeNode{ID: reqs, Label: "Requests", Kind: NodeRequestsGroup, Collection: cid, Tree: "requests"})
-	addNested(add, reqs, "requests", c, requestLeaves(c))
+	addNested(add, reqs, "requests", c, append(requestLeaves(c), brokenLeaves(c, "request")...))
 	flows := root + "/flows"
 	add(root, TreeNode{ID: flows, Label: "Flows", Kind: NodeFlowsGroup, Collection: cid, Tree: "flows"})
-	addNested(add, flows, "flows", c, flowLeaves(c))
+	addNested(add, flows, "flows", c, append(flowLeaves(c), brokenLeaves(c, "flow")...))
 }
 
 // treeLeaf is a request or flow to place in a nested tree by its path.
@@ -518,6 +610,20 @@ func requestLeaves(c model.Collection) []treeLeaf {
 		}
 		out[i] = treeLeaf{r.Path, TreeNode{ID: "r:" + string(c.Manifest.ID) + ":" + string(r.ID), Label: label, Kind: NodeRequest,
 			Collection: c.Manifest.ID, Request: r.ID, File: r.File, Path: r.Path, Method: verbOf(r)}}
+	}
+	return out
+}
+
+// brokenLeaves are the files of c that could not be read, placed where the request or flow would have been, so a file
+// with merge conflict markers stays in the tree (marked) instead of vanishing as if deleted.
+func brokenLeaves(c model.Collection, kind string) []treeLeaf {
+	var out []treeLeaf
+	for _, b := range c.Broken {
+		if b.Kind != kind {
+			continue
+		}
+		out = append(out, treeLeaf{b.Path, TreeNode{ID: "x:" + string(c.Manifest.ID) + ":" + b.File, Label: path.Base(b.Path), Kind: NodeBroken,
+			Collection: c.Manifest.ID, File: b.File, Path: b.Path, Detail: b.Message, Tree: kind + "s"}})
 	}
 	return out
 }

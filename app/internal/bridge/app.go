@@ -5,8 +5,10 @@ package bridge
 import (
 	"context"
 	"log/slog"
+	"slices"
 	"time"
 
+	flowi "github.com/githugt/flowi/lib"
 	"github.com/githugt/flowi/lib/diag"
 	"github.com/githugt/flowi/lib/engine"
 
@@ -42,6 +44,8 @@ type App struct {
 	// openProblems is what opening the workspace reported, for the
 	// Problems panel's notice; set once, in NewApp.
 	openProblems diag.List
+	// matrices are the matrix runs in progress, which a Cancel reaches by node.
+	matrices matrixRuns
 
 	tree       *WorkspaceService
 	flows      *FlowService
@@ -111,6 +115,11 @@ func NewApp(b vm.Backend, actor *Actor, emit Emit, opts ...Option) *App {
 	if actor.inline {
 		w = vm.NewInlineWorker()
 	}
+	if actor.OnPanic == nil {
+		actor.OnPanic = func(any) { // the stack is in the log; the person gets a plain line
+			emit("notice", Notice{Level: "error", Text: "Something went wrong inside Flowi. Your open edits are kept. Check the log for details."})
+		}
+	}
 	ws := vm.NewWorkspace(b, w)
 	log, history := vm.NewRunLog(), vm.NewHistory()
 	a := &App{actor: actor, backend: b, worker: w, workspace: ws, emit: emit, log: log, history: history,
@@ -171,11 +180,32 @@ func (a *App) Start(ctx context.Context) {
 			a.emit("workspace", a.tree.tree())
 		})
 		a.workspace.OnLabelChange(func() { a.emit("workspace", a.tree.tree()) })
+		a.workspace.OnWatchProblem(func(err error) {
+			a.emit("notice", Notice{Level: "error", Text: "Changes made outside Flowi may not show up: the file watcher failed (" + vm.ErrorText(err) + "). Flowi tries again."})
+		})
 		a.workspace.Load()
 		a.workspace.Watch(ctx)
 		a.problems.Refresh()
 		a.tracing.vm.Reload() // traces flow from the first send, without the Tracing page being opened
 	})
+	go a.lockVaultWhenIdle(ctx)
+}
+
+// vaultTick is how often the vault is checked against vault.auto_lock.
+const vaultTick = 30 * time.Second
+
+// lockVaultWhenIdle locks the secrets vault once vault.auto_lock says it has been idle long enough, until ctx ends.
+func (a *App) lockVaultWhenIdle(ctx context.Context) {
+	t := time.NewTicker(vaultTick)
+	defer t.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-t.C:
+			a.actor.Do(func() { a.secrets.vm.Tick() })
+		}
+	}
 }
 
 // Workspace is the service for the workspace tree and its context menu.
@@ -245,10 +275,17 @@ func (a *App) Passphrase() *PassphraseService { return a.passphrase }
 func newRequestService(a *App) *RequestService {
 	s := &RequestService{app: a, reqs: map[string]*openRequest{}}
 	// A send starts and ends outside the request's own changes: tell every open request.
+	// Before: every open request was sent to the page on every change, and a live stream changes with each message.
+	// Only a request that holds send state needs it: the ones involved now, and the ones involved before (they lose it).
+	var before []flowi.RequestTarget
 	a.send.OnChange(func() {
+		now := a.send.Involved()
 		for node, o := range s.reqs {
-			a.emit("request", s.view(node, o))
+			if t := o.req.Target(); slices.Contains(now, t) || slices.Contains(before, t) {
+				a.emit("request", s.view(node, o))
+			}
 		}
+		before = now
 	})
 	// An open request was never told its file was reloaded: after a rename its tab kept the old name, and an
 	// untitled draft kept showing its address as its name.
@@ -265,6 +302,7 @@ func newRequestService(a *App) *RequestService {
 // Shutdown stops what the app started (the replayer) and finishes the
 // session writes. Call it once, off the actor.
 func (a *App) Shutdown() {
+	a.flows.cancelRuns()
 	a.passphrase.Close()
 	a.replayer.Close()
 	a.schedules.Close()

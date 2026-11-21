@@ -4,6 +4,7 @@ package vm_test
 
 import (
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/githugt/flowi/lib/model"
@@ -28,6 +29,7 @@ func TestSetupOf_should_count_what_the_workspace_holds(t *testing.T) {
 	async := model.Request{Versions: []model.RequestVersion{{Label: "1", Async: &model.Async{Protocol: "ws"}}}}
 	withHooks := httpRequest()
 	withHooks.Hooks.Post = []model.HookStep{{}}
+	withHooks.Versions = []model.RequestVersion{{Assert: []string{"response.status == 200"}}} // a check, in any version
 	cols := []model.Collection{
 		{Manifest: model.Manifest{ID: "c1"}, Requests: []model.Request{httpRequest(), withHooks, grpc, async}, Flows: []model.Flow{{}}, Blueprints: []model.Blueprint{{}}, Overlays: []model.Overlay{{}, {}}},
 		{Manifest: model.Manifest{ID: "scratch", Name: "Scratch"}, Requests: []model.Request{httpRequest()}},
@@ -39,7 +41,7 @@ func TestSetupOf_should_count_what_the_workspace_holds(t *testing.T) {
 
 	got := vm.SetupOf(cols, func(c model.Collection) bool { return c.Manifest.ID == "scratch" }, envs, schedules)
 
-	want := vm.Setup{Collections: 2, Requests: 5, HTTP: 3, Messaging: 1, GRPC: 1, Flows: 1, Environments: 2, SecretVars: 1, Schedules: 1, Blueprints: 1, Overlays: 2, WithHooks: 1}
+	want := vm.Setup{Collections: 2, Requests: 5, HTTP: 3, Messaging: 1, GRPC: 1, Flows: 1, Environments: 2, SecretVars: 1, Schedules: 1, Blueprints: 1, Overlays: 2, WithHooks: 1, WithChecks: 1}
 	if got != want {
 		t.Fatalf("got  %+v\nwant %+v", got, want)
 	}
@@ -54,14 +56,14 @@ func TestSuggestFeatures_Given_an_empty_workspace_Then_suggests_nothing_to_do_wi
 }
 
 func TestSuggestFeatures_should_offer_a_feature_only_while_it_is_unused(t *testing.T) {
-	used := vm.Setup{Collections: 1, Requests: 5, HTTP: 5, Flows: 2, Environments: 1, SecretVars: 1, Schedules: 1, Blueprints: 1, Overlays: 1, WithHooks: 1, TracingOn: true, Messaging: 1}
+	used := vm.Setup{Collections: 1, Requests: 5, HTTP: 5, Flows: 2, Environments: 1, SecretVars: 1, Schedules: 1, Blueprints: 1, Overlays: 1, WithHooks: 1, WithChecks: 2, TracingOn: true, Messaging: 1}
 	idle := vm.Setup{Collections: 1, Requests: 5, HTTP: 5, Flows: 2, Environments: 1}
 
 	if got := vm.SuggestFeatures(used); len(got) != 0 {
 		t.Fatalf("everything in use, yet suggested %v", suggestionIDs(got))
 	}
 	got := suggestionIDs(vm.SuggestFeatures(idle))
-	for _, want := range []string{"schedules", "secrets", "hooks", "overlays", "blueprints", "tracing", "protocols"} {
+	for _, want := range []string{"schedules", "secrets", "hooks", "checks", "overlays", "blueprints", "tracing", "protocols"} {
 		if !slices.Contains(got, want) {
 			t.Errorf("idle workspace lacks the %q suggestion: %v", want, got)
 		}
@@ -88,5 +90,33 @@ func TestSuggestFeatures_should_say_why_and_where_to_go(t *testing.T) {
 		if s.Title == "" || s.Why == "" || s.Action == "" || s.Label == "" {
 			t.Errorf("incomplete suggestion %+v", s)
 		}
+	}
+}
+
+func TestSuggestFeatures_should_name_where_secrets_are_kept_and_not_call_hooks_checks(t *testing.T) {
+	// Before: the secrets idea said "your system's keychain" (it holds only the vault's key) and hooks were sold as "Check responses".
+	idle := vm.Setup{Collections: 1, Requests: 5, HTTP: 5, Flows: 2, Environments: 1}
+
+	for _, idea := range vm.SuggestFeatures(idle) {
+		if strings.Contains(idea.Why, "keychain") {
+			t.Errorf("%q names the keychain: %s", idea.Title, idea.Why)
+		}
+		if idea.ID == "hooks" && idea.Title == "Check responses automatically" {
+			t.Error("hooks are still sold as checks")
+		}
+	}
+}
+
+// Before: a person who already wrote checks (Assert lines) still saw "Check responses", because the card looked at
+// hooks, and a person with no checks had no card of their own for them.
+func TestSuggestFeatures_should_offer_checks_only_to_a_workspace_that_has_none(t *testing.T) {
+	none := suggestionIDs(vm.SuggestFeatures(vm.Setup{Collections: 1, Requests: 2, HTTP: 2, WithHooks: 1}))
+	some := suggestionIDs(vm.SuggestFeatures(vm.Setup{Collections: 1, Requests: 2, HTTP: 2, WithChecks: 1}))
+
+	if !slices.Contains(none, "checks") || slices.Contains(none, "hooks") {
+		t.Errorf("no checks, but hooks used: want checks and not hooks, got %v", none)
+	}
+	if slices.Contains(some, "checks") || !slices.Contains(some, "hooks") {
+		t.Errorf("checks used, no hooks: want hooks and not checks, got %v", some)
 	}
 }

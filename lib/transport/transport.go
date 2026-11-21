@@ -88,6 +88,27 @@ type Transport interface {
 	Run(ctx context.Context, op Operation) (Result, error)
 }
 
+// Prober is a Transport that can check a connection without sending or receiving anything: it connects, signs in
+// with the operation's credentials and disconnects. Send and Receive of the operation are ignored. Probe must return
+// promptly when ctx ends. Transports that cannot do this safely do not implement it (a queue service has no
+// connection to make apart from a call that would also take a message).
+type Prober interface {
+	Probe(ctx context.Context, op Operation) error
+}
+
+// ErrNoProbe means the transport has no connection test.
+var ErrNoProbe = errors.New("this protocol has no connection test")
+
+// Probe checks the connection of op with tr, or says ErrNoProbe.
+func Probe(ctx context.Context, tr Transport, op Operation) error {
+	p, ok := tr.(Prober)
+	if !ok {
+		return ErrNoProbe
+	}
+	op.Send, op.Receive = nil, nil
+	return p.Probe(ctx, op)
+}
+
 var (
 	// ErrTimeout means the receive timed out before enough messages arrived.
 	ErrTimeout = errors.New("receive timed out")

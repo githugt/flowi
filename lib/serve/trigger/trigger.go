@@ -8,7 +8,9 @@
 //
 // Every route but /healthz needs "Authorization: Bearer <token>". The
 // token is checked before the path is looked at, so a caller without it
-// learns nothing about which flows exist. An address that sends ten bad
+// learns nothing about which flows exist. A named token (see package tokens) may be limited to some flows and
+// environments and to a time: a call outside its scope is answered 403, an expired token 401, and a limited token
+// can read only the runs it started. An address that sends ten bad
 // tokens in a minute is answered 429 until the minute ends; a request with
 // the right token is never refused for it, since callers behind a proxy
 // share one address.
@@ -32,11 +34,17 @@ import (
 	"time"
 
 	"github.com/githugt/flowi/lib/serve/runs"
+	"github.com/githugt/flowi/lib/serve/tokens"
 )
 
-// ErrNoToken is returned by New when the token is empty: triggers without
+// ErrNoToken is returned by New when there is neither a token nor a token store: triggers without
 // authentication are never offered.
 var ErrNoToken = errors.New("triggers need a token")
+
+// Authenticator looks a presented token up; *tokens.Store is one.
+type Authenticator interface {
+	Authenticate(secret string) (tokens.Token, tokens.Result)
+}
 
 const (
 	maxBody        = 1 << 20
@@ -47,7 +55,12 @@ const (
 
 // Options configure the handler.
 type Options struct {
-	Token   string
+	// Token is a token with full power and no expiry (the single token of earlier releases; "" for none). It makes
+	// the calls whose Source is "trigger".
+	Token string
+	// Tokens are the named tokens, each with the scopes and expiry it was made with ("trigger:<name>" is the Source
+	// of its runs). At least one of Token and Tokens is needed.
+	Tokens  Authenticator
 	Runs    *runs.Manager
 	MaxWait time.Duration // longest ?wait= honoured (default 5m)
 	Logger  *slog.Logger
@@ -55,7 +68,9 @@ type Options struct {
 }
 
 type handler struct {
-	digest  [sha256.Size]byte // of the token, so comparison time does not depend on its length
+	digest  [sha256.Size]byte // of the legacy token, so comparison time does not depend on its length
+	legacy  bool              // there is one
+	tokens  Authenticator
 	runs    *runs.Manager
 	maxWait time.Duration
 	log     *slog.Logger
@@ -64,7 +79,7 @@ type handler struct {
 
 // New returns the trigger handler.
 func New(o Options) (http.Handler, error) {
-	if o.Token == "" {
+	if o.Token == "" && o.Tokens == nil {
 		return nil, ErrNoToken
 	}
 	if o.MaxWait <= 0 {
@@ -76,7 +91,7 @@ func New(o Options) (http.Handler, error) {
 	if o.Now == nil {
 		o.Now = time.Now
 	}
-	return &handler{digest: sha256.Sum256([]byte(o.Token)), runs: o.Runs, maxWait: o.MaxWait, log: o.Logger, denied: newFailureLimiter(o.Now)}, nil
+	return &handler{digest: sha256.Sum256([]byte(o.Token)), legacy: o.Token != "", tokens: o.Tokens, runs: o.Runs, maxWait: o.MaxWait, log: o.Logger, denied: newFailureLimiter(o.Now)}, nil
 }
 
 func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -84,7 +99,8 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 		return
 	}
-	if !h.authorised(r) {
+	who, why := h.authorise(r)
+	if why != "" {
 		// A valid token is never locked out: behind a proxy every caller shares one address, so a lockout that
 		// also refused the right token would let anyone shut every caller out. The lockout only stops a
 		// caller that keeps sending wrong ones.
@@ -98,16 +114,16 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		h.denied.recordFailure(remote)
 		h.log.Warn("trigger call denied", "Event", "TriggerDenied", "Remote", r.RemoteAddr, "Method", r.Method)
 		w.Header().Set("WWW-Authenticate", "Bearer")
-		writeError(w, http.StatusUnauthorized, "a bearer token is required")
+		writeError(w, http.StatusUnauthorized, why)
 		return
 	}
 	switch flow, ok := flowRoute(r.URL.Path); {
 	case ok && r.Method == http.MethodPost:
-		h.start(w, r, flow)
+		h.start(w, r, flow, who)
 	case ok:
 		methodNotAllowed(w, http.MethodPost)
 	case strings.HasPrefix(r.URL.Path, "/runs/") && r.Method == http.MethodGet:
-		h.report(w, strings.TrimPrefix(r.URL.Path, "/runs/"))
+		h.report(w, strings.TrimPrefix(r.URL.Path, "/runs/"), who)
 	case strings.HasPrefix(r.URL.Path, "/runs/"):
 		methodNotAllowed(w, http.MethodGet)
 	default:
@@ -115,13 +131,44 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (h *handler) authorised(r *http.Request) bool {
+// caller is who a call was authorised as.
+type caller struct {
+	source string // the Source of the runs it starts: "trigger", or "trigger:<name>" for a named token
+	scopes tokens.Scopes
+}
+
+// own says whether the caller may see the run with this source: a caller limited by scope sees only the runs it
+// started, one without limits sees every run.
+func (c caller) own(source string) bool { return c.scopes.Unrestricted() || source == c.source }
+
+const (
+	needToken    = "a bearer token is required"
+	tokenExpired = "this token has expired; ask for a new one"
+)
+
+// authorise tells who the bearer token is, or, when it is not accepted, what to say to the caller.
+func (h *handler) authorise(r *http.Request) (caller, string) {
 	scheme, token, ok := strings.Cut(r.Header.Get("Authorization"), " ")
 	if !ok || !strings.EqualFold(scheme, "Bearer") {
-		return false
+		return caller{}, needToken
 	}
 	got := sha256.Sum256([]byte(token))
-	return subtle.ConstantTimeCompare(got[:], h.digest[:]) == 1
+	// Both are always tried, so the time taken does not say which kind of token was near.
+	legacy := h.legacy && subtle.ConstantTimeCompare(got[:], h.digest[:]) == 1
+	var named tokens.Token
+	result := tokens.Unknown
+	if h.tokens != nil {
+		named, result = h.tokens.Authenticate(token)
+	}
+	switch {
+	case legacy:
+		return caller{source: "trigger"}, ""
+	case result == tokens.Valid:
+		return caller{source: "trigger:" + named.Name, scopes: named.Scopes}, ""
+	case result == tokens.Expired:
+		return caller{}, tokenExpired
+	}
+	return caller{}, needToken
 }
 
 // flowRoute extracts <flow> from /flows/<flow>/run. A flow path may hold
@@ -148,14 +195,24 @@ type body struct {
 	Seed          uint64         `json:"seed"`
 }
 
-func (h *handler) start(w http.ResponseWriter, r *http.Request, flow string) {
+func (h *handler) start(w http.ResponseWriter, r *http.Request, flow string, who caller) {
 	if flow == "" {
 		writeError(w, http.StatusNotFound, "no flow named in the path")
+		return
+	}
+	if !who.scopes.AllowsFlow(flow) {
+		h.log.Warn("trigger call out of scope", "Event", "TriggerOutOfScope", "Token", who.source, "Flow", flow, "Remote", r.RemoteAddr)
+		writeError(w, http.StatusForbidden, "this token may not start that flow")
 		return
 	}
 	b, err := readBody(w, r)
 	if err != nil {
 		writeBodyError(w, err)
+		return
+	}
+	if !who.scopes.AllowsEnv(b.Env) {
+		h.log.Warn("trigger call out of scope", "Event", "TriggerOutOfScope", "Token", who.source, "Flow", flow, "Env", b.Env, "Remote", r.RemoteAddr)
+		writeError(w, http.StatusForbidden, "this token may only use the environments: "+strings.Join(who.scopes.Envs, ", ")+"; name one in env")
 		return
 	}
 	wait, err := parseWait(r.URL.Query().Get("wait"), h.maxWait)
@@ -165,13 +222,13 @@ func (h *handler) start(w http.ResponseWriter, r *http.Request, flow string) {
 	}
 	rec, err := h.runs.Start(runs.Request{
 		Flow: flow, Collection: r.URL.Query().Get("collection"), Env: b.Env, PreferVersion: b.PreferVersion,
-		Inputs: stringInputs(b.Inputs), Seed: b.Seed, Source: "trigger",
+		Inputs: stringInputs(b.Inputs), Seed: b.Seed, Source: who.source,
 	})
 	if err != nil {
 		h.refuse(w, flow, err)
 		return
 	}
-	h.log.Info("trigger accepted", "Event", "TriggerAccepted", "RunID", rec.ID, "Flow", flow, "Remote", r.RemoteAddr)
+	h.log.Info("trigger accepted", "Event", "TriggerAccepted", "RunID", rec.ID, "Flow", flow, "Token", who.source, "Remote", r.RemoteAddr)
 	w.Header().Set("Location", "/runs/"+rec.ID)
 	if wait > 0 {
 		ctx, cancel := contextWithWait(r, wait)
@@ -187,10 +244,13 @@ func (h *handler) start(w http.ResponseWriter, r *http.Request, flow string) {
 // reportLookup bounds asking other instances about a run.
 const reportLookup = 3 * time.Second
 
-func (h *handler) report(w http.ResponseWriter, id string) {
+func (h *handler) report(w http.ResponseWriter, id string, who caller) {
 	ctx, cancel := context.WithTimeout(context.Background(), reportLookup)
 	defer cancel()
 	rec, ok := h.runs.Find(ctx, id)
+	if ok && !who.own(rec.Source) {
+		ok = false // a limited token learns nothing of the runs of others
+	}
 	if !ok {
 		writeError(w, http.StatusNotFound, "no such run (it may be too old to remember)")
 		return

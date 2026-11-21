@@ -25,6 +25,17 @@ export function Close(node) {
 }
 
 /**
+ * Compare lays the variables of all the workspace's environments side by side. A secret shows only whether it holds
+ * a value, never the value.
+ * @returns {$CancellablePromise<$models.EnvCompareView>}
+ */
+export function Compare() {
+    return $Call.ByID(1138852001).then(/** @type {($result: any) => any} */(($result) => {
+        return $$createType0($result);
+    }));
+}
+
+/**
  * DeclineDrop gives up a save that would drop comments.
  * @param {string} node
  * @returns {$CancellablePromise<void>}
@@ -41,7 +52,7 @@ export function DeclineDrop(node) {
  */
 export function Open(node) {
     return $Call.ByID(1934938562, node).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType0($result);
+        return $$createType1($result);
     }));
 }
 
@@ -93,6 +104,16 @@ export function SetExtends(node, base) {
 }
 
 /**
+ * SetProtected turns on or off the confirmation before a request that changes data is sent with this environment.
+ * @param {string} node
+ * @param {boolean} on
+ * @returns {$CancellablePromise<void>}
+ */
+export function SetProtected(node, on) {
+    return $Call.ByID(1303579984, node, on);
+}
+
+/**
  * SetRows replaces the variables.
  * @param {string} node
  * @param {$models.EnvRow[]} rows
@@ -100,6 +121,34 @@ export function SetExtends(node, base) {
  */
 export function SetRows(node, rows) {
     return $Call.ByID(4174504431, node, rows);
+}
+
+/**
+ * Share writes the open environment into the collection's own environments folder, so it travels with the collection.
+ * Secrets go as declarations with no values. The environment must be saved: what is shared is the file's content, not
+ * the edits on the screen. A file already there is kept unless overwrite is set.
+ * 
+ * Before: environments could be imported from a collection but never exported to one.
+ * @param {string} node
+ * @param {string} collection
+ * @param {boolean} overwrite
+ * @returns {$CancellablePromise<$models.EnvShareView>}
+ */
+export function Share(node, collection, overwrite) {
+    return $Call.ByID(1091050289, node, collection, overwrite).then(/** @type {($result: any) => any} */(($result) => {
+        return $$createType2($result);
+    }));
+}
+
+/**
+ * ShareTargets are the mounted collections an environment can be shared with: not the drafts, which have no folder to
+ * commit.
+ * @returns {$CancellablePromise<$models.Choice[]>}
+ */
+export function ShareTargets() {
+    return $Call.ByID(3262955797).then(/** @type {($result: any) => any} */(($result) => {
+        return $$createType4($result);
+    }));
 }
 
 /**
@@ -111,11 +160,15 @@ export function SetRows(node, rows) {
  */
 export function Unset(node) {
     return $Call.ByID(2264062559, node).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType2($result);
+        return $$createType6($result);
     }));
 }
 
 // Private type creation functions
-const $$createType0 = $models.EnvView.createFrom;
-const $$createType1 = $models.MissingVar.createFrom;
-const $$createType2 = $Create.Array($$createType1);
+const $$createType0 = $models.EnvCompareView.createFrom;
+const $$createType1 = $models.EnvView.createFrom;
+const $$createType2 = $models.EnvShareView.createFrom;
+const $$createType3 = $models.Choice.createFrom;
+const $$createType4 = $Create.Array($$createType3);
+const $$createType5 = $models.MissingVar.createFrom;
+const $$createType6 = $Create.Array($$createType5);

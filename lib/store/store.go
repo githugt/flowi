@@ -34,6 +34,8 @@ type Codec interface {
 	EncodeFolder(model.Folder) ([]byte, error)
 	EncodeEnvironment(model.Environment) ([]byte, error)
 	EncodeRequest(model.Request) ([]byte, error)
+	EncodeEdit(model.Request) ([]byte, error)
+	DecodeEdit(file string, data []byte) (*model.RequestVersion, string, string, diag.List)
 	EncodeFlow(model.Flow) ([]byte, error)
 	EncodeBlueprint(model.Blueprint) ([]byte, error)
 	EncodeAuth(model.NamedAuth) ([]byte, error)
@@ -49,12 +51,17 @@ type Store struct {
 	ids     *ids.Source       // ids for flows read from foreign Arazzo documents
 	mu      sync.Mutex        // guards sources
 	sources map[string][]byte // absolute path → bytes as last loaded
+	running string            // the release running, for a collection's min_version; "" reads everything
 }
 
 // New returns a store using codec.
 func New(c Codec) *Store {
 	return &Store{codec: c, ids: ids.NewSource(time.Now, rand.Reader), sources: map[string][]byte{}}
 }
+
+// SetRunning names the Flowi release that is running, so a collection that needs a newer one (min_version in its
+// flowi.yaml) is refused with a message that says so. A version that is not a release number ("dev") accepts all.
+func (s *Store) SetRunning(version string) { s.running = version }
 
 func (s *Store) remember(file string, data []byte) {
 	s.mu.Lock()

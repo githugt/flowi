@@ -4,6 +4,7 @@ package vm_test
 
 import (
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -60,6 +61,34 @@ func TestFlowRun_maps_events_to_this_flows_nodes(t *testing.T) {
 	}
 	if !b.Called("RunFlow") || r.Result().Status != engine.StatusFailed {
 		t.Fatalf("calls %v result %+v", b.Calls, r.Result())
+	}
+}
+
+// Before: events went out only when another one arrived 33 ms after the last flush, so a NodeStarted that came
+// straight after one waited until its step ended: a slow request never showed "running".
+func TestFlowRun_should_show_a_step_as_running_while_it_is_still_going(t *testing.T) {
+	r, b, w, _ := runFixture(t, nil)
+	hold := make(chan struct{})
+	b.NextRun = &vmtest.Running{EventList: []engine.Event{engine.NodeStarted{Path: "a", Node: "a"}}, Hold: hold}
+	var released atomic.Bool
+	showedWhileRunning := false
+	// The inline worker runs the whole run inside Run: the run ends when the timer releases it, so a status that
+	// arrives before that moment was shown while the step was still going.
+	timer := time.AfterFunc(300*time.Millisecond, func() { released.Store(true); close(hold) })
+	defer timer.Stop()
+	r.OnStatus(func(node, status string) {
+		if node == "a" && status == "running" && !released.Load() {
+			showedWhileRunning = true
+			timer.Stop()
+			close(hold)
+		}
+	})
+
+	r.Run("staging", nil)
+	w.Wait()
+
+	if !showedWhileRunning {
+		t.Fatal("the step did not show as running until its run ended")
 	}
 }
 
@@ -182,5 +211,27 @@ func TestEventLine_should_say_what_the_person_is_asked_to_do(t *testing.T) {
 
 	if !strings.Contains(device, "ABCD") || !strings.Contains(device, "https://idp.example/verify") || !strings.Contains(open, "sign in") {
 		t.Fatalf("device %q open %q", device, open)
+	}
+}
+
+// Before: a step kept only its summed duration, so the run could not be drawn on a timeline.
+func TestFlowRun_should_bracket_a_step_with_its_first_start_and_last_finish(t *testing.T) {
+	at := time.Date(2026, 1, 1, 12, 0, 0, 0, time.UTC)
+	events := []engine.Event{
+		engine.RunStarted{At: at},
+		engine.NodeStarted{Path: "users[0]/create", Node: "create", At: at.Add(10 * time.Millisecond)},
+		engine.NodeStarted{Path: "users[1]/create", Node: "create", At: at.Add(20 * time.Millisecond)},
+		engine.NodeFinished{Path: "users[1]/create", Node: "create", Status: engine.StatusPassed, Duration: 100 * time.Millisecond},
+		engine.NodeFinished{Path: "users[0]/create", Node: "create", Status: engine.StatusPassed, Duration: 30 * time.Millisecond},
+		engine.RunFinished{Status: engine.StatusPassed},
+	}
+	r, _, w, _ := runFixture(t, events)
+
+	r.Run("staging", nil)
+	w.Wait()
+
+	d, _ := r.Detail("create")
+	if !r.Began().Equal(at) || !d.Began.Equal(at.Add(10*time.Millisecond)) || !d.Ended.Equal(at.Add(120*time.Millisecond)) {
+		t.Fatalf("run began %v, step %v to %v", r.Began(), d.Began, d.Ended)
 	}
 }

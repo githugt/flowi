@@ -74,6 +74,19 @@ type ServeOptions struct {
 
 	NoReplay, NoTriggers, NoSchedules bool
 
+	// TLSCert and TLSKey are PEM files (a certificate chain and its private key) the trigger endpoint serves HTTPS
+	// with; both or neither. Without them it speaks plain HTTP, and the bearer token crosses the network in clear text.
+	TLSCert, TLSKey string
+	// InsecureListen allows the trigger endpoint on an address other machines can reach without TLS, for a proxy or a
+	// service mesh that terminates TLS in front of it. Without it (and without TLS) such an address is refused.
+	InsecureListen bool
+
+	// HealthAddr (host:port) is where /healthz, /readyz and, with Metrics, /metrics are served, for an orchestrator or
+	// a monitor; "" serves none. They need no token and say nothing about flows or secrets. Port 0 picks a free one.
+	HealthAddr string
+	// Metrics adds /metrics, in the Prometheus text format, to the health address. It needs HealthAddr.
+	Metrics bool
+
 	// ValkeyAddr (host:port) shares run records and schedule ticks with
 	// other instances through a Valkey or Redis server; "" uses
 	// serve.valkey_addr, and empty there means no sharing. The password is
@@ -163,6 +176,10 @@ func validateServe(o ServeOptions) error {
 		return fmt.Errorf("%w: the shutdown timeout cannot be negative", ErrInvalidServeOptions)
 	case o.ValkeyAddr != "" && !validHostPort(o.ValkeyAddr):
 		return fmt.Errorf("%w: the Valkey address needs the form host:port, got %q", ErrInvalidServeOptions, o.ValkeyAddr)
+	case o.Metrics && o.HealthAddr == "":
+		return fmt.Errorf("%w: metrics are served on the health address; give one", ErrInvalidServeOptions)
+	case o.HealthAddr != "" && !validHostPort(o.HealthAddr):
+		return fmt.Errorf("%w: the health address needs the form host:port, got %q", ErrInvalidServeOptions, o.HealthAddr)
 	case o.MaxRuns < 0 || o.TrafficLog < 0:
 		return fmt.Errorf("%w: run and traffic-log limits cannot be negative", ErrInvalidServeOptions)
 	}
@@ -171,12 +188,13 @@ func validateServe(o ServeOptions) error {
 
 // Server is a running `flowi serve`.
 type Server struct {
-	replayAddr, triggerAddr string
-	traffic                 *replay.Log
-	notes                   []string
-	sched                   *scheduler.Scheduler
-	done                    chan struct{}
-	err                     error // the shutdown result, set before done closes
+	replayAddr, triggerAddr, healthAddr string
+	traffic                             *replay.Log
+	notes                               []string
+	triggerTLS                          bool
+	sched                               *scheduler.Scheduler
+	done                                chan struct{}
+	err                                 error // the shutdown result, set before done closes
 }
 
 // ReplayAddr is where the replayer listens ("" when it is off).
@@ -184,6 +202,12 @@ func (s *Server) ReplayAddr() string { return s.replayAddr }
 
 // TriggerAddr is where HTTP triggers listen ("" when they are off).
 func (s *Server) TriggerAddr() string { return s.triggerAddr }
+
+// TriggerTLS says whether the trigger endpoint serves HTTPS.
+func (s *Server) TriggerTLS() bool { return s.triggerTLS }
+
+// HealthAddr is where the health endpoints listen ("" when they are off).
+func (s *Server) HealthAddr() string { return s.healthAddr }
 
 // Traffic is the replayer's log of calls.
 func (s *Server) Traffic() *replay.Log { return s.traffic }

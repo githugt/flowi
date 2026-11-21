@@ -183,11 +183,20 @@ type SpecUpdateView struct {
 	Changed []string `json:"changed"` // files it rewrites
 	Removed []string `json:"removed"` // files it removes
 	Notes   []string `json:"notes"`   // what did not carry over, and edits kept where the spec changed too
+	// Source is what the preview is of: "" for the kept copy, else the file or address of the newer spec. Update
+	// passes it back, and is refused if it is not what was previewed.
+	Source string `json:"source"`
+	// Checked says Breakages were worked out: a newer spec was read and compared with what the flows read. The
+	// kept copy changes nothing, so there is nothing to check.
+	Checked bool `json:"checked"`
+	// Breakages are the flows, hooks and checks the new spec would break (a removed request still in use among them).
+	Breakages []BreakageView `json:"breakages"`
 }
 
 // pendingSpecUpdate is the last previewed update, applied by ApplySpecUpdate.
 type pendingSpecUpdate struct {
 	collection, name string
+	source           string // what was previewed, as the person gave it
 	plan             flowi.ImportPlan
 }
 
@@ -218,12 +227,14 @@ func (s *ManagerService) KeptSpecs(collection string) ([]KeptSpecView, error) {
 
 // PreviewSpecUpdate previews importing the kept spec name again: from the
 // kept copy when source is "", else from a newer document at source (a
-// file or an http(s) URL), which then becomes the kept copy.
+// file or an http(s) URL), which then becomes the kept copy. For a newer
+// spec the preview also says what it would break in the collection's flows.
 func (s *ManagerService) PreviewSpecUpdate(collection, name, source string) (SpecUpdateView, error) {
 	if s.app.specs == nil {
 		return SpecUpdateView{}, errNoSpecs
 	}
-	data, err := readSource(strings.TrimSpace(source))
+	source = strings.TrimSpace(source)
+	data, err := readSource(source)
 	if err != nil {
 		return SpecUpdateView{}, err
 	}
@@ -231,23 +242,41 @@ func (s *ManagerService) PreviewSpecUpdate(collection, name, source string) (Spe
 	s.app.actor.Do(func() {
 		plan, err = s.app.specs.PreviewSpecUpdate(model.ID(collection), name, data)
 		if err == nil {
-			s.pending = &pendingSpecUpdate{collection: collection, name: name, plan: plan}
+			s.pending = &pendingSpecUpdate{collection: collection, name: name, source: source, plan: plan}
 		}
 	})
 	if err != nil {
 		return SpecUpdateView{}, fmt.Errorf("previewing the update: %w", err)
 	}
-	return specUpdateView(name, plan), nil
+	v := specUpdateView(name, plan)
+	v.Source = source
+	if len(data) > 0 {
+		// Before: "Spec change" (what breaks) and "Update from spec" (what files change) were two previews, so an
+		// update could be applied without seeing the breakages. The same document is checked here.
+		res, err := s.app.backend.ImpactAgainst(model.ID(collection), name, data)
+		if err != nil {
+			v.Notes = append(v.Notes, "Could not check what the update would break: "+vm.ErrorText(err))
+		} else {
+			v.Checked, v.Breakages = true, breakagesOf(res)
+		}
+	}
+	return v, nil
 }
 
 // ApplySpecUpdate applies the update last previewed for the spec, replacing
-// the files it rewrites (requests are merged with their edits).
-func (s *ManagerService) ApplySpecUpdate(collection, name string) error {
+// the files it rewrites (requests are merged with their edits). source is the
+// one the preview was of: an update never applies a different document than the
+// one the person looked at.
+func (s *ManagerService) ApplySpecUpdate(collection, name, source string) error {
 	var err error
 	s.app.actor.Do(func() {
 		p := s.pending
-		if p == nil || p.collection != collection || p.name != name {
+		switch {
+		case p == nil || p.collection != collection || p.name != name:
 			err = errors.New("preview the update first")
+			return
+		case p.source != strings.TrimSpace(source):
+			err = errors.New("the source is not the one previewed: preview the update again")
 			return
 		}
 		s.pending = nil
@@ -281,7 +310,7 @@ func readSource(source string) ([]byte, error) {
 }
 
 func specUpdateView(name string, plan flowi.ImportPlan) SpecUpdateView {
-	v := SpecUpdateView{Spec: name, Added: []string{}, Changed: []string{}, Removed: []string{}, Notes: []string{}}
+	v := SpecUpdateView{Spec: name, Added: []string{}, Changed: []string{}, Removed: []string{}, Notes: []string{}, Breakages: []BreakageView{}}
 	for _, f := range plan.Files {
 		switch {
 		case f.Same:

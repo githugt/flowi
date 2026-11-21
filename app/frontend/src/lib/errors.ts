@@ -22,3 +22,17 @@ export function reportUnhandled(reason: unknown, toast: (text: string, level: st
   const text = errorText(reason)
   toast(text || 'Something went wrong.', 'error')
 }
+
+/** What the window tells the log about a caught failure; cancellations are not failures. */
+export function frontendReport(kind: 'error' | 'rejection', reason: unknown): { kind: string; message: string; stack: string } | null {
+  if (isCancelled(reason)) return null
+  const stack = reason instanceof Error ? (reason.stack ?? '') : ''
+  return { kind, message: errorText(reason), stack }
+}
+
+export const REPORT_LIMIT = 20
+
+/** Whether another report may go to the log: a render that fails in a loop must not fill it. */
+export function mayReport(sent: number): boolean {
+  return sent < REPORT_LIMIT
+}

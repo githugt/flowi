@@ -34,3 +34,21 @@ describe('filterTraffic', () => {
     expect(filterTraffic(rows, '', true).map((r) => r.seq)).toEqual([2, 3])
   })
 })
+
+describe('filterTraffic by mode', () => {
+  const mk = (seq: number, status: number, match = 'example'): TrafficRow => ({ seq, at: '', method: 'GET', path: '/x', status, match, request: '', duration: '', remote: '', version: '', example: '', source: '', delay: '' })
+  const calls = [mk(1, 200), mk(2, 404), mk(3, 503), mk(4, 500, 'fault')]
+
+  it('keeps the 4xx, the 5xx or the injected faults', () => {
+    // Before: only All and Failed, so the calls the replayer broke on purpose were mixed with real ones.
+    expect(filterTraffic(calls, '', '4xx').map((r) => r.seq)).toEqual([2])
+    expect(filterTraffic(calls, '', '5xx').map((r) => r.seq)).toEqual([3, 4])
+    expect(filterTraffic(calls, '', 'faults').map((r) => r.seq)).toEqual([4])
+    expect(filterTraffic(calls, '', 'failed').map((r) => r.seq)).toEqual([2, 3, 4])
+    expect(filterTraffic(calls, '', 'all')).toBe(calls)
+  })
+
+  it('narrows by words inside a mode', () => {
+    expect(filterTraffic(calls, '503', '5xx').map((r) => r.seq)).toEqual([3])
+  })
+})

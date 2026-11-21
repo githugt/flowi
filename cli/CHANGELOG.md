@@ -12,7 +12,7 @@ by `git cliff` (see `cliff.toml`); `flowi changelog` prints it.
 - **run:** run flows with live progress, batches, parallel branches and reports
 - **serve:** replay saved responses as a fake API, run flows on HTTP calls and cron schedules
 - **schedule:** add, list and remove cron schedules for `flowi serve`
-- **import:** import Postman, Bruno, HAR and curl; export OpenAPI, Arazzo and Mermaid
+- **import:** import Postman, Bruno, HAR and curl; export Arazzo and Mermaid
 - **http:** HTTP/3 with `http.version: 3`
 - **otel:** export one OpenTelemetry trace per run when `otel.endpoint` is set
 - **telemetry:** opt-in usage reporting, off by default, with `flowi telemetry show`

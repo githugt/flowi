@@ -11,6 +11,8 @@ import (
 
 	"github.com/twmb/franz-go/pkg/kfake"
 	"github.com/twmb/franz-go/pkg/kgo"
+	"github.com/twmb/franz-go/pkg/kmsg"
+	"github.com/twmb/franz-go/pkg/sasl/plain"
 
 	"github.com/githugt/flowi/lib/transport"
 	"github.com/githugt/flowi/lib/transport/kafka"
@@ -220,5 +222,29 @@ func TestRun_should_accept_brokers_written_without_a_scheme(t *testing.T) {
 
 	if err != nil || res.Sent == nil {
 		t.Fatalf("err %v sent %+v", err, res.Sent)
+	}
+}
+
+func TestProbe_should_reach_the_broker_sign_in_and_create_no_topic(t *testing.T) {
+	// Before: a wrong address or password showed only after a full send, which could also create the topic.
+	server := cluster(t, kfake.EnableSASL(), kfake.Superuser("PLAIN", "u", "p"))
+	op := transport.Operation{Server: server, Channel: "new-topic", Send: &transport.Message{Body: []byte("x")},
+		Binding: map[string]string{"sasl.mechanism": "PLAIN", "username": "u", "password": "wrong"}}
+
+	wrong := transport.Probe(t.Context(), kafka.New(), op)
+	op.Binding["password"] = "p"
+	right := transport.Probe(t.Context(), kafka.New(), op)
+
+	if wrong == nil || right != nil {
+		t.Fatalf("wrong %v, right %v", wrong, right)
+	}
+	topics, err := client(t, server, kgo.SASL(plain.Auth{User: "u", Pass: "p"}.AsMechanism())).Request(t.Context(), kmsg.NewPtrMetadataRequest())
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, tp := range topics.(*kmsg.MetadataResponse).Topics {
+		if tp.Topic != nil && *tp.Topic == "new-topic" {
+			t.Fatal("the probe created a topic")
+		}
 	}
 }

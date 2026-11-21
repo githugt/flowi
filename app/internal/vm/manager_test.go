@@ -123,3 +123,28 @@ func TestManagerVM_open_arazzo_calls_the_backend_with_the_reference_and_reloads(
 		t.Fatalf("calls %v", b.Calls)
 	}
 }
+
+// Before: nothing in the app opened the bundled example.
+func TestManagerVM_open_example_calls_the_backend_and_tells_how_it_went(t *testing.T) {
+	m, b, w := newManager(t)
+	var got []error
+
+	m.OpenExampleThen(func(err error) { got = append(got, err) })
+	w.Wait()
+
+	if !b.Called("OpenExample") || len(got) != 1 || got[0] != nil {
+		t.Fatalf("calls %v done %v", b.Calls, got)
+	}
+}
+
+func TestManagerVM_allow_secret_host_calls_the_backend_with_the_host_and_tells_how_it_went(t *testing.T) {
+	m, b, w := newManager(t)
+	var got []error
+
+	m.AllowSecretHostThen("api.example.com", func(err error) { got = append(got, err) })
+	w.Wait()
+
+	if !b.Called("AllowSecretHost api.example.com") || len(got) != 1 || got[0] != nil {
+		t.Fatalf("calls %v done %v", b.Calls, got)
+	}
+}

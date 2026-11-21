@@ -7,19 +7,25 @@ import (
 	"fmt"
 	"maps"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/githugt/flowi/app/internal/vm"
+	flowi "github.com/githugt/flowi/lib"
+	"github.com/githugt/flowi/lib/model"
 )
 
 // RunView is how the last run of a flow went, as the canvas and the header show it.
 type RunView struct {
-	Running  bool              `json:"running"`
-	Error    string            `json:"error,omitempty"`
-	Summary  string            `json:"summary,omitempty"` // "passed · seed 7 · report file"
-	Statuses map[string]string `json:"statuses"`          // by step id
-	Results  map[string]string `json:"results"`           // by step id: "passed · 120ms"
+	Running bool   `json:"running"`
+	Error   string `json:"error,omitempty"`
+	Summary string `json:"summary,omitempty"` // "passed · seed 7 · report file"
+	// Seed is the last run's seed as text, so a copied `flowi run` command can repeat its generated values.
+	Seed     string            `json:"seed,omitempty"`
+	Statuses map[string]string `json:"statuses"` // by step id
+	Results  map[string]string `json:"results"`  // by step id: "passed · 120ms"
+	Timeline []TimelineBar     `json:"timeline"` // the steps on the run's clock, by start
 }
 
 // VarsView is what the flow does with variables and secrets.
@@ -30,6 +36,31 @@ type VarsView struct {
 	// Values are the variables as the last run ended, masked and shortened to one line each;
 	// empty before a run.
 	Values []VarValue `json:"values"`
+	// Uses says which steps write and read each variable, by name.
+	Uses []VarUse `json:"uses"`
+}
+
+// VarUse is the steps that write and read one variable, by step id.
+type VarUse struct {
+	Name    string   `json:"name"`
+	Writers []string `json:"writers"`
+	Readers []string `json:"readers"`
+}
+
+// varUsesOf lists the steps that write and read each variable, by name.
+func varUsesOf(f vm.FlowVars) []VarUse {
+	names := map[string]bool{}
+	for n := range f.Writers {
+		names[n] = true
+	}
+	for n := range f.Readers {
+		names[n] = true
+	}
+	out := []VarUse{}
+	for _, n := range slices.Sorted(maps.Keys(names)) {
+		out = append(out, VarUse{Name: n, Writers: nonNil(f.Writers[n]), Readers: nonNil(f.Readers[n])})
+	}
+	return out
 }
 
 // VarValue is one variable and what it held when the run ended.
@@ -100,6 +131,8 @@ type NodeData struct {
 	Kind     string        `json:"kind"`
 	Size     string        `json:"size,omitempty"` // how big the response (or the messages) were
 	Messages []StepMessage `json:"messages"`
+	// Table holds the rows of a dataset step, so the Output tab shows a table as the request's response pane does.
+	Table *TableView `json:"table,omitempty"`
 }
 
 // StepMessage is one message of a message request in a step, with the way it went.
@@ -107,6 +140,12 @@ type StepMessage struct {
 	Direction string `json:"direction"` // sent or received
 	Text      string `json:"text"`
 	Lang      string `json:"lang,omitempty"`
+	// The fields below are what the message feed shows, the same as a request's own messages.
+	At   string `json:"at"`
+	Body string `json:"body"`
+	Key  string `json:"key,omitempty"`
+	Kind string `json:"kind,omitempty"`
+	Type string `json:"type,omitempty"`
 }
 
 // HistoryRow is a saved run in the Runs tab.
@@ -136,6 +175,10 @@ type FlowRunEvent struct {
 type HistoryEvent struct {
 	Node string       `json:"node"`
 	Runs []HistoryRow `json:"runs"`
+	// Trend is the latest runs as one line ("✓✓✗✓ · flaky · median 1.2 s"), and SlowNote names a step that ran much
+	// longer than usual in the latest run; both are "" when there is nothing to say.
+	Trend    string `json:"trend"`
+	SlowNote string `json:"slowNote"`
 }
 
 // Run runs the saved flow in the selected environment. inputs override the
@@ -145,6 +188,37 @@ func (s *FlowService) Run(node string, inputs map[string]string) {
 		o.run.Run(s.app.workspace.SelectedEnv(), inputs)
 		return nil
 	})
+}
+
+// Preflight says what a run now would need that the selected environment does not have: one plain line each, none
+// when the run is ready or no environment is selected. It reads the files, so it runs off the actor.
+func (s *FlowService) Preflight(node string) ([]string, error) {
+	var target flowi.FlowTarget
+	var draft model.Flow
+	if err := s.edit(node, func(o *openFlow) error { target, draft = o.doc.Target(), o.doc.Draft(); return nil }); err != nil {
+		return nil, err
+	}
+	env := s.app.workspace.SelectedEnv()
+	needs, err := s.app.backend.PreflightFlow(target, env, &draft)
+	if err != nil {
+		return nil, err
+	}
+	return append([]string{}, vm.PreflightLines(env, needs)...), nil
+}
+
+// Writes says which steps of the flow change data, one plain line each, none when it only reads. The window asks
+// before a run in a protected environment, and shows these lines in the question.
+func (s *FlowService) Writes(node string) ([]string, error) {
+	var target flowi.FlowTarget
+	var draft model.Flow
+	if err := s.edit(node, func(o *openFlow) error { target, draft = o.doc.Target(), o.doc.Draft(); return nil }); err != nil {
+		return nil, err
+	}
+	writes, err := s.app.backend.FlowWrites(target, &draft)
+	if err != nil {
+		return nil, err
+	}
+	return append([]string{}, vm.WriteLines(writes)...), nil
 }
 
 // RunPart runs part of the flow around the selected step: scope is only,
@@ -195,7 +269,7 @@ func (s *FlowService) NodeData(node, step, format string) (NodeData, error) {
 			Step: step, Status: d.Status, Instances: d.Instances, Duration: d.Duration.Round(time.Millisecond).String(),
 			Input: partsOf(vm.InputParts(n, d)), Output: partsOf(vm.OutputParts(n, d, f)),
 			Tests: testsOf(vm.TestRows(n, d)), Diags: append([]string{}, d.Diags...),
-			Kind: dataKind(d), Size: vm.RecordSize(d), Messages: stepMessagesOf(vm.MessageRows(d)),
+			Kind: dataKind(d), Size: vm.RecordSize(d), Messages: stepMessagesOf(vm.MessageRows(d), d), Table: stepTable(d),
 		}
 		return nil
 	})
@@ -277,26 +351,57 @@ func runComparisonViewOf(c vm.RunComparison) RunComparisonView {
 // runViewOf builds the RunView; call it on the actor.
 func runViewOf(o *openFlow) RunView {
 	v := RunView{Running: o.run.Running(), Error: o.run.Err(), Statuses: map[string]string{}, Results: map[string]string{}}
+	v.Timeline = timelineOf(o.doc.NodeIDs(), o.run.Detail, o.run.Began(), time.Now())
 	for _, id := range o.doc.NodeIDs() {
 		d, ok := o.run.Detail(id)
 		if !ok || d.Status == "" {
 			continue
 		}
 		v.Statuses[id] = d.Status
-		v.Results[id] = d.Status
-		if d.Duration > 0 {
-			v.Results[id] += " · " + d.Duration.Round(time.Millisecond).String()
-		}
+		v.Results[id] = resultLine(d)
 	}
 	if r := o.run.Result(); r.RunID != "" && v.Error == "" && !v.Running {
-		v.Summary = fmt.Sprintf("%s · seed %d", r.Status, r.Seed)
+		v.Summary = runSummary(string(r.Status), r.Seed, v.Statuses)
+		if r.Seed != 0 {
+			v.Seed = strconv.FormatUint(r.Seed, 10)
+		}
 	}
 	return v
 }
 
+// runSummary is the line after a run: how it ended, how many steps passed, failed or were left out, and the seed.
+// Before: only "passed · seed 7", so a failed run did not say how much of it had failed.
+func runSummary(status string, seed uint64, steps map[string]string) string {
+	var passed, failed, left int
+	for _, st := range steps {
+		switch st {
+		case "passed":
+			passed++
+		case "failed", "error", "aborted":
+			failed++
+		case "skipped", "cancelled":
+			left++
+		}
+	}
+	var counts []string
+	if passed > 0 {
+		counts = append(counts, fmt.Sprintf("%d passed", passed))
+	}
+	if failed > 0 {
+		counts = append(counts, fmt.Sprintf("%d failed", failed))
+	}
+	if left > 0 {
+		counts = append(counts, fmt.Sprintf("%d not run", left))
+	}
+	if len(counts) == 0 {
+		return fmt.Sprintf("%s · seed %d", status, seed)
+	}
+	return fmt.Sprintf("%s · %s · seed %d", status, strings.Join(counts, ", "), seed)
+}
+
 func varsOf(o *openFlow) VarsView {
 	f := vm.ScanFlow(o.doc.Draft())
-	return VarsView{Set: nonNil(f.Set), Secrets: nonNil(f.Secrets), Unset: nonNil(f.Unset), Values: varValuesOf(o.run.Vars())}
+	return VarsView{Set: nonNil(f.Set), Secrets: nonNil(f.Secrets), Unset: nonNil(f.Unset), Values: varValuesOf(o.run.Vars()), Uses: varUsesOf(f)}
 }
 
 func nonNil(s []string) []string {
@@ -350,10 +455,30 @@ func dataKind(d vm.NodeDetail) string {
 	return "step"
 }
 
-func stepMessagesOf(rows []vm.MessageRow) []StepMessage {
+// stepMessagesOf joins each message row to the feed fields of the same message in the record, so the output dock
+// shows the same feed as the request's response pane. Before, the dock listed bare text with no time, type or search.
+func stepMessagesOf(rows []vm.MessageRow, d vm.NodeDetail) []StepMessage {
+	var feed []MessageView
+	if d.Record != nil {
+		feed = messagesOf(d.Record.Messages)
+	}
 	out := make([]StepMessage, 0, len(rows))
-	for _, r := range rows {
-		out = append(out, StepMessage{Direction: r.Direction, Text: r.Text, Lang: r.Lang})
+	for i, r := range rows {
+		m := StepMessage{Direction: r.Direction, Text: r.Text, Lang: r.Lang, Body: r.Text}
+		if i < len(feed) {
+			f := feed[i]
+			m.At, m.Body, m.Key, m.Kind, m.Type = f.At, f.Body, f.Key, f.Kind, f.Type
+		}
+		out = append(out, m)
 	}
 	return out
+}
+
+// stepTable is the dataset table of a step's record; nil for any other step.
+// Before: a dataset step's rows showed in the dock as a block of JSON.
+func stepTable(d vm.NodeDetail) *TableView {
+	if d.Record == nil {
+		return nil
+	}
+	return tableOf(d.Record)
 }

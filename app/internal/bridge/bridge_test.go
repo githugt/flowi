@@ -3,6 +3,7 @@
 package bridge_test
 
 import (
+	"encoding/base64"
 	"fmt"
 	"log/slog"
 	"maps"
@@ -191,6 +192,28 @@ func TestFlowService_AddStep_should_append_and_select_when_not_placed(t *testing
 	}
 }
 
+// Before: the popup could not add a note, so a flow could be annotated only by editing its file.
+func TestFlowService_AddStep_Given_a_note_Then_its_text_can_be_written_and_the_card_shows_it(t *testing.T) {
+	flows, v, pub := openSignup(t)
+
+	id := flows.AddStep(v.Node, "note", 0, 0, 0, false)
+	flows.SetParam(v.Node, "text", "Sign-up needs the staging mail catcher")
+	got := lastView(pub)
+
+	var text string
+	for _, p := range got.Form.Step.Params {
+		if p.Name == "text" {
+			text = p.Value
+		}
+	}
+	if got.Selected != id || got.Form.Step.Type != "note" || text != "Sign-up needs the staging mail catcher" {
+		t.Fatalf("selected %q, type %q, params %+v", got.Selected, got.Form.Step.Type, got.Form.Step.Params)
+	}
+	if c := got.Cards[id]; c.Face.Badge != "NOTE" || c.Face.Subline != text {
+		t.Fatalf("card %+v", c.Face)
+	}
+}
+
 // Behaviour change: a step added from the palette used to go to the end of the
 // flow even with another step selected; it goes after the selected one.
 func TestFlowService_AddStep_should_go_after_the_selected_step(t *testing.T) {
@@ -273,7 +296,7 @@ func TestFlowService_Run_should_publish_statuses_and_summary(t *testing.T) {
 	flows.Run(v.Node, nil)
 	ev := pub.last["flowrun"].(bridge.FlowRunEvent)
 
-	if ev.Run.Running || ev.Run.Statuses["a"] != "passed" || ev.Run.Results["a"] != "passed · 5ms" || ev.Run.Summary != "passed · seed 7" {
+	if ev.Run.Running || ev.Run.Statuses["a"] != "passed" || ev.Run.Results["a"] != "passed · 5ms" || ev.Run.Summary != "passed · 1 passed · seed 7" {
 		t.Fatalf("run %+v", ev.Run)
 	}
 }
@@ -454,10 +477,11 @@ func TestWorkspaceService_Menu_should_offer_what_applies_to_the_row(t *testing.T
 	// Rename used to ask for the whole path ("auth/login") under the title
 	// "Rename / move", yet could not move to another collection. It now asks
 	// for the name, and Move to… does the moving.
+	// Delete asks nothing: the request goes to the trash and a toast offers Undo.
 	if strings.Join(actions, ",") != "open,duplicate,rename,move,delete" {
 		t.Fatalf("menu %v", actions)
 	}
-	if menu[2].Prompt == nil || menu[2].Prompt.Initial != "login" || menu[3].Dialog != "move" || menu[4].Confirm == "" {
+	if menu[2].Prompt == nil || menu[2].Prompt.Initial != "login" || menu[3].Dialog != "move" || menu[4].Confirm != "" {
 		t.Fatalf("prompt %+v, move %+v, confirm %q", menu[2].Prompt, menu[3], menu[4].Confirm)
 	}
 }
@@ -764,7 +788,7 @@ func TestRequestService_Snippet_should_follow_edits_and_formats(t *testing.T) {
 	reqs.SetSnippetFormat(v.Node, "wget")
 	got := pub.last["request"].(bridge.RequestView)
 
-	if got.Snippet.Format != "wget" || len(got.Snippet.Formats) != 4 {
+	if got.Snippet.Format != "wget" || len(got.Snippet.Formats) != 7 {
 		t.Fatalf("snippet %+v", got.Snippet)
 	}
 }
@@ -928,9 +952,15 @@ func TestWelcomeService_should_show_the_latest_changes_and_the_telemetry_choice(
 
 func openTwoUnits(t *testing.T) (*bridge.FlowService, bridge.FlowView, *published) {
 	t.Helper()
+	return openPair(t, nil)
+}
+
+// openPair is openTwoUnits with login waiting for loginNeeds (a file written by hand may make it wait for a later step).
+func openPair(t *testing.T, loginNeeds []string) (*bridge.FlowService, bridge.FlowView, *published) {
+	t.Helper()
 	c := vmtest.SampleCollection()
 	c.Flows = []model.Flow{{Meta: model.Meta{ID: "F1", Name: "Pair"}, Path: "pair", File: "/c/flows/pair.arazzo.yaml", Nodes: []model.Node{
-		{ID: "login", Type: "request", Request: &model.RequestCall{Request: model.Ref{ID: "R1", Path: "auth/login"}}},
+		{ID: "login", Type: "request", Needs: loginNeeds, Request: &model.RequestCall{Request: model.Ref{ID: "R1", Path: "auth/login"}}},
 		{ID: "wait", Type: "delay", Params: []model.Field{{Key: "duration", Value: "1s"}}},
 		{ID: "verify", Type: "request", Request: &model.RequestCall{Request: model.Ref{ID: "R2", Path: "auth/verify"}}},
 	}}}
@@ -948,24 +978,60 @@ func openTwoUnits(t *testing.T) (*bridge.FlowService, bridge.FlowView, *publishe
 func TestFlowService_Connect_should_make_a_step_wait_for_another(t *testing.T) {
 	flows, v, pub := openTwoUnits(t)
 
-	flows.Connect(v.Node, "verify", "login") // login now waits for verify: a step after it
+	if err := flows.Connect(v.Node, "login", "verify"); err != nil { // verify waits for login as well as for wait
+		t.Fatal(err)
+	}
+	flows.Select(v.Node, "verify")
+	got := pub.last["flow"].(bridge.FlowView)
+
+	if got.Form.Step == nil || len(got.Form.Step.Needs) != 2 || got.Form.Step.Needs[1] != "login" {
+		t.Fatalf("needs %+v", got.Form.Step)
+	}
+}
+
+// Before: dragging a link from a later step to an earlier one was saved, and the layout could not draw it.
+func TestFlowService_Connect_Given_a_step_after_the_target_Then_refuses_with_the_reason_and_changes_nothing(t *testing.T) {
+	flows, v, pub := openTwoUnits(t)
+
+	err := flows.Connect(v.Node, "verify", "login")
 	flows.Select(v.Node, "login")
 	got := pub.last["flow"].(bridge.FlowView)
 
-	if got.Form.Step == nil || len(got.Form.Step.Needs) != 1 || got.Form.Step.Needs[0] != "verify" {
-		t.Fatalf("needs %+v", got.Form.Step)
+	if err == nil || !strings.Contains(err.Error(), "verify comes after login") || len(got.Form.Step.Needs) != 0 {
+		t.Fatalf("err %v needs %v", err, got.Form.Step.Needs)
 	}
+}
+
+// A file written by hand may make a step wait for a later one: it is flagged, and Repair takes the need away.
+func TestFlowService_RepairNeeds_Given_a_need_on_a_later_step_Then_the_chip_goes(t *testing.T) {
+	flows, v, pub := openPair(t, []string{"verify"})
+
+	flows.Select(v.Node, "login")
+	got := pub.last["flow"].(bridge.FlowView)
 	var kinds []string
 	for _, c := range got.Chips {
 		kinds = append(kinds, c.Kind)
 	}
-	if strings.Join(kinds, ",") != "needs,unsaved" {
+	if strings.Join(kinds, ",") != "needs" {
 		t.Fatalf("chips %v", kinds)
 	}
 
 	flows.RepairNeeds(v.Node)
 	if after := pub.last["flow"].(bridge.FlowView); len(after.Chips) != 1 || after.Chips[0].Kind != "unsaved" {
 		t.Fatalf("after repair %+v", after.Chips)
+	}
+}
+
+func TestFlowService_WireTargets_Should_say_which_steps_a_wire_may_end_on(t *testing.T) {
+	flows, v, _ := openTwoUnits(t)
+
+	targets := map[string]bridge.WireTargetView{}
+	for _, tg := range flows.WireTargets(v.Node, "wait", "wait") {
+		targets[tg.ID] = tg
+	}
+
+	if !targets["verify"].OK || targets["login"].OK || !strings.Contains(targets["login"].Reason, "wait comes after login") || targets["wait"].OK {
+		t.Fatalf("targets %+v", targets)
 	}
 }
 
@@ -1002,6 +1068,80 @@ func TestRequestService_should_send_the_json_body_and_pin_and_extract(t *testing
 	}
 }
 
+// Before: sharing a request with its response took three manual, unmasked copies.
+func TestRequestService_BugReport_should_write_the_last_send_as_markdown_and_say_what_it_masked(t *testing.T) {
+	reqs, v, _, _ := openLogin(t)
+	_, before := reqs.BugReport(v.Node)
+	reqs.Send(v.Node, "")
+
+	got, err := reqs.BugReport(v.Node)
+
+	if before == nil {
+		t.Error("a report before any send did not say to send first")
+	}
+	if err != nil || !strings.HasPrefix(got.Text, "### ") || !strings.Contains(got.Text, "**cURL**") || got.Masked == nil {
+		t.Fatalf("err %v masked %v text:\n%s", err, got.Masked, got.Text)
+	}
+}
+
+// Before: the pane could not say how a response differed from the one before it.
+func TestRequestService_ComparePrevious_should_list_what_changed_since_the_earlier_send(t *testing.T) {
+	reqs, v, _, b := openLogin(t)
+	_, none := reqs.ComparePrevious(v.Node)
+	reqs.Send(v.Node, "")
+	_, onlyOne := reqs.ComparePrevious(v.Node)
+	b.NextSend = &vmtest.Sending{Result: engine.SendResult{Status: engine.StatusFailed, Seed: 8,
+		Record: &engine.Record{Status: 404, Version: "1", RequestPath: "auth/login", Body: engine.Body{JSON: map[string]any{"ok": false}}}}}
+	reqs.Send(v.Node, "")
+
+	got, err := reqs.ComparePrevious(v.Node)
+
+	if none == nil || onlyOne == nil || !strings.Contains(onlyOne.Error(), "no earlier response") {
+		t.Errorf("before a second send: %v, %v", none, onlyOne)
+	}
+	if err != nil || got.Same || got.OldStatus != 200 || got.NewStatus != 404 || got.BodyMode != "json" || len(got.Body) != 1 || got.Body[0].Path != "$.ok" || got.Body[0].Old != "true" || got.Body[0].New != "false" {
+		t.Fatalf("err %v diff %+v", err, got)
+	}
+}
+
+func countCalls(b *vmtest.Backend, call string) int {
+	b.Mu.Lock()
+	defer b.Mu.Unlock()
+	n := 0
+	for _, c := range b.Calls {
+		if c == call {
+			n++
+		}
+	}
+	return n
+}
+
+// Before: a check being written could only be tried by sending again, which made another record for a POST.
+func TestRequestService_EvalChecks_should_judge_checks_on_the_shown_response_without_sending(t *testing.T) {
+	reqs, v, _, b := openLogin(t)
+	reqs.Send(v.Node, "")
+	sent := countCalls(b, "Send")
+
+	got := reqs.EvalChecks(v.Node, []string{"status == 200", "response.body.ok == false", "vars.token != empty"})
+
+	if len(got.Checks) != 3 || got.At == "" || got.Checks[0].Verdict != "passed" || got.Checks[1].Verdict != "failed" || got.Checks[2].Verdict != "unknown" {
+		t.Fatalf("%+v", got)
+	}
+	if countCalls(b, "Send") != sent {
+		t.Fatalf("a check was tried by sending: %v", b.Calls)
+	}
+}
+
+func TestRequestService_EvalChecks_Given_no_response_yet_Then_there_is_nothing_to_judge(t *testing.T) {
+	reqs, v, _, _ := openLogin(t)
+
+	got := reqs.EvalChecks(v.Node, []string{"status == 200"})
+
+	if got.At != "" || got.Checks == nil || len(got.Checks) != 0 {
+		t.Fatalf("%+v", got)
+	}
+}
+
 func TestRequestService_URLSpans_and_Suggest_should_know_the_environment(t *testing.T) {
 	reqs, v, _, _ := openLogin(t)
 
@@ -1018,6 +1158,21 @@ func TestRequestService_URLSpans_and_Suggest_should_know_the_environment(t *test
 	}
 	if len(got.Items) == 0 || !strings.HasPrefix(got.Items[0].Insert, "env.") || got.From != len("https://x.test/{{") {
 		t.Fatalf("suggestions %+v", got)
+	}
+}
+
+func TestRequestService_TemplateSpans_should_colour_variables_and_not_read_text_as_a_url(t *testing.T) {
+	reqs, v, _, _ := openLogin(t)
+
+	// Before: header and query values had no template colour; URLSpans on them would have coloured "Bearer" as a scheme or host.
+	spans := reqs.TemplateSpans(v.Node, "Bearer {{env.nope}}")
+
+	var parts []string
+	for _, s := range spans {
+		parts = append(parts, s.Part)
+	}
+	if got := strings.Join(parts, ","); got != "text,unknown-variable" {
+		t.Fatalf("parts %v, want text then unknown-variable", parts)
 	}
 }
 
@@ -2001,6 +2156,52 @@ func TestFlowService_NodeData_Given_a_message_request_Then_messages_are_listed_w
 	}
 }
 
+func TestFlowService_NodeData_Given_messages_Then_each_has_the_feed_fields_of_the_response_pane(t *testing.T) {
+	// Before: the output dock listed bare text with a direction, so a step's messages had no time, type or key and
+	// no search, while the same messages in the request's response pane did.
+	at := time.Date(2026, 1, 2, 3, 4, 5, 0, time.Local)
+	rec := engine.Record{Kind: engine.KindAsync, Outcome: "received", Messages: []engine.RecordMessage{
+		{Direction: "received", At: at, Key: "k1", Type: "update", Body: engine.Body{Text: `{"a":1}`, JSON: map[string]any{"a": float64(1)}, ContentType: "application/json"}},
+		{Direction: "received", At: at, Body: engine.Body{Base64: "AAEC", Size: 3, ContentType: "application/octet-stream"}},
+	}}
+	flows, v, _ := openRunnable(t, []engine.Event{
+		engine.RecordCaptured{Path: "a", Node: "a", Record: rec},
+		engine.NodeFinished{Path: "a", Node: "a", Status: engine.StatusPassed},
+	})
+	flows.Run(v.Node, nil)
+
+	got, err := flows.NodeData(v.Node, "a", "json")
+
+	if err != nil || len(got.Messages) != 2 {
+		t.Fatalf("data %+v, err %v", got, err)
+	}
+	m := got.Messages[0]
+	if m.At != "03:04:05" || m.Key != "k1" || m.Type != "update" || m.Kind != "json" || !strings.Contains(m.Body, `"a"`) {
+		t.Fatalf("first %+v", m)
+	}
+	if b := got.Messages[1]; b.Kind != "binary" || !strings.Contains(b.Body, "3 bytes") {
+		t.Fatalf("second %+v", b)
+	}
+}
+
+func TestFlowService_NodeData_Given_a_dataset_step_Then_the_rows_come_as_a_table(t *testing.T) {
+	// Before: a dataset step's rows showed in the output dock as a block of JSON, with no table.
+	rec := engine.Record{Kind: engine.KindDataset, Outcome: engine.OutcomeOK, Body: engine.Body{JSON: map[string]any{
+		"columns": []any{"id", "name"}, "rows": []any{map[string]any{"id": 1, "name": "Ada"}}, "row_count": 1,
+	}}}
+	flows, v, _ := openRunnable(t, []engine.Event{
+		engine.RecordCaptured{Path: "a", Node: "a", Record: rec},
+		engine.NodeFinished{Path: "a", Node: "a", Status: engine.StatusPassed},
+	})
+	flows.Run(v.Node, nil)
+
+	got, err := flows.NodeData(v.Node, "a", "json")
+
+	if err != nil || got.Table == nil || len(got.Table.Columns) != 2 || got.Table.Rows[0][1] != "Ada" || got.Table.RowCount != 1 {
+		t.Fatalf("table %+v, err %v", got.Table, err)
+	}
+}
+
 func TestFlowService_NodeData_Given_an_http_request_Then_the_kind_is_request_and_the_size_is_the_response_body(t *testing.T) {
 	rec := engine.Record{Status: 200, Body: engine.Body{Text: "{}", Size: 2048}}
 	flows, v, _ := openRunnable(t, []engine.Event{
@@ -2300,5 +2501,284 @@ func TestRequestService_Send_should_say_which_checks_the_response_judged(t *test
 
 	if got.Response == nil || len(got.Response.Checks) != 1 || got.Response.Checks[0] != "status == 200" {
 		t.Fatalf("checks judged %+v", got.Response)
+	}
+}
+
+// Before: the window had no way to say what status a request expects, so a negative test needed its hook edited.
+func TestRequestService_SetExpect_should_save_a_status_and_refuse_text_that_is_not_one(t *testing.T) {
+	reqs, v, pub, _ := openLogin(t)
+
+	bad := reqs.SetExpect(v.Node, "unauthorized")
+	afterBad := pub.last["request"]
+	ok := reqs.SetExpect(v.Node, " 4xx ")
+	got := pub.last["request"].(bridge.RequestView)
+
+	if bad == "" || ok != "" {
+		t.Fatalf("bad %q, ok %q", bad, ok)
+	}
+	if got.Current.Expect != "4xx" {
+		t.Fatalf("expect %q (after the refused text: %v)", got.Current.Expect, afterBad != nil)
+	}
+	reqs.SetExpect(v.Node, "")
+	if again := pub.last["request"].(bridge.RequestView); again.Current.Expect != "" {
+		t.Fatalf("not cleared: %q", again.Current.Expect)
+	}
+}
+
+// Before: the Extract tab never said whether a path matched; the user found out in a later step. The response says
+// what each extraction the send tried took, and an extraction added afterwards is not yet listed.
+func TestRequestService_Send_should_say_what_each_extraction_took_or_that_it_matched_nothing(t *testing.T) {
+	reqs, v, pub, b := openLogin(t)
+	b.NextSend.Result.Record.Outputs = map[string]any{"token": "abc"}
+	reqs.SetExtract(v.Node, []model.Extraction{{Name: "token", From: "body", Path: "$.token"}, {Name: "id", From: "body", Path: "$.id"}})
+
+	reqs.Send(v.Node, "")
+	reqs.SetExtract(v.Node, []model.Extraction{{Name: "token", From: "body", Path: "$.token"}, {Name: "id", From: "body", Path: "$.id"}, {Name: "later", From: "status"}})
+	got := pub.last["request"].(bridge.RequestView)
+
+	want := []bridge.ExtractedView{{Name: "token", Value: "abc", Found: true}, {Name: "id"}}
+	if got.Response == nil || !slices.Equal(got.Response.Extracted, want) {
+		t.Fatalf("extracted %+v", got.Response)
+	}
+}
+
+func TestWorkspaceService_ImportEnvironments_should_keep_colour_base_and_kinds(t *testing.T) {
+	// Before: only names, values and the secret flag were copied: a shipped prod lost its colour, its base and its numbers.
+	c := vmtest.SampleCollection()
+	shipped := []model.Environment{
+		// The child is listed first: it must still be written after its base.
+		{Meta: model.Meta{Name: "prod"}, Colour: "red", Extends: "base", Vars: []model.EnvVar{{Name: "retries", Value: "3", Kind: model.VarNumber}}},
+		{Meta: model.Meta{Name: "base"}, Vars: []model.EnvVar{{Name: "host", Value: "h"}}},
+		{Meta: model.Meta{Name: "orphan"}, Extends: "missing"},
+	}
+	b := &vmtest.Backend{Cols: []model.Collection{c}, CollEnvs: map[model.ID][]model.Environment{"C1": shipped}}
+	app := bridge.NewApp(b, bridge.NewInlineActor(), (&published{}).emit)
+	app.Start(t.Context())
+
+	added, err := app.Workspace().ImportEnvironments("C1")
+
+	if err != nil || !slices.Equal(added, []string{"base", "orphan", "prod"}) {
+		t.Fatalf("added %v, err %v", added, err)
+	}
+	got := map[string]model.Environment{}
+	for _, e := range b.SavedEnvs {
+		got[e.Name] = e
+	}
+	if got["prod"].Colour != "red" || got["prod"].Extends != "base" || got["prod"].Vars[0].Kind != model.VarNumber {
+		t.Fatalf("prod %+v", got["prod"])
+	}
+	if got["orphan"].Extends != "" {
+		t.Fatalf("orphan keeps a base that does not exist: %+v", got["orphan"])
+	}
+}
+
+func TestFlowService_Wrap_Given_two_selected_steps_Then_they_go_in_a_container_that_becomes_the_selection(t *testing.T) {
+	// Arrange
+	flows, v, pub := openTwoUnits(t)
+	flows.Select(v.Node, "login")
+	flows.ToggleSelect(v.Node, "wait")
+
+	// Act
+	id, err := flows.Wrap(v.Node, "loop")
+
+	// Assert
+	after := pub.last["flow"].(bridge.FlowView)
+	if err != nil || id == "" || after.Selected != id || len(after.Selection) != 1 {
+		t.Fatalf("id %q err %v selected %q selection %v", id, err, after.Selected, after.Selection)
+	}
+	if !slices.ContainsFunc(after.Diagram.Units, func(u canvas.Unit) bool { return slices.Contains(u.Nodes, id) }) {
+		t.Errorf("units %+v", after.Diagram.Units)
+	}
+}
+
+func TestFlowService_Wrap_Given_steps_with_another_between_Then_it_is_refused_and_the_selection_stays(t *testing.T) {
+	// Arrange
+	flows, v, pub := openTwoUnits(t)
+	flows.Select(v.Node, "login")
+	flows.ToggleSelect(v.Node, "verify")
+
+	// Act
+	_, err := flows.Wrap(v.Node, "loop")
+
+	// Assert
+	after := pub.last["flow"].(bridge.FlowView)
+	if err == nil || len(after.Selection) != 2 {
+		t.Fatalf("err %v selection %v", err, after.Selection)
+	}
+}
+
+func TestFlowService_Wrap_Given_nothing_selected_Then_it_says_to_select_steps_first(t *testing.T) {
+	flows, v, _ := openTwoUnits(t)
+	flows.Select(v.Node, "")
+
+	_, err := flows.Wrap(v.Node, "group")
+
+	if err == nil || !strings.Contains(err.Error(), "select") {
+		t.Fatalf("err %v", err)
+	}
+}
+
+func TestFlowService_WirePreview_Given_a_step_that_ran_Then_the_value_at_the_path_and_the_children_come_back(t *testing.T) {
+	// Arrange
+	rec := engine.Record{Status: 200, Body: engine.Body{JSON: map[string]any{"token": "abc", "id": float64(4)}}}
+	flows, v, _ := openRunnable(t, []engine.Event{
+		engine.RecordCaptured{Path: "a", Node: "a", Record: rec},
+		engine.NodeFinished{Path: "a", Node: "a", Status: engine.StatusPassed},
+	})
+	flows.Run(v.Node, nil)
+
+	// Act
+	token := flows.WirePreview(v.Node, "a", "body.token")
+	body := flows.WirePreview(v.Node, "a", "body")
+
+	// Assert
+	if !token.Ran || !token.Found || token.Text != "abc" {
+		t.Fatalf("token %+v", token)
+	}
+	if len(body.Children) != 2 || body.Children[0].Path != "body.id" || body.Children[1].Sample != "abc" {
+		t.Fatalf("children %+v", body.Children)
+	}
+}
+
+func TestFlowService_WirePreview_Given_no_run_or_the_flow_input_Then_nothing_shows(t *testing.T) {
+	flows, v, _ := openRunnable(t, nil)
+
+	notRun := flows.WirePreview(v.Node, "a", "body")
+	input := flows.WirePreview(v.Node, "", "email")
+
+	if notRun.Ran || input.Ran || notRun.Children == nil {
+		t.Fatalf("notRun %+v input %+v", notRun, input)
+	}
+}
+
+func TestRequestService_Send_Given_other_kinds_of_response_Then_the_view_says_the_kind_and_carries_what_the_viewer_draws(t *testing.T) {
+	png := base64.StdEncoding.EncodeToString([]byte("\x89PNG\r\n"))
+	tests := []struct {
+		name string
+		body engine.Body
+		kind string
+		has  func(bridge.ResponseView) bool
+	}{
+		{"a picture", engine.Body{Base64: png, ContentType: "image/png", Size: 6}, "image", func(r bridge.ResponseView) bool { return r.BodyImage == "data:image/png;base64,"+png }},
+		{"a page", engine.Body{Text: "<h1>Hi</h1>", ContentType: "text/html; charset=utf-8", Size: 11}, "html", func(r bridge.ResponseView) bool { return r.BodyHTML == "<h1>Hi</h1>" }},
+		{"a pdf", engine.Body{Base64: png, ContentType: "application/pdf", Size: 6}, "pdf", func(r bridge.ResponseView) bool { return r.BodyHex != "" && r.BodyImage == "" }},
+		{"binary", engine.Body{Base64: png, ContentType: "application/octet-stream", Size: 6}, "binary", func(r bridge.ResponseView) bool { return strings.HasPrefix(r.BodyHex, "00000000  89 50 4e 47") }},
+		{"plain text", engine.Body{Text: "hi", ContentType: "text/plain", Size: 2}, "text", func(r bridge.ResponseView) bool { return r.BodyHex == "" && r.BodyHTML == "" }},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Arrange
+			reqs, v, pub, b := openLogin(t)
+			b.NextSend = &vmtest.Sending{Result: engine.SendResult{Status: engine.StatusPassed, Record: &engine.Record{Status: 200, Body: tt.body}}}
+
+			// Act
+			reqs.Send(v.Node, "")
+			got := pub.last["request"].(bridge.RequestView).Response
+
+			// Assert
+			// Before: the view had no kind or content type for the body, so all of these were drawn as text.
+			if got.BodyKind != tt.kind || got.ContentType != tt.body.ContentType || !tt.has(*got) {
+				t.Fatalf("kind %q type %q response %+v", got.BodyKind, got.ContentType, got)
+			}
+		})
+	}
+}
+
+func TestRequestService_ExampleTaken_Given_a_name_that_is_taken_When_asked_Then_the_screen_is_told(t *testing.T) {
+	// Before: pinning replaced an example of the same name without a word.
+	reqs, v, _, b := openLogin(t)
+	reqs.Send(v.Node, "")
+	b.TakenExamples = map[string]bool{"success": true}
+
+	taken, err := reqs.ExampleTaken(v.Node, "", "", "success")
+	free, errFree := reqs.ExampleTaken(v.Node, "", "", "other")
+
+	if err != nil || errFree != nil {
+		t.Fatalf("errors %v %v", err, errFree)
+	}
+	if !taken || free {
+		t.Fatalf("taken %t, free %t", taken, free)
+	}
+}
+
+func TestRequestService_ExampleTaken_Given_nothing_sent_When_asked_Then_it_says_to_send_first(t *testing.T) {
+	reqs, v, _, _ := openLogin(t)
+
+	_, err := reqs.ExampleTaken(v.Node, "", "", "x")
+
+	if err == nil {
+		t.Fatal("no error for a request that was never sent")
+	}
+}
+
+// Before: a chip showed only whether its name was defined; the value and the place to set it were in another screen.
+func TestRequestService_VariableHint_should_give_the_value_and_for_an_unset_name_the_row_a_click_adds(t *testing.T) {
+	reqs, _, _, _ := openLogin(t)
+
+	known := reqs.VariableHint("env.base_url")
+	unset := reqs.VariableHint("env.nope")
+	secret := reqs.VariableHint("secret.nope")
+	generator := reqs.VariableHint("$nope")
+
+	if !known.Known || !strings.HasPrefix(known.Text, "base_url → ") || known.Name != "" {
+		t.Errorf("known %+v", known)
+	}
+	if unset.Known || unset.Name != "nope" || unset.Secret || unset.Environment == "" {
+		t.Errorf("unset %+v", unset)
+	}
+	if secret.Known || secret.Name != "nope" || !secret.Secret {
+		t.Errorf("secret %+v", secret)
+	}
+	if generator.Known || generator.Name != "" || generator.Environment != "" {
+		t.Errorf("generator %+v", generator)
+	}
+}
+
+// Before: saving a schedule from the window rebuilt it from the form and dropped any alert address set elsewhere.
+func TestSchedulesService_Save_should_keep_the_alert_addresses_and_show_them_again(t *testing.T) {
+	c := vmtest.SampleCollection()
+	b := &vmtest.Backend{Cols: []model.Collection{c}}
+	app := bridge.NewApp(b, bridge.NewInlineActor(), (&published{}).emit)
+	app.Start(t.Context())
+	svc := app.Schedules()
+	svc.State()
+
+	problem := svc.Save("", bridge.ScheduleView{Name: "nightly", Flow: "signup", Cron: "@daily", OnFailure: " env:SLACK_HOOK ", OnSuccess: "https://hooks.example/ok"})
+	v := svc.State()
+
+	if problem != "" || v.Schedules[0].OnFailure != "env:SLACK_HOOK" || v.Schedules[0].OnSuccess != "https://hooks.example/ok" {
+		t.Fatalf("problem %q, schedules %+v", problem, v.Schedules)
+	}
+}
+
+// Before: the window inferred a passing check from the absence of an error note; the engine now says each result.
+func TestRequestService_should_carry_what_the_send_said_about_each_check(t *testing.T) {
+	reqs, v, pub, b := openLogin(t)
+	b.Mu.Lock()
+	b.NextSend.Result.Checks = []engine.CheckEval{{Line: "status == 200", Verdict: engine.CheckPassed}, {Line: "status == 201", Verdict: engine.CheckFailed, Note: "status = 200"}}
+	b.Mu.Unlock()
+
+	reqs.Send(v.Node, "")
+
+	got := pub.last["request"].(bridge.RequestView).Response.CheckResults
+	if len(got) != 2 || got[0].Verdict != "passed" || got[1].Verdict != "failed" || got[1].Note != "status = 200" {
+		t.Fatalf("%+v", got)
+	}
+}
+
+// Before: the window did not know a flow's path or the collection it is in, nor the seed of its last run, so it
+// could not offer the `flowi run` command that does what the Run button just did.
+func TestFlowService_View_should_name_the_flow_and_the_seed_as_flowi_run_takes_them(t *testing.T) {
+	flows, v, pub := openRunnable(t, nil)
+
+	before := v
+	flows.Run(v.Node, nil)
+	ev := pub.last["flowrun"].(bridge.FlowRunEvent)
+
+	if before.Path != "signup" || before.Collection != vmtest.SampleCollection().Manifest.Name {
+		t.Fatalf("path %q collection %q", before.Path, before.Collection)
+	}
+	if before.Run.Seed != "" || ev.Run.Seed != "7" {
+		t.Fatalf("seed before the run %q, after %q", before.Run.Seed, ev.Run.Seed)
 	}
 }

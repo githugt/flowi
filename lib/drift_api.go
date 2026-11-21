@@ -33,6 +33,9 @@ type DriftReport struct {
 	Flow      string
 	RunStatus engine.Status // how the run itself ended; a failed run still reports what it did get
 	Requests  []RequestDrift
+	// seen are the JSON responses the report compared, which AcceptDrift learns from: accepting is of what was
+	// shown, not of a second run.
+	seen []engine.Record
 }
 
 // Has says whether any request drifted in one of the kinds.
@@ -75,6 +78,7 @@ func (w *Workspace) addDrift(rep *DriftReport, c model.Collection, rec engine.Re
 		return
 	}
 	entry := RequestDrift{Request: r.Path, Version: rec.Version, Status: rec.Status}
+	rep.seen = append(rep.seen, rec)
 	file, err := schemaFile(r.File, rec.Version, SchemaPart{Kind: "response", Status: rec.Status})
 	if err != nil {
 		return
@@ -103,4 +107,36 @@ func (r *DriftReport) merge(entry RequestDrift) {
 		return
 	}
 	r.Requests = append(r.Requests, entry)
+}
+
+// AcceptDrift makes the schemas of the requests agree with the responses a drift report saw: a new field is added, a
+// required field that is gone becomes optional, a field of another type takes both types, and a response with no
+// schema yet gets one. requests lists the paths of the requests to accept (none: all of them). It returns what it
+// changed in schemas that already existed. Schemas from a spec or edited by hand are never rewritten, so accepting
+// them changes nothing.
+//
+// Before: to accept a new field the person had to leave the check, send with learning on and run again, and the
+// result of the check was lost.
+func (w *Workspace) AcceptDrift(rep DriftReport, requests []string) ([]SchemaChange, error) {
+	var out []SchemaChange
+	touched := map[model.ID]bool{}
+	for _, rec := range rep.seen {
+		_, r, err := w.requestFor(RequestTarget{Collection: rec.CollectionID, Request: rec.RequestID})
+		if err != nil || (len(requests) > 0 && !slices.Contains(requests, r.Path)) {
+			continue
+		}
+		part := SchemaPart{Kind: "response", Status: rec.Status}
+		got, err := learnOne(r.File, rec.Version, part, rec.Body.JSON, mayWiden(part))
+		if err != nil {
+			return out, err
+		}
+		out = append(out, got...)
+		touched[rec.CollectionID] = true
+	}
+	for c := range touched {
+		if err := w.RegenerateDescription(c); err != nil {
+			return out, err
+		}
+	}
+	return out, nil
 }

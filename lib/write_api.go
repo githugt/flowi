@@ -3,6 +3,8 @@
 package flowi
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -24,6 +26,46 @@ type SaveOptions struct {
 	// canonical encoding does not keep them, so without it such a write is
 	// refused with FLW-WRITE-001.
 	DropComments bool
+	// Expect is the FileSum the editor got when it loaded the file. When it is set and the file on disk no longer has that
+	// sum (an editor or git changed it), the write is refused with FLW-WRITE-005 instead of overwriting the change.
+	// Before: a save wrote over whatever was on disk, with no warning. Empty skips the check, which is also how an
+	// "overwrite anyway" save is made.
+	Expect string
+}
+
+// FileSum is a short fingerprint of a file's bytes ("" for a file that does not exist yet), for SaveOptions.Expect.
+func FileSum(data []byte) string {
+	if data == nil {
+		return ""
+	}
+	sum := sha256.Sum256(data)
+	return hex.EncodeToString(sum[:])
+}
+
+// FlowSum is the FileSum of flow t's file as it is on disk now.
+func (w *Workspace) FlowSum(t FlowTarget) (string, error) {
+	_, f, err := w.flowFor(t)
+	if err != nil {
+		return "", err
+	}
+	return w.sumOf(f.File)
+}
+
+// RequestSum is the FileSum of request t's file as it is on disk now.
+func (w *Workspace) RequestSum(t RequestTarget) (string, error) {
+	_, r, err := w.requestFor(t)
+	if err != nil {
+		return "", err
+	}
+	return w.sumOf(r.File)
+}
+
+func (w *Workspace) sumOf(file string) (string, error) {
+	data, err := os.ReadFile(file)
+	if err != nil && !errors.Is(err, fs.ErrNotExist) {
+		return "", fmt.Errorf("reading %s: %w", file, err)
+	}
+	return FileSum(data), nil
 }
 
 // SaveRequest writes r, an edited copy of request t, in canonical form and
@@ -35,11 +77,23 @@ func (w *Workspace) SaveRequest(t RequestTarget, r model.Request, o SaveOptions)
 		return err
 	}
 	r.ID, r.File, r.Path = current.ID, current.File, current.Path // identity and location are not editable here
-	data, err := w.store.EncodeRequest(r)
+	data, err := w.store.EncodeRequest(r)                         // the working copy is not in the file: see edit_store.go
 	if err != nil {
 		return fmt.Errorf("encoding %s: %w", r.File, err)
 	}
-	return w.writeAndReload(t.Collection, r.File, data, o)
+	if err := w.writeAndReload(t.Collection, r.File, data, o); err != nil {
+		return err
+	}
+	// The file is saved; now the working copy, which a promotion or a discard clears. After, so that a refused save
+	// (a commented file, a file changed on disk) does not lose the draft.
+	if sameEdit(current, r) {
+		return nil
+	}
+	if err := w.writeEdit(t.Collection, r); err != nil {
+		return err
+	}
+	w.setEdit(t.Collection, r)
+	return nil
 }
 
 // NewRequest creates requests/<path>.req.yaml in collection with a fresh
@@ -202,13 +256,14 @@ func (w *Workspace) newRequestWith(collection model.ID, path string, version mod
 
 // pathForName is the path a new request typed as path is kept at, and its name. The last part is what the request
 // is called, so it may be written as a name ("Test postgres"): the file then takes it with each run of other
-// characters as one "-" (Test-postgres) and the request keeps the name as typed. Folders stay plain names.
+// characters as one "-" (Test-postgres) and the request keeps the name as typed. Letters of any script stay as they
+// are (Café-menu). Folders stay plain names.
 func pathForName(path string) (string, string) {
 	dir, name := "", path
 	if i := strings.LastIndex(path, "/"); i >= 0 {
 		dir, name = path[:i+1], path[i+1:]
 	}
-	name = strings.TrimSpace(name)
+	name = names.Normalize(strings.TrimSpace(name))
 	if names.Valid(name) || strings.HasPrefix(name, ".") {
 		return dir + name, name // a leading dot is refused as it is: it would hide the file
 	}
@@ -225,7 +280,7 @@ func pathForName(path string) (string, string) {
 		}
 		gap = true
 	}
-	return dir + file.String(), name
+	return dir + strings.TrimRight(file.String(), "."), name // a name may not end in a dot: Windows drops it
 }
 
 // NewFolder creates the folder path under tree ("requests" or "flows") of
@@ -287,6 +342,9 @@ func (w *Workspace) writeAndReload(collection model.ID, file string, data []byte
 	if err != nil && !errors.Is(err, fs.ErrNotExist) {
 		return fmt.Errorf("reading %s: %w", file, err)
 	}
+	if o.Expect != "" && FileSum(old) != o.Expect {
+		return diag.List{diag.New(diag.CodeWriteChangedOnDisk, diag.Location{File: file}, map[string]string{"file": filepath.Base(file)})}.Err()
+	}
 	if !o.DropComments && old != nil && w.store.HasComments(old) {
 		return diag.List{diag.New(diag.CodeWriteDropsComments, diag.Location{File: file}, map[string]string{"file": filepath.Base(file)})}.Err()
 	}
@@ -319,7 +377,7 @@ func (w *Workspace) reloadEntity(collection model.ID, file string) error {
 	if err != nil {
 		return fmt.Errorf("reloading %s: %w", file, err)
 	}
-	w.collections[i] = next
+	w.collections[i] = w.withEdits(next)
 	w.replaceLoadDiags(func(f string) bool { return f == file }, diags)
 	return nil
 }

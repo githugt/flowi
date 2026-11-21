@@ -9,6 +9,7 @@ import (
 	flowi "github.com/githugt/flowi/lib"
 	"github.com/githugt/flowi/lib/analysis"
 	"github.com/githugt/flowi/lib/announce"
+	"github.com/githugt/flowi/lib/dataset"
 	"github.com/githugt/flowi/lib/diag"
 	"github.com/githugt/flowi/lib/engine"
 	"github.com/githugt/flowi/lib/flowioverlay"
@@ -52,6 +53,8 @@ type Backend interface {
 	GenerateGRPCRequests(collection model.ID, base model.GRPC, methods []grpcx.Method) (flowi.GeneratedGRPC, error)
 	// GRPCMethods lists the methods of the schema the gRPC version v would use.
 	GRPCMethods(ctx context.Context, t flowi.RequestTarget, v model.RequestVersion, o flowi.SendOptions) ([]grpcx.Method, error)
+	// TestConnection connects and signs in as the message or database version v would, sending and reading nothing.
+	TestConnection(ctx context.Context, t flowi.RequestTarget, v model.RequestVersion, o flowi.SendOptions) (engine.Probe, error)
 	// NewFolder creates a folder under tree ("requests" or "flows").
 	NewFolder(collection model.ID, tree, path string) error
 	// SetFolderOrder sets the order the entries of a folder are shown in (dir "" is the top of the tree).
@@ -64,9 +67,16 @@ type Backend interface {
 	// DuplicateRequestTo copies a request to path in another (or the same) collection.
 	DuplicateRequestTo(t flowi.RequestTarget, to model.ID, path string) (flowi.RequestTarget, error)
 	DeleteRequest(t flowi.RequestTarget) error
+	// DeleteRequestToTrash and DeleteFlowToTrash remove an item the way the tree does: into the trash, from where
+	// RestoreFromTrash puts it back where it was.
+	DeleteRequestToTrash(t flowi.RequestTarget) (flowi.TrashedItem, error)
+	DeleteFlowToTrash(t flowi.FlowTarget) (flowi.TrashedItem, error)
 	DuplicateFlow(t flowi.FlowTarget, path string) (flowi.FlowTarget, error)
 	DeleteFlow(t flowi.FlowTarget) error
+	// DeleteEnvironment removes the file and the secret values it declared from the vault.
 	DeleteEnvironment(file string) error
+	// EnvironmentImpact names the secrets deleting the environment file takes with it and the environments that build on it.
+	EnvironmentImpact(file string) (flowi.EnvImpact, error)
 	// Environments are the workspace's own: the same in every collection.
 	Environments() []model.Environment
 	// ExportMermaid is the saved flow as a Mermaid flowchart.
@@ -99,6 +109,11 @@ type Backend interface {
 	SchemaFor(t flowi.RequestTarget, version string, part flowi.SchemaPart) (schemainfer.Schema, flowi.SchemaSource, bool)
 	DeleteSchema(t flowi.RequestTarget, version string, part flowi.SchemaPart) error
 	PinExample(rec engine.Record, name string) (string, error)
+	// ShareEnvironment writes the workspace's environment name into the collection's own environments folder; a file
+	// already there is kept unless overwrite is set (existed then says so). Notes are things to tell the person.
+	ShareEnvironment(collection model.ID, name string, overwrite bool) (file string, existed bool, notes []string, err error)
+	// ExampleTaken says whether pinning rec as name (empty: its status) would replace an example that is already there.
+	ExampleTaken(rec engine.Record, name string) (bool, error)
 	// TrashStaleDrafts moves old, unused try-out requests and flows of Scratch to the trash;
 	// ListTrash, RestoreFromTrash, DeleteFromTrash and EmptyTrash are the rest of the trash.
 	TrashStaleDrafts(olderThan time.Duration, open func(kind string, id model.ID) bool) ([]flowi.TrashedItem, error)
@@ -130,6 +145,12 @@ type Backend interface {
 	ImpactOfDraft(t flowi.RequestTarget, draft model.Request) (analysis.Report, diag.List, error)
 
 	Secrets() ([]flowi.SecretInfo, error)
+	// VaultState says whether the secrets vault is open and when it locks; it opens nothing and asks nothing.
+	VaultState() flowi.VaultState
+	// LockVault forgets the vault's key now.
+	LockVault()
+	// AutoLockVault locks the vault when vault.auto_lock says it was idle long enough, and says whether it did.
+	AutoLockVault() bool
 	SetSecret(env, name, value string) error
 	// DeclareSecret adds name as a secret of the environment when it is not one, and stores its value.
 	DeclareSecret(env, name, value string) error
@@ -143,6 +164,11 @@ type Backend interface {
 	OpenBundle(path string) error
 	// OpenArazzo opens an Arazzo document (a file or URL) as a collection whose flows run against its own server.
 	OpenArazzo(ctx context.Context, ref string) error
+	// OpenExample copies the bundled example into a collection and starts a demo server for it to call, in this
+	// process, on a free port; the "demo" environment holds that server's address. Asking again opens nothing new.
+	OpenExample() error
+	// AllowSecretHost adds host to the person's own list of hosts that may receive secrets (secrets.allowed_hosts).
+	AllowSecretHost(host string) error
 	// Coverage measures how much of the imported API descriptions the flows use ("" measures every collection).
 	Coverage(collection model.ID) (analysis.Coverage, error)
 	// ImpactAgainst says what a changed OpenAPI description would break; name picks a kept description ("" when
@@ -151,7 +177,12 @@ type Backend interface {
 	// SpecNames are the OpenAPI descriptions a collection kept at import.
 	SpecNames(collection model.ID) []string
 	CheckAccess(ctx context.Context, t flowi.FlowTarget, o flowi.AccessOptions) (flowi.AccessReport, error)
+	// LastAccess is the access check last run for the flow, kept in the data folder, if there is one.
+	LastAccess(t flowi.FlowTarget) (flowi.SavedAccess, bool)
 	CheckDrift(ctx context.Context, t flowi.FlowTarget, o flowi.DriftOptions) (flowi.DriftReport, error)
+	// AcceptDrift makes the stored schemas agree with the responses a drift report saw (requests: the paths to
+	// accept, none for all) and returns what it changed in schemas that existed.
+	AcceptDrift(rep flowi.DriftReport, requests []string) ([]flowi.SchemaChange, error)
 	Unmount(id model.ID) error
 	Relocate(id model.ID, dir string) error
 	InitCollection(dir, name string) (model.Manifest, error)
@@ -164,7 +195,24 @@ type Backend interface {
 	PreviewImportSource(src flowi.ImportSource, collection model.ID) (flowi.ImportPlan, error)
 	ApplyImport(p flowi.ImportPlan, o flowi.ApplyOptions) error
 
-	SaveFlow(t flowi.FlowTarget, f model.Flow, dropComments bool) error
+	// SaveFlow writes f. expect is the FlowSum from when the flow was loaded: when the file has changed since, the
+	// save is refused with FLW-WRITE-005; "" saves over whatever is there.
+	SaveFlow(t flowi.FlowTarget, f model.Flow, dropComments bool, expect string) error
+	// FlowSum fingerprints the flow's file as it is on disk now, for SaveFlow's expect.
+	FlowSum(t flowi.FlowTarget) (string, error)
+	// SecretUses says which requests, flows and authentications write {{secret.name}}, by secret name. It reads the
+	// collections' text, so call it off the UI goroutine.
+	SecretUses() map[string][]flowi.SecretUse
+	// DataFileTables lists the tables of the data files a request over files would read (blocking: it reads them).
+	DataFileTables(ctx context.Context, collection model.ID, driver, server string) ([]dataset.TableInfo, error)
+	// PreflightFlow lists what a run of the flow (the draft, when given) reads from env that env does not have.
+	PreflightFlow(t flowi.FlowTarget, env string, draft *model.Flow) ([]flowi.Need, error)
+	// AuthTokens lists the OAuth tokens the workspace holds, never the tokens themselves.
+	AuthTokens() []flowi.AuthToken
+	// ForgetAuthToken drops the token with that id (or the start of it), so the next send signs in again.
+	ForgetAuthToken(id string) error
+	// FlowWrites lists the steps of the flow (the draft, when given) that change data, subflows included.
+	FlowWrites(t flowi.FlowTarget, draft *model.Flow) ([]flowi.FlowWrite, error)
 	NewFlow(collection model.ID, path string) (flowi.FlowTarget, error)
 	NewUntitledFlow(collection model.ID) (flowi.FlowTarget, error)
 	NewFlowFromBlueprint(bp flowi.BlueprintTarget, collection model.ID, path string, values map[string]string) (flowi.FlowTarget, error)

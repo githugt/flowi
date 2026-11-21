@@ -1,4 +1,7 @@
 <script lang="ts">
+  import Field from './Field.svelte'
+  import IconButton from './IconButton.svelte'
+  import Select from './Select.svelte'
   import Toggle from './Toggle.svelte'
   // What opens under a card when one of its rows is clicked: the same controls the side inspector has for that part
   // of the step, with nothing else. One row is open at a time; the card's step is the selected one.
@@ -10,7 +13,7 @@
   import OutcomesEditor from './OutcomesEditor.svelte'
   import { ui } from './lib/ui.svelte'
   import { errorText } from './lib/errors'
-  import TextField from './TextField.svelte'
+  import TextInput from './TextInput.svelte'
   import TemplateField from './TemplateField.svelte'
   import { completeFor, vocabularyFor } from './lib/flowfields'
 
@@ -28,7 +31,7 @@
 
 {#if step}
   <div class="rowedit" role="region" aria-label={TITLES[row] ?? row}>
-    <div class="top"><h4>{TITLES[row] ?? row}</h4><button class="close" aria-label="Close" onclick={onclose}>×</button></div>
+    <div class="top"><h4>{TITLES[row] ?? row}</h4><IconButton icon="close" label="Close" onclick={onclose} /></div>
 
     {#if row === 'inputs' || row === 'send' || row === 'receive'}
       {#if call}
@@ -42,41 +45,39 @@
         <ParamFields {view} />
       {/if}
     {:else if row === 'hooks' && call?.kind === 'request'}
-      <label class="field">
-        <span class="label">Which hooks run with this step</span>
-        <select value={call.hooks} onchange={(e) => FlowService.SetHooks(node, e.currentTarget.value)}>
+      <Field label="Which hooks run with this step">
+        <Select value={call.hooks} onchange={(e) => FlowService.SetHooks(node, e.currentTarget.value)}>
           <option value="all">all of them</option><option value="none">none</option><option value="skip-pre">all but the ones before</option><option value="skip-post">all but the ones after</option>
-        </select>
-      </label>
+        </Select>
+      </Field>
     {:else if row === 'outcomes' && call?.kind === 'request'}
       <p class="hint">{call.outcomesOwn ? 'This step has its own outcomes, used in this flow only.' : "The request's outcomes. Change one and this step gets its own list, used in this flow only."} The arrows leaving the card follow them.</p>
       <OutcomesEditor outcomes={call.outcomes} ruleKind={call.ruleKind} resetLabel="Use the request's" hideReset={!call.outcomesOwn}
-        onchange={(rows) => FlowService.SetStepOutcomes(node, step.id, rows as never).catch((e) => ui.toast(errorText(e)))}>
+        onchange={(rows) => FlowService.SetStepOutcomes(node, step.id, rows as never).catch(ui.fail)}>
         {#snippet footer()}
           <button title="Write this list into the request, so every flow that uses it has these outcomes" disabled={!call.outcomesOwn}
-            onclick={() => FlowService.SaveStepOutcomesToRequest(node, step.id).then(() => ui.toast('Saved to the request.')).catch((e) => ui.toast(errorText(e)))}>Save to the request</button>
+            onclick={() => FlowService.SaveStepOutcomesToRequest(node, step.id).then(() => ui.toast('Saved to the request.')).catch(ui.fail)}>Save to the request</button>
         {/snippet}
       </OutcomesEditor>
     {:else if row === 'connection' && call?.kind === 'request'}
-      <TextField label="Open connection" value={call.open ?? ''} oninput={(v) => text('open', v)} placeholder="name (WebSocket, MQTT 5, NATS)" />
-      <TextField label="Use connection" value={call.over ?? ''} oninput={(v) => text('over', v)} placeholder="a name opened by an earlier step" />
+      <Field label="Open connection"><TextInput value={call.open ?? ''} ontext={(v) => text('open', v)} placeholder="name (WebSocket, MQTT 5, NATS)" /></Field>
+      <Field label="Use connection"><TextInput value={call.over ?? ''} ontext={(v) => text('over', v)} placeholder="a name opened by an earlier step" /></Field>
       {#if call.over}
         <Toggle checked={call.close ?? false} onchange={(on) => FlowService.SetClose(node, on)}>Close it after this step</Toggle>
       {/if}
     {:else if row === 'settings'}
-      <TextField label="Timeout (e.g. 5s)" value={step.timeout} oninput={(v) => text('timeout', v)} />
+      <Field label="Timeout (e.g. 5s)"><TextInput value={step.timeout} ontext={(v) => text('timeout', v)} /></Field>
       <TemplateField label="Run when (a test, no braces)" help="flow.when" placeholder="vars.count > 3" value={step.when} oninput={(v) => text('when', v)} suggest={completeFor(node)} vocabulary={vocabularyFor(node, 'flow.when')} />
-      <label class="field">
-        <span class="label">If this step fails</span>
-        <select value={step.failMode} onchange={(e) => FlowService.SetFailRoute(node, e.currentTarget.value, step.failTarget)}>
+      <Field label="If this step fails">
+        <Select value={step.failMode} onchange={(e) => FlowService.SetFailRoute(node, e.currentTarget.value, step.failTarget)}>
           {#each Object.entries(failLabels) as [m, l]}<option value={m}>{l}</option>{/each}
-        </select>
-      </label>
+        </Select>
+      </Field>
       {#if step.failMode === 'goto'}
-        <select value={step.failTarget} onchange={(e) => FlowService.SetFailRoute(node, 'goto', e.currentTarget.value)}>
+        <Select value={step.failTarget} onchange={(e) => FlowService.SetFailRoute(node, 'goto', e.currentTarget.value)}>
           <option value="" disabled>Choose a step</option>
           {#each step.steps as s}<option value={s}>{s}</option>{/each}
-        </select>
+        </Select>
       {/if}
       <p class="hint">Retries and the request's own timeout are settings of the request.</p>
     {:else if row === 'values'}
@@ -95,9 +96,6 @@
   .rowedit { display: flex; flex-direction: column; gap: 8px; }
   .top { display: flex; align-items: center; justify-content: space-between; }
   h4 { margin: 0; font-size: var(--fs-md); }
-  .close { background: none; border: 0; color: var(--muted); font: inherit; font-size: var(--fs-lg); line-height: 1; }
-  .close:hover { color: var(--text); }
   .hint { color: var(--muted); font-size: var(--fs-sm); margin: 0; }
-  .field { display: flex; flex-direction: column; gap: 3px; }
   .label { color: var(--muted); font-size: var(--fs-xs); }
 </style>

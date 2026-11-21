@@ -53,6 +53,15 @@
         "seed_blueprint": {
           "type": "string",
           "default": "default"
+        },
+        "graphql_errors": {
+          "type": "string",
+          "enum": [
+            "warn",
+            "fail",
+            "ignore"
+          ],
+          "default": "warn"
         }
       }
     },
@@ -81,6 +90,10 @@
           "default": "auto"
         },
         "follow_redirects": {
+          "type": "boolean",
+          "default": true
+        },
+        "reuse_connections": {
           "type": "boolean",
           "default": true
         },
@@ -216,11 +229,34 @@
           "pattern": "^([0-9]+(\\.[0-9]+)?(ns|us|\u00b5s|ms|s|m|h))+$",
           "default": "60s"
         },
+        "keep": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100000,
+          "default": 200
+        },
+        "keep_failed": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100000,
+          "default": 50
+        },
         "max_concurrency": {
           "type": "integer",
           "minimum": 1,
           "maximum": 1024,
           "default": 8
+        }
+      }
+    },
+    "vault": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "auto_lock": {
+          "type": "string",
+          "pattern": "^([0-9]+(\\.[0-9]+)?(ns|us|\u00b5s|ms|s|m|h))+$",
+          "default": "0s"
         }
       }
     },
@@ -286,6 +322,10 @@
         "propagate": {
           "type": "boolean",
           "default": false
+        },
+        "trace_url": {
+          "type": "string",
+          "default": ""
         }
       }
     },
@@ -377,6 +417,10 @@
           "minimum": 8,
           "maximum": 48,
           "default": 13
+        },
+        "mono_font": {
+          "type": "string",
+          "default": ""
         },
         "palette_file": {
           "type": "string",
@@ -514,6 +558,10 @@
         },
         "snippet_exclude_secrets": {
           "type": "boolean",
+          "default": true
+        },
+        "hide_sensitive": {
+          "type": "boolean",
           "default": false
         }
       }
@@ -536,9 +584,35 @@
           "type": "boolean",
           "default": false
         },
+        "allow_outside_collection": {
+          "type": "boolean",
+          "default": false
+        },
         "read_only": {
           "type": "boolean",
           "default": false
+        }
+      }
+    },
+    "secrets": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "host_check": {
+          "type": "string",
+          "enum": [
+            "off",
+            "warn",
+            "block"
+          ],
+          "default": "block"
+        },
+        "allowed_hosts": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": []
         }
       }
     },

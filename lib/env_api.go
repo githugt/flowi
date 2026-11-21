@@ -14,6 +14,7 @@ import (
 	"github.com/githugt/flowi/lib/internal/names"
 	"github.com/githugt/flowi/lib/model"
 	"github.com/githugt/flowi/lib/store"
+	"github.com/githugt/flowi/lib/vault"
 	"github.com/githugt/flowi/lib/workspace"
 )
 
@@ -91,19 +92,105 @@ func (w *Workspace) CollectionEnvironments(collection model.ID) ([]model.Environ
 	return w.store.LoadEnvironments(filepath.Join(c.Root, "environments"), "")
 }
 
-// DeleteEnvironment removes an environment file. Its secret values stay in
-// the vault. An unknown file is FLW-REQ-004.
+// ShareEnvironment writes the workspace's environment name into the collection's own environments folder
+// (<collection>/environments/<name>.yaml), so it goes with the collection, in git, to a colleague. It keeps the
+// colour, the base it builds on, and each variable with its kind; a secret is written as a declaration only, with no
+// value, because the values live in the vault. The copy gets a fresh id and no vault scope, as a collection's own
+// environment has.
+//
+// A file of that name already there is not touched unless overwrite is set: existed then says so and nothing is
+// written. A base the collection does not also hold is named in the returned notes, because the file would build on an
+// environment the colleague lacks.
+//
+// Before: environments could be imported from a collection but never exported to one, so a team shared them by hand.
+func (w *Workspace) ShareEnvironment(collection model.ID, name string, overwrite bool) (file string, existed bool, notes []string, err error) {
+	w.mu.RLock()
+	c, ok := w.collection(collection)
+	i := slices.IndexFunc(w.globalEnvs, func(x model.Environment) bool { return x.Name == name })
+	var env model.Environment
+	if i >= 0 {
+		env = w.globalEnvs[i]
+	}
+	w.mu.RUnlock()
+	switch {
+	case !ok:
+		return "", false, nil, diagErr(diag.CodeWSUnknownCollection, map[string]string{"name": string(collection)})
+	case i < 0:
+		return "", false, nil, diagErr(diag.CodeRequestEnvUnknown, map[string]string{"env": name})
+	case !names.Valid(name):
+		return "", false, nil, diagErr(diag.CodeWriteRequestPath, map[string]string{"path": "environments/" + name, "detail": "the name must use letters, digits, '.', '_' or '-' and not start with '.'"})
+	}
+	file = filepath.Join(c.Root, "environments", name+".yaml")
+	old, err := os.ReadFile(file)
+	switch {
+	case err == nil && !overwrite:
+		return file, true, nil, nil
+	case err != nil && !errors.Is(err, fs.ErrNotExist):
+		return "", false, nil, fmt.Errorf("reading %s: %w", file, err)
+	}
+	shared := env
+	shared.ID, shared.Scope, shared.File = w.newID(), "", file
+	shared.Vars = slices.Clone(env.Vars)
+	for j := range shared.Vars {
+		if shared.Vars[j].Secret {
+			shared.Vars[j].Value = ""
+		}
+	}
+	if shared.Extends != "" && !w.collectionHasEnvironment(c, shared.Extends, name) {
+		notes = append(notes, fmt.Sprintf("%s builds on %s, which is not shared with the collection: share it too, or the file will name an environment a colleague lacks.", name, shared.Extends))
+	}
+	data, err := w.store.EncodeEnvironment(shared)
+	if err != nil {
+		return "", false, nil, fmt.Errorf("encoding %s: %w", file, err)
+	}
+	if err := os.MkdirAll(filepath.Dir(file), 0o750); err != nil {
+		return "", false, nil, fmt.Errorf("creating %s: %w", filepath.Dir(file), err)
+	}
+	if err := store.Apply([]store.FileChange{{File: file, Old: old, New: data}}); err != nil {
+		return "", false, nil, err
+	}
+	return file, false, notes, nil
+}
+
+// collectionHasEnvironment says whether the collection's environments folder holds an environment called base.
+func (w *Workspace) collectionHasEnvironment(c model.Collection, base, except string) bool {
+	if base == except {
+		return false
+	}
+	_, err := os.Stat(filepath.Join(c.Root, "environments", base+".yaml"))
+	return err == nil
+}
+
+// DeleteEnvironment removes an environment file and the secret values it declared from the vault: they are for good
+// with it, and left behind they would sit in the vault with nothing to show or remove them. An environment that
+// declares no secret does not touch the vault, so deleting it never asks to unlock it. When the file is gone but the
+// vault could not be cleaned (locked, no way to ask), the error says so, and `flowi secret prune` finishes the job.
+// An unknown file is FLW-REQ-004.
 func (w *Workspace) DeleteEnvironment(file string) error {
 	w.mu.RLock()
-	known := slices.ContainsFunc(w.globalEnvs, func(x model.Environment) bool { return x.File == file })
+	i := slices.IndexFunc(w.globalEnvs, func(x model.Environment) bool { return x.File == file })
+	var gone model.Environment
+	if i >= 0 {
+		gone = w.globalEnvs[i]
+	}
 	w.mu.RUnlock()
-	if !known {
+	if i < 0 {
 		return diagErr(diag.CodeRequestEnvUnknown, map[string]string{"env": filepath.Base(file)})
 	}
 	if err := os.Remove(file); err != nil && !errors.Is(err, fs.ErrNotExist) {
 		return fmt.Errorf("removing %s: %w", file, err)
 	}
-	return w.reloadEnvironments()
+	if err := w.reloadEnvironments(); err != nil {
+		return err
+	}
+	if !slices.ContainsFunc(gone.Vars, func(v model.EnvVar) bool { return v.Secret }) {
+		return nil
+	}
+	_, err := w.secrets().Prune(func(e vault.Entry) bool { return e.Collection != vault.WorkspaceScope || e.Environment != gone.ID })
+	if err != nil {
+		return fmt.Errorf("%s was deleted, but its stored secrets could not be removed (%w); flowi secret prune removes them later", gone.Name, vaultErr(err))
+	}
+	return nil
 }
 
 // writeEnvironment writes file atomically, refusing to drop comments unless
@@ -135,7 +222,7 @@ func (w *Workspace) reloadEnvironments() error {
 		return fmt.Errorf("reloading environments: %w", err)
 	}
 	for i := range w.collections {
-		w.collections[i].Environments = slices.Clone(w.globalEnvs)
+		w.collections[i].Environments = withShipped(w.globalEnvs, w.collections[i].Environments)
 	}
 	dir := workspace.EnvironmentsDir(w.opts.Paths, w.opts.Name)
 	w.replaceLoadDiags(func(file string) bool { return within(dir, file) }, diags)

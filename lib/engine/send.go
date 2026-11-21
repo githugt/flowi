@@ -156,6 +156,9 @@ type SendResult struct {
 	Vars   map[string]any // variables set by hooks
 	Diags  diag.List
 	Saved  []string // files written (saved responses)
+	// Checks are what each of the request's assert lines said (passed, failed or error), in order. A check the send
+	// never reached (it failed before the response, a pre-hook stopped it) is not here.
+	Checks []CheckEval
 	// Err is a system failure that did not stop the send (saving a
 	// response or the cookie jar failed).
 	Err error

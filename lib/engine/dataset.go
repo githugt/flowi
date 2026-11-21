@@ -211,7 +211,7 @@ func timeoutOf(err error) string {
 // buildDataset renders the version strictly, after the pre-hooks.
 func (x *execution) buildDataset() (builtDataset, bool) {
 	b, diags := x.renderDataset(false)
-	diags = append(diags, x.r.secrets.problems(x.env.name, b.missing)...)
+	diags = append(diags, x.r.secrets.problems(x.env, b.missing)...)
 	if diags.HasErrors() {
 		x.fail(StatusError, diags)
 		return builtDataset{}, false
@@ -222,10 +222,11 @@ func (x *execution) buildDataset() (builtDataset, bool) {
 func (x *execution) renderDataset(lenient bool) (builtDataset, diag.List) {
 	b, diags := buildDataset(buildInput{
 		version: x.version, scope: x.scope(lenient), empty: x.cfg.empty, label: x.c.request.Path,
-		root: x.c.collection.Root, secretVars: x.env.secrets, missingSecret: x.r.secrets.isMissing(x.env.name), memo: x.memo,
+		root: x.c.collection.Root, secretVars: x.env.secrets, envValues: x.env.values, missingSecret: x.r.secrets.isMissing(x.env.name), memo: x.memo,
 		secret: x.r.secrets.derived, verbatim: lenient,
 	})
 	b.query.Timeout = x.cfg.timeout
+	b.query.AllowOutsideRoot = x.cfg.datasetOutside
 	d := x.version.SQL()
 	// datasets.read_only wins over everything that allows a write.
 	b.query.AllowWrites = !x.cfg.datasetReadOnly && (x.cfg.datasetWrites || (d != nil && d.Writes))

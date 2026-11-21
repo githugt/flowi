@@ -303,3 +303,38 @@ func TestReplayer_Start_Given_a_har_file_Then_it_goes_with_the_options_in_any_mo
 		t.Fatalf("served %+v", b.ServedWith)
 	}
 }
+
+func TestReplayer_Given_a_restart_Then_call_numbers_do_not_repeat(t *testing.T) {
+	// Before: each run's log counted from 1, so after Stop and Start old and new calls shared numbers and opening
+	// one showed the other's headers and body.
+	first := replay.NewLog(10)
+	b := &vmtest.Backend{ServeLog: first}
+	r, q := startReplayer(t, b)
+	r.Start(vm.ReplayerForm{})
+	q.run(1)
+	first.Add(replay.Entry{Path: "/old-1"})
+	first.Add(replay.Entry{Path: "/old-2"})
+	q.run(2)
+	r.Stop()
+	q.run(1)
+
+	b.Mu.Lock()
+	b.ServeLog = replay.NewLog(10) // the new server has a new log that counts from 1
+	second := b.ServeLog
+	b.Mu.Unlock()
+	r.Start(vm.ReplayerForm{})
+	q.run(1)
+	second.Add(replay.Entry{Path: "/new-1"})
+	q.run(1)
+
+	seen := map[int]string{}
+	for _, e := range r.Entries() {
+		if other, dup := seen[e.Seq]; dup {
+			t.Fatalf("number %d is used by %s and %s", e.Seq, other, e.Path)
+		}
+		seen[e.Seq] = e.Path
+	}
+	if got, ok := r.Entry(3); !ok || got.Path != "/new-1" {
+		t.Fatalf("call 3 is %+v (found %v), want the new call", got, ok)
+	}
+}

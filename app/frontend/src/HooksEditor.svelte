@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { plural } from './lib/plural'
+  import { isLetter } from './lib/keymatch'
   import Button from './Button.svelte'
   // A request's own hooks: pre and post steps, and for message requests a step run for each message, each a small flow canvas.
   import { HooksService } from '../bindings/github.com/githugt/flowi/app/internal/bridge'
@@ -6,6 +8,7 @@
   import { ui } from './lib/ui.svelte'
   import type { HooksView } from './lib/types'
   import FlowEditor from './FlowEditor.svelte'
+  import Select from './Select.svelte'
 
   let { view }: { view: HooksView } = $props()
   let problem = $state('')
@@ -30,7 +33,7 @@
   }
 
   function onkeydown(e: KeyboardEvent) {
-    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 's') {
+    if ((e.metaKey || e.ctrlKey) && isLetter(e, 's')) {
       e.preventDefault()
       save()
     }
@@ -45,19 +48,19 @@
     {#if view.dirty}<span class="dirty">unsaved</span>{/if}
     <span class="spacer"></span>
     {#if view.blueprints.length}
-      <select bind:value={blueprint} onchange={() => { if (blueprint) HooksService.AddBlueprint(view.request, blueprint); blueprint = '' }}>
+      <Select tone="raised" bind:value={blueprint} onchange={() => { if (blueprint) HooksService.AddBlueprint(view.request, blueprint); blueprint = '' }}>
         <option value="">Add from a blueprint…</option>
         {#each view.blueprints as b}<option value={b.id}>{b.label}</option>{/each}
-      </select>
+      </Select>
     {/if}
-    <Button onclick={exit}>Exit</Button>
+    <Button onclick={exit}>Back to request</Button>
     <Button variant="primary" disabled={!view.dirty} onclick={() => save()}>Save</Button>
   </header>
   {#if problem}<p class="err">{problem}</p>{/if}
   <div class="phases">
     {#each [[view.pre, 'Before sending', view.othersPre], [view.post, 'After the response', view.othersPost], ...(view.showMessage ? [[view.message, 'For each message received', view.othersMessage]] : [])] as [row, title, others]}
       <section>
-        <h4>{title}{#if others}<span class="muted"> · {others} more step(s) from other levels run too</span>{/if}</h4>
+        <h4>{title}{#if others}<span class="muted"> · {plural(Number(others), 'more step')} from the folder and collection run too</span>{/if}</h4>
         <div class="canvas">{#if app.flows[row as string]}<FlowEditor view={app.flows[row as string]} embedded />{/if}</div>
       </section>
     {/each}
@@ -75,6 +78,4 @@
   h4 { margin: 0; padding: 6px 12px; font-size: var(--fs-sm); }
   .muted { color: var(--muted); font-weight: 400; }
   .canvas { flex: 1; min-height: 0; position: relative; }
-  select { background: var(--raised); color: var(--text); border: 0; box-shadow: inset 0 0 0 1px var(--line); border-radius: var(--r-md); padding: 0 12px; min-height: var(--ctl-h); font: inherit; font-weight: 500; }
-  select { background: var(--bg); }
 </style>

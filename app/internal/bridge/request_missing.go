@@ -37,7 +37,7 @@ func (s *RequestService) Missing(node string) MissingView {
 		vars, secrets := s.app.workspace.VariableNames()
 		env := s.app.workspace.SelectedEnv()
 		if err == nil { // without the vault's answer, a declaration is the best hint there is
-			secrets = withValues(secrets, env, infos)
+			secrets = withValues(secrets, s.app.workspace.SelectedChain(), infos)
 		}
 		cur := o.req.Current()
 		known := knownWithOwn(vm.NewNameChecker(vars, secrets), keysOf(cur.Variables))
@@ -47,11 +47,13 @@ func (s *RequestService) Missing(node string) MissingView {
 	return v
 }
 
-// withValues keeps the secrets of env that have a value.
-func withValues(declared []string, env string, infos []flowi.SecretInfo) []string {
+// withValues keeps the secrets that have a value in the selected environment or in one it builds on (chain).
+func withValues(declared []string, chain []string, infos []flowi.SecretInfo) []string {
 	var out []string
 	for _, name := range declared {
-		if slices.ContainsFunc(infos, func(i flowi.SecretInfo) bool { return i.Environment == env && i.Name == name && (i.Set || i.Override) }) {
+		if slices.ContainsFunc(infos, func(i flowi.SecretInfo) bool {
+			return slices.Contains(chain, i.Environment) && i.Name == name && (i.Set || i.Override)
+		}) {
 			out = append(out, name)
 		}
 	}

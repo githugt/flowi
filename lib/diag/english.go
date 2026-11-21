@@ -33,3 +33,14 @@ func substitute(template string, args map[string]string) string {
 	}
 	return strings.NewReplacer(pairs...).Replace(template)
 }
+
+// Text is the message of d in English with its hint after it: "message (hint)". Places that show a single line
+// use it: before, the response notes and the step notes of a flow kept the message and dropped the hint, which is
+// the half that says what to do.
+func Text(d Diagnostic) string {
+	msg, hint := English().Message(d)
+	if hint != "" {
+		msg += " (" + hint + ")"
+	}
+	return msg
+}

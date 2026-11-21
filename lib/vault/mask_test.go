@@ -4,6 +4,7 @@ package vault
 
 import (
 	"encoding/base64"
+	"encoding/hex"
 	"net/url"
 	"strings"
 	"testing"
@@ -59,5 +60,39 @@ func TestMasker_zero_value_should_mask_nothing(t *testing.T) {
 
 	if m.String("anything") != "anything" {
 		t.Fatal("zero masker changed text")
+	}
+}
+
+func TestMasker_Given_secret_echoed_as_base64url_or_hex_Then_masked(t *testing.T) {
+	// Before: only raw, escaped and padded standard base64 were masked.
+	const secret = "s3cr3t?>~value"
+	raw := []byte(secret)
+	m := NewMasker(secret)
+	echoed := map[string]string{
+		"base64url":          base64.URLEncoding.EncodeToString(raw),
+		"base64url unpadded": base64.RawURLEncoding.EncodeToString(raw),
+		"base64 unpadded":    base64.RawStdEncoding.EncodeToString(raw),
+		"hex":                hex.EncodeToString(raw),
+		"hex upper":          strings.ToUpper(hex.EncodeToString(raw)),
+	}
+	for name, form := range echoed {
+		t.Run(name, func(t *testing.T) {
+			got := m.String("sig=" + form + ";")
+
+			if strings.Contains(got, form) {
+				t.Fatalf("still shows the secret: %q", got)
+			}
+		})
+	}
+}
+
+func TestMasker_Given_short_secret_Then_hex_form_is_left_alone(t *testing.T) {
+	// A 3-character secret in hex is 6 characters that can turn up in an id.
+	m := NewMasker("dev")
+
+	got := m.String("id=" + hex.EncodeToString([]byte("dev")))
+
+	if strings.Contains(got, Mask) {
+		t.Fatalf("masked unrelated text: %q", got)
 	}
 }

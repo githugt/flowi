@@ -264,6 +264,11 @@ func (w *Workspace) prepareReplay(br *BundleRun, b bundle.Bundle) error {
 	if fi < 0 {
 		return fmt.Errorf("the bundle has no flow %q", b.Manifest.FlowPath)
 	}
+	// Before: a replay stubbed HTTP only, so a gRPC, message or database step in a bundle from someone else ran against
+	// the real network or a local file. A bundle with such a request is refused: it cannot be replayed offline.
+	if name := firstNonHTTPRequest(*c); name != "" {
+		return fmt.Errorf("the bundle has the request %q, which is not an HTTP request; a replay only plays back HTTP, so Flowi does not run it (it would reach the real network or a local file)", name)
+	}
 	br.Target = FlowTarget{Collection: c.Manifest.ID, Flow: c.Flows[fi].ID}
 	br.Options = RunOptions{
 		Env: b.Manifest.Env, Seed: b.Manifest.Seed, Inputs: b.Manifest.Inputs,
@@ -281,6 +286,19 @@ func (w *Workspace) prepareReplay(br *BundleRun, b bundle.Bundle) error {
 	c.Environments = slices.DeleteFunc(c.Environments, func(e model.Environment) bool { return e.Name == env.Name })
 	c.Environments = append(c.Environments, env)
 	return nil
+}
+
+// firstNonHTTPRequest is the name of the first request of c that a recording cannot stand in for: a gRPC call, a
+// message request or a query of a database or data file. It is "" when every request is HTTP.
+func firstNonHTTPRequest(c model.Collection) string {
+	for _, r := range c.Requests {
+		for _, v := range r.Versions {
+			if v.Async != nil || v.GRPC != nil || v.Dataset != nil || v.File != nil {
+				return r.Name
+			}
+		}
+	}
+	return ""
 }
 
 func maskedSecrets(names []string) map[string]string {

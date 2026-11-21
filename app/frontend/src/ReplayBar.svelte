@@ -1,4 +1,8 @@
 <script lang="ts">
+  import Button from './Button.svelte'
+  import IconButton from './IconButton.svelte'
+  import { replayerDraft } from './lib/replayerdraft.svelte'
+  import { copy as copyOut } from './lib/clip'
   // The replayer, from the request screen: start and stop it, choose its port,
   // and see the address a client calls to get this request's saved answer.
   import { onMount } from 'svelte'
@@ -32,41 +36,35 @@
   function toggle() {
     if (!view) return
     if (running) return void ReplayerService.Stop()
-    ReplayerService.Start({ ...view.form, addr: `${hostOf(view.form.addr)}:${port || portOf(view.form.addr)}` })
+    const form = replayerDraft.form ?? view.form // what the screen last held, so its faults and forwarding are kept
+    ReplayerService.Start({ ...form, addr: `${hostOf(form.addr)}:${port || portOf(form.addr)}` })
   }
 
   async function copy() {
-    await navigator.clipboard.writeText(url)
-    ui.toast('Copied ' + url)
+    await copyOut(url, url)
   }
 </script>
 
 {#if view && (open || running || busy)}
   <div class="replay" class:on={running}>
-    <button class="toggle" disabled={busy} onclick={toggle} title={running ? 'Stop answering calls' : 'Answer calls to this address with the saved responses'}>
+    <Button small variant={running ? 'danger' : 'secondary'} disabled={busy} onclick={toggle} title={running ? 'Stop answering calls' : 'Answer calls to this address with the saved responses'}>
       {#if running}■ Stop replayer{:else if view.state === 'starting'}Starting…{:else}▶ Replay{/if}
-    </button>
+    </Button>
     <label class="port" title="The port the replayer listens on">
       <span>port</span>
       <input inputmode="numeric" spellcheck="false" bind:value={port} disabled={running || busy} oninput={() => (editedPort = true)} />
     </label>
     <span class="muted">{method}</span>
     <input class="url" readonly value={url} aria-label="Address of the replayer for this request" onfocus={(e) => e.currentTarget.select()} />
-    <button onclick={copy} title="Copy the address">Copy</button>
+    <Button small onclick={copy} title="Copy the address">Copy</Button>
     {#if running}<span class="state">● {forwardLabel(view.form)}</span>{:else}<span class="muted">stopped</span>{/if}
     {#if view.error}<span class="err">{view.error}</span>{/if}
-    {#if !running && !busy && onclose}<button class="close" aria-label="Hide the replay bar" onclick={onclose}>×</button>{/if}
+    {#if !running && !busy && onclose}<IconButton icon="close" label="Hide the replay bar" onclick={onclose} />{/if}
   </div>
 {/if}
 
 <style>
   .replay { display: flex; align-items: center; gap: var(--sp-2); padding: 4px 12px; border-bottom: 1px solid var(--line); font-size: var(--fs-sm); }
-  .close { border: 0; color: var(--muted); padding: 0 4px; }
-  button { background: var(--raised); color: var(--text); border: 0; box-shadow: inset 0 0 0 1px var(--line); border-radius: var(--r-md); padding: 0 10px; min-height: var(--ctl-h-sm); font: inherit; font-weight: 500; white-space: nowrap; }
-  button:hover:not(:disabled) { background: var(--raised-3); }
-  button:disabled { opacity: 0.5; }
-  .on .toggle { border-color: var(--fail); color: var(--fail); }
-  .toggle:not(:disabled):hover { border-color: var(--accent); }
   .port { display: flex; align-items: center; gap: 4px; color: var(--muted); }
   .port input { width: 52px; padding: 2px 6px; font: var(--fs-sm) var(--mono); }
   .url { flex: 1; min-width: 0; background: color-mix(in srgb, var(--bg) 70%, transparent); color: var(--muted); border: 1px dashed var(--line); border-radius: var(--r-md); padding: 2px 8px; font: var(--fs-sm) var(--mono); -webkit-user-select: text; user-select: text; cursor: text; }

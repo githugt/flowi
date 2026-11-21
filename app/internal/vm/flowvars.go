@@ -18,6 +18,10 @@ type FlowVars struct {
 	Read    []string // variables a template or expression reads
 	Unset   []string // read but written by no step of this flow
 	Secrets []string // secrets referenced as secret.<name>
+	// Writers and Readers say which steps write or read each variable, by step id: click a variable and its steps light
+	// up. Before: the bar listed names only, so finding who changed a variable meant reading every step.
+	Writers map[string][]string
+	Readers map[string][]string
 }
 
 var (
@@ -41,7 +45,42 @@ func ScanFlow(f model.Flow) FlowVars {
 			v.Unset = append(v.Unset, name)
 		}
 	}
+	v.Writers, v.Readers = map[string][]string{}, map[string][]string{}
+	collectUses(f.Nodes, v.Writers, v.Readers)
 	return v
+}
+
+// collectUses records, for every step at any depth, the variables it writes and the ones its own text reads. A
+// container's own text leaves out its children (they are listed on their own), and a set step's target is a write, not a read.
+func collectUses(list []model.Node, writers, readers map[string][]string) {
+	for _, n := range list {
+		for _, name := range writesOf(n) {
+			writers[name] = appendOnce(writers[name], n.ID)
+		}
+		for _, name := range matches(varReadPattern, ownText(n)) {
+			readers[name] = appendOnce(readers[name], n.ID)
+		}
+		for _, child := range n.Children() {
+			collectUses(child, writers, readers)
+		}
+	}
+}
+
+func appendOnce(list []string, id string) []string {
+	if slices.Contains(list, id) {
+		return list
+	}
+	return append(list, id)
+}
+
+// ownText is the step's text without its children and, for a set step, without the variable it writes.
+func ownText(n model.Node) string {
+	n.Body, n.Branches, n.Then, n.Else, n.Cases = nil, nil, nil, nil, nil
+	if n.Type == "set" {
+		n.Params = slices.DeleteFunc(slices.Clone(n.Params), func(p model.Field) bool { return p.Key == "target" })
+	}
+	text, _ := json.Marshal(n)
+	return string(text)
 }
 
 func collectWrites(list []model.Node, set map[string]bool) {

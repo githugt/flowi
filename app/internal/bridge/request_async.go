@@ -20,6 +20,9 @@ type AsyncInfo struct {
 	Credentials          []string    `json:"credentials"` // the entries that sign in; none for ws and sse
 	Cloud                bool        `json:"cloud"`       // a cloud service: its sign-in is the provider's own lookup or the credentials written here
 	HeadersAreConnection bool        `json:"headersAreConnection"`
+	ServerExample        string      `json:"serverExample"` // what the server box shows as its placeholder for this protocol
+	ChannelLabel         string      `json:"channelLabel"`  // the second box's name: Topic, Subject, Queue, Event...
+	ChannelHint          string      `json:"channelHint"`   // its placeholder
 	Block                model.Async `json:"block"`
 }
 
@@ -50,6 +53,7 @@ func asyncInfoOf(r *vm.Request) *AsyncInfo {
 		return nil
 	}
 	a := r.Async()
+	hint := model.AsyncEndpointHint(a.Protocol)
 	modes := []string{}
 	for _, m := range vm.AsyncModesFor(a.Protocol) {
 		modes = append(modes, string(m))
@@ -57,6 +61,7 @@ func asyncInfoOf(r *vm.Request) *AsyncInfo {
 	return &AsyncInfo{
 		Protocols: protocolChoices(), Modes: modes, Mode: string(r.Mode()), Bindings: nonNil(model.AsyncBindings(a.Protocol)),
 		Credentials: nonNil(model.AsyncCredentials(a.Protocol)), Cloud: model.CloudProtocol(a.Protocol), HeadersAreConnection: vm.AsyncHeadersAreConnection(a.Protocol), Block: a,
+		ServerExample: hint.Server, ChannelLabel: hint.Channel, ChannelHint: hint.ChannelHint,
 	}
 }
 
@@ -71,6 +76,29 @@ func grpcInfoOf(r *vm.Request) *GRPCInfo {
 			ClientStream: m.ClientStream, ServerStream: m.ServerStream, Input: m.Input, Output: m.Output})
 	}
 	return info
+}
+
+// ConnectionView is the Test connection button of a message or database request and what its last use found.
+type ConnectionView struct {
+	Busy   bool   `json:"busy"`
+	Status string `json:"status"` // ok, failed or unsupported; empty when not tried since the server or credentials changed
+	Target string `json:"target,omitempty"`
+	Detail string `json:"detail,omitempty"`
+	TookMs int64  `json:"tookMs"`
+}
+
+func connectionOf(r *vm.Request) *ConnectionView {
+	if !r.CanTestConnection() {
+		return nil
+	}
+	c := r.Connection()
+	return &ConnectionView{Busy: c.Busy, Status: string(c.Status), Target: c.Target, Detail: c.Detail, TookMs: c.Took.Milliseconds()}
+}
+
+// TestConnection connects and signs in as the request would, without sending, publishing or reading anything; the
+// "request" event delivers the result.
+func (s *RequestService) TestConnection(node string) {
+	s.with(node, func(o *openRequest) { s.app.send.TestConnection(o.req) })
 }
 
 // SetAsync replaces the async block of the selected message version.

@@ -1,7 +1,7 @@
 import type { TreeNode } from './types'
 
 // Rows that open something when clicked; every other kind is a group that holds rows.
-const LEAF_KINDS = ['request', 'environment', 'flow', 'missing']
+const LEAF_KINDS = ['request', 'environment', 'flow', 'missing', 'broken']
 
 const isLeaf = (n: TreeNode): boolean => LEAF_KINDS.includes(n.kind)
 

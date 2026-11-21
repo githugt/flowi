@@ -44,6 +44,7 @@ type PassphraseService struct {
 type question struct {
 	done   chan struct{}
 	answer askedPassword
+	create bool // the vault is being made: the window asks twice and warns that the passphrase cannot be recovered
 }
 
 type askedPassword struct {
@@ -66,14 +67,21 @@ const passphraseReminder = 2 * time.Second
 // window was not connected (a reload, the browser build's event socket
 // reconnecting) is lost, and the vault would wait for good. The window
 // ignores a repeat while its dialog shows.
-func (s *PassphraseService) Ask() (string, error) {
-	q, asking := s.question()
+func (s *PassphraseService) Ask() (string, error) { return s.ask(false) }
+
+// AskNew is Ask for a vault that is being made: the window asks for the passphrase twice and says it cannot be
+// recovered. It is the vault's NewPassphrase function.
+func (s *PassphraseService) AskNew() (string, error) { return s.ask(true) }
+
+func (s *PassphraseService) ask(create bool) (string, error) {
+	q, asking := s.question(create)
 	if q == nil {
 		return "", ErrPassphraseCancelled
 	}
+	mode := q.mode()
 	var remind <-chan time.Time
 	if asking {
-		s.app.emit("passphrase", nil)
+		s.app.emit("passphrase", mode)
 		t := time.NewTicker(passphraseReminder)
 		defer t.Stop()
 		remind = t.C
@@ -85,7 +93,7 @@ func (s *PassphraseService) Ask() (string, error) {
 		case <-s.closed:
 			return "", ErrPassphraseClosed
 		case <-remind:
-			s.app.emit("passphrase", nil)
+			s.app.emit("passphrase", mode)
 		}
 	}
 }
@@ -93,14 +101,14 @@ func (s *PassphraseService) Ask() (string, error) {
 // question returns the open question, opening one when there is none;
 // asking says it is new, so the window has yet to be asked. It is nil while
 // the user has declined to answer.
-func (s *PassphraseService) question() (q *question, asking bool) {
+func (s *PassphraseService) question(create bool) (q *question, asking bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.declined {
 		return nil, false
 	}
 	if s.open == nil {
-		s.open, asking = &question{done: make(chan struct{})}, true
+		s.open, asking = &question{done: make(chan struct{}), create: create}, true
 	}
 	return s.open, asking
 }
@@ -151,4 +159,12 @@ func (s *PassphraseService) reply(a askedPassword) {
 // when the window shuts down, so no goroutine waits on a window that is gone.
 func (s *PassphraseService) Close() {
 	s.closeOnce.Do(func() { close(s.closed) })
+}
+
+// mode is what the "passphrase" event carries: "create" for a vault being made, "unlock" for one that exists.
+func (q *question) mode() string {
+	if q.create {
+		return "create"
+	}
+	return "unlock"
 }

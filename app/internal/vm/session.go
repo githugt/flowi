@@ -21,6 +21,9 @@ import (
 // welcomeMarker is the file whose presence says the first run is over.
 const welcomeMarker = "welcome-shown.json"
 
+// versionMarker holds the version whose release notes were last shown.
+const versionMarker = "version-seen.json"
+
 const (
 	sessionDirMode  = 0o700
 	sessionFileMode = 0o600 // histories hold response bodies
@@ -59,6 +62,15 @@ func (s *SessionStore) WelcomeShown() (bool, error) {
 
 // MarkWelcomeShown remembers that the welcome page was opened, so later runs open the home page instead.
 func (s *SessionStore) MarkWelcomeShown() error { return s.write(welcomeMarker, true) }
+
+// SeenVersion is the version of the build that last showed its release notes ("" before the first launch).
+func (s *SessionStore) SeenVersion() (string, error) {
+	var v string
+	return v, s.read(versionMarker, &v)
+}
+
+// MarkVersionSeen remembers that the notes of version were shown.
+func (s *SessionStore) MarkVersionSeen(version string) error { return s.write(versionMarker, version) }
 
 // SaveLog stores the run log's lines.
 func (s *SessionStore) SaveLog(lines []string) error { return s.write("log.json", lines) }
@@ -156,7 +168,44 @@ func (h *History) Export() []StoredExchange {
 		out = append(out, StoredExchange{ID: ex.ID, At: ex.At, Title: ex.Title, Collection: ex.Target.Collection, Request: ex.Target.Request,
 			Version: ex.Version, RunID: ex.Result.RunID, Status: ex.Result.Status, Record: ex.Result.Record})
 	}
+	budgetBodies(out, maxStoredBodyBytes, maxStoredBody)
 	return out
+}
+
+const (
+	maxStoredBody      = 256 << 10 // a response body over this is not stored
+	maxStoredBodyBytes = 64 << 20  // the bodies of the whole history together
+)
+
+// budgetBodies leaves out the content of response bodies the stored history should not carry: any over one, and
+// the oldest ones once the newer ones use up budget. Items are newest first. The record is copied before it is
+// changed, so the history in memory keeps its bodies; metadata, size and digest stay, and Dropped says why.
+//
+// Before: the history was limited by count alone, so 50 responses of 1 MiB were rewritten into history.json on
+// every send.
+func budgetBodies(items []StoredExchange, budget, one int) {
+	used := 0
+	for i := range items {
+		rec := items[i].Record
+		if rec == nil {
+			continue
+		}
+		n := len(rec.Body.Text) + len(rec.Body.Base64)
+		why := ""
+		switch {
+		case n > one:
+			why = fmt.Sprintf("over %d KiB", one>>10)
+		case used+n > budget:
+			why = "history over its size limit"
+		}
+		if why == "" {
+			used += n
+			continue
+		}
+		cp := *rec
+		cp.Body.Text, cp.Body.Base64, cp.Body.JSON, cp.Body.Dropped = "", "", nil, why
+		items[i].Record = &cp
+	}
 }
 
 // Restore adds stored exchanges, newest first, behind what the history

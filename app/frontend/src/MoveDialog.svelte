@@ -1,6 +1,11 @@
 <script lang="ts">
+  import { listKeyTarget } from './lib/listkeys'
+  import { contains } from './lib/fold'
+  import { isEnter } from './lib/enterkey'
+  import Modal from './Modal.svelte'
   import SearchField from './SearchField.svelte'
   import Button from './Button.svelte'
+  import EmptyState from './EmptyState.svelte'
   // Move to…: where one or more requests go, any collection or request folder. The old "Rename / move"
   // asked only for a path, inside the request's own collection.
   import { WorkspaceService } from '../bindings/github.com/githugt/flowi/app/internal/bridge'
@@ -23,8 +28,8 @@
   })
 
   const shown = $derived.by(() => {
-    const q = query.trim().toLowerCase()
-    return q ? targets.filter((t) => t.label.toLowerCase().includes(q)) : targets
+    const q = query.trim()
+    return q ? targets.filter((t) => contains(t.label, q)) : targets
   })
   const title = $derived(ids && ids.length > 1 ? `Move ${ids.length} requests` : 'Move request')
 
@@ -38,10 +43,10 @@
   }
   function keys(e: KeyboardEvent) {
     if (e.key === 'Escape') close()
-    else if (e.key === 'Enter' && chosen) move()
+    else if (isEnter(e) && chosen) move()
     else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
       const i = shown.findIndex((t) => t.row === chosen)
-      const next = shown[Math.min(Math.max(i + (e.key === 'ArrowDown' ? 1 : -1), 0), shown.length - 1)]
+      const next = shown[listKeyTarget(e.key, i, shown.length)!]
       if (next) chosen = next.row
     } else return
     e.preventDefault()
@@ -49,9 +54,7 @@
 </script>
 
 {#if ids}
-  <div class="scrim" role="presentation" onpointerdown={close}>
-    <div class="dialog" role="dialog" aria-label={title} tabindex="-1" onpointerdown={(e) => e.stopPropagation()} onkeydown={keys}>
-      <h3>{title}</h3>
+  <Modal {title} onclose={close} onkeydown={keys}>
       <p class="muted">To a collection, or a folder of its requests. Each request keeps its name.</p>
       <SearchField bind:el={filter} bind:value={query} label="Filter places" />
       <div class="list" role="listbox" aria-label="Places">
@@ -61,28 +64,22 @@
             {query ? t.label : t.label.split(' / ').pop()}{#if t.draft}<span class="tag">draft</span>{/if}
           </button>
         {:else}
-          <p class="muted empty">No place matches.</p>
+          <EmptyState kind="filtered" compact {query} onclear={() => (query = '')} />
         {/each}
       </div>
-      <div class="actions">
-        <Button type="button" onclick={close}>Cancel</Button>
-        <Button type="button" variant="primary" disabled={!chosen} onclick={move}>Move</Button>
-      </div>
-    </div>
-  </div>
+    {#snippet actions()}
+      <Button type="button" onclick={close}>Cancel</Button>
+      <Button type="button" variant="primary" disabled={!chosen} onclick={move}>Move</Button>
+    {/snippet}
+  </Modal>
 {/if}
 
 <style>
-  .scrim { position: fixed; inset: 0; background: rgb(0 0 0 / 0.4); display: grid; place-items: center; z-index: 60; }
-  .dialog { width: 420px; max-height: 80vh; display: flex; flex-direction: column; gap: 10px; padding: 16px; background: var(--panel); border: 1px solid var(--line); border-radius: var(--r-lg); outline: none; }
-  h3 { margin: 0; }
   .muted { color: var(--muted); font-size: var(--fs-sm); margin: 0; }
   .list { flex: 1; min-height: 120px; max-height: 340px; overflow: auto; border: 1px solid var(--line); border-radius: var(--r-md); padding: 4px; background: var(--bg); }
   .list button { width: 100%; display: flex; align-items: center; gap: 6px; text-align: left; background: none; border: 0; border-radius: var(--r-sm); color: var(--text); font: inherit; padding-block: 4px; padding-right: 10px; }
   .list button:hover { background: var(--tint-hover); }
-  .list button.on { background: color-mix(in srgb, var(--accent) 24%, transparent); }
+  .list button.on { background: var(--tint-sel); }
   .list button.top { font-weight: 600; }
   .tag { margin-left: auto; color: var(--muted); font-size: var(--fs-xs); font-weight: 400; }
-  .empty { padding: 8px; }
-  .actions { display: flex; justify-content: flex-end; gap: 8px; }
 </style>

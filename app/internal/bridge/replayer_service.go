@@ -4,6 +4,7 @@ package bridge
 
 import (
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/githugt/flowi/app/internal/vm"
@@ -53,6 +54,16 @@ type TrafficRow struct {
 	Delay   string `json:"delay"`
 }
 
+// RecordedView is what the replayer saved as new requests while it forwarded calls no saved request matched.
+//
+// Before: record mode ended with no result. It wrote request files into the collection and said nothing of how many or
+// where.
+type RecordedView struct {
+	Count    int      `json:"count"`
+	Requests []string `json:"requests"` // the saved requests' paths, first call first
+	Target   string   `json:"target"`   // where they went: "Payments/recorded"
+}
+
 // ReplayerView is the replayer mode.
 type ReplayerView struct {
 	State   string       `json:"state"` // stopped, starting, running or stopping
@@ -62,6 +73,8 @@ type ReplayerView struct {
 	Form    ReplayerForm `json:"form"`
 	Targets []Choice     `json:"targets"` // where recorded requests can be saved
 	Traffic []TrafficRow `json:"traffic"` // newest first
+	// Recorded is what this run saved as new requests; Count is 0 when nothing was saved.
+	Recorded RecordedView `json:"recorded"`
 }
 
 const maxTrafficShown = 300
@@ -150,9 +163,36 @@ func (s *ReplayerService) view() ReplayerView {
 		Form: ReplayerForm(f), Targets: s.targets(), Traffic: []TrafficRow{},
 	}
 	entries := s.vm.Entries()
+	v.Recorded = recordedOf(entries, v.Targets, f.RecordTo, f.RecordFolder)
 	for i := len(entries) - 1; i >= 0 && len(v.Traffic) < maxTrafficShown; i-- {
 		v.Traffic = append(v.Traffic, trafficRowOf(entries[i]))
 	}
+	return v
+}
+
+// recordedOf counts the requests the replayer saved: each call that was forwarded and saved names the request it made,
+// and a request several calls matched counts once.
+func recordedOf(entries []replay.Entry, targets []Choice, recordTo, folder string) RecordedView {
+	v := RecordedView{Requests: []string{}}
+	seen := map[string]bool{}
+	for _, e := range entries {
+		if e.Match != replay.MatchRecorded || e.Request == "" || seen[e.Request] {
+			continue
+		}
+		seen[e.Request] = true
+		v.Requests = append(v.Requests, e.Request)
+	}
+	v.Count = len(v.Requests)
+	collection := "Scratch"
+	for _, t := range targets {
+		if t.ID == recordTo && t.ID != "" {
+			collection = t.Path
+		}
+	}
+	if strings.TrimSpace(folder) == "" {
+		folder = "recorded"
+	}
+	v.Target = collection + "/" + strings.TrimSpace(folder)
 	return v
 }
 

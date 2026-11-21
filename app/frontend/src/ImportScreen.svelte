@@ -1,4 +1,7 @@
 <script lang="ts">
+  import ScreenPage from './ScreenPage.svelte'
+  import Field from './Field.svelte'
+  import Select from './Select.svelte'
   import TextInput from './TextInput.svelte'
   import Button from './Button.svelte'
   import { onMount } from 'svelte'
@@ -7,15 +10,21 @@
   import type { ImportView } from './lib/types'
   import PathField from './PathField.svelte'
   import FileTree from './FileTree.svelte'
+  import Icon from './Icon.svelte'
   import { buildFileTree } from './lib/filetree'
   import { ui } from './lib/ui.svelte'
+  import { app } from './lib/app.svelte'
+  import { DEFAULT_EXISTING, EXISTING_CHOICES, groupKinds } from './lib/importkinds'
+  import { collectionRoot, firstOfKind } from './lib/treewalk'
 
   let view = $state<ImportView | null>(null)
   const fileTree = $derived(buildFileTree(view?.files ?? []))
   let file = $state('')
   let overlay = $state('')
-  let existing = $state('refuse')
+  let existing = $state(DEFAULT_EXISTING)
   let showItems = $state(true)
+  // Where to go next once an import is done: the first request of the collection it went into.
+  const firstRequest = $derived(view?.done ? firstOfKind('request', collectionRoot(app.tree?.roots, view.collection)?.children ?? []) : undefined)
 
   onMount(() =>
     live<ImportView>('import', () => ImportService.State(), (v) => {
@@ -57,38 +66,41 @@
 </script>
 
 {#if view}
-  <div class="page">
+  <ScreenPage width={860} column>
     <p class="note">Import an API description or a collection from another tool. Nothing is written until you have seen the preview.</p>
     <div class="grid">
-      <label class="f"><span>Kind</span>
-        <select value={view.kind} onchange={(e) => ImportService.SetKind(e.currentTarget.value)}>
-          {#each view.kinds as k}<option value={k.id}>{k.label}</option>{/each}
-        </select>
-      </label>
+      <Field label="Kind">
+        <Select value={view.kind} onchange={(e) => ImportService.SetKind(e.currentTarget.value)}>
+          {#each groupKinds(view.kinds) as g (g.title)}
+            <optgroup label={g.title}>{#each g.kinds as k (k.id)}<option value={k.id}>{k.label}</option>{/each}</optgroup>
+          {/each}
+        </Select>
+      </Field>
       <div class="f"><span>Into collection</span>
         <button type="button" class="choose" onclick={chooseCollection} title="Choose a collection, or make a new one">
-          {collectionLabel ?? 'Choose a collection…'}<span class="chev">▾</span>
+          {collectionLabel ?? 'Choose a collection…'}<span class="chev"><Icon name="chevd" size={12} /></span>
         </button>
       </div>
     </div>
 
+    {#if view.detected}<p class="note" role="status">Recognised {view.detected}: the kind is set to match. Change it above if that is wrong.</p>{/if}
     {#if view.pasted}
       <div class="pasted">
         <span>Importing the text you pasted.</span>
-        <button type="button" class="link" onclick={usePath}>Choose a file instead</button>
+        <Button variant="link" onclick={usePath}>Choose a file instead</Button>
       </div>
     {:else}
       <PathField bind:value={file} kind={kind?.source === 'folder' ? 'folder' : 'file'} label={kind?.source === 'folder' ? 'Folder to import' : 'File to import, or an http(s) URL'} title="Choose what to import" />
     {/if}
     {#if kind?.source === 'paste'}
-      <label class="f"><span>…or paste it here (curl commands, a .http file, a Mermaid flowchart)</span>
+      <Field label="…or paste it here (curl commands, a .http file, a Mermaid flowchart)">
         <textarea value={view.paste} oninput={(e) => ImportService.SetPaste(e.currentTarget.value)} spellcheck="false"></textarea>
-      </label>
+      </Field>
     {/if}
     {#if kind?.overlay}
-      <label class="f"><span>Overlay (fixes applied before the import): file(s) or URL(s), separated by ;</span>
+      <Field label="Overlay (fixes applied before the import): file(s) or URL(s), separated by ;">
         <TextInput bind:value={overlay} label="Overlay" oninput={() => ImportService.SetOverlay(overlay)} />
-      </label>
+      </Field>
     {/if}
 
     <div class="actions">
@@ -103,7 +115,7 @@
         <ul>{#each view.lossy as l}<li>{l}</li>{/each}</ul>
       {/if}
       {#if view.items.length}
-        <h4><button class="link" onclick={() => (showItems = !showItems)}>{showItems ? '▾' : '▸'} Report ({view.items.length})</button></h4>
+        <h4><button class="link" onclick={() => (showItems = !showItems)}><Icon name={showItems ? 'chevd' : 'chevr'} size={12} /> Report ({view.items.length})</button></h4>
         {#if showItems}
           {#each view.items as it}
             <div class="item" class:skipped={it.skipped}>
@@ -119,13 +131,11 @@
       <h4>Files</h4>
       <div class="files"><FileTree nodes={fileTree} /></div>
       {#if view.existing}
-        <label class="f"><span>{view.existing} file(s) already exist</span>
-          <select bind:value={existing}>
-            <option value="refuse">Stop if any exist</option>
-            <option value="overwrite">Overwrite them</option>
-            <option value="skip">Skip them, add only new files</option>
-          </select>
-        </label>
+        <Field label={`${view.existing} file(s) already exist`}>
+          <Select bind:value={existing}>
+            {#each EXISTING_CHOICES as c (c.id)}<option value={c.id}>{c.label}</option>{/each}
+          </Select>
+        </Field>
       {/if}
       <div class="actions">
         <Button variant="primary" disabled={!view.canImport} onclick={() => ImportService.Import(existing, view!.skipped > 0)}>
@@ -133,21 +143,26 @@
         </Button>
       </div>
     {/if}
-    {#if view.done}<p class="ok">{view.done}</p>{/if}
-  </div>
+    {#if view.done}
+      <p class="ok">{view.done}</p>
+      <div class="actions">
+        {#if firstRequest}<Button variant="primary" onclick={() => app.open(firstRequest!)}>Open {firstRequest.label}</Button>{/if}
+        <Button onclick={() => app.openScreen('screen:manager', 'Collections')}>Collections</Button>
+      </div>
+    {/if}
+  </ScreenPage>
 {/if}
 
 <style>
-  .page { position: absolute; inset: 0; overflow: auto; padding: 28px 32px 56px; max-width: 860px; display: flex; flex-direction: column; gap: 10px; }
   .note { color: var(--muted); margin: 0; }
   .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
   .f { display: flex; flex-direction: column; gap: 3px; color: var(--muted); font-size: var(--fs-xs); }
   .choose { min-height: var(--ctl-h); display: flex; justify-content: space-between; align-items: center; gap: 8px; text-align: left; background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); padding: 5px 8px; font: inherit; }
   .choose:hover { border-color: var(--accent); }
-  .chev { color: var(--muted); }
+  .chev { display: inline-flex; color: var(--muted); }
   textarea { min-height: 90px; font: var(--fs-sm) var(--mono); resize: vertical; }
   .actions { display: flex; gap: 8px; }
-  .link { background: none; border: 0; color: var(--text); padding: 0; font: inherit; font-weight: 600; }
+  .link { display: inline-flex; align-items: center; gap: var(--sp-1); background: none; border: 0; color: var(--text); padding: 0; font: inherit; font-weight: 600; }
   h3 { margin: 12px 0 0; }
   h4 { margin: 8px 0 2px; font-size: var(--fs-sm); }
   .muted { color: var(--muted); font-weight: 400; font-size: var(--fs-sm); }

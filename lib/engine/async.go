@@ -52,6 +52,9 @@ func (x *execution) sendAsync(ctx context.Context, post []HookRef) {
 		x.fail(StatusError, diag.List{diag.New(diag.CodeAsyncProtocol, diag.Location{}, map[string]string{"protocol": b.protocol})})
 		return
 	}
+	if !x.checkAsyncSecretDestination(b.op) {
+		return
+	}
 	x.emitAsyncSent(b)
 	if b.op.Receive != nil {
 		seq := 0
@@ -139,7 +142,7 @@ func (x *execution) failAsync(err error, res transport.Result) {
 // buildAsync renders the version strictly, after the pre-hooks.
 func (x *execution) buildAsync() (builtAsync, bool) {
 	b, diags := x.renderAsync(false)
-	diags = append(diags, x.r.secrets.problems(x.env.name, b.missing)...)
+	diags = append(diags, x.r.secrets.problems(x.env, b.missing)...)
 	if diags.HasErrors() {
 		x.fail(StatusError, diags)
 		return builtAsync{}, false
@@ -150,7 +153,7 @@ func (x *execution) buildAsync() (builtAsync, bool) {
 func (x *execution) renderAsync(lenient bool) (builtAsync, diag.List) {
 	in := buildInput{
 		version: x.version, scope: x.scope(lenient), empty: x.cfg.empty, label: x.c.request.Path,
-		root: x.c.collection.Root, secretVars: x.env.secrets, missingSecret: x.r.secrets.isMissing(x.env.name), memo: x.memo,
+		root: x.c.collection.Root, secretVars: x.env.secrets, envValues: x.env.values, missingSecret: x.r.secrets.isMissing(x.env.name), memo: x.memo,
 		secret: x.r.secrets.derived, verbatim: lenient,
 	}
 	b, diags := buildAsync(in)

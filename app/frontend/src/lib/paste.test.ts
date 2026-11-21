@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { recognise } from './paste'
+import { isEditable, recognise, windowPaste } from './paste'
+import app from '../App.svelte?raw'
 
 describe('recognise', () => {
   it.each([
@@ -30,5 +31,35 @@ describe('recognise', () => {
     ['nothing', '   '],
   ])('Given %s Then it pastes as text', (_, text) => {
     expect(recognise(text)).toBeNull()
+  })
+})
+
+describe('paste anywhere in the window', () => {
+  const curl = "curl -X POST https://api.example.com/orders -d '{}'"
+
+  it('tells a place that takes text from one that does not', () => {
+    expect(isEditable({ tagName: 'INPUT' })).toBe(true)
+    expect(isEditable({ tagName: 'textarea' })).toBe(true)
+    expect(isEditable({ tagName: 'DIV', isContentEditable: true })).toBe(true)
+    expect(isEditable({ tagName: 'DIV', closest: (s: string) => (s.includes('.cm-editor') ? {} : null) })).toBe(true)
+    expect(isEditable({ tagName: 'DIV', closest: () => null })).toBe(false)
+    expect(isEditable(null)).toBe(false)
+  })
+
+  it('offers an import for a recognised paste on the canvas, sidebar or Home', () => {
+    // Before: only the request address bar looked at a paste.
+    expect(windowPaste({ tagName: 'DIV' }, curl, false)?.id).toBe('curl')
+  })
+
+  it('leaves a paste into a field, a handled one, plain text and a request file alone', () => {
+    expect(windowPaste({ tagName: 'INPUT' }, curl, false)).toBeNull()
+    expect(windowPaste({ tagName: 'DIV' }, curl, true)).toBeNull()
+    expect(windowPaste({ tagName: 'DIV' }, 'hello', false)).toBeNull()
+    expect(windowPaste({ tagName: 'DIV' }, 'versions:\n  - label: a\n    method: GET\n', false)).toBeNull()
+  })
+
+  it('is listened for on the window and opens the offer without a request', () => {
+    expect(app).toContain('onpaste={onWindowPaste}')
+    expect(app).toContain("app.pasteOffer = { node: '', kind, text, http: false, field: null }")
   })
 })

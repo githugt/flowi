@@ -45,12 +45,12 @@ func (rt *nodeRuntime) WriteFile(dir, name string, data []byte, appendTo bool) (
 
 func writeData(file string, data []byte, appendTo bool) error {
 	if !appendTo {
-		return writeFileAtomic(file, data)
+		return writeFileAtomic(file, data, dataFileMode)
 	}
 	if err := os.MkdirAll(filepath.Dir(file), 0o750); err != nil {
 		return fmt.Errorf("creating %s: %w", filepath.Dir(file), err)
 	}
-	f, err := os.OpenFile(file, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644) //nolint:gosec // path built from validated segments under the data dir
+	f, err := os.OpenFile(file, os.O_APPEND|os.O_CREATE|os.O_WRONLY, dataFileMode)
 	if err != nil {
 		return fmt.Errorf("opening %s: %w", file, err)
 	}
