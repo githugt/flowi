@@ -1,1 +1,8 @@
 go.work.sum
+.claude/worktrees/
+bin/
+dist/
+improvements-table.md
+critiques-and-improvements.md
+test_updates.md
+updates.md

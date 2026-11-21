@@ -1,14 +1,36 @@
 <script lang="ts">
+  import { modalOpen } from './lib/modal'
+  import { untrack } from 'svelte'
+  import { nodeUi, setNodeUi } from './lib/nodeui'
+  import { headerWord, sectionTitle } from './lib/sectiontitle'
+  import { isLetter } from './lib/keymatch'
+  import Select from './Select.svelte'
   import Toggle from './Toggle.svelte'
+  import { headersHint } from './lib/headershint'
+  import IconButton from './IconButton.svelte'
+  import Segmented from './Segmented.svelte'
+  import Menu, { type MenuItem } from './Menu.svelte'
+  import { anchorAt, type MenuAt } from './lib/menuanchor'
+  import { copy as copyOut } from './lib/clip'
+  import { snippetCopied, copyCodeLabel } from './lib/snippetnote'
+  import { COMMON_HEADERS, headerValues, implicitHeaders } from './lib/headernames'
+  import { modeLoss } from './lib/modeloss'
   import { errorText } from './lib/errors'
   import { app } from './lib/app.svelte'
   import { ui } from './lib/ui.svelte'
   import { parseXml } from './lib/xml'
+  import { jsonProblem } from './lib/jsonproblem'
+  import { elapsedText } from './lib/elapsed'
+  import Button from './Button.svelte'
   import { RequestService } from '../bindings/github.com/githugt/flowi/app/internal/bridge'
+  import type { DiskDiff } from './lib/diskdiff'
   import type { Extraction, RequestView } from './lib/types'
-  import TextField from './TextField.svelte'
+  import { extractChip } from './lib/extractchip'
+  import TextInput from './TextInput.svelte'
+  import Field from './Field.svelte'
   import TemplateField from './TemplateField.svelte'
   import KVRows from './KVRows.svelte'
+  import ConnectionTest from './ConnectionTest.svelte'
   import ResponsePane from './ResponsePane.svelte'
   import Splitter from './Splitter.svelte'
   let leftWidth = $state(520)
@@ -20,7 +42,8 @@
   import AssertCards from './AssertCards.svelte'
   import OutcomesEditor from './OutcomesEditor.svelte'
   import { requestVocabulary } from './lib/vocabulary'
-  import { sectionCounts } from './lib/tabcounts'
+  import { sectionConfigured, sectionCounts } from './lib/tabcounts'
+  import { startersFor } from './lib/assertstarters'
   import Dropdown from './Dropdown.svelte'
   import ExprHelp from './ExprHelp.svelte'
   import RequestMatrix from './RequestMatrix.svelte'
@@ -30,12 +53,17 @@
   import VersionDetails from './VersionDetails.svelte'
   import StoredResponses from './StoredResponses.svelte'
   import Verb from './Verb.svelte'
+  import { isMac } from './lib/commands'
+  import { hookBadge } from './lib/hookmode'
+  import { onEvent } from './lib/events'
+  import { isSendKey } from './lib/sendkey'
   import Icon from './Icon.svelte'
   import MethodPicker from './MethodPicker.svelte'
   import CodeArea from './CodeArea.svelte'
   import type { CodeLang } from './lib/highlight'
   import EmptyState from './EmptyState.svelte'
   import { protocolVerb } from './lib/verbs'
+  import { sendNeedsConfirm } from './lib/protect'
   import { isFileDriver, moveServerPassword, serverHasPassword } from './lib/dataset'
   import { AuthsService, SecretsService } from '../bindings/github.com/githugt/flowi/app/internal/bridge'
   const PASSWORD_NOTE = "The password is saved in this request's file, which is often committed. Put it in a secret and write {{secret.name}} in its place."
@@ -44,7 +72,6 @@
   import { authSummary } from './lib/authsummary'
   import type { DropOption } from './lib/types'
   import { WorkspaceService, ManagerService } from '../bindings/github.com/githugt/flowi/app/internal/bridge'
-  import { Events } from '@wailsio/runtime'
   import type { KeptSpec, SpecOrigin } from './lib/types'
   import OverlayDialog from './OverlayDialog.svelte'
   import VersionPicker from './VersionPicker.svelte'
@@ -69,11 +96,11 @@
   // Databases that take a login in the connection URL; a file or an SQLite path has none.
   const urlDriver = $derived(['postgres', 'mysql', 'mariadb'].includes(view.dataset?.block.Driver ?? ''))
   const sections = $derived.by(() => {
-    if (view.kind === 'dataset') return ['Query', 'Values', ...(urlDriver ? ['Credentials'] : []), 'Extract', 'Assert', 'Outcomes', 'Variables', 'Settings', 'Hooks', 'Docs', 'Responses', 'Used by']
-    if (view.kind === 'grpc') return ['Message', 'Headers', 'Receive', 'Auth', 'Proto', 'Variables', 'Extract', 'Assert', 'Outcomes', 'Settings', 'Hooks', 'Schema', 'Docs', 'Responses', 'Used by']
+    if (view.kind === 'dataset') return ['Query', 'Values', ...(urlDriver ? ['Credentials'] : []), 'Extract', 'Assert', 'Outcomes', 'Variables', 'Settings', 'Hooks', 'Docs', 'Code', 'Responses', 'Used by']
+    if (view.kind === 'grpc') return ['Message', 'Headers', 'Receive', 'Auth', 'Proto', 'Variables', 'Extract', 'Assert', 'Outcomes', 'Settings', 'Hooks', 'Schema', 'Docs', 'Code', 'Responses', 'Used by']
     if (view.kind === 'async') {
       const p = view.async?.block.Protocol
-      return ['Message', 'Headers', 'Receive', ...(view.async?.credentials.length ? ['Credentials'] : []), 'Binding', 'Variables', 'Extract', 'Assert', 'Outcomes', 'Settings', 'Hooks', 'Schema', 'Docs', 'Responses', 'Used by'].filter(
+      return ['Message', 'Headers', 'Receive', ...(view.async?.credentials.length ? ['Credentials'] : []), 'Binding', 'Variables', 'Extract', 'Assert', 'Outcomes', 'Settings', 'Hooks', 'Schema', 'Docs', 'Code', 'Responses', 'Used by'].filter(
         (s) => !(s === 'Receive' && p === 'sns') && !(s === 'Message' && p === 'sse' && !view.async?.block.Send),
       )
     }
@@ -112,33 +139,36 @@
   })
   const moreSecs = $derived(ordered.filter((s) => !mainSecs.includes(s)))
   // A gRPC request's message is its Body and what it waits for is a Stream.
-  const titleOf = (s: string) => (view.kind === 'grpc' ? ({ Message: 'Body', Receive: 'Stream' } as Record<string, string>)[s] ?? s : s)
+  const titleOf = (s: string) => sectionTitle(view.kind, s)
   const iconOf = (s: string) =>
     ({ Params: 'params', Headers: 'headers', Body: 'body', Message: 'body', Query: 'body', Values: 'params', Auth: 'auth', Credentials: 'auth', Extract: 'extract', Assert: 'assert', Outcomes: 'checks', Variables: 'variables', Hooks: 'hooks', Docs: 'docs', Schema: 'schema', Receive: 'stream', Proto: 'proto', Binding: 'binding', Code: 'code', Cookies: 'cookie', Responses: 'clock', 'Used by': 'usedby', Settings: 'settings' } as Record<string, string>)[s] ?? 'list'
   // The green dot: the section has content.
-  const configured = (s: string) =>
-    ({
-      Params: !!v.Query?.length,
-      Headers: !!(view.async && !view.async.headersAreConnection ? view.async.block.Send?.Headers?.length : v.Headers?.length),
-      Body: view.bodyKind !== 'none',
-      Query: !!view.dataset?.block.Query.trim(),
-      Values: !!view.dataset?.block.Params?.length,
-      Message: !!(view.async?.block.Send || (view.grpc?.block.Body.JSON || view.grpc?.block.Body.Text)),
-      Auth: view.auth.kind !== 'none',
-      Hooks: view.hookChain.length > 0,
-      Docs: !!v.Docs,
-      Variables: !!v.Variables?.length,
-      Extract: !!v.Extract?.length,
-      Assert: !!v.Assert?.length,
-      Outcomes: !!v.Outcomes?.length,
-    })[s] ?? false
+  const configured = (s: string) => sectionConfigured(view, s)
   // The count badge: how many rows the section holds. Sections that are not lists keep the dot.
   const counts = $derived(sectionCounts(view))
   const moreOptions = $derived<DropOption[]>(moreSecs.map((s) => ({ value: s, label: titleOf(s), icon: iconOf(s), dot: configured(s), count: counts[s] })))
-  let chosen = $state<Section>('')
+  // The section, the hook mode and the replay bar are kept per node, so a tab switch (which remounts this) leaves them.
+  const kept = untrack(() => nodeUi(view.node))
+  let chosen = $state<Section>(kept.section)
+  let expectProblem = $state('') // what is wrong with the text typed in Expected status; '' when nothing is
   const section = $derived(sections.includes(chosen) ? chosen : sections[0])
   // The open menu: the Send button's (how to send) or the Save button's (versions).
   let menu = $state<'send' | 'save' | null>(null)
+  let menuAt = $state<MenuAt>({ x: 0, y: 0 })
+  function openMenu(which: 'send' | 'save', e: MouseEvent) {
+    menuAt = anchorAt((e.currentTarget as HTMLElement).getBoundingClientRect(), { end: true })
+    menu = menu === which ? null : which
+  }
+  // A click in the first 0.4 s after Send is the second half of a double-click: it does not cancel.
+  // How long the send has run, counted in the window: it ticks while a send is on and starts again with the next.
+  let sendMs = $state(0)
+  $effect(() => {
+    if (!view.sending) return
+    const from = Date.now()
+    sendMs = 0
+    const tick = setInterval(() => (sendMs = Date.now() - from), 100)
+    return () => clearInterval(tick)
+  })
   let detailsOpen = $state(false)
   // The Docs section shows the notes as written (Markdown source) or as read.
   let docsPreview = $state(false)
@@ -159,8 +189,8 @@
   })
   $effect(() => {
     const forNode = node
-    const offOrigin = Events.On('spec-origin', (e: any) => e.data === forNode && askOrigin(forNode))
-    const offTree = Events.On('workspace', () => askOrigin(forNode))
+    const offOrigin = onEvent('spec-origin', (data) => data === forNode && askOrigin(forNode))
+    const offTree = onEvent('workspace', () => askOrigin(forNode))
     return () => {
       offOrigin()
       offTree()
@@ -188,9 +218,10 @@
       fail(e)
     }
   }
-  let replayOpen = $state(false)
+  let replayOpen = $state(kept.replay)
   let matrixOpen = $state(false)
-  let hooks = $state('all')
+  let hooks = $state(kept.hooks)
+  $effect(() => setNodeUi(node, { section: chosen, hooks, replay: replayOpen }))
 
   const bodyKinds = ['none', 'text', 'form', 'file']
   const formats = ['json', 'xml', 'yaml', 'raw']
@@ -203,6 +234,13 @@
     const got = parseXml(bodyText)
     return 'error' in got ? got.error : null
   })
+  // A JSON body is checked the same way, and Beautify indents it.
+  const jsonBad = $derived(view.bodyFormat === 'json' && view.bodyKind === 'text' ? jsonProblem(bodyText) : null)
+  async function beautifyBody() {
+    const [pretty, ok] = (await RequestService.PrettyJSON(bodyText)) as unknown as [string, boolean]
+    if (ok) RequestService.SetBodyText(node, pretty)
+    else ui.toast('The body is not valid JSON, so it cannot be formatted. A template must be inside a string to count as JSON.', 'error')
+  }
   const codeLangOf = (format: string): CodeLang => (format === 'json' ? 'json' : format === 'yaml' ? 'yaml' : format === 'xml' ? 'xml' : 'text')
 
   // A method the lists lack (typed through Custom…) shows as the current choice, so the button is never blank.
@@ -241,6 +279,12 @@
     else RequestService.SetAuth(node, k, view.auth.value)
   }
   const protocolOptions = $derived<DropOption[]>((view.async?.protocols ?? []).map((p) => ({ value: p.id, label: p.label, tone: protocolVerb(p.id) })))
+  // Switching to a mode that has no room for what was written asks first: the other side is deleted.
+  function chooseMode(m: string) {
+    const lost = modeLoss(view.async?.block, m)
+    if (!lost) return void RequestService.SetMode(node, m)
+    ui.confirm('Switch the mode?', `Switching to ${modeLabels[m] ?? m} deletes ${lost}.`, () => RequestService.SetMode(node, m), 'Switch')
+  }
   const modeLabels: Record<string, string> = { send: 'Send', receive: 'Receive', send_receive: 'Send, then receive' }
   // The button says what a message request will do, in its own colour: it said Send while set to receive.
   const actions: Record<string, { label: string; tone: string }> = {
@@ -365,10 +409,50 @@
       fail(e)
     }
   }
-  function menuAction(run: () => void) {
-    menu = null
-    run()
-  }
+  const sendItems = $derived.by<MenuItem[]>(() => {
+    const out: MenuItem[] = []
+    const modes = view.async?.modes ?? []
+    for (const m of modes) out.push({ label: modeLabels[m] ?? m, checked: view.async?.mode === m, onselect: () => chooseMode(m) })
+    hookModes.forEach(([m, label], i) =>
+      out.push({ label, checked: hooks === m, onselect: () => (hooks = m), heading: i === 0 ? 'When sending' : undefined, separated: i === 0 && modes.length > 0 }),
+    )
+    // Only an HTTP request has the replay bar: on any other kind the item toggled a tick and showed nothing.
+    const blocked = view.inScratch || view.dirty
+    if (view.kind === 'http') out.push({ label: 'Replay saved responses…', checked: replayOpen, onselect: () => (replayOpen = !replayOpen), separated: true })
+    out.push({
+      label: 'Run a matrix…',
+      disabled: blocked,
+      title: blocked ? 'Save the request first: a matrix sends the file on disk' : 'Send it once for every combination of environments, overlays and values',
+      onselect: () => (matrixOpen = true),
+      separated: view.kind !== 'http',
+    })
+    return out
+  })
+  const saveItems = $derived.by<MenuItem[]>(() => {
+    const out: MenuItem[] = []
+    if (view.flowiOverlay) {
+      out.push({ label: `Save to flowi overlay ${view.flowiOverlay}…`, hint: '⌘S', disabled: !view.dirty, onselect: () => (saveOverlayOpen = true) })
+      out.push({ label: 'Save into the version, with the overlay', title: "Writes the overlay's changes into the version itself", onselect: saveVersion })
+    } else {
+      out.push({ label: 'Save current version', hint: '⌘S', onselect: saveVersion })
+    }
+    out.push({ label: 'Save as new version…', onselect: newVersion })
+    if (!view.inScratch) {
+      out.push({ label: 'Save as new request…', title: 'Copies the request as saved, under a new name or in another place', onselect: saveAsNew })
+      out.push({ label: 'Save as flowi overlay…', disabled: !view.dirty && !view.flowiOverlay, title: 'Keeps the changes apart from the version, to lay over it when sending', onselect: () => (saveOverlayOpen = true) })
+    }
+    if (origin?.spec) out.push({ label: "Save to the API spec's overlay file…", title: `Also write what the spec can say to an overlay on ${origin.spec}`, onselect: () => (overlayOpen = true) })
+    out.push({ label: 'Set as default version', onselect: () => RequestService.SetDefault(node) })
+    out.push({ label: 'Version title and description…', onselect: () => (detailsOpen = true) })
+    out.push({
+      label: 'Delete this version…',
+      danger: true,
+      separated: true,
+      onselect: () => ui.confirm('Delete version?', `Version ${view.selected} is removed from the request file. This cannot be undone.`, () => deleteVersion(), 'Delete'),
+    })
+    if (!view.inScratch) out.push({ label: 'Delete this request…', danger: true, onselect: () => ui.confirm('Delete request', `Delete ${view.name}?`, () => WorkspaceService.Do('delete', [node], '', ''), 'Delete') })
+    return out
+  })
 
   function newExtraction(): Extraction {
     return { Name: '', From: 'body', Path: '', Header: '', Cookie: '', Regex: '' }
@@ -421,18 +505,48 @@
     app.pasteOffer = { node, kind, text, http: view.kind === 'http', field: e.target instanceof HTMLElement ? e.target : null }
   }
 
+  // A protected environment asks before a request that changes data goes out.
+  // The click shows at once: Go takes a moment to report that it is sending, and a second click in that moment
+  // sent the request twice. Before: the button waited for Go to answer before it changed.
+  let pending = $state(false)
+  function dispatch() {
+    if (pending) return
+    pending = true
+    void Promise.resolve(RequestService.Send(node, hooks)).finally(() => (pending = false))
+  }
+  function send() {
+    const env = app.tree?.selected ?? ''
+    const shape = { kind: view.kind, method: view.current.Method, writes: !!view.dataset?.block.Writes }
+    if (sendNeedsConfirm(env, app.tree?.protected ?? [], shape)) {
+      const what = view.kind === 'http' ? `${view.current.Method.toUpperCase()} ${view.fullUrl}` : view.name
+      ui.confirm(`Send to ${env}?`, `${env} is a protected environment. This request changes data: ${what}`, dispatch, 'Send')
+    } else {
+      dispatch()
+    }
+  }
+
   // The palette's Send command: only the editor that is showing sends.
   let seenSend = app.sendRequests
   $effect(() => {
     if (app.sendRequests === seenSend) return
     seenSend = app.sendRequests
-    if (app.active === node) RequestService.Send(node, hooks)
+    if (app.active === node) send()
   })
 
   function onkeydown(e: KeyboardEvent) {
-    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 's') {
+    // A dialog is open: the keys belong to it. Before, Ctrl+Enter here still sent the request behind the dialog.
+    if (modalOpen()) return
+    if ((e.metaKey || e.ctrlKey) && isLetter(e, 's')) {
       e.preventDefault()
       save()
+    }
+    // Before: the Send button and the palette advertised Ctrl/Cmd+Enter but nothing handled it. A key that is
+    // held down repeats, so a repeat is ignored: it must not send again.
+    if (isSendKey(e)) {
+      e.preventDefault()
+      send()
+    } else if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+      e.preventDefault() // the key that sends, held down or with Shift or Alt: not a send, and no new line either
     }
   }
 </script>
@@ -444,7 +558,7 @@
   {/each}
 {/snippet}
 
-<svelte:window {onkeydown} onpointerdown={() => (menu = null)} />
+<svelte:window {onkeydown} />
 
 <div class="req">
   <header {onpaste}>
@@ -457,18 +571,23 @@
           value={view.fullUrl}
           placeholder={'{{env.base_url}}/path'}
           oninput={(t) => RequestService.SetURL(node, t)}
-          onenter={() => RequestService.Send(node, hooks)}
+          onenter={() => send()}
           spans={(t) => RequestService.URLSpans(node, t) as unknown as Promise<any>}
           suggest={(t, c) => RequestService.Suggest(node, t, c) as unknown as Promise<any>}
         />
       </div>
+      {#if serverHasPassword(view.fullUrl)}
+        <span class="pwwarn" role="note" title={PASSWORD_NOTE}>⚠ Password in the URL</span>
+      {/if}
+      <span class="fhelp"><ExprHelp context="request.fields" /></span>
     {:else if view.async}
       {@const ab = view.async.block}
       <Dropdown pill title="Protocol" options={protocolOptions} value={ab.Protocol} width="110px" onpick={(p) => RequestService.SetProtocol(node, p)} />
       <div class="url2">
-        <TextField mono value={ab.Server} placeholder={'{{env.broker}}'} oninput={(t) => RequestService.SetAsync(node, { ...ab, Server: t } as never)} />
-        <TextField mono value={ab.Channel} placeholder="topic, subject, queue…" oninput={(t) => RequestService.SetAsync(node, { ...ab, Channel: t } as never)} />
+        <TemplateField aria="Server" value={ab.Server} placeholder={view.async.serverExample} oninput={(t) => RequestService.SetAsync(node, { ...ab, Server: t } as never)} onenter={() => send()}  spans={(t) => RequestService.URLSpans(node, t) as unknown as Promise<any>} suggest={(t, c) => RequestService.Suggest(node, t, c) as unknown as Promise<any>} />
+        <TemplateField aria={view.async.channelLabel} value={ab.Channel} placeholder={view.async.channelHint} oninput={(t) => RequestService.SetAsync(node, { ...ab, Channel: t } as never)} onenter={() => send()}  spans={(t) => RequestService.TemplateSpans(node, t) as unknown as Promise<any>} suggest={(t, c) => RequestService.Suggest(node, t, c) as unknown as Promise<any>} />
       </div>
+      {#if view.connection}<ConnectionTest {node} info={view.connection} />{/if}
     {:else if view.dataset}
       {@const db = view.dataset.block}
       {@const fileSource = isFileDriver(db.Driver)}
@@ -476,15 +595,16 @@
       <Dropdown pill title={fileSource ? 'File type' : 'Database'} options={view.dataset.drivers.filter((x) => isFileDriver(x.id) === fileSource).map((x) => ({ value: x.id, label: x.label, tone: protocolVerb(x.id) }))} value={db.Driver} width="130px"
         onpick={(id) => RequestService.SetDataset(node, { ...db, Driver: id } as never)} />
       <div class="url">
-        <TextField mono value={db.Server} placeholder={fileSource ? 'data/sales.csv (a file or a folder in the collection)' : db.Driver === 'sqlite' ? 'shop.db (a file in the collection)' : '{{env.database_url}}'}
-          oninput={(t) => RequestService.SetDataset(node, { ...db, Server: t } as never)} onenter={() => RequestService.Send(node, hooks)} />
+        <TemplateField aria="Server" value={db.Server} placeholder={fileSource ? 'data/sales.csv (a file or a folder in the collection)' : db.Driver === 'sqlite' ? 'shop.db (a file in the collection)' : view.dataset.serverExample}
+          oninput={(t) => RequestService.SetDataset(node, { ...db, Server: t } as never)} onenter={() => send()}  spans={(t) => RequestService.URLSpans(node, t) as unknown as Promise<any>} suggest={(t, c) => RequestService.Suggest(node, t, c) as unknown as Promise<any>} />
       </div>
       {#if fileSource || db.Driver === 'sqlite'}
         <span class="pick">
-          <button type="button" title={fileSource ? 'Choose a data file' : 'Choose the database file'} onclick={() => pickDataPath(false)}>File…</button>
-          {#if fileSource}<button type="button" title="Choose a folder of data files" onclick={() => pickDataPath(true)}>Folder…</button>{/if}
+          <Button type="button" title={fileSource ? 'Choose a data file' : 'Choose the database file'} onclick={() => pickDataPath(false)}>File…</Button>
+          {#if fileSource}<Button type="button" title="Choose a folder of data files" onclick={() => pickDataPath(true)}>Folder…</Button>{/if}
         </span>
       {/if}
+      {#if view.connection && !fileSource}<ConnectionTest {node} info={view.connection} />{/if}
       {#if !fileSource && serverHasPassword(db.Server)}
         <span class="pwwarn" role="note" title={PASSWORD_NOTE}>⚠ Password in the file</span>
       {/if}
@@ -492,74 +612,43 @@
       {@const gb = view.grpc.block}
       <Verb verb="GRPC" />
       <div class="url2">
-        <TextField mono value={gb.Server} placeholder={'grpc://{{env.host}}:50051'} oninput={(t) => RequestService.SetGRPC(node, { ...gb, Server: t } as never)} />
+        <TemplateField aria="Server" value={gb.Server} placeholder={'grpc://{{env.host}}:50051'} oninput={(t) => RequestService.SetGRPC(node, { ...gb, Server: t } as never)} onenter={() => send()}  spans={(t) => RequestService.URLSpans(node, t) as unknown as Promise<any>} suggest={(t, c) => RequestService.Suggest(node, t, c) as unknown as Promise<any>} />
         <MethodPicker {node} info={view.grpc} />
       </div>
     {/if}
-    <div class="send" data-tone={action.tone} style:--act={`var(--act-${action.tone})`}>
-      {#if view.sending}
-        <button class="act main" onclick={() => RequestService.Cancel(node)}>Cancel</button>
-      {:else}
-        <button class="act main" onclick={() => RequestService.Send(node, hooks)}>{action.label}<kbd>⌘↵</kbd></button>
-      {/if}
-      <button class="act more" aria-label="Send options" onpointerdown={(e) => e.stopPropagation()} onclick={() => (menu = menu === 'send' ? null : 'send')}><Icon name="chevd" size={14} /></button>
-      {#if menu === 'send'}
-        <div class="menu" role="menu" tabindex="-1" onpointerdown={(e) => e.stopPropagation()}>
-          {#if view.async && view.async.modes.length}
-            {#each view.async.modes as m}
-              <button role="menuitemradio" aria-checked={view.async.mode === m} onclick={() => menuAction(() => RequestService.SetMode(node, m))}><span class="tick">{view.async.mode === m ? '✓' : ''}</span>{modeLabels[m] ?? m}</button>
-            {/each}
-            <hr />
-          {/if}
-          <div class="hd">When sending</div>
-          {#each hookModes as [m, label]}
-            <button role="menuitemradio" aria-checked={hooks === m} onclick={() => menuAction(() => (hooks = m))}><span class="tick">{hooks === m ? '✓' : ''}</span>{label}</button>
-          {/each}
-          <hr />
-          <button role="menuitem" onclick={() => menuAction(() => (replayOpen = !replayOpen))}><span class="tick">{replayOpen ? '✓' : ''}</span>Replay saved responses…</button>
-          <button role="menuitem" disabled={view.inScratch || view.dirty} title={view.inScratch || view.dirty ? 'Save the request first: a matrix sends the file on disk' : 'Send it once for every combination of environments, overlays and values'} onclick={() => menuAction(() => (matrixOpen = true))}><span class="tick"></span>Run a matrix…</button>
-        </div>
-      {/if}
-    </div>
-    </div>
-    <VersionPicker {view} {node} onmanage={() => (overlaysOpen = true)} />
-    {#if view.dirty}
-      <button title="Throw away the unsaved changes" onclick={() => ui.confirm('Discard changes', 'Throw away the unsaved changes of this version?', () => RequestService.DiscardEdit(node), 'Discard')}>Discard</button>
+    {#if hookBadge(hooks)}
+      {@const badge = hookBadge(hooks)!}
+      <span class="hookbadge"><Button small title={badge.title} onclick={() => (hooks = 'all')}><Icon name="hooks" size={12} /> {badge.text}</Button></span>
     {/if}
+    {#if view.kind === 'http' && view.snippet.text}
+      <IconButton icon="code" label={copyCodeLabel(view.snippet.format)} onclick={() => void copyOut(view.snippet.text, snippetCopied(!!view.snippet.secrets, view.snippet.exclude))} />
+    {/if}
+    <div class="send" class:cancel={view.sending} data-tone={view.sending ? 'send' : action.tone} style:--act={`var(--act-${action.tone})`}>
+      {#if view.sending}
+        <button class="act main" aria-label="Cancel the send, running for {elapsedText(sendMs)}" onclick={() => sendMs >= 400 && RequestService.Cancel(node)}><span class="stop" aria-hidden="true"></span>Cancel<span class="elapsed">{elapsedText(sendMs)}</span></button>
+      {:else}
+        <button class="act main" disabled={pending} aria-busy={pending} onclick={() => send()}>{action.label}<kbd>{isMac() ? '⌘↵' : 'Ctrl+↵'}</kbd></button>
+      {/if}
+      <button class="act more" aria-label="Send options" aria-haspopup="menu" aria-expanded={menu === 'send'} disabled={view.sending} onclick={(e) => openMenu('send', e)}><Icon name="chevd" size={14} /></button>
+      {#if menu === 'send'}<Menu at={menuAt} minWidth={150} label="Send options" items={sendItems} onclose={() => (menu = null)} />{/if}
+    </div>
+    </div>
+    <VersionPicker {view} {node} onmanage={() => (overlaysOpen = true)} onnew={newVersion} />
+    <!-- The pill and Discard keep their room while the version is clean, so the header does not shift when an edit begins. -->
+    <span class="edited" class:clean={!view.dirty} aria-hidden={!view.dirty} inert={!view.dirty}>
+      <span class="pill" role="status">● Edited</span>
+      <Button small variant="ghost" title="Throw away the unsaved changes" onclick={() => ui.confirm('Discard changes', 'Throw away the unsaved changes of this version?', () => RequestService.DiscardEdit(node), 'Discard')}>Discard</Button>
+    </span>
     <!-- Saving as a new version, and the other version actions, sat at the end of the Send menu where
          nobody looked for them; they open from the Save button now. -->
     <div class="send savegrp">
       {#if view.inScratch}
         <button class="saveicon main pending" title="Save to a collection…" aria-label="Save to a collection" onclick={saveTo}><Icon name="save" size={15} /></button>
       {:else}
-        <button class="saveicon main" class:pending={view.dirty} title={view.flowiOverlay ? `Save to the flowi overlay ${view.flowiOverlay} (⌘S)` : 'Save (⌘S)'} aria-label="Save" disabled={!view.dirty} onclick={save}><Icon name="save" size={15} /></button>
+        <button class="saveicon main" class:pending={view.dirty} title={view.flowiOverlay ? `Save to the flowi overlay ${view.flowiOverlay} (⌘S)` : 'Save (⌘S)'} aria-label="Save" disabled={!view.dirty} onclick={save}><Icon name="save" size={15} /><span class="savetext">Save</span></button>
       {/if}
-      <button class="more" aria-label="Save options" aria-expanded={menu === 'save'} onpointerdown={(e) => e.stopPropagation()} onclick={() => (menu = menu === 'save' ? null : 'save')}><Icon name="chevd" size={14} /></button>
-      {#if menu === 'save'}
-        <div class="menu" role="menu" tabindex="-1" onpointerdown={(e) => e.stopPropagation()}>
-          {#if view.flowiOverlay}
-            <button role="menuitem" disabled={!view.dirty} onclick={() => menuAction(() => (saveOverlayOpen = true))}><span class="tick"></span>Save to flowi overlay {view.flowiOverlay}…<kbd>⌘S</kbd></button>
-            <button role="menuitem" title="Writes the overlay's changes into the version itself" onclick={() => menuAction(saveVersion)}><span class="tick"></span>Save into the version, with the overlay</button>
-          {:else}
-            <button role="menuitem" onclick={() => menuAction(saveVersion)}><span class="tick"></span>Save current version<kbd>⌘S</kbd></button>
-          {/if}
-          <button role="menuitem" onclick={() => menuAction(newVersion)}><span class="tick"></span>Save as new version…</button>
-          {#if !view.inScratch}
-            <button role="menuitem" title="Copies the request as saved, under a new name or in another place" onclick={() => menuAction(saveAsNew)}><span class="tick"></span>Save as new request…</button>
-            <button role="menuitem" disabled={!view.dirty && !view.flowiOverlay} title="Keeps the changes apart from the version, to lay over it when sending" onclick={() => menuAction(() => (saveOverlayOpen = true))}><span class="tick"></span>Save as flowi overlay…</button>
-          {/if}
-          {#if origin?.spec}
-            <button role="menuitem" title={`Also write what the spec can say to an overlay on ${origin.spec}`} onclick={() => menuAction(() => (overlayOpen = true))}><span class="tick"></span>Save to spec overlay…</button>
-          {/if}
-          <button role="menuitem" onclick={() => menuAction(() => RequestService.SetDefault(node))}><span class="tick"></span>Set as default version</button>
-          <button role="menuitem" onclick={() => menuAction(() => (detailsOpen = true))}><span class="tick"></span>Version title and description…</button>
-          <hr />
-          <button role="menuitem" onclick={() => menuAction(() => ui.confirm('Delete version?', `Version ${view.selected} is removed from the request file. This cannot be undone.`, () => deleteVersion(), 'Delete'))}><span class="tick"></span>Delete this version…</button>
-          {#if !view.inScratch}
-            <button role="menuitem" onclick={() => menuAction(() => ui.confirm('Delete request', `Delete ${view.name}?`, () => WorkspaceService.Do('delete', [node], '', ''), 'Delete'))}><span class="tick"></span>Delete this request…</button>
-          {/if}
-        </div>
-      {/if}
+      <button class="more" aria-label="Save options" aria-haspopup="menu" aria-expanded={menu === 'save'} onclick={(e) => openMenu('save', e)}><Icon name="chevd" size={14} /></button>
+      {#if menu === 'save'}<Menu at={menuAt} minWidth={150} label="Save options" items={saveItems} onclose={() => (menu = null)} />{/if}
     </div>
   </header>
   {#if detailsOpen}
@@ -576,17 +665,17 @@
   {#if overlaysOpen}<FlowiOverlayEditor {node} overlays={view.flowiOverlays} current={view.flowiOverlay} onclose={() => (overlaysOpen = false)} />{/if}
   {#if warningOpen && view.flowiOverlay}<FlowiOverlayWarning overlay={view.flowiOverlay} notes={view.flowiOverlayNotes} version={view.selected} onclose={() => (warningOpen = false)} />{/if}
   {#if updating && origin}<SpecUpdateDialog collection={origin.collection} spec={updating} onclose={() => (updating = null)} />{/if}
-  <FileBanner onDisk={view.onDisk} needsDrop={view.needsDrop} revert={() => RequestService.Revert(node)} saveDropping={() => RequestService.SaveDroppingComments(node)} declineDrop={() => RequestService.DeclineDrop(node)} />
+  <FileBanner dirty={view.dirty} onDisk={view.onDisk} needsDrop={view.needsDrop} revert={() => RequestService.Revert(node)} compare={() => RequestService.CompareDisk(node) as Promise<DiskDiff>} saveDropping={() => RequestService.SaveDroppingComments(node)} declineDrop={() => RequestService.DeclineDrop(node)} />
   {#if view.error}<p class="bar err"><Problem text={view.error} /></p>{/if}
   {#if view.flowiOverlay}
     {@const info = stack.length === 1 ? view.flowiOverlays.find((o) => o.name === view.flowiOverlay) : undefined}
     <p class="bar overlaybar">
       Flowi {stack.length > 1 ? 'overlays' : 'overlay'}
-      {#each stack as n, i}{#if i}<span class="then">&nbsp;then&nbsp;</span>{/if}<strong>{n}</strong>{#if stack.length > 1}<button class="link" title={`Take ${n} off`} aria-label={`Take ${n} off`} onclick={() => unstackOverlay(n)}>×</button>{/if}{/each}
+      {#each stack as n, i}{#if i}<span class="then">&nbsp;then&nbsp;</span>{/if}<strong>{n}</strong>{#if stack.length > 1}<IconButton icon="close" size={12} danger label={`Take ${n} off`} onclick={() => unstackOverlay(n)} />{/if}{/each}
       {stack.length > 1 ? 'are' : 'is'} laid over version {view.selected}{#if info} · {info.shared} shared {info.shared === 1 ? 'change' : 'changes'}{info.used ? `, ${info.own} for this request` : ''}{/if}.
       Sends use the request as shown; their responses are kept apart from the version's.
-      {#if view.flowiOverlayNotes.length}<button class="link" onclick={() => (warningOpen = true)}>{view.flowiOverlayNotes.length} not applied in full</button>{/if}
-      · <button class="link" onclick={() => RequestService.SelectFlowiOverlay(node, '')}>Take it off</button>
+      {#if view.flowiOverlayNotes.length}<Button variant="link" onclick={() => (warningOpen = true)}>{view.flowiOverlayNotes.length} not applied in full</Button>{/if}
+      · <Button variant="link" onclick={() => RequestService.SelectFlowiOverlay(node, '')}>Take it off</Button>
     </p>
   {/if}
   <MissingBar {view} />
@@ -596,7 +685,7 @@
       {#if overlayFields.length}
         · <span title={origin.fields.map((f) => `${f.key ? `${f.section} ${f.key}` : f.section}: ${f.file}`).join('\n')}>{overlayFields.length} {overlayFields.length === 1 ? 'field' : 'fields'} set by overlays: {overlayFields.join(', ')}</span>
       {/if}
-      · <button class="link" onclick={openUpdate}>Update from spec…</button>
+      · <Button variant="link" onclick={openUpdate}>Update from spec…</Button>
     </p>
   {/if}
   {#if matrixOpen}<RequestMatrix {node} onclose={() => (matrixOpen = false)} />{/if}
@@ -635,7 +724,7 @@
                   <input class="mini id" aria-label="JSON-RPC id" placeholder="id" title="The call's id. Empty makes it a notification: no id, no answer." value={view.jsonrpc.id} onchange={(e) => RequestService.SetJSONRPC(node, 'id', e.currentTarget.value)} />
                 </span>
               {:else}
-                <button class="link" title="Wrap this body as the parameters of a JSON-RPC 2.0 call" onclick={() => RequestService.MakeJSONRPC(node)}>Make it a JSON-RPC call</button>
+                <Button variant="link" title="Wrap this body as the parameters of a JSON-RPC 2.0 call" onclick={() => RequestService.MakeJSONRPC(node)}>Make it a JSON-RPC call</Button>
               {/if}
             {/if}
             {#if view.bodyKind === 'form'}
@@ -653,12 +742,20 @@
           {:else if ['Query', 'Values'].includes(section)}
             <DatasetSections {view} {section} />
           {:else if section === 'Params'}
-            <KVRows rows={v.Query} describe marks={overlayMarks('query', v.Query)} onchange={(r) => RequestService.SetRows(node, 'query', r)}
+            <p class="muted fieldnote">Write <code>{'{{name}}'}</code> for a variable. <ExprHelp context="request.fields" /></p>
+            <KVRows spans={(t) => RequestService.TemplateSpans(node, t) as unknown as Promise<any>} suggest={(t, c) => RequestService.Suggest(node, t, c) as unknown as Promise<any>} rows={v.Query} describe toggle marks={overlayMarks('query', v.Query)} onchange={(r) => RequestService.SetRows(node, 'query', r)}
               empty={{ icon: 'params', title: 'No query parameters', hint: 'Add one here, or type ?name=value at the end of the address.', add: 'Add parameter' }} />
           {:else if section === 'Headers'}
+            <p class="muted fieldnote">Write <code>{'{{name}}'}</code> for a variable. <ExprHelp context="request.fields" /></p>
             {@const sendHeaders = view.async && !view.async.headersAreConnection}
-            <KVRows rows={sendHeaders ? (view.async?.block.Send?.Headers ?? null) : v.Headers} describe keyLabel="header" marks={sendHeaders ? {} : overlayMarks('header', v.Headers)} onchange={(r) => RequestService.SetRows(node, 'headers', r)}
-              empty={{ icon: 'headers', title: 'No headers', hint: sendHeaders ? 'Headers travel with each message sent.' : 'Content-Type, Accept and the like. Credentials go in Auth.', add: 'Add header' }} />
+            <KVRows spans={(t) => RequestService.TemplateSpans(node, t) as unknown as Promise<any>} suggest={(t, c) => RequestService.Suggest(node, t, c) as unknown as Promise<any>} rows={sendHeaders ? (view.async?.block.Send?.Headers ?? null) : v.Headers} describe toggle={!sendHeaders} keyLabel="header" suggestKeys={view.kind === 'http' ? COMMON_HEADERS : []} valuesOf={headerValues} marks={sendHeaders ? {} : overlayMarks('header', v.Headers)} onchange={(r) => RequestService.SetRows(node, 'headers', r)}
+              empty={{ icon: 'headers', title: `No ${headerWord(view.kind)}s`, hint: view.kind === 'grpc' ? 'Metadata travels with the call, the way headers do for HTTP. Credentials go in Auth.' : headersHint(view.async ? (sendHeaders ? 'send' : 'connect') : 'http'), add: `Add ${headerWord(view.kind)}` }} />
+            {#if view.kind === 'http' && !view.async}
+              {@const implicit = implicitHeaders({ body: v.Body, headers: (v.Headers ?? []).filter((h) => !h.Disabled).map((h) => h.Key), hasAuth: ['bearer', 'basic', 'header'].includes(view.auth.kind) })}
+              {#each implicit as h (h.name)}
+                <p class="muted implicit"><code>{h.name}: {h.value}</code> <span>Sent by Flowi, {h.source}. Add a header of the same name to replace it.</span></p>
+              {/each}
+            {/if}
           {:else if section === 'Body'}
             {@const bodyFrom = origin?.fields.find((f) => f.section === 'body')}
             {#if bodyFrom}<p class="muted overlaynote">The example comes from the overlay <code>{bodyFrom.file}</code>.</p>{/if}
@@ -667,23 +764,25 @@
                 empty={{ icon: 'body', title: 'Empty body', hint: 'Click to write the body to send.' }} />
               {#if xmlProblem}<p class="xmlnote bad" role="status">Not well-formed XML: line {xmlProblem.line}, column {xmlProblem.column}: {xmlProblem.message}</p>
               {:else if view.bodyFormat === 'xml' && bodyText.trim()}<p class="xmlnote" role="status">Well-formed XML</p>{/if}
+              {#if jsonBad}<p class="xmlnote bad" role="status">Not valid JSON: line {jsonBad.line}, column {jsonBad.column}: {jsonBad.message}</p>
+              {:else if view.bodyFormat === 'json' && bodyText.trim()}<p class="xmlnote" role="status">Valid JSON <Button type="button" variant="ghost" small onclick={beautifyBody}>Beautify</Button></p>{/if}
             {:else if view.bodyKind === 'form' && !view.multipart}
-              <KVRows rows={v.Body.Form} onchange={(r) => RequestService.SetFormRows(node, r)}
+              <KVRows spans={(t) => RequestService.TemplateSpans(node, t) as unknown as Promise<any>} suggest={(t, c) => RequestService.Suggest(node, t, c) as unknown as Promise<any>} rows={v.Body.Form} onchange={(r) => RequestService.SetFormRows(node, r)}
                 empty={{ icon: 'list', title: 'No form fields', hint: 'Each field is sent as name=value.', add: 'Add field' }} />
             {:else if view.bodyKind === 'form'}
               <PartsEditor parts={view.parts} onchange={(p) => RequestService.SetParts(node, p as never)} />
             {:else if view.bodyKind === 'file'}
-              <TextField label="File path" mono value={v.Body.File} oninput={(t) => RequestService.SetBodyFile(node, t)} />
+              <Field label="File path"><TextInput mono value={v.Body.File} ontext={(t) => RequestService.SetBodyFile(node, t)} /></Field>
             {:else}
               <EmptyState icon="body" title="No body" hint="Pick a body type above to send text, a form or a file." compact />
             {/if}
           {:else if section === 'Auth'}
             {#if view.auth.kind === 'none'}
               <EmptyState icon="auth" title="No auth" hint={'Pick a type above. Keep credentials out of the file: use {{secret.name}}.'} compact>
-                <button onclick={() => pickAuth('bearer')}>Bearer token</button><button onclick={() => pickAuth('basic')}>Basic</button>
+                <Button onclick={() => pickAuth('bearer')}>Bearer token</Button><Button onclick={() => pickAuth('basic')}>Basic</Button>
               </EmptyState>
             {:else if view.auth.kind === 'use'}
-              <div class="pickrow"><Dropdown title="Named authentication" options={namedOptions} value={view.auth.use} onpick={(n) => RequestService.SetAuthUse(node, n)} /><button onclick={openAuths}>Edit authentications…</button></div>
+              <div class="pickrow"><Dropdown title="Named authentication" options={namedOptions} value={view.auth.use} onpick={(n) => RequestService.SetAuthUse(node, n)} /><Button onclick={openAuths}>Edit authentications…</Button></div>
               {#if view.auth.useMissing}
                 <p class="muted">This collection has no authentication named {view.auth.use}. The request cannot be sent until you pick another or add it again.</p>
               {:else}
@@ -692,12 +791,11 @@
             {:else if isScheme}
               <AuthFields fields={view.auth.fields} onparam={(name, t) => RequestService.SetAuthParam(node, name, t)} />
               <div class="keepauth">
-                <button disabled={view.inScratch} title={view.inScratch ? 'Save the request into a collection first' : 'Keep this authentication under a name, so other requests can use it too. This request then uses it by name.'}
-                  onclick={keepAuth}>Save as a named authentication…</button>
+                <Button disabled={view.inScratch} title={view.inScratch ? 'Save the request into a collection first' : 'Keep this authentication under a name, so other requests can use it too. This request then uses it by name.'}
+                  onclick={keepAuth}>Save as a named authentication…</Button>
               </div>
             {:else}
-              <TextField label={view.auth.kind === 'bearer' ? 'Token' : view.auth.kind === 'basic' ? 'Base64 credentials or a template' : 'Authorization header value'} mono
-                value={view.auth.value} oninput={(t) => RequestService.SetAuth(node, view.auth.kind, t)} />
+              <Field label={view.auth.kind === 'bearer' ? 'Token' : view.auth.kind === 'basic' ? 'Base64 credentials or a template' : 'Authorization header value'}><TextInput mono value={view.auth.value} ontext={(t) => RequestService.SetAuth(node, view.auth.kind, t)} /></Field>
               <p class="muted">Keep credentials out of the file: use {'{{secret.name}}'}.</p>
             {/if}
             {#if authSummary(view.auth.kind, view.auth.value, view.auth.fields)}
@@ -705,27 +803,41 @@
             {/if}
           {:else if section === 'Extract' && !extract.length}
             <EmptyState icon="extract" title="Nothing extracted" hint="Take a value out of the response into a variable, for later requests and steps." compact>
-              <button onclick={() => extract.push(newExtraction())}>Add extraction</button>
+              <Button onclick={() => extract.push(newExtraction())}>Add extraction</Button>
             </EmptyState>
           {:else if section === 'Extract'}
             <p class="muted">Take a value out of the response into a variable, for later requests and steps.{#if view.kind !== 'http'} <ExprHelp context={checkContext} />{/if}</p>
             {#each extract as e, i}
               <div class="row">
                 <input class="k" placeholder="variable" bind:value={e.Name} oninput={() => RequestService.SetExtract(node, extract)} spellcheck="false" />
-                <select bind:value={e.From} onchange={() => RequestService.SetExtract(node, extract)}>
+                <Select bind:value={e.From} onchange={() => RequestService.SetExtract(node, extract)}>
                   {#each ['body', 'header', 'cookie', 'status'] as f}<option value={f}>{f}</option>{/each}
-                </select>
+                </Select>
                 {#if e.From !== 'status'}
                   <input class="v" placeholder={e.From === 'body' ? '$.path.to.value' : 'name'} value={selector(e)} oninput={(ev) => setSelector(extract, i, ev.currentTarget.value)} spellcheck="false" />
                 {/if}
-                <button class="x" aria-label="Remove" onclick={() => { extract.splice(i, 1); RequestService.SetExtract(node, extract) }}>×</button>
+                {#if extractChip(e.Name, view.response)}{@const chip = extractChip(e.Name, view.response)!}
+                  <span class="xchip {chip.state}" title={chip.state === 'ok' ? 'What the last send took' : 'The last send found nothing at this path'}>{chip.text}</span>
+                {/if}
+                <IconButton icon="close" size={12} danger label="Remove" onclick={() => { extract.splice(i, 1); RequestService.SetExtract(node, extract) }} />
               </div>
             {/each}
-            <button class="add" onclick={() => { extract.push(newExtraction()) }}>+ Add</button>
+            <Button variant="link" onclick={() => { extract.push(newExtraction()) }}>+ Add</Button>
           {:else if section === 'Assert'}
+            {#if view.kind === 'http'}
+              <label class="expect">
+                <span>Expected status</span>
+                <input class="mini" aria-label="Expected status" placeholder="any 2xx" value={v.Expect ?? ''} spellcheck="false"
+                  title="A status (401), a range (400-499), a class (4xx) or a list (200, 404). The request passes on that status and fails on any other; the usual check for a 2xx stands aside."
+                  onchange={async (e) => { expectProblem = await RequestService.SetExpect(node, e.currentTarget.value) }}
+                  oninput={() => (expectProblem = '')} />
+                {#if expectProblem}<span class="expect-problem" role="alert">{expectProblem}</span>{/if}
+              </label>
+            {/if}
             <p class="muted">One card per check, for example <code>{checkExample}</code>. A failing check fails the send. <ExprHelp context={checkContext} /></p>
-            <AssertCards checks={v.Assert ?? []} outcome={view.response ?? undefined} example={checkExample}
+            <AssertCards checks={v.Assert ?? []} outcome={view.response ?? undefined} example={checkExample} starters={view.kind === 'http' ? startersFor(view.response) : []}
               vocabulary={requestVocabulary(checkContext, node, view.response, view.kind)}
+              evaluate={view.kind === 'http' ? (lines) => RequestService.EvalChecks(node, lines) : undefined}
               onchange={(c) => RequestService.SetAssert(node, c)} />
           {:else if section === 'Outcomes'}
             <OutcomesEditor outcomes={v.Outcomes} ruleKind={view.kind === 'dataset' ? 'dataset' : view.kind === 'http' ? 'http' : 'message'} onchange={(rows) => RequestService.SetOutcomes(node, rows)} />
@@ -739,13 +851,13 @@
             <RequestExtras {view} which="schema" />
           {:else if section === 'Hooks' && !view.hookChain.length}
             <EmptyState icon="hooks" title="No hooks" hint="Hooks run steps before the request is sent and after its response." compact>
-              <button onclick={() => app.openHooks(node, view.name)}>Add hooks…</button>
+              <Button onclick={() => app.openHooks(node, view.name)}>Add hooks…</Button>
             </EmptyState>
             {@render builtIns()}
           {:else if section === 'Hooks'}
             <p class="muted">Steps that run before the request is sent and after its response, from this request and the levels above it.</p>
             <ol class="chain">{#each view.hookChain as h}<li>{h}</li>{/each}</ol>
-            <button class="add" onclick={() => app.openHooks(node, view.name)}>Edit this request's hooks…</button>
+            <Button variant="link" onclick={() => app.openHooks(node, view.name)}>Edit this request's hooks…</Button>
             {@render builtIns()}
           {:else if section === 'Code'}
             <RequestExtras {view} which="snippet" />
@@ -756,10 +868,7 @@
           {:else if section === 'Cookies'}
             <RequestExtras {view} which="cookies" />
           {:else}
-            <div class="docsbar" role="group" aria-label="Notes view">
-              <button class:on={!docsPreview} onclick={() => (docsPreview = false)}>Write</button>
-              <button class:on={docsPreview} onclick={() => (docsPreview = true)} disabled={!v.Docs}>Preview</button>
-            </div>
+            <div class="docsbar"><Segmented size="xs" label="Notes view" items={[{ id: 'write', label: 'Write' }, { id: 'preview', label: 'Preview', disabled: !v.Docs }]} value={docsPreview ? 'preview' : 'write'} onpick={(id) => (docsPreview = id === 'preview')} /></div>
             {#if docsPreview && v.Docs}
               <div class="docsview"><Markdown text={v.Docs} /></div>
             {:else}
@@ -771,7 +880,7 @@
       {/if}
     </div>
     <Splitter name="request-left" side="left" min={300} max={1000} bind:width={leftWidth} />
-    <div class="right"><ResponsePane {view} /></div>
+    <div class="right"><ResponsePane {view} onchecks={() => (chosen = 'Assert')} /></div>
   </div>
 </div>
 
@@ -788,45 +897,38 @@
   .addr > .url2 { padding-right: 6px; }
   .url { flex: 1; min-width: 0; }
   .pick { display: flex; gap: 4px; padding-right: 6px; }
-  .pick button { background: var(--raised); color: var(--text); border: 0; box-shadow: inset 0 0 0 1px var(--line); border-radius: var(--r-md); padding: 0 10px; min-height: var(--ctl-h); font: inherit; font-size: var(--fs-sm); }
-  .pick button:hover { background: var(--raised-3); }
   .url2 { flex: 1; min-width: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
   .url2 :global(input) { width: 100%; box-sizing: border-box; }
   .url :global(input) { width: 100%; box-sizing: border-box; }
-  select, button {
+  button {
     background: var(--raised);
     color: var(--text);
     border: 0;
     border-radius: var(--r-md);
     font: inherit;
+    /* The toolbar's controls share one height, so the method, the address and the buttons sit on one line. */
+    padding: 0 12px; min-height: var(--addr-h); box-sizing: border-box; font-weight: 500;
   }
-  /* The toolbar's controls share one height, so the method, the address and the buttons sit on one line. */
-  select, button { padding: 0 12px; min-height: var(--addr-h); box-sizing: border-box; font-weight: 500; }
   header :global(input) { min-height: var(--addr-h-sm); box-sizing: border-box; }
   button:hover:not(:disabled) { background: var(--raised-3); }
-  button:disabled { opacity: 0.4; }
-  .send { position: relative; display: flex; gap: 2px; }
+  button:disabled { opacity: var(--op-disabled); }
+  .send { position: relative; display: flex; gap: 2px; --act-fill: linear-gradient(135deg, color-mix(in srgb, var(--act) 78%, white), var(--act)); --act-glow: color-mix(in srgb, var(--act) 34%, transparent); --act-ink: var(--on-act); }
+  .hookbadge { flex: none; }
+  .hookbadge :global(button) { color: var(--warn); background: var(--warn-t); border-radius: var(--r-pill); font-size: var(--fs-xs); }
   .more { padding: 0 8px; min-height: var(--addr-h); }
-  .menu {
-    position: absolute; top: 100%; right: 0; margin-top: 4px; min-width: 150px; display: flex; flex-direction: column; padding: 4px;
-    background: var(--raised); border: 1px solid var(--line); border-radius: var(--r-lg); box-shadow: var(--shadow); z-index: 20;
-  }
-  .menu button { border: 0; text-align: left; }
-  .hd { color: var(--muted); font-size: var(--fs-xs); padding: 2px 10px; }
   .bar { margin: 0; padding: 6px 12px; font-size: var(--fs-sm); }
   .specbar, .overlaybar { color: var(--muted); border-bottom: 1px solid var(--line); }
   .overlaybar { background: color-mix(in srgb, var(--accent) 7%, transparent); }
   .overlaybar strong { color: var(--text); font-weight: 600; }
   .overlaybar .then { color: var(--muted); }
-  .overlaybar strong + .link { margin-left: 3px; font-size: 1.1em; line-height: 1; }
-  .overlaybar .link { background: none; border: 0; padding: 0; color: var(--accent); font: inherit; }
   .specbar code, .overlaynote code { font-size: var(--fs-xs); }
-  .specbar .link { background: none; border: 0; padding: 0; color: var(--accent); font: inherit; }
   .rpc { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; min-width: 0; }
   .rpc .mini { width: 110px; background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); padding: 2px 6px; font: inherit; font-size: var(--fs-sm); }
   .rpc .mini.id { width: 64px; }
-  .typebar .link { background: none; border: 0; box-shadow: none; padding: 0 10px; min-height: var(--ctl-h); border-radius: var(--r-md); color: var(--accent); font: inherit; font-size: var(--fs-sm); }
-  .typebar .link:hover { background: var(--tint-accent); }
+  .expect { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; font-size: var(--fs-sm); color: var(--muted); }
+  .expect .mini { width: 120px; background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); padding: 2px 6px; font: inherit; font-size: var(--fs-sm); }
+  .expect > span:first-child { white-space: nowrap; }
+  .expect-problem { color: var(--fail); }
   .overlaynote { margin: 0 0 6px; font-size: var(--fs-xs); }
   .err { color: var(--fail); background: color-mix(in srgb, var(--fail) 12%, transparent); }
   .panels { flex: 1; min-height: 0; display: flex; }
@@ -836,45 +938,45 @@
   .sectabs { display: flex; align-items: flex-end; gap: 2px; min-width: 0; overflow-x: auto; scrollbar-width: none; }
   .sectabs::-webkit-scrollbar { display: none; }
   .tab { position: relative; flex: none; display: inline-flex; align-items: center; gap: 6px; border: 0; border-bottom: 2px solid transparent; border-radius: 0; color: var(--muted); padding: 8px 10px 6px; white-space: nowrap; }
-  .cdot { position: absolute; top: 6px; right: 5px; }
+  .cdot { position: absolute; top: 6px; right: 5px; display: block; width: 5px; height: 5px; border-radius: 50%; background: var(--ok); }
   /* The badge sits on the icon's corner, so an icon-only tab keeps its width. */
-  .tabcount { position: absolute; top: 1px; right: -2px; min-width: 14px; margin: 0; padding: 0 4px; font-size: 10px; line-height: 14px; }
+  .tabcount { position: absolute; top: 1px; right: -2px; min-width: 14px; margin: 0; padding: 0 4px; font-size: var(--fs-xs); line-height: 14px; }
   .tab.on .tabcount { position: static; margin-left: 2px; }
   .tab:hover:not(:disabled) { color: var(--text); border-color: transparent; border-bottom-color: var(--line); }
   .tab.on, .tab.on:hover:not(:disabled) { color: var(--text); border-bottom-color: var(--accent); }
-  .cdot { display: block; width: 5px; height: 5px; border-radius: 50%; background: var(--ok); }
   .more-secs { flex: none; margin: 0 0 4px auto; padding-left: 6px; }
   .more-secs.on :global(.btn) { border-color: var(--accent); }
   .docsbar { flex: none; display: flex; gap: 2px; padding: 0 0 6px; }
-  .docsbar button { background: transparent; color: var(--muted); border: 1px solid var(--line); border-radius: var(--r-md); padding: 1px 10px; font: inherit; font-size: var(--fs-xs); }
-  .docsbar button.on { color: var(--text); background: var(--panel); }
-  .docsbar button:disabled { opacity: 0.5; }
   .docsview { flex: 1; min-height: 0; overflow: auto; padding: 4px 2px; }
   .typebar { flex: none; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; padding: 6px 10px; border-bottom: 1px solid var(--line); }
   .pickrow { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
   /* Every main action is a gradient with a soft glow: Send in the colour chosen in Settings, listening and the
      two-way modes in their own, so the mode still reads at a glance. */
-  .send { --act-fill: linear-gradient(135deg, color-mix(in srgb, var(--act) 78%, white), var(--act)); --act-glow: color-mix(in srgb, var(--act) 34%, transparent); --act-ink: var(--on-act); }
   .send[data-tone='send'] { --act-fill: var(--send-fill); --act-glow: var(--send-glow); --act-ink: var(--on-send); }
   .act { background: var(--act-fill); color: var(--act-ink); border: 0; font-weight: 600; box-shadow: var(--send-edge), 0 2px 6px var(--act-glow); }
   .act:hover:not(:disabled) { background: var(--act-fill); filter: brightness(1.1); }
   .act:active:not(:disabled) { filter: brightness(0.95); }
   /* The floppy disk is the save everyone knows; the words stay as the tooltip and the name read aloud. */
-  .saveicon { display: flex; align-items: center; padding-inline: 9px; }
+  .saveicon { display: flex; align-items: center; gap: 5px; padding-inline: 9px; }
+  .savetext { font-size: var(--fs-sm); }
+  .edited { display: inline-flex; align-items: center; gap: var(--sp-1); flex: none; }
+  .edited.clean { visibility: hidden; }
+  .edited .pill { color: var(--dirty); font-size: var(--fs-xs); white-space: nowrap; }
   .send .main { border-radius: var(--r-md) 0 0 var(--r-md); white-space: nowrap; display: inline-flex; align-items: center; gap: 7px; }
-  .send .main kbd { font: 500 var(--fs-xs) var(--font, system-ui); padding: 0 5px; border-radius: var(--r-sm); background: rgb(255 255 255 / 0.22); color: inherit; text-shadow: none; }
+  .send .main kbd { font: 500 var(--fs-xs) var(--font, system-ui); padding: 0 5px; border-radius: var(--r-sm); background: var(--shine); color: inherit; text-shadow: none; }
   /* Inside the address bar the buttons are shorter than the bar, so it frames them. */
+  .send .more { border-radius: 0 var(--r-md) var(--r-md) 0; display: inline-flex; align-items: center; justify-content: center; }
+  .send .act.more { border-left: 1px solid var(--shade); }
   .addr .send { margin-right: 4px; }
   .addr .send button { min-height: var(--ctl-h); }
-  .send .more { border-radius: 0 var(--r-md) var(--r-md) 0; display: inline-flex; align-items: center; justify-content: center; }
-  .send .act.more { border-left: 1px solid rgb(0 0 0 / 0.22); }
   .send:not(.savegrp) { gap: 0; }
+  /* While a send runs the button is a stop button: the danger colour, a square, and the time so far. */
+  .send.cancel { --act-fill: var(--fail); --act-glow: transparent; --act-ink: var(--on-accent); }
+  .send.cancel .more { opacity: 0.45; }
+  .stop { width: 9px; height: 9px; border-radius: 2px; background: currentColor; }
+  .elapsed { font: 500 var(--fs-xs) var(--mono); opacity: 0.85; }
   /* The button stays dark; the disk takes the accent colour while there is something to save. */
   .savegrp .pending { color: var(--accent); }
-  .menu .tick { width: 14px; display: inline-block; }
-  .menu hr { border: 0; border-top: 1px solid var(--line); margin: 4px 0; }
-  .menu kbd { margin-left: auto; padding-left: 16px; color: var(--muted); font: inherit; font-size: var(--fs-xs); }
-  .menu button { display: flex; align-items: center; white-space: nowrap; }
   .section { flex: 1; overflow: auto; padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; }
   .muted { color: var(--muted); font-size: var(--fs-sm); margin: 0; }
   .sends { color: var(--muted); font-size: var(--fs-sm); margin: 8px 0 0; }
@@ -884,11 +986,17 @@
     font: var(--fs-sm) var(--mono); -webkit-user-select: text; user-select: text;
   }
   .row .k { flex: 0 0 28%; }
-  .add { align-self: flex-start; border: 0; color: var(--accent); padding: 2px 0; }
+  .xchip { flex: none; align-self: center; max-width: 30%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 1px 8px; border-radius: var(--r-pill); font: var(--fs-xs) var(--mono); cursor: default; }
+  .xchip.ok { background: var(--ok-t); color: var(--ok); }
+  .xchip.none { background: var(--fail-t); color: var(--fail); }
   .x { border: 0; color: var(--muted); }
   code { font-family: var(--mono); }
   .builtin { border-top: 1px solid var(--line); padding-top: 8px; }
   .chain { margin: 0; padding-left: 18px; font: var(--fs-sm) var(--mono); }
   .keepauth { margin-top: 8px; }
+  .fhelp { display: inline-flex; align-items: center; flex: none; }
+  .fieldnote { margin: 0 0 6px; }
+  .implicit { margin: 4px 0 0; font-size: var(--fs-xs); }
+  .implicit code { font-size: var(--fs-xs); }
   .pwwarn { flex: none; color: var(--warn); font-size: var(--fs-xs); white-space: nowrap; margin-right: 10px; }
 </style>

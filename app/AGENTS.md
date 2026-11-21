@@ -56,6 +56,22 @@ Instructions for AI coding agents (and a useful checklist for people) working in
 - No real `time.Sleep` in tests: use the inline actor, channels or polling.
 - Releases and the changelog come from Conventional Commits (`feat:`, `fix:`, `docs:`…).
 
+## Effects in Svelte
+
+`$effect` is the last tool, not the first. About 80 of them copied or derived state, and one threw away
+in-progress edits when any view update arrived. Choose in this order:
+
+1. **A value computed from other values: `$derived`** (or `$derived.by`). Never an effect that writes a `$state`.
+2. **A copy of a prop the person edits: `$derived` that is written to** (a writable derived), or `{#key node}` /
+   a child component, so a new node resets it and a view update does not.
+3. **A one-shot fetch or a subscription: `onMount`**, or `live()` for state that follows a Go event.
+4. **Per-node UI state that must survive a tab switch: `lib/nodeui.ts`**, not an effect that saves and restores.
+5. **A real side effect** (focus, a timer, `localStorage`, the DOM): an effect, and write its cleanup. Read only
+   what it needs; `untrack` the rest, so it does not run again for a value it only samples.
+
+An effect that sets state it also reads will loop; an effect keyed on a whole view object runs on every event.
+Compare the primitive you care about (`view.rev`, `view.node`) and leave the object alone.
+
 ## Layout
 
 | Path | What it holds |
@@ -63,6 +79,7 @@ Instructions for AI coding agents (and a useful checklist for people) working in
 | `main.go`, `menu.go` | the Wails application and its menu |
 | `internal/bridge` | one Go service per area (workspace, flows, requests, settings…); Svelte calls their methods |
 | `internal/vm` | screen logic, tested without a window; `vmtest` is a fake backend |
+| `internal/uidev`, `cmd/uidev` | a made-up workspace and canned sends and runs, and the server that shows the front end over them in a browser: `just uidev` (build tag `server`, localhost only, nothing saved) |
 | `internal/canvas` | the layout of the flow canvas |
 | `internal/preflight` | the Linux start-up check: WebKit's helpers and sandbox tools, and the install command per distribution |
 | `internal/backend`, `internal/uithread` | the adapter to `flowi-lib`, and the UI-goroutine guard |

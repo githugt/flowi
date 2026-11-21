@@ -48,6 +48,7 @@ type Request struct {
 	schemas    *Schemas       // made by Schemas on first use
 	methods    []grpcx.Method // the methods of a gRPC request's schema, as last loaded
 	methodsErr string         // why they could not be loaded
+	conn       ConnectionTest // the last connection test
 	coll       model.Collection
 	target     flowi.RequestTarget
 	disk       model.Request // last loaded or saved
@@ -338,7 +339,7 @@ func (r *Request) CanDiscardEdit() bool {
 // isBlankVersion is a version with nothing but a method and a label.
 func isBlankVersion(v model.RequestVersion) bool {
 	return v.URL == "" && len(v.Query) == 0 && len(v.Headers) == 0 && !bodyHasContent(v.Body) && len(v.Extract) == 0 &&
-		len(v.Assert) == 0 && len(v.Outcomes) == 0 && len(v.Variables) == 0 && v.Docs == "" && len(v.Settings) == 0 &&
+		len(v.Assert) == 0 && v.Expect == "" && len(v.Outcomes) == 0 && len(v.Variables) == 0 && v.Docs == "" && len(v.Settings) == 0 &&
 		len(v.Hooks.Pre) == 0 && len(v.Hooks.Post) == 0 && len(v.Hooks.Message) == 0
 }
 
@@ -511,7 +512,7 @@ func sameVersionLabel(labels []string, label string) (string, bool) {
 
 // Auth reads the Authorization header of the selected version.
 func (r *Request) Auth() (AuthKind, string) {
-	i := slices.IndexFunc(r.Current().Headers, func(kv model.KeyValue) bool { return strings.EqualFold(kv.Key, authHeader) })
+	i := slices.IndexFunc(r.Current().Headers, func(kv model.KeyValue) bool { return !kv.Disabled && strings.EqualFold(kv.Key, authHeader) })
 	if i < 0 {
 		return AuthNone, ""
 	}
@@ -1003,16 +1004,28 @@ type AvailableSetting struct {
 	Set         bool     // the version already sets it
 }
 
+// httpOnlySetting reports whether a setting only means something to an HTTP request: redirects, cookies, the HTTP
+// version, default headers and the download threshold.
+func httpOnlySetting(key string) bool {
+	return strings.HasPrefix(key, "http.") || strings.HasPrefix(key, "downloads.")
+}
+
 // AvailableSettings lists the settings that may be written in a request
-// file, in schema order.
+// file, in schema order. A gRPC, message or SQL request is not offered the HTTP-only ones.
+//
+// Before: the Settings tab of a gRPC, message or SQL request listed redirects, cookies and the HTTP version, which do nothing there.
 func (r *Request) AvailableSettings() []AvailableSetting {
 	have := map[string]bool{}
 	for _, row := range r.SettingRows() {
 		have[row.Key] = true
 	}
+	notHTTP := r.IsGRPC() || r.IsAsync() || r.IsDataset()
 	var out []AvailableSetting
 	for _, k := range settings.Schema() {
 		if !slices.Contains(k.FileLayers, settings.LayerRequest) {
+			continue
+		}
+		if notHTTP && httpOnlySetting(k.Name) {
 			continue
 		}
 		out = append(out, AvailableSetting{Key: k.Name, Description: k.Description, Default: valueText(k.Default), Choices: k.Enum, Set: have[k.Name]})

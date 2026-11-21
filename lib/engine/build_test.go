@@ -124,6 +124,50 @@ func TestBuild_Given_env_ref_to_secret_var_Then_hint_suggests_secret_scope(t *te
 	}
 }
 
+func TestBuild_Given_env_ref_that_no_environment_row_sets_Then_hint_says_what_to_do(t *testing.T) {
+	// Before: "undefined `env.base_url`" gave no hint, so a typo or a missing row was slow to find.
+	v := model.RequestVersion{Method: "GET", URL: "http://x/{{env.base_url}}"}
+
+	_, diags := build(baseInput(v, map[string]any{"env": map[string]any{}}))
+
+	if len(diags) != 1 {
+		t.Fatalf("diags %v", diags)
+	}
+	msg, _ := diag.English().Message(diags[0])
+	if !strings.Contains(msg, "does not set base_url") || !strings.Contains(msg, "choose another environment") {
+		t.Fatalf("message %q", msg)
+	}
+}
+
+func TestBuild_Given_a_misspelt_env_ref_Then_hint_names_the_close_variable(t *testing.T) {
+	// Before: the hint did not say which variables the environment does set.
+	v := model.RequestVersion{Method: "GET", URL: "http://x/{{env.base_ulr}}"}
+	in := baseInput(v, map[string]any{"env": map[string]any{}})
+	in.envValues = map[string]any{"base_url": "http://x", "region": "eu"}
+
+	_, diags := build(in)
+
+	if len(diags) != 1 || !strings.Contains(diags[0].Args["hint"], "Did you mean env.base_url?") {
+		t.Fatalf("diags %v", diags)
+	}
+}
+
+func TestNearest_Given_names_Then_only_a_likely_typo_is_suggested(t *testing.T) {
+	names := []string{"base_url", "region", "Token"}
+	tests := map[string]string{
+		"base_ulr": "base_url", // two letters swapped
+		"token":    "Token",    // case only
+		"regio":    "region",
+		"zone":     "",
+		"base_url": "", // the name itself is not a suggestion
+	}
+	for in, want := range tests {
+		if got := nearest(in, names); got != want {
+			t.Errorf("nearest(%q) = %q, want %q", in, got, want)
+		}
+	}
+}
+
 func TestBuild_Given_missing_declared_secret_Then_left_to_caller(t *testing.T) {
 	v := model.RequestVersion{Method: "GET", URL: "http://x", Headers: []model.KeyValue{{Key: "X-Key", Value: "{{secret.api_key}}"}}}
 	in := baseInput(v, map[string]any{"secret": map[string]any{}})
@@ -264,5 +308,29 @@ func TestBuild_should_send_a_multipart_file_part_the_way_a_request_file_decodes_
 	// Assert
 	if text := bodyText(t, body); len(diags) != 0 || !strings.Contains(text, "hi there") || !strings.Contains(text, "text/plain") {
 		t.Fatalf("diags %v body %q", diags, text)
+	}
+}
+
+func TestBuild_Given_disabled_rows_Then_they_are_not_sent_and_a_default_header_takes_the_place_of_a_disabled_one(t *testing.T) {
+	// Before: a row could not be switched off, only deleted.
+	v := model.RequestVersion{
+		Method:  "GET",
+		URL:     "https://api.example/v1/items",
+		Query:   []model.KeyValue{{Key: "page", Value: "1"}, {Key: "debug", Value: "{{vars.missing}}", Disabled: true}},
+		Headers: []model.KeyValue{{Key: "X-Trace", Value: "t"}, {Key: "X-Off", Value: "no", Disabled: true}, {Key: "Accept", Value: "text/plain", Disabled: true}},
+	}
+	in := baseInput(v, map[string]any{"vars": map[string]any{}})
+	in.defaults = []model.KeyValue{{Key: "Accept", Value: "application/json"}}
+
+	b, diags := build(in)
+
+	if len(diags) != 0 {
+		t.Fatalf("a disabled row is not rendered, so it cannot fail: %v", diags)
+	}
+	if b.request.URL != "https://api.example/v1/items?page=1" {
+		t.Fatalf("url %s", b.request.URL)
+	}
+	if b.request.Header.Get("X-Off") != "" || b.request.Header.Get("X-Trace") != "t" || b.request.Header.Get("Accept") != "application/json" {
+		t.Fatalf("headers %v", b.request.Header)
 	}
 }

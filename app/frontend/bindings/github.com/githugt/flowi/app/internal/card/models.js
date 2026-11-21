@@ -51,6 +51,13 @@ export class Card {
              */
             this["ports"] = [];
         }
+        if (!("guards" in $$source)) {
+            /**
+             * @member
+             * @type {Guard[]}
+             */
+            this["guards"] = [];
+        }
 
         Object.assign(this, $$source);
     }
@@ -64,6 +71,7 @@ export class Card {
         const $$createField2_0 = $$createType1;
         const $$createField3_0 = $$createType1;
         const $$createField4_0 = $$createType3;
+        const $$createField5_0 = $$createType5;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("rows" in $$parsedSource) {
             $$parsedSource["rows"] = $$createField2_0($$parsedSource["rows"]);
@@ -74,7 +82,51 @@ export class Card {
         if ("ports" in $$parsedSource) {
             $$parsedSource["ports"] = $$createField4_0($$parsedSource["ports"]);
         }
+        if ("guards" in $$parsedSource) {
+            $$parsedSource["guards"] = $$createField5_0($$parsedSource["guards"]);
+        }
         return new Card(/** @type {Partial<Card>} */($$parsedSource));
+    }
+}
+
+/**
+ * Guard is a mark in the header of a step that does not always run, or does not stop the run when it fails: a
+ * condition, a tolerated error, a time limit, a concurrent step. Before, such a step looked like any other.
+ */
+export class Guard {
+    /**
+     * Creates a new Guard instance.
+     * @param {Partial<Guard>} [$$source = {}] - The source object to create the Guard.
+     */
+    constructor($$source = {}) {
+        if (!("glyph" in $$source)) {
+            /**
+             * one short symbol: "if", "continue", "5s" or "∥"
+             * @member
+             * @type {string}
+             */
+            this["glyph"] = "";
+        }
+        if (!("tip" in $$source)) {
+            /**
+             * what it means, with the expression
+             * @member
+             * @type {string}
+             */
+            this["tip"] = "";
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new Guard instance from a string or object.
+     * @param {any} [$$source = {}]
+     * @returns {Guard}
+     */
+    static createFrom($$source = {}) {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new Guard(/** @type {Partial<Guard>} */($$parsedSource));
     }
 }
 
@@ -200,3 +252,5 @@ const $$createType0 = Row.createFrom;
 const $$createType1 = $Create.Array($$createType0);
 const $$createType2 = Port.createFrom;
 const $$createType3 = $Create.Array($$createType2);
+const $$createType4 = Guard.createFrom;
+const $$createType5 = $Create.Array($$createType4);

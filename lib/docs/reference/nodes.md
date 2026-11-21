@@ -110,9 +110,10 @@ Fields: `body`.
 
 | Parameter | Kind | Required | Notes |
 |---|---|---|---|
-| `over` | template |  | A list to iterate (item, index in scope). Exactly one of over and times. |
-| `times` | integer 1–100000 |  | Iterate N times (item = index). |
+| `over` | template |  | The list to repeat over, usually a list an earlier step produced or an input. The steps inside run once per item; there `item` is the current one and `index` its position. Set over or times, not both. |
+| `times` | integer 1–100000 |  | Repeat a fixed number of times instead of over a list; `index` counts from 0 (and `item` is the same number). |
 | `concurrency` | integer ≥ 1 |  | Iterations in flight (default 1); capped by the run-wide limit. |
+| `label` | template |  | Names each iteration in the run tree, reports and failures instead of its number (item, index in scope): `{{item.email}}` gives users[ada@example.com]/create. Slashes and brackets become _, long names are cut, repeats get #2. |
 
 ### `run_till`
 

@@ -32,7 +32,9 @@ func (s *Store) Load(root string) (model.Collection, diag.List, error) {
 		return c, nil, err
 	}
 	c.Manifest = manifest
-	if slices.ContainsFunc(diags, func(d diag.Diagnostic) bool { return d.Code == diag.CodeFormatTooNew }) {
+	if slices.ContainsFunc(diags, func(d diag.Diagnostic) bool {
+		return d.Code == diag.CodeFormatTooNew || d.Code == diag.CodeFormatNeedsNewer
+	}) {
 		// Files written by a newer Flowi may use syntax this version
 		// misreads, so nothing else is decoded.
 		return c, diags, nil
@@ -82,6 +84,11 @@ func (s *Store) loadManifest(root string) (model.Manifest, diag.List, error) {
 	if diags.HasErrors() && m.Format == 0 {
 		return m, diags, nil // the format line itself is broken; already reported
 	}
+	if need := migrate.CheckVersion(m.MinVersion, s.running); need.Code != "" {
+		// Like a newer format: what a newer release wrote cannot be judged by an older one, so the rest is not reported.
+		need.File = file
+		return m, diag.List{s.Locate(need)}, nil
+	}
 	check := migrate.Check(m.Format)
 	if check.Code == "" {
 		return m, diags, nil
@@ -129,12 +136,16 @@ func (s *Store) decodeInto(c model.Collection, f discovered, data []byte) (model
 		r, diags = s.codec.DecodeRequest(f.abs, entityPath(f.rel, "requests", requestSuffix), data)
 		if r.ID != "" {
 			c.Requests = append(c.Requests, r)
+		} else {
+			c.Broken = appendBroken(c.Broken, f, "request", entityPath(f.rel, "requests", requestSuffix), diags)
 		}
 	case kindFlow:
 		var fl model.Flow
 		fl, diags = arazzo.DecodeFlow(f.abs, entityPath(f.rel, "flows", flowSuffix), data, s.flowOptions(c, entityPath(f.rel, "flows", flowSuffix)))
 		if fl.ID != "" {
 			c.Flows = append(c.Flows, fl)
+		} else {
+			c.Broken = appendBroken(c.Broken, f, "flow", entityPath(f.rel, "flows", flowSuffix), diags)
 		}
 	case kindBlueprint:
 		var bp model.Blueprint
@@ -219,6 +230,7 @@ func withoutFile(c model.Collection, file string) model.Collection {
 	c.Blueprints = slices.DeleteFunc(slices.Clone(c.Blueprints), func(b model.Blueprint) bool { return b.File == file })
 	c.Auths = slices.DeleteFunc(slices.Clone(c.Auths), func(a model.NamedAuth) bool { return a.File == file })
 	c.Overlays = slices.DeleteFunc(slices.Clone(c.Overlays), func(o model.Overlay) bool { return o.File == file })
+	c.Broken = slices.DeleteFunc(slices.Clone(c.Broken), func(b model.BrokenFile) bool { return b.File == file })
 	return c
 }
 
@@ -232,6 +244,7 @@ func withoutPrefix(c model.Collection, dir string) model.Collection {
 	c.Blueprints = slices.DeleteFunc(slices.Clone(c.Blueprints), func(b model.Blueprint) bool { return under(b.File) })
 	c.Auths = slices.DeleteFunc(slices.Clone(c.Auths), func(a model.NamedAuth) bool { return under(a.File) })
 	c.Overlays = slices.DeleteFunc(slices.Clone(c.Overlays), func(o model.Overlay) bool { return under(o.File) })
+	c.Broken = slices.DeleteFunc(slices.Clone(c.Broken), func(b model.BrokenFile) bool { return under(b.File) })
 	return c
 }
 
@@ -244,6 +257,7 @@ func sortEntities(c model.Collection) model.Collection {
 	slices.SortFunc(c.Blueprints, func(a, b model.Blueprint) int { return strings.Compare(a.File, b.File) })
 	slices.SortFunc(c.Auths, func(a, b model.NamedAuth) int { return strings.Compare(a.File, b.File) })
 	slices.SortFunc(c.Overlays, func(a, b model.Overlay) int { return strings.Compare(a.File, b.File) })
+	slices.SortFunc(c.Broken, func(a, b model.BrokenFile) int { return strings.Compare(a.File, b.File) })
 	return c
 }
 
@@ -261,10 +275,28 @@ func resolveFile(file string) (string, error) {
 	return filepath.Join(dir, filepath.Base(abs)), nil
 }
 
+// appendBroken notes a request or flow file that gave no entity: it could not be read as a mapping, or (for a flow)
+// not as an Arazzo document. A file that was read and found wrong is an entity with problems, not a broken file.
+func appendBroken(list []model.BrokenFile, f discovered, kind, entity string, diags diag.List) []model.BrokenFile {
+	i := slices.IndexFunc(diags, func(d diag.Diagnostic) bool { return unparsed(diag.List{d}) })
+	if i < 0 {
+		i = slices.IndexFunc(diags, func(d diag.Diagnostic) bool { return d.Severity == diag.SeverityError })
+	}
+	if i < 0 {
+		return list
+	}
+	d := diags[i]
+	msg := diag.Text(d)
+	if d.Pos.Line > 0 {
+		msg += fmt.Sprintf(" (line %d)", d.Pos.Line)
+	}
+	return append(list, model.BrokenFile{File: f.abs, Path: entity, Kind: kind, Code: string(d.Code), Message: msg})
+}
+
 // unparsed reports whether a file could not be read as a mapping at all.
 func unparsed(diags diag.List) bool {
 	return slices.ContainsFunc(diags, func(d diag.Diagnostic) bool {
-		return d.Code == diag.CodeYAMLSyntax || d.Code == diag.CodeYAMLEmpty || (d.Code == diag.CodeYAMLType && d.Path == "$")
+		return d.Code == diag.CodeYAMLSyntax || d.Code == diag.CodeFileConflict || d.Code == diag.CodeYAMLEmpty || (d.Code == diag.CodeYAMLType && d.Path == "$")
 	})
 }
 

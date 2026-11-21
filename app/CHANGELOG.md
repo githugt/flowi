@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to the Flow-I desktop app are documented here. The format follows
+All notable changes to the Flowi desktop app are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/) and the file is generated from Conventional Commits
 by `git cliff` (see `cliff.toml`); the Welcome tab shows the newest release as "What's new".
 

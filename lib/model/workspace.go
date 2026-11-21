@@ -20,6 +20,11 @@ type Schedule struct {
 	Inputs     []KeyValue
 	TZ         string // IANA zone name; "" is the machine's zone
 	Disabled   bool
+	// OnFailure and OnSuccess are where to tell when a run ends: an http(s) address that gets a Slack-compatible
+	// {"text": …} POST, or env:NAME to read the address from that environment variable (a webhook address is a
+	// credential, so a shared file can name it without holding it). Empty sends nothing.
+	OnFailure string
+	OnSuccess string
 }
 
 // Workspace is the content of workspace.yaml.

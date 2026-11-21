@@ -39,3 +39,14 @@ export function toggleOverlay(stack: string[], name: string): string {
 export function pickerLabel(selected: string, stack: string[]): string {
   return [selected, ...stack].join(' + ')
 }
+
+/**
+ * What the picker's button shows. With one version and no overlay there is nothing to pick, so it offers the one
+ * thing there is to do, "+ version", and a click adds one; otherwise it names what is open, with "Ver." only when
+ * several versions exist.
+ * Before: it read "Ver. 1" even with one version, which looked like a choice and was not.
+ */
+export function pickerButton(versions: number, selected: string, stack: string[], overlaysInCollection: number): { prefix: string; text: string; direct: boolean } {
+  if (versions <= 1 && stack.length === 0 && overlaysInCollection === 0) return { prefix: '', text: '+ version', direct: true }
+  return { prefix: versions > 1 ? 'Ver.' : '', text: pickerLabel(selected, stack), direct: false }
+}

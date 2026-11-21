@@ -49,6 +49,15 @@ export function Ask() {
 }
 
 /**
+ * AskNew is Ask for a vault that is being made: the window asks for the passphrase twice and says it cannot be
+ * recovered. It is the vault's NewPassphrase function.
+ * @returns {$CancellablePromise<string>}
+ */
+export function AskNew() {
+    return $Call.ByID(3256413570);
+}
+
+/**
  * Cancel answers the open question with ErrPassphraseCancelled, and every
  * later one too, until Unlock.
  * @returns {$CancellablePromise<void>}

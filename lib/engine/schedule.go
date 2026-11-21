@@ -348,6 +348,6 @@ func (lr *listRun) outcome() listOutcome {
 // reportSkipped emits a node that did not run.
 func (r *runner) reportSkipped(f *frame, n model.Node) {
 	path := f.path(n.ID)
-	r.emit(NodeStarted{RunID: r.runID, Path: path, Parent: f.parentPath, Lane: f.lane, Node: n.ID, Type: string(n.Type), Name: n.Name, Depth: f.depth})
+	r.emit(NodeStarted{RunID: r.runID, Path: path, Parent: f.parentPath, Lane: f.lane, Node: n.ID, Type: string(n.Type), Name: n.Name, Depth: f.depth, At: r.deps.Clock()})
 	r.emit(NodeFinished{RunID: r.runID, Path: path, Parent: f.parentPath, Lane: f.lane, Node: n.ID, Type: string(n.Type), Status: StatusSkipped, Depth: f.depth})
 }

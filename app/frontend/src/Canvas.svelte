@@ -12,14 +12,24 @@
 </script>
 
 <script lang="ts">
+  import { modalOpen } from './lib/modal'
   // The canvas renders a laid-out Diagram as SVG. Pan, pinch-zoom and drag
   // happen here, locally; the Go side hears of a drop once, on release, and
   // answers every pointer move of a drag with the slot to mark.
+  import { wheelAction } from './lib/wheel'
+  import { clamp } from './lib/clamp'
+  import { minimapView, minimapWorthIt } from './lib/minimap'
   import { untrack, type Snippet } from 'svelte'
+  import { innermost } from './lib/hit'
+  import { blockedUnits, hintOf, type WireKind, type WireTarget } from './lib/wiretargets'
+  import { paintOrder } from './lib/zorder'
+  import { detailLevel, portRadius } from './lib/detail'
+  import { edgeTaken, running } from './lib/edgetaken'
   import type { Card, DataEdge, Diagram, Edge, Face, Slot, Unit } from './lib/types'
   import StepCard from './StepCard.svelte'
   import EdgeCard from './EdgeCard.svelte'
   import { edgeCards, keepStart } from './lib/edgecards'
+  import { debounced } from './lib/debounce'
   import { arrowEdges, arrowKey, arrowMarker, arrowOutcomes, outcomeOfPort, outcomesOfCard, toggled } from './lib/arrows'
   import { CARD, COLOUR_NAMES, openAfterClick, portLine, type OpenRow } from './lib/card'
 
@@ -46,7 +56,10 @@
     onarrow,
     onlocked,
     oncollapse,
+    onopen,
     onaddcase,
+    onaddinlane,
+    oncontext,
     onadd,
     ontoolbar,
     oncolour,
@@ -58,6 +71,7 @@
     onviewchange,
     panel,
     ondata,
+    wireTargets,
     dock,
     start = null,
     end = null,
@@ -75,7 +89,7 @@
     slot: Slot | null
     editable?: boolean // structure changes (move, lift, connect) need Edit; pan and select do not
     onselect: (step: string, additive: boolean) => void
-    onconnect: (from: string, to: string) => void
+    onconnect: (from: string, to: string) => void | Promise<unknown>
     /** A Fail port was dragged onto a step (or an arrow from it deleted, target ""): `step` goes on at `target` when it fails. */
     onfail?: (step: string, target: string) => void
     /** An outcome port (success, failure or a named outcome) was dragged onto a step: `to` runs when `from` ends with it. */
@@ -87,7 +101,11 @@
     /** The person tried to change the flow (move a step, open a row) while Edit is off. */
     onlocked?: () => void
     oncollapse: (unit: string, collapsed: boolean) => void
+    /** A double-click on a request or flow card: open what the step calls. */
+    onopen?: (step: string) => void
     onaddcase?: (condition: string) => void // the "+ else if" under a condition (editing only)
+    onaddinlane?: (container: string, lane: number, e: MouseEvent) => void // the "+ Add a step" in an empty lane (editing only)
+    oncontext?: (step: string, e: MouseEvent) => void // a right-click on a card
     /** A + was clicked: a new step goes right before or after `near.step`; near is null for the + of an empty flow. */
     onadd?: (clientX: number, clientY: number, near: { step: string; before: boolean } | null) => void
     ontoolbar?: (tool: 'add' | 'skip' | 'break' | 'duplicate' | 'delete', step: string, e: MouseEvent) => void // the selected card's toolbar
@@ -102,6 +120,8 @@
     panel?: Snippet<[string, () => void]>
     /** A value wire was dropped from one step onto another (Edit only); where it was released, in client points. */
     ondata?: (from: string, to: string, clientX: number, clientY: number) => void
+    /** Asked when a link starts: which steps may it end on? The others are dimmed and the reason shows under the pointer. */
+    wireTargets?: (from: string, kind: WireKind) => Promise<WireTarget[]>
     /** What a step did in the last run, shown under its card while it is selected or pinned; given the step and its pin. */
     dock?: Snippet<[string, boolean, () => void]>
     /** The Start card (the flow's inputs) and the End card (its outputs; null without outputs). */
@@ -136,10 +156,42 @@
   let svg = $state<SVGSVGElement>() as SVGSVGElement
   // The unit being moved (not a lifted card) and how far.
   let moving = $state<{ id: string; dx: number; dy: number } | null>(null)
+  // True while the view pans or zooms, and for a moment after: the cards drop their shadows (a filter the browser
+  // repaints per frame, per card) and get them back once the view is still.
+  let viewMoving = $state(false)
+  const stillAfterMoving = debounced(() => (viewMoving = false), 160)
+  $effect(() => {
+    view.x, view.y, view.k
+    viewMoving = true
+    stillAfterMoving()
+  })
   // A lifted card follows the pointer as a ghost.
   let ghost = $state<{ step: string; x: number; y: number } | null>(null)
   // A needs link being drawn from a unit's port to the pointer; a value wire (kind data) is drawn the same way.
   let link = $state<{ from: string; x: number; y: number; data?: boolean; port?: string; ports?: string[] } | null>(null)
+  // The units the link being drawn would be refused on, with why: asked of Go when the link starts.
+  let blocked = $state<Record<string, string>>({})
+  async function askTargets(u: Unit, port: string | undefined, data: boolean) {
+    blocked = {}
+    if (!wireTargets) return
+    // The same steps the drop will name: a plain port waits for the unit's last step, an outcome port for its core.
+    const fromNode = data ? u.nodes[0] : port && port !== 'done' ? coreOf(u) : u.nodes[u.nodes.length - 1]
+    try {
+      const targets = await wireTargets(fromNode, data ? 'data' : 'wait')
+      if (link?.from === u.id) blocked = blockedUnits(units, targets, u.id)
+    } catch {
+      blocked = {} // no answer: nothing is dimmed, and Go still refuses the drop
+    }
+  }
+  $effect(() => {
+    if (!link) blocked = {}
+  })
+  const linkHint = $derived.by(() => {
+    if (!link) return ''
+    const over = unitAt(link.x, link.y)
+    const why = over ? blocked[over.id] : undefined
+    return why ? hintOf(why) : ''
+  })
   // Outcome ports picked together (shift-click) on one card: dragging any of them takes them all to the step it is dropped on.
   let pickedPorts = $state<{ unit: string; ports: string[] }>({ unit: '', ports: [] })
   // Where a unit was dropped, until Go's new layout arrives. The layout may put the unit somewhere else (a drop
@@ -290,11 +342,12 @@
   // WebView2); two-finger scroll is a plain wheel event.
   function onwheel(e: WheelEvent) {
     e.preventDefault()
-    if (e.ctrlKey) {
+    const act = wheelAction(e)
+    if (act.kind === 'zoom') {
       const p = local(e)
-      zoomAt(p.x, p.y, Math.exp(-e.deltaY * 0.01))
+      zoomAt(p.x, p.y, act.factor)
     } else {
-      view = { ...view, x: view.x - e.deltaX, y: view.y - e.deltaY }
+      view = { ...view, x: view.x - act.dx, y: view.y - act.dy }
     }
   }
 
@@ -362,6 +415,7 @@
   })
 
   function onbackground(e: PointerEvent) {
+    if (e.button === 2) return // a right click is for a menu, not a pan
     open = null
     pickedEdge = ''
     pickedPorts = { unit: '', ports: [] }
@@ -397,7 +451,7 @@
     }
     if (u.kind !== 'strip' || u.collapsed) return u.nodes[0]
     const i = Math.floor((canvasX - u.x - STRIP_PAD / 2) / ACTION_W)
-    return u.nodes[Math.min(Math.max(i, 0), u.nodes.length - 1)]
+    return u.nodes[clamp(i, 0, u.nodes.length - 1)]
   }
 
   /** The step a unit's card is for (the request of a block, else its first step). */
@@ -472,6 +526,21 @@
     pickedEdge = ''
   }
   function onkeydown(ev: KeyboardEvent) {
+    // A dialog is open: the keys belong to it. Before, Esc here still let go of the selection behind the dialog.
+    if (modalOpen()) return
+    // Esc lets go of a drag in progress (a card, a lifted step or a new arrow) as if it had never started: the
+    // pointer-up that follows finds nothing to drop. Before, the only way out was to drop it somewhere harmless.
+    if (ev.key === 'Escape' && (link || ghost || moving || press?.dragging)) {
+      ev.preventDefault()
+      oncancelPointer()
+      return
+    }
+    // With nothing in progress, Esc lets go of the selection (not while typing in a field, and not when something open
+    // over the card, such as an expression's help, has just taken the Esc to close itself).
+    if (ev.key === 'Escape' && !ev.defaultPrevented && !pickedE && selection.length && !(ev.target as Element | null)?.closest?.('input, textarea, select, [contenteditable]')) {
+      onselect('', false)
+      return
+    }
     if (!pickedE) return
     if (ev.key === 'Escape') pickedEdge = ''
     if ((ev.key === 'Delete' || ev.key === 'Backspace') && !(ev.target as Element | null)?.closest?.('input, textarea, [contenteditable]')) {
@@ -502,6 +571,8 @@
       return // shift-click only changes the selection
     }
     if (!selection.includes(step)) onselect(step, false)
+    // A right-click selects the card and opens its menu (oncontextmenu); it neither drags it nor pans the view.
+    if (e.button === 2) return
     if (!editable) {
       press = { kind: 'pan', sx: e.clientX, sy: e.clientY, vx: view.x, vy: view.y, dragging: false, locked: true }
       svg.setPointerCapture(e.pointerId)
@@ -537,6 +608,7 @@
     pickedPorts = { unit: '', ports: [] }
     const c = toCanvas(e.clientX, e.clientY)!
     link = { from: u.id, x: c.x, y: c.y, port, ports: together }
+    void askTargets(u, port, false)
     svg.setPointerCapture(e.pointerId)
   }
 
@@ -545,11 +617,12 @@
     if (!editable || !ondata) return
     const c = toCanvas(e.clientX, e.clientY)!
     link = { from: u.id, x: c.x, y: c.y, data: true }
+    void askTargets(u, undefined, true)
     svg.setPointerCapture(e.pointerId)
   }
 
   function unitAt(x: number, y: number): Unit | undefined {
-    return units.find((u) => x >= u.x && x <= u.x + u.w && y >= u.y && y <= u.y + u.h)
+    return innermost(units, x, y)
   }
 
   function onmovePointer(e: PointerEvent) {
@@ -589,7 +662,7 @@
       if (target && target.id !== from) {
         if (wire) ondata?.(byId.get(from)!.nodes[0], target.nodes[0], e.clientX, e.clientY)
         else if ((port && port !== 'done') || ports.length > 1) for (const p of ports) onoutcome?.(coreOf(byId.get(from)!), outcomeOfPort(p), target.nodes[0])
-        else onconnect(from, target.id)
+        else void onconnect(from, target.id)
       }
       return
     }
@@ -677,10 +750,13 @@
     if (isBlock(u)) return results[u.nodes[u.core ?? 0]] ?? ''
     return u.nodes.length === 1 ? (results[u.nodes[0]] ?? '') : ''
   }
+  // An arrow is lit when the run took it, and moves only while the run is going.
   const live = (e: Edge) => {
     const a = byId.get(e.from)
-    return !!a && ['passed', 'running'].includes(statusOf(a))
+    const b = byId.get(e.to)
+    return !!a && !!b && edgeTaken(e, statusOf(a), statusOf(b))
   }
+  const going = $derived(running(statuses))
 
   // The minimap: the flow's extent, and the part of it the canvas shows.
   const bounds = $derived.by(() => {
@@ -695,6 +771,7 @@
     return () => ro.disconnect()
   })
   const shown = $derived({ x: -view.x / view.k, y: -view.y / view.k, w: size.w / view.k, h: size.h / view.k })
+  const mini = $derived(minimapView(shown, bounds))
   // The minimap only earns its place when part of the flow is out of view.
   const clipped = $derived(bounds.x < shown.x || bounds.y < shown.y || bounds.x + bounds.w > shown.x + shown.w || bounds.y + bounds.h > shown.y + shown.h)
 
@@ -716,6 +793,11 @@
   }
 
   const selectedUnits = $derived(new Set(units.filter((u) => u.nodes.some((n) => selection.includes(n))).map((u) => u.id)))
+  // The selected cards and the dragged one are drawn last, so they sit over the card they overlap.
+  // Zoomed far out a card is a tile, and the ports grow so they can still be hit.
+  const detail = $derived(detailLevel(view.k))
+  const portR = $derived(portRadius(view.k))
+  const painted = $derived(paintOrder(units, selectedUnits, moving?.id, (u) => !!u.card))
   // A + on each side of a card: on the selected one, else the right + after the last card (the one
   // reaching furthest right) and the left + before the first. There was only the right one, so a step
   // could not be added in front of another.
@@ -760,6 +842,7 @@
 <svg
   bind:this={svg}
   class:readonly={!editable}
+  class:view-moving={viewMoving}
   role="application"
   aria-label="Flow canvas"
   onwheel={onwheel}
@@ -794,6 +877,13 @@
     {#each diagram.lanes as l}
       <rect class="lane" x={l.x} y={l.y} width={l.w} height={l.h} rx="10" />
       {#if l.label && !byId.get(l.container)?.headW}<text class="lanelabel" x={l.x + 10} y={l.y - 7}>{l.label.length > 40 ? l.label.slice(0, 39) + '…' : l.label}</text>{/if}
+      {#if editable && onaddinlane && !units.some((u) => u.parent === l.container && u.x >= l.x && u.x < l.x + l.w && u.y >= l.y && u.y < l.y + l.h)}
+        <!-- an empty lane is a target: the person clicks it to put the first step in -->
+        <g class="addcase" role="button" tabindex="-1" aria-label={`Add a step to ${l.label || 'this lane'}`} onpointerdown={(e) => e.stopPropagation()} onclick={(e) => onaddinlane(l.container, l.index, e)} onkeydown={() => {}}>
+          <rect x={l.x + l.w / 2 - 46} y={l.y + l.h / 2 - 11} width="92" height="22" rx="11" />
+          <text x={l.x + l.w / 2} y={l.y + l.h / 2 + 4} text-anchor="middle">+ Add a step</text>
+        </g>
+      {/if}
     {/each}
 
     {#each dataArcs as a}
@@ -836,7 +926,7 @@
       {#if !e.into}
         {@const either = !e.fail && !e.outcome && diagram.edges.some((x) => (x.fail || !!x.outcome) && !x.goto && x.from === e.from && x.to === e.to)}
         <path class="edge" class:fail={e.fail} class:named={!!e.outcome} style:stroke={edgeTone(e)} d={edgePath(e)} marker-end={markerOf(e)} />
-        <path class="flow" class:fail={e.fail} class:named={!!e.outcome} class:live={live(e)} style:stroke={edgeTone(e)} d={edgePath(e)} />
+        <path class="flow" class:fail={e.fail} class:named={!!e.outcome} class:live={live(e)} class:still={!going} style:stroke={edgeTone(e)} d={edgePath(e)} />
         <path class="edgepick" class:on={pickedEdges.includes(e)} d={edgePath(e)} />
         <path class="edgehit" d={edgePath(e)} role="button" tabindex="-1" aria-label="Select this arrow" onpointerdown={(ev) => pickEdge(ev, e)}><title>{e.fail ? 'Runs when the step fails' : 'Runs when the step succeeds'}</title></path>
         {#if e.fail && edgeMid(e)}{@const m = edgeMid(e)!}<text class="edgelabel fail" x={m.x} y={m.y + 16} text-anchor="middle">if it fails</text>{/if}
@@ -845,14 +935,14 @@
       {/if}
     {/each}
 
-    {#each units as u (u.id)}
+    {#each painted as u (u.id)}
       {@const p = at(u)}
       {@const card = cards[u.id]}
       {@const status = statusOf(u)}
-      <g class="unit {u.kind} {status}" class:selected={selectedUnits.has(u.id)} class:pulse={pulse === u.id} class:dragging={moving?.id === u.id}
-        transform={`translate(${p.x} ${p.y})`} onpointerdown={(e) => onunit(e, u)} ondblclick={() => u.kind === 'strip' && (u.nodes.length > 1 || u.collapsed) && oncollapse(u.id, !u.collapsed)} role="button" tabindex="-1">
+      <g class="unit {u.kind} {status}" class:selected={selectedUnits.has(u.id)} class:pulse={pulse === u.id} class:dragging={moving?.id === u.id} class:blocked={!!link && blocked[u.id] !== undefined}
+        transform={`translate(${p.x} ${p.y})`} onpointerdown={(e) => onunit(e, u)} oncontextmenu={(e) => { const c = toCanvas(e.clientX, e.clientY); if (!oncontext || !c) return; e.preventDefault(); oncontext(stepAt(u, c.x, c.y), e) }} ondblclick={() => (u.kind === 'strip' && (u.nodes.length > 1 || u.collapsed) ? oncollapse(u.id, !u.collapsed) : onopen && (u.kind === 'request' || u.kind === 'card') && onopen(u.nodes[u.core ?? 0]))} role="button" tabindex="-1">
         {#if u.card && card?.face}
-          <StepCard {u} face={card.face} title={card.title} selected={selectedUnits.has(u.id)} {status} result={resultOf(u)} skipped={card.skipped} breakpoint={card.break} note={card.skipNote} colour={card.color || undefined}
+          <StepCard {u} detail={detail} portR={portR} face={card.face} title={card.title} tip={card.tip} selected={selectedUnits.has(u.id)} {status} result={resultOf(u)} skipped={card.skipped} breakpoint={card.break} note={card.skipNote} colour={card.color || undefined}
             toolbar={!!ontoolbar && editable && selection.length === 1 && selectedUnits.has(u.id) && !moving && !link}
             ontool={(tool, e) => ontoolbar?.(tool, u.nodes[u.core ?? 0], e)} oncolour={(c) => oncolour?.(u.nodes[u.core ?? 0], c)}
             oncase={oncase ? (i, e) => oncase(u.nodes[u.core ?? 0], i, e) : undefined}
@@ -992,7 +1082,7 @@
       {@const from = byId.get(link.from)}
       {#if from}
         <path class="linking" class:wire={link.data} class:failing={link.port === 'fail'} class:named={!!link.port && link.port.startsWith('outcome-')} d={link.data ? `M${at(from).x + from.w / 2},${at(from).y + (from.headH || from.h)} L${link.x},${link.y}` : `M${at(from).x + from.w},${link.port && link.port !== 'done' ? portYOf(from, link.port) : portY(from)} L${link.x},${link.y}`} />
-        <text class="slotlabel" x={link.x + 10} y={link.y - 8}>{link.data ? `Release on a step to pass it a value from ${from.nodes[0]}` : link.port === 'fail' ? `Release on a step to run it when ${coreOf(from)} fails` : link.port?.startsWith('outcome-') ? `Release on a step to run it on ${outcomeOfPort(link.port)} of ${coreOf(from)}` : `Release on a step to make it wait for ${coreOf(from)}`}</text>
+        <text class="slotlabel" class:refused={!!linkHint} x={link.x + 10} y={link.y - 8}>{linkHint ? `Not here: ${linkHint}` : link.data ? `Release on a step to pass it a value from ${from.nodes[0]}` : link.port === 'fail' ? `Release on a step to run it when ${coreOf(from)} fails` : link.port?.startsWith('outcome-') ? `Release on a step to run it on ${outcomeOfPort(link.port)} of ${coreOf(from)}` : `Release on a step to make it wait for ${coreOf(from)}`}</text>
       {/if}
     {/if}
     {#if slot?.ok}
@@ -1015,7 +1105,7 @@
 
 {#if panel && open && panelBox}
   <div class="rowpanel" style:left={`${panelBox.left}px`} style:top={`${panelBox.top}px`} style:width={`${panelBox.width}px`}
-    onpointerdown={(e) => e.stopPropagation()} onwheel={(e) => e.stopPropagation()} onkeydown={(e) => e.key === 'Escape' && (open = null)} role="presentation">
+    onpointerdown={(e) => e.stopPropagation()} onwheel={(e) => e.stopPropagation()} onkeydown={(e) => e.key === 'Escape' && !e.defaultPrevented && (open = null)} role="presentation">
     {@render panel(open.key, () => (open = null))}
   </div>
 {/if}
@@ -1029,10 +1119,10 @@
   {/each}
 {/if}
 
-{#if units.length > 1 && clipped}
+{#if minimapWorthIt(clipped, units.length)}
   <svg class="minimap" viewBox={`${bounds.x - 40} ${bounds.y - 40} ${bounds.w + 80} ${bounds.h + 80}`} role="presentation" onpointerdown={minimapPan}>
     {#each units as u (u.id)}<rect x={u.x} y={u.y} width={u.w} height={u.h} class={u.kind} />{/each}
-    <rect class="view" x={shown.x} y={shown.y} width={shown.w} height={shown.h} />
+    <rect class="view" x={mini.x} y={mini.y} width={mini.w} height={mini.h} />
   </svg>
 {/if}
 
@@ -1052,7 +1142,7 @@
     cursor: grab;
     touch-action: none;
   }
-  .lanelabel { fill: var(--accent); font-size: 11px; font-weight: 600; pointer-events: none; }
+  .lanelabel { fill: var(--accent); font-size: var(--cv-xs); font-weight: 600; pointer-events: none; }
   .hk { fill: none; stroke: var(--muted); stroke-width: 1.5; }
   .hklabel { fill: var(--muted); font-size: 9.5px; letter-spacing: 0.03em; }
   .hkbar { stroke: var(--muted); stroke-width: 2; stroke-linecap: round; }
@@ -1066,16 +1156,16 @@
   .addstub { stroke: var(--muted); stroke-width: 1.5; stroke-dasharray: 3 4; }
   .addcase { cursor: pointer; }
   .addcase rect { fill: var(--panel); stroke: var(--accent); stroke-dasharray: 3 3; }
-  .addcase text { fill: var(--accent); font-size: 11px; pointer-events: none; }
+  .addcase text { fill: var(--accent); font-size: var(--cv-xs); pointer-events: none; }
   .addcase:hover rect { fill: color-mix(in srgb, var(--accent) 18%, var(--panel)); }
   /* Quiet until a step is selected: every value arc at full strength was a tangle, and the ones of the selected
      step are the ones being asked about. A quiet arc is still drawn solid and visible, so it is found, not lost. */
   .data { fill: none; stroke: var(--data); stroke-width: 1.4; opacity: 0.3; pointer-events: none; transition: opacity var(--t-base) var(--ease-out), stroke-width var(--t-base) var(--ease-out); }
   .data.hot { opacity: 1; stroke-width: 2; stroke-dasharray: 6 4; }
-  .datalabel { fill: var(--data); font-size: 11px; opacity: 0; pointer-events: none; transition: opacity var(--t-base) var(--ease-out); }
+  .datalabel { fill: var(--data); font-size: var(--cv-xs); opacity: 0; pointer-events: none; transition: opacity var(--t-base) var(--ease-out); }
   .datalabel.hot { opacity: 1; font-weight: 600; }
   .edgelabel { fill: var(--muted); font-size: 10px; font-style: italic; pointer-events: none; }
-  .branchlabel { fill: var(--accent); font-size: 11px; font-weight: 600; pointer-events: none; }
+  .branchlabel { fill: var(--accent); font-size: var(--cv-xs); font-weight: 600; pointer-events: none; }
   .edge.branch { stroke-dasharray: none; }
   .lane { fill: none; stroke: var(--line); stroke-dasharray: 6 5; }
   .edge { fill: none; stroke: color-mix(in srgb, var(--muted) 80%, var(--bg)); stroke-width: 1.5; stroke-linecap: round; }
@@ -1089,8 +1179,8 @@
   .edgex:hover circle { fill: var(--fail); stroke: var(--fail); }
   .edgex path { fill: none; stroke: var(--text); stroke-width: 2; stroke-linecap: round; pointer-events: none; }
   .switch { cursor: pointer; }
-  .switch rect { fill: var(--panel); stroke: var(--line); stroke-width: 1.4; filter: drop-shadow(0 2px 6px rgb(0 0 0 / 0.3)); }
-  .switch text { fill: var(--muted); font-size: 12px; font-weight: 600; pointer-events: none; }
+  .switch rect { fill: var(--panel); stroke: var(--line); stroke-width: 1.4; filter: var(--float); }
+  .switch text { fill: var(--muted); font-size: var(--cv-sm); font-weight: 600; pointer-events: none; }
   .switch .tick { fill: none; stroke: transparent; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; pointer-events: none; }
   .switch.on text { fill: var(--text); }
   .switch.on rect { stroke: var(--chip, var(--accent)); }
@@ -1118,18 +1208,22 @@
     transition: opacity 0.3s;
   }
   .flow.live { opacity: 1; stroke-width: 3; }
+  .flow.still { animation: none; }
   @keyframes drift { to { stroke-dashoffset: -24; } }
   .unit { cursor: pointer; }
   .unit rect {
     stroke: var(--line);
     stroke-width: 1.2;
     transition: stroke 0.2s, filter 0.2s;
-    filter: drop-shadow(0 2px 6px rgb(0 0 0 / 0.25));
+    filter: var(--float);
   }
   .unit.request rect { fill: var(--request); }
   .unit.strip rect { fill: var(--strip); }
   .unit.action rect { fill: var(--action); }
   .unit.container rect { fill: var(--container); }
+  /* While a link is drawn, a step it would be refused on is dimmed. */
+  .unit.blocked { opacity: 0.35; }
+  .slotlabel.refused { fill: var(--fail); }
   .unit.selected rect { stroke: var(--accent); stroke-width: 2.5; filter: drop-shadow(0 0 10px var(--accent)); }
   .unit.dragging rect { stroke: var(--accent); }
   .unit text { pointer-events: none; }
@@ -1155,13 +1249,13 @@
   .port:hover { fill: var(--accent); stroke: var(--accent); }
   .linking.wire { stroke: var(--data); }
   .linking { stroke: var(--accent); stroke-width: 2; stroke-dasharray: 5 4; fill: none; pointer-events: none; }
-  .kind { fill: var(--muted); font-size: 11px; }
-  .id { fill: var(--text); font-size: 13px; font-weight: 600; }
+  .kind { fill: var(--muted); font-size: var(--cv-xs); }
+  .id { fill: var(--text); font-size: var(--cv-md); font-weight: 600; }
   .slot { fill: var(--accent); pointer-events: none; }
   .slotlabel { fill: var(--accent); font-size: 10px; pointer-events: none; }
   .ghost { pointer-events: none; opacity: 0.85; }
   .ghost rect { fill: var(--accent); }
-  .ghost text { fill: var(--on-accent); font-size: 11px; font-weight: 600; }
+  .ghost text { fill: var(--on-accent); font-size: var(--cv-xs); font-weight: 600; }
   .rowpanel {
     position: absolute;
     z-index: 5;
@@ -1171,7 +1265,7 @@
     padding: 12px;
     background: var(--raised);
     border: 1px solid var(--accent);
-    border-radius: 14px;
+    border-radius: var(--r-xl);
     box-shadow: var(--shadow);
   }
   .dockbox { position: absolute; z-index: 4; box-sizing: border-box; }
@@ -1188,7 +1282,7 @@
     cursor: pointer;
   }
   .minimap rect { fill: var(--muted); opacity: 0.55; rx: 6; }
-  .minimap rect.view { fill: color-mix(in srgb, var(--accent) 18%, transparent); stroke: var(--accent); stroke-width: 6; opacity: 1; rx: 0; }
+  .minimap rect.view { fill: color-mix(in srgb, var(--accent) 18%, transparent); stroke: var(--accent); stroke-width: 2px; vector-effect: non-scaling-stroke; opacity: 1; rx: 0; }
   .bar {
     position: absolute;
     right: 16px;

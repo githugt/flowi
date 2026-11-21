@@ -1,5 +1,9 @@
 <script lang="ts">
+  import Field from './Field.svelte'
+  import Popover from './Popover.svelte'
+  import IconButton from './IconButton.svelte'
   import Button from './Button.svelte'
+  import Select from './Select.svelte'
   // The editor behind a Start or End row: the input's or output's name, type and default or value, and Remove. It
   // opens where the row was clicked and each field commits when it is left, so Undo takes back one field at a time.
   import { FlowService } from '../bindings/github.com/githugt/flowi/app/internal/bridge'
@@ -50,31 +54,23 @@
 </script>
 
 <svelte:window onkeydown={(e) => e.key === 'Escape' && onclose()} />
-<div class="scrim" role="presentation" onpointerdown={onclose}></div>
-<div class="io" style:left={`${Math.min(x, window.innerWidth - 340)}px`} style:top={`${Math.min(y + 8, window.innerHeight - 300)}px`} role="dialog" aria-label={isInput ? 'Input' : 'Output'}>
-  <div class="top"><h4>{isInput ? 'Input' : 'Output'}</h4><button class="close" aria-label="Close" onclick={onclose}>×</button></div>
-  <label class="field"><span class="label">Name</span><input bind:value={name} onchange={commit} spellcheck="false" /></label>
-  <label class="field">
-    <span class="label">Type</span>
-    <select bind:value={type} onchange={commit}>{#each IO_TYPES as t}<option value={t}>{t || 'any'}</option>{/each}</select>
-  </label>
-  <label class="field">
-    <span class="label">{isInput ? 'Default' : 'Value'}</span>
+<Popover {x} {y} label={isInput ? 'Input' : 'Output'} width={320} height={300} {onclose}>
+  <div class="top"><h4>{isInput ? 'Input' : 'Output'}</h4><IconButton icon="close" label="Close" onclick={onclose} /></div>
+  <Field label="Name"><input bind:value={name} onchange={commit} spellcheck="false" /></Field>
+  <Field label="Type">
+    <Select bind:value={type} onchange={commit}>{#each IO_TYPES as t}<option value={t}>{t || 'any'}</option>{/each}</Select>
+  </Field>
+  <Field label={`${isInput ? 'Default' : 'Value'}`}>
     <input bind:value onchange={commit} placeholder={isInput ? '' : '{{vars.token}}'} spellcheck="false" />
-  </label>
+  </Field>
   {#if error}<p class="err">{error}</p>{/if}
   <div class="actions"><Button variant="danger" onclick={remove}>Remove</Button><Button variant="primary" onclick={onclose}>Done</Button></div>
-</div>
+</Popover>
 
 <style>
-  .scrim { position: fixed; inset: 0; z-index: 29; }
-  .io { position: fixed; z-index: 30; width: 320px; box-sizing: border-box; display: flex; flex-direction: column; gap: 8px; padding: 12px; background: var(--raised); border: 1px solid var(--line); border-radius: 14px; box-shadow: var(--shadow); }
   .top { display: flex; align-items: center; justify-content: space-between; }
   h4 { margin: 0; font-size: var(--fs-md); }
-  .close { background: none; border: 0; color: var(--muted); font: inherit; font-size: var(--fs-lg); line-height: 1; }
-  .field { display: flex; flex-direction: column; gap: 3px; }
-  .label { color: var(--muted); font-size: var(--fs-xs); }
-  input:focus, select:focus { border-color: var(--accent); outline: none; }
   .err { color: var(--fail); font-size: var(--fs-sm); margin: 0; }
+  input:focus { border-color: var(--accent); outline: none; }
   .actions { display: flex; justify-content: space-between; gap: 8px; }
 </style>

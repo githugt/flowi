@@ -1,4 +1,7 @@
 <script lang="ts">
+  import Field from './Field.svelte'
+  import Button from './Button.svelte'
+  import Select from './Select.svelte'
   import Toggle from './Toggle.svelte'
   // The sections only message (async) and gRPC requests have.
   import { RequestService } from '../bindings/github.com/githugt/flowi/app/internal/bridge'
@@ -6,13 +9,15 @@
   import type { AsyncBlock, GRPCBlock, KV, RequestView } from './lib/types'
   import AreaField from './AreaField.svelte'
   import CodeArea from './CodeArea.svelte'
-  import TextField from './TextField.svelte'
+  import TextInput from './TextInput.svelte'
   import TemplateField from './TemplateField.svelte'
   import { requestVocabulary } from './lib/vocabulary'
   import KVRows from './KVRows.svelte'
   import EmptyState from './EmptyState.svelte'
   import { parseDuration, showDuration } from './lib/duration'
   import { mergeBinding, optionNames } from './lib/binding'
+  import { streamNote } from './lib/streamkind'
+  import { parseCount } from './lib/count'
 
   let { view, section }: { view: RequestView; section: string } = $props()
   const node = $derived(view.node)
@@ -20,9 +25,13 @@
   const g = $derived(view.grpc)
 
   let timeoutBad = $state(false)
+  let countError = $state('')
 
   type Receive = { Count: number; Timeout: number; Match: string }
   const receive = $derived<Receive | null>(a ? a.block.Receive : (g?.block.Receive ?? null))
+  // What the chosen gRPC method does with its messages; undefined for a message request or an unknown method.
+  const method = $derived(g?.methods.find((m) => m.full === g.block.Method))
+  const note = $derived(streamNote(g ? method : undefined))
 
   // ---- writes: the block comes from the latest view, with one change
   function putAsync(change: (b: AsyncBlock) => void) {
@@ -101,61 +110,61 @@
   <div class="line">
     {#if a}
       <label class="radio">Format
-        <select value={isJSON ? 'json' : 'text'} onchange={(e) => setMessage(msgText, e.currentTarget.value === 'json')}>
+        <Select value={isJSON ? 'json' : 'text'} onchange={(e) => setMessage(msgText, e.currentTarget.value === 'json')}>
           <option value="json">JSON</option><option value="text">Text</option>
-        </select>
+        </Select>
       </label>
     {/if}
-    <button disabled={a ? !isJSON : false} onclick={prettify}>Prettify</button>
+    <Button disabled={a ? !isJSON : false} onclick={prettify}>Prettify</Button>
   </div>
   <CodeArea value={msgText} lang={isJSON ? 'json' : 'text'} oninput={(t) => setMessage(t)} empty={{ icon: 'body', title: 'No message', hint: 'Click to write the message to send.' }} />
 {:else if section === 'Receive' && !receive}
-  <EmptyState icon="stream" title="Not waiting for messages" hint="This request only sends. Wait for messages to check the replies or events that follow." compact>
-    <button onclick={() => setReceiveOn(true)}>Wait for messages</button>
+  <EmptyState icon="stream" title={note.title} hint={note.hint} compact>
+    {#if note.reads}<Button onclick={() => setReceiveOn(true)}>Wait for messages</Button>{/if}
   </EmptyState>
 {:else if section === 'Receive'}
   <Toggle checked={receive !== null} onchange={setReceiveOn}>Wait for messages</Toggle>
   {#if receive}
-    <TextField label="Messages (empty: 1)" value={receive.Count ? String(receive.Count) : ''} oninput={(t) => putReceive((r) => (r.Count = Math.max(0, parseInt(t) || 0)))} />
-    <TextField
-      label="Timeout (empty: 30s)"
-      value={showDuration(receive.Timeout)}
-      placeholder="30s"
-      oninput={(t) => {
+    <Field label="Messages (empty: 1)"><TextInput value={receive.Count ? String(receive.Count) : ''} ontext={(t) => {
+        const n = parseCount(t)
+        countError = n.error
+        if (!n.error) putReceive((r) => (r.Count = n.value))
+      }} /></Field>
+    {#if countError}<p class="err">{countError}</p>{/if}
+    <Field label="Timeout (empty: 30s)"><TextInput value={showDuration(receive.Timeout)} placeholder="30s" ontext={(t) => {
         const ns = parseDuration(t)
         timeoutBad = ns === null
         if (ns !== null) putReceive((r) => (r.Timeout = ns))
-      }}
-    />
+      }} /></Field>
     {#if timeoutBad}<p class="err">Write the timeout as a duration like 500ms, 30s or 2m.</p>{/if}
     <TemplateField label="Only if" help="message.filter" placeholder={'body.type == "order"'} value={receive.Match} oninput={(t) => putReceive((r) => (r.Match = t))} vocabulary={requestVocabulary('message.filter', node, view.response, view.kind)} />
     <p class="muted">Stops after this many messages, or fails when the timeout passes. Only messages the filter accepts count.</p>
   {/if}
 {:else if section === 'Credentials' && a}
   {#if a.cloud}
-    <label class="f"><span>Sign in</span>
-      <select value={authMode} onchange={(e) => putBinding(options, e.currentTarget.value, credentials)}>
+    <Field label="Sign in">
+      <Select value={authMode} onchange={(e) => putBinding(options, e.currentTarget.value, credentials)}>
         <option value="default">The provider's own credential lookup</option>
         <option value="explicit">Credentials written here</option>
-      </select>
-    </label>
+      </Select>
+    </Field>
   {/if}
   {#if a.cloud && authMode !== 'explicit'}
     <EmptyState icon="auth" title="The provider's own credentials" hint="Found the provider's usual way (its environment variables, profile or signed-in session). Pick “Credentials written here” above to set them for this request." compact />
   {:else}
     {#each credentialNames as name}
-      <TextField label={name} mono placeholder={'{{secret.' + name + '}}'} value={credentials.find((c) => c.Key === name)?.Value ?? ''} oninput={(t) => setCredential(name, t)} />
+      <Field label={name}><TextInput mono placeholder={'{{secret.' + name + '}}'} value={credentials.find((c) => c.Key === name)?.Value ?? ''} ontext={(t) => setCredential(name, t)} /></Field>
     {/each}
     <p class="muted">Keep credentials out of the file: use <code>{'{{secret.name}}'}</code>.</p>
   {/if}
 {:else if section === 'Binding' && a}
   {#if a.block.Protocol === 'servicebus'}
-    <label class="f"><span>Reading the queue</span>
-      <select value={readMode} onchange={(e) => setReadMode(e.currentTarget.value)}>
+    <Field label="Reading the queue">
+      <Select value={readMode} onchange={(e) => setReadMode(e.currentTarget.value)}>
         <option value="peek">Only look: leave every message where it is (recommended for testing)</option>
         <option value="lock">Receive: remove the messages it keeps, give the others back</option>
-      </select>
-    </label>
+      </Select>
+    </Field>
     {#if readMode === 'lock'}
       <p class="muted">Receiving removes the kept messages from the queue. Every other message it sees counts as a delivery, and a message delivered too often goes to the dead-letter queue.</p>
     {:else}
@@ -176,11 +185,7 @@
 <style>
   .line { display: flex; gap: 12px; align-items: center; }
   .radio { display: flex; gap: 6px; align-items: center; }
-  .f { display: flex; flex-direction: column; gap: 3px; color: var(--muted); font-size: var(--fs-xs); }
   .muted { color: var(--muted); font-size: var(--fs-sm); margin: 0; }
   .err { color: var(--fail); font-size: var(--fs-sm); margin: 0; }
-  select, button { background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); padding: 4px 10px; font: inherit; }
-  button { background: transparent; }
-  button:disabled { opacity: 0.4; }
   code { font-family: var(--mono); }
 </style>

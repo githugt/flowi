@@ -35,6 +35,18 @@ export function NewToken() {
 }
 
 /**
+ * PreviewCron explains a cron line and time zone without saving anything.
+ * @param {string} cron
+ * @param {string} tz
+ * @returns {$CancellablePromise<$models.CronPreviewView>}
+ */
+export function PreviewCron(cron, tz) {
+    return $Call.ByID(3894064395, cron, tz).then(/** @type {($result: any) => any} */(($result) => {
+        return $$createType0($result);
+    }));
+}
+
+/**
  * Remove deletes a schedule.
  * @param {string} name
  * @returns {$CancellablePromise<string>}
@@ -69,7 +81,7 @@ export function StartRunner() {
  */
 export function State() {
     return $Call.ByID(587885550).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType0($result);
+        return $$createType1($result);
     }));
 }
 
@@ -82,4 +94,5 @@ export function StopRunner() {
 }
 
 // Private type creation functions
-const $$createType0 = $models.SchedulesView.createFrom;
+const $$createType0 = $models.CronPreviewView.createFrom;
+const $$createType1 = $models.SchedulesView.createFrom;

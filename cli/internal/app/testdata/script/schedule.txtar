@@ -9,6 +9,13 @@ exec flowi schedule ls --output json
 stdout '"name":"nightly"'
 stdout '"inputs":\{"email":"a@b.c"\}'
 
+exec flowi schedule add alerted --flow user-creation --cron '@daily' --on-failure env:SLACK_HOOK --on-success https://hooks.example/ok
+exec flowi schedule ls --output json
+stdout '"alerts":\["failure","success"\]'
+! exec flowi schedule add badhook --flow user-creation --cron '@daily' --on-failure 'hooks.example/x'
+stderr 'on_failure'
+exec flowi schedule rm alerted
+
 ! exec flowi schedule add nightly --flow user-creation --cron '@daily'
 stderr 'already exists'
 ! exec flowi schedule add broken --flow user-creation --cron 'nope'

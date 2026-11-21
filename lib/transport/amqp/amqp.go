@@ -283,3 +283,9 @@ func received(d amqp091.Delivery, at time.Time) transport.Message {
 	}
 	return m
 }
+
+// Probe connects, signs in and opens a channel; nothing is declared, consumed or published.
+func (t Transport) Probe(ctx context.Context, op transport.Operation) error {
+	_, err := t.Run(ctx, op)
+	return err
+}

@@ -51,7 +51,7 @@ func (f Forward) upstreamFor(a answer) (up *url.URL, why string) {
 	if err != nil {
 		return nil, "the API of " + a.route.req.Path + " is not known: " + err.Error()
 	}
-	if f.Self != "" && strings.EqualFold(base.Host, f.Self) {
+	if f.Self != "" && SameHost(base.Host, f.Self) {
 		return nil, "the API of " + a.route.req.Path + " is the replayer itself"
 	}
 	if len(f.Only) > 0 && !f.allows(base) {

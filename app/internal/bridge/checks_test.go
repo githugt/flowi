@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	flowi "github.com/githugt/flowi/lib"
 	"github.com/githugt/flowi/lib/analysis"
@@ -20,15 +21,22 @@ import (
 
 func checksApp(t *testing.T) (*bridge.App, *vmtest.Backend) {
 	t.Helper()
+	app, b, _ := checksAppPublishing(t)
+	return app, b
+}
+
+func checksAppPublishing(t *testing.T) (*bridge.App, *vmtest.Backend, *published) {
+	t.Helper()
 	c := vmtest.SampleCollection()
 	c.Flows = []model.Flow{{Meta: model.Meta{ID: "F1", Name: "Pair"}, Path: "pair", File: "/c/flows/pair.arazzo.yaml", Nodes: []model.Node{
 		{ID: "login", Type: "request", Request: &model.RequestCall{Request: model.Ref{ID: "R1", Path: "auth/login"}}},
 		{ID: "verify", Type: "request", Request: &model.RequestCall{Request: model.Ref{ID: "R2", Path: "auth/verify"}}},
 	}}}
 	b := &vmtest.Backend{Cols: []model.Collection{c}}
-	app := bridge.NewApp(b, bridge.NewInlineActor(), (&published{}).emit)
+	pub := &published{}
+	app := bridge.NewApp(b, bridge.NewInlineActor(), pub.emit)
 	app.Start(t.Context())
-	return app, b
+	return app, b, pub
 }
 
 func TestChecks_Coverage_Then_the_view_has_a_row_for_each_operation_with_its_statuses_and_totals(t *testing.T) {
@@ -258,5 +266,184 @@ func TestRequestMatrix_Choices_Then_environments_and_overlays_are_listed(t *test
 
 	if err != nil || len(got.Envs) == 0 || got.Names == nil {
 		t.Fatalf("choices %+v err %v", got, err)
+	}
+}
+
+func TestRequestMatrix_Given_it_runs_Then_progress_is_published_for_the_node_and_the_total_is_known(t *testing.T) {
+	// Arrange
+	app, b, pub := checksAppPublishing(t)
+	node, ok := findNode(app.Workspace().Tree().Roots, "request")
+	if !ok {
+		t.Fatal("no request in the sample collection")
+	}
+	if _, err := app.Requests().Open(node.ID); err != nil {
+		t.Fatal(err)
+	}
+	b.NextSend = &vmtest.Sending{Result: engine.SendResult{Status: engine.StatusPassed, Record: &engine.Record{Status: 200}}}
+
+	// Act
+	got, err := app.Requests().RunMatrix(node.ID, []bridge.MatrixDimView{{Name: "env", Values: []string{"local", "staging", "prod"}}})
+
+	// Assert
+	last, _ := pub.last["matrix"].(bridge.MatrixProgressView)
+	if err != nil || got.Total != 3 || got.Cancelled || last.Node != node.ID || last.Done != 3 || last.Total != 3 {
+		t.Fatalf("matrix %+v err %v last progress %+v", got, err, last)
+	}
+}
+
+func TestFlowChecks_Matrix_Given_it_is_cancelled_midway_Then_the_cells_that_ran_come_back_marked_cancelled(t *testing.T) {
+	// Arrange
+	flows, v, b := openChecksFlow(t)
+	runs := 0
+	b.RunFor = func(flowi.RunOptions) (*vmtest.Running, error) {
+		runs++
+		if runs == 2 {
+			flows.CancelMatrix(v.Node) // the person pressed Cancel while the second cell was running
+		}
+		return &vmtest.Running{Result: engine.RunResult{Status: engine.StatusPassed}}, nil
+	}
+
+	// Act
+	got, err := flows.RunMatrix(v.Node, []bridge.MatrixDimView{{Name: "env", Values: []string{"local", "staging", "prod", "dev"}}}, nil)
+
+	// Assert
+	if err != nil || !got.Cancelled || got.Total != 4 || len(got.Cells) != 2 || got.Passed != 2 || runs != 2 {
+		t.Fatalf("matrix %+v err %v runs %d", got, err, runs)
+	}
+}
+
+func TestFlowChecks_Matrix_Given_one_is_already_running_Then_a_second_for_the_same_flow_is_refused(t *testing.T) {
+	// Arrange
+	flows, v, b := openChecksFlow(t)
+	var second error
+	b.RunFor = func(flowi.RunOptions) (*vmtest.Running, error) {
+		_, second = flows.RunMatrix(v.Node, []bridge.MatrixDimView{{Name: "env", Values: []string{"local"}}}, nil)
+		return &vmtest.Running{Result: engine.RunResult{Status: engine.StatusPassed}}, nil
+	}
+
+	// Act
+	_, first := flows.RunMatrix(v.Node, []bridge.MatrixDimView{{Name: "env", Values: []string{"local"}}}, nil)
+
+	// Assert
+	if first != nil || second == nil || !strings.Contains(second.Error(), "already running") {
+		t.Fatalf("first %v second %v", first, second)
+	}
+}
+
+func TestFlowChecks_CancelMatrix_Given_none_is_running_Then_nothing_happens(t *testing.T) {
+	flows, v, _ := openChecksFlow(t)
+
+	flows.CancelMatrix(v.Node)
+}
+
+func driftBackend(b *vmtest.Backend) {
+	b.Check.Drift = flowi.DriftReport{Flow: "pair", RunStatus: engine.StatusPassed, Requests: []flowi.RequestDrift{
+		{Request: "auth/login", Version: "1", Status: 200, Differences: []schemainfer.Difference{{Path: "$.region", Kind: schemainfer.DriftNew}, {Path: "$.id", Kind: schemainfer.DriftChanged}}},
+		{Request: "auth/verify", Version: "1", Status: 200, Differences: []schemainfer.Difference{{Path: "$.x", Kind: schemainfer.DriftNew}}},
+	}}
+}
+
+func TestFlowChecks_AcceptDrift_Given_one_request_Then_only_it_is_accepted_and_the_check_is_settled_for_it(t *testing.T) {
+	// Arrange
+	flows, v, b := openChecksFlow(t)
+	driftBackend(b)
+	b.Check.Accepted = []flowi.SchemaChange{{}}
+	if _, err := flows.CheckDrift(v.Node, "local", []string{"missing", "changed"}); err != nil {
+		t.Fatal(err)
+	}
+
+	// Act
+	got, err := flows.AcceptDrift(v.Node, []string{"auth/login"})
+
+	// Assert
+	// Before: the drift check was a read-only report; accepting meant leaving it and sending with learning on.
+	if err != nil || !b.Called("AcceptDrift auth/login") || b.Called("AcceptDrift auth/login,auth/verify") {
+		t.Fatalf("err %v calls %v", err, b.Calls)
+	}
+	login, verify := got.Requests[0], got.Requests[1]
+	if !login.Accepted || len(login.Differences) != 0 || verify.Accepted || len(verify.Differences) != 1 {
+		t.Fatalf("login %+v verify %+v", login, verify)
+	}
+	if got.Failing || got.Note != "" {
+		t.Fatalf("the failing change was accepted, so the check passes: %+v", got)
+	}
+}
+
+func TestFlowChecks_AcceptDrift_Given_none_listed_Then_all_are_accepted_and_nothing_changing_says_why(t *testing.T) {
+	// Arrange
+	flows, v, b := openChecksFlow(t)
+	driftBackend(b)
+	if _, err := flows.CheckDrift(v.Node, "local", nil); err != nil {
+		t.Fatal(err)
+	}
+
+	// Act
+	got, err := flows.AcceptDrift(v.Node, nil)
+
+	// Assert
+	if err != nil || !b.Called("AcceptDrift auth/login,auth/verify") || !got.Requests[0].Accepted || !got.Requests[1].Accepted {
+		t.Fatalf("err %v calls %v view %+v", err, b.Calls, got)
+	}
+	if !strings.Contains(got.Note, "never rewritten") {
+		t.Fatalf("note %q", got.Note)
+	}
+}
+
+func TestFlowChecks_AcceptDrift_Given_no_check_yet_Then_it_says_to_run_it_first(t *testing.T) {
+	flows, v, _ := openChecksFlow(t)
+
+	_, err := flows.AcceptDrift(v.Node, nil)
+
+	if err == nil || !strings.Contains(err.Error(), "run the check first") {
+		t.Fatalf("err %v", err)
+	}
+}
+
+func TestFlowChecks_Drift_Then_the_view_has_the_command_that_runs_the_same_check_in_ci(t *testing.T) {
+	// Arrange
+	flows, v, b := openChecksFlow(t)
+	driftBackend(b)
+
+	// Act
+	got, err := flows.CheckDrift(v.Node, "local", []string{"missing", "changed"})
+
+	// Assert
+	if err != nil || !strings.HasPrefix(got.CI, "flowi drift pair ") || !strings.Contains(got.CI, "--env local") || !strings.HasSuffix(got.CI, "--fail-on missing,changed") {
+		t.Fatalf("ci %q err %v", got.CI, err)
+	}
+}
+
+func TestFlowChecks_LastAccess_Given_a_kept_check_When_the_dialog_opens_Then_the_table_and_its_time_come_back(t *testing.T) {
+	// Before: the results were lost when the dialog closed, and nothing said when the check was last run.
+	flows, v, b := openChecksFlow(t)
+	at := time.Date(2026, 11, 3, 9, 30, 0, 0, time.Local)
+	b.Check.Saved = &flowi.SavedAccess{At: at, Report: flowi.AccessReport{Owner: "alice", Steps: []flowi.AccessStep{{ID: "read", Owner: 200,
+		Attempts: []flowi.AccessAttempt{{Identity: "bob", Status: 403, Verdict: flowi.AccessDenied}}}}}}
+
+	got, err := flows.LastAccess(v.Node)
+
+	if err != nil || got.Owner != "alice" || got.Exposed || len(got.Steps) != 1 || got.Checked != "2026-11-03 09:30" {
+		t.Fatalf("access %+v err %v", got, err)
+	}
+}
+
+func TestFlowChecks_LastAccess_Given_no_kept_check_When_asked_Then_the_owner_is_empty_and_the_lists_are_not_null(t *testing.T) {
+	flows, v, _ := openChecksFlow(t)
+
+	got, err := flows.LastAccess(v.Node)
+
+	if err != nil || got.Owner != "" || got.Steps == nil || got.Checked != "" {
+		t.Fatalf("access %+v err %v", got, err)
+	}
+}
+
+func TestFlowChecks_Access_When_run_Then_the_view_says_when_it_ran(t *testing.T) {
+	flows, v, b := openChecksFlow(t)
+	b.Check.Access = flowi.AccessReport{Owner: "alice"}
+
+	got, err := flows.CheckAccess(v.Node, "alice", []string{"bob"}, nil, nil)
+
+	if err != nil || got.Checked == "" {
+		t.Fatalf("access %+v err %v", got, err)
 	}
 }

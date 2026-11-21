@@ -351,3 +351,27 @@ func TestReferences_should_name_a_hyphenated_variable_whole(t *testing.T) {
 		t.Fatalf("refs %+v err %v", refs, err)
 	}
 }
+
+// The window offers these as one-click checks (app/frontend/src/lib/assertstarters.ts); each must compile, and the
+// ones that read the response must hold for it.
+func TestCheck_should_accept_every_check_the_window_offers_from_a_response(t *testing.T) {
+	s := scope(map[string]any{
+		"status":   200,
+		"response": map[string]any{"time": 500 * time.Millisecond},
+		"body":     map[string]any{"s": "a", "n": 3, "ok": true, "items": []any{1, 2}, "owner": map[string]any{"id": 1}, "gone": nil},
+	})
+	lines := []string{
+		"status == 200", "status >= 200 and status < 300", "response.time < 1s",
+		`body.s == "a"`, "body.n == 3", "body.ok == true", "len(body.items) == 2", "body.owner != empty", "body.gone == empty",
+	}
+
+	for _, line := range lines {
+		if err := CheckSyntax(line); err != nil {
+			t.Errorf("%q does not compile: %v", line, err)
+			continue
+		}
+		if ok, _, err := Check(line, s); err != nil || !ok {
+			t.Errorf("%q = %v, %v; want true", line, ok, err)
+		}
+	}
+}

@@ -51,10 +51,10 @@ func TestFlowService_ConvertStep_Given_an_unknown_step_Then_it_is_refused(t *tes
 	}
 }
 
-func TestFlowView_Steps_Then_the_popup_gets_the_ten_entries(t *testing.T) {
+func TestFlowView_Steps_Then_the_popup_gets_the_eleven_entries(t *testing.T) {
 	_, v, _ := openSignup(t)
 
-	if len(v.Steps) != 10 || v.Steps[0].Name != "Request" || v.Steps[0].Description == "" {
+	if len(v.Steps) != 11 || v.Steps[0].Name != "Request" || v.Steps[0].Description == "" {
 		t.Fatalf("steps %+v", v.Steps)
 	}
 }

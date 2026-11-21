@@ -358,3 +358,20 @@ func TestLearnSchemas_should_learn_the_request_and_each_response_message_of_a_gr
 		t.Error("a gRPC call has no HTTP response schema")
 	}
 }
+
+func TestLearnSchemas_Given_an_error_response_Then_it_never_widens_an_existing_schema(t *testing.T) {
+	// Before: an odd error body widened the tracked schema of its status for good.
+	w := demoWorkspace(t)
+	target, _ := w.FindRequest("auth/login", "")
+	if _, err := w.LearnSchemas(target, "1", recordWith(500, nil, map[string]any{"error": "x"})); err != nil {
+		t.Fatal(err)
+	}
+
+	changes, err := w.LearnSchemas(target, "1", recordWith(500, nil, map[string]any{"detail": "y"}))
+
+	got, _, ok := w.SchemaFor(target, "1", SchemaPart{Kind: "response", Status: 500})
+	required, _ := got["required"].([]any)
+	if err != nil || !ok || len(changes) != 0 || !slices.Equal(required, []any{"error"}) {
+		t.Fatalf("changes %+v required %v ok %v err %v", changes, required, ok, err)
+	}
+}

@@ -1,0 +1,12 @@
+# Saved OAuth tokens are listed without their values and forgotten by id; a fresh workspace has none.
+exec flowi workspace mount ./example
+exec flowi auth tokens
+stderr 'No saved tokens'
+! stdout .
+exec flowi auth tokens --output json
+! stdout .
+! exec flowi auth forget 3fa9c1d2
+stderr 'no saved token has the id'
+stderr 'flowi auth tokens'
+! exec flowi auth forget
+stderr 'accepts 1 arg'

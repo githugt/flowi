@@ -3,7 +3,12 @@
 package bridge
 
 import (
+	"io"
+	"os"
+	"path/filepath"
+	"strings"
 	"sync"
+	"time"
 
 	flowi "github.com/githugt/flowi/lib"
 	"github.com/githugt/flowi/lib/model"
@@ -63,6 +68,8 @@ type ImportView struct {
 	CanImport   bool             `json:"canImport"`
 	Error       string           `json:"error,omitempty"`
 	Done        string           `json:"done,omitempty"`
+	// Detected says what the source was recognised as ("OpenAPI 3.1.0"), when it was and the kind was set from it.
+	Detected string `json:"detected,omitempty"`
 }
 
 func importLabels() map[flowi.ImportKind]string {
@@ -86,6 +93,7 @@ type ImportService struct {
 // newImportService builds the service for the import wizard.
 func newImportService(a *App) *ImportService {
 	s := &ImportService{app: a, vm: vm.NewImportWizard(a.backend, a.worker, a.workspace), first: newFirstLoad()}
+	sweepPasted(os.TempDir(), stalePasteAge, time.Now())
 	s.vm.OnChange(func() {
 		s.first.mark()
 		a.emit("import", s.view())
@@ -107,11 +115,59 @@ func (s *ImportService) SetKind(kind string) {
 	s.app.actor.Do(func() { s.vm.SetKind(flowi.ImportKind(kind)) })
 }
 
-// SetFile chooses the document: a file path, a folder (Bruno), or an http(s) URL.
-func (s *ImportService) SetFile(path string) { s.app.actor.Do(func() { s.vm.SetFile(path) }) }
+// SetFile chooses the document: a file path, a folder (Bruno), or an http(s) URL. A file or folder on disk is
+// recognised, and the kind is set to what it is: the screen says so.
+func (s *ImportService) SetFile(path string) {
+	found, ok := detectSource(path) // reads the start of the file: outside the actor
+	s.app.actor.Do(func() {
+		s.vm.SetFile(path)
+		if ok {
+			s.vm.SetDetected(found.Kind, found.Label)
+		}
+	})
+}
 
-// SetPaste sets pasted text, used instead of the file when not empty.
-func (s *ImportService) SetPaste(text string) { s.app.actor.Do(func() { s.vm.SetPaste(text) }) }
+// SetPaste sets pasted text, used instead of the file when not empty. Text that is recognised sets the kind.
+func (s *ImportService) SetPaste(text string) {
+	found, ok := flowi.DetectImportKind("", []byte(text[:min(len(text), flowi.DetectHeadBytes)]))
+	s.app.actor.Do(func() {
+		s.vm.SetPaste(text)
+		if ok {
+			s.vm.SetDetected(found.Kind, found.Label)
+		}
+	})
+}
+
+// detectSource recognises what the file or folder at path is. An address (http, https) is not fetched just to look.
+func detectSource(path string) (flowi.Detected, bool) {
+	path = strings.TrimSpace(path)
+	if path == "" || flowi.IsImportURL(path) {
+		return flowi.Detected{}, false
+	}
+	info, err := os.Stat(path)
+	if err != nil {
+		return flowi.Detected{}, false
+	}
+	if info.IsDir() {
+		entries, err := os.ReadDir(path)
+		if err != nil {
+			return flowi.Detected{}, false
+		}
+		names := make([]string, 0, len(entries))
+		for _, e := range entries {
+			names = append(names, e.Name())
+		}
+		return flowi.DetectImportDir(names)
+	}
+	f, err := os.Open(path) //nolint:gosec // the person chose this file in the window
+	if err != nil {
+		return flowi.Detected{}, false
+	}
+	defer func() { _ = f.Close() }()
+	head := make([]byte, flowi.DetectHeadBytes)
+	n, _ := io.ReadFull(f, head)
+	return flowi.DetectImportKind(filepath.Base(path), head[:n])
+}
 
 // SetOverlay sets overlay files or URLs, separated by ";".
 func (s *ImportService) SetOverlay(refs string) { s.app.actor.Do(func() { s.vm.SetOverlay(refs) }) }
@@ -136,7 +192,7 @@ func (s *ImportService) view() ImportView {
 	v := ImportView{
 		Kinds: []ImportKindView{}, Kind: string(w.Kind()), File: w.File(), Paste: w.Paste(), Collections: []Choice{}, Collection: string(w.Collection()),
 		Files: []ImportFileView{}, Items: []ImportItemView{}, Lossy: nonNil(w.Lossy()), Summary: w.Summary(), Skipped: w.Skipped(),
-		Existing: w.Existing(), CanImport: w.CanImport(), Error: w.Err(), Done: w.Done(),
+		Existing: w.Existing(), CanImport: w.CanImport(), Error: w.Err(), Done: w.Done(), Detected: w.Detected(),
 	}
 	v.Pasted = s.isPasted(w.File(), w.Paste())
 	v.Previewed = w.Summary() != "" // the summary exists once a preview is shown

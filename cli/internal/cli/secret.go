@@ -60,7 +60,29 @@ func newSecretCommand(i do.Injector) *cobra.Command {
 		},
 	}
 	get.Flags().BoolVar(&reveal, "reveal", false, "print the secret's value")
-	cmd.AddCommand(set, unset, ls, get)
+	var checkEnv string
+	check := &cobra.Command{
+		Use:   "check",
+		Short: "Fail (exit 2) when a declared secret has no value, so CI stops before a run is half done",
+		Long: "Lists the secrets the environments declare that have neither a vault value nor a FLOWI_SECRET_<ENV>_<NAME>\n" +
+			"override. Nothing is printed and the exit code is 0 when all are set. Use it as the first step of a CI job:\n" +
+			"  flowi secret check --env staging",
+		Args: cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, _ []string) error { return runSecretCheck(cmd, i, checkEnv) },
+	}
+	check.Flags().StringVar(&checkEnv, "env", "", "only this environment")
+	var dryRun bool
+	prune := &cobra.Command{
+		Use:   "prune",
+		Short: "Remove stored secrets that no environment declares any more",
+		Long: "Deleting an environment removes its secrets, but a secret whose variable was removed or made plain, or an\n" +
+			"environment deleted by another tool, can leave a value in the vault with nothing to show it. This lists those\n" +
+			"and removes them. A secret an environment still declares is never touched. --dry-run only lists.",
+		Args: cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, _ []string) error { return runSecretPrune(cmd, i, dryRun) },
+	}
+	prune.Flags().BoolVar(&dryRun, "dry-run", false, "list what would be removed and change nothing")
+	cmd.AddCommand(set, unset, ls, get, check, prune, newSecretHostsCommand(i), newSecretAllowHostCommand(i), newSecretDenyHostCommand(i))
 	return cmd
 }
 
@@ -84,6 +106,56 @@ func runSecretSet(cmd *cobra.Command, i do.Injector, env, name string) error {
 	}
 	cmd.Printf("Set secret %s for %s\n", name, env)
 	return nil
+}
+
+// runSecretPrune removes (or with dryRun only lists) the stored secrets nothing declares any more.
+func runSecretPrune(cmd *cobra.Command, i do.Injector, dryRun bool) error {
+	s, err := session(cmd, i)
+	if err != nil {
+		return err
+	}
+	var found []flowi.OrphanSecret
+	if dryRun {
+		found, err = s.Workspace.OrphanSecrets()
+	} else {
+		found, err = s.Workspace.PruneSecrets()
+	}
+	if err != nil {
+		return err
+	}
+	rows := orphanRows(found, dryRun)
+	if do.MustInvoke[*GlobalOptions](i).Output == OutputJSON {
+		return writeJSONLines(cmd.OutOrStdout(), rows)
+	}
+	if len(rows) == 0 {
+		cmd.Println("No orphaned secrets.")
+		return nil
+	}
+	if err := writeSecretTable(cmd.OutOrStdout(), rows); err != nil {
+		return err
+	}
+	if dryRun {
+		cmd.Printf("%s would be removed; run without --dry-run to remove them\n", plural(len(rows), "secret"))
+	} else {
+		cmd.Printf("Removed %s\n", plural(len(rows), "secret"))
+	}
+	return nil
+}
+
+// orphanRows words the orphans as table rows: the state says whether they were removed, would be, and why they are orphans.
+func orphanRows(found []flowi.OrphanSecret, dryRun bool) []secretRow {
+	rows := make([]secretRow, 0, len(found))
+	for _, o := range found {
+		state := "removed"
+		if dryRun {
+			state = "orphan"
+		}
+		if o.EnvironmentGone {
+			state += " (environment gone)"
+		}
+		rows = append(rows, secretRow{Environment: o.Environment, Name: o.Name, State: state})
+	}
+	return rows
 }
 
 func runSecretUnset(cmd *cobra.Command, i do.Injector, env, name string) error {
@@ -163,6 +235,43 @@ func runSecretLs(cmd *cobra.Command, i do.Injector, env, name string) error {
 	return writeSecretTable(cmd.OutOrStdout(), rows)
 }
 
+// runSecretCheck is the CI preflight: it names every declared secret without a value and exits 2 if there is one.
+// Before: a missing secret failed in the middle of a run, after earlier steps had already sent requests.
+func runSecretCheck(cmd *cobra.Command, i do.Injector, env string) error {
+	s, err := session(cmd, i)
+	if err != nil {
+		return err
+	}
+	infos, err := s.Workspace.Secrets()
+	if err != nil {
+		return err
+	}
+	missing := missingSecrets(secretRows(infos, env, ""))
+	if len(missing) == 0 {
+		return nil
+	}
+	if do.MustInvoke[*GlobalOptions](i).Output == OutputJSON {
+		if err := writeJSONLines(cmd.OutOrStdout(), missing); err != nil {
+			return err
+		}
+	} else if err := writeSecretTable(cmd.OutOrStdout(), missing); err != nil {
+		return err
+	}
+	cmd.PrintErrf("%d secret(s) have no value: set them with flowi secret set, or FLOWI_SECRET_<ENV>_<NAME>\n", len(missing))
+	return Exit(ExitUsage)
+}
+
+// missingSecrets keeps the rows that have no value.
+func missingSecrets(rows []secretRow) []secretRow {
+	var out []secretRow
+	for _, r := range rows {
+		if r.State == "missing" {
+			out = append(out, r)
+		}
+	}
+	return out
+}
+
 func secretRows(infos []flowi.SecretInfo, env, name string) []secretRow {
 	var rows []secretRow
 	for _, s := range infos {
@@ -199,4 +308,79 @@ func writeJSONLines[T any](w io.Writer, rows []T) error {
 		}
 	}
 	return nil
+}
+
+func newSecretHostsCommand(i do.Injector) *cobra.Command {
+	return &cobra.Command{
+		Use:   "hosts",
+		Short: "List the hosts you allowed to receive secrets",
+		Long: "A request that would send a secret to a host is stopped (FLW-SEC-005) unless the host is named by a variable of\n" +
+			"the selected environment, is this computer, or is allowed here. These are the hosts you allowed with\n" +
+			"`flowi secret allow-host`; a collection file cannot add to them.",
+		Args: cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			s, err := session(cmd, i)
+			if err != nil {
+				return err
+			}
+			hosts := s.Workspace.AllowedSecretHosts()
+			if len(hosts) == 0 {
+				fmt.Fprintln(cmd.ErrOrStderr(), "No hosts allowed. Secrets go only to the hosts the selected environment names, and to this computer.")
+				return nil
+			}
+			for _, h := range hosts {
+				fmt.Fprintln(cmd.OutOrStdout(), h)
+			}
+			return nil
+		},
+	}
+}
+
+func newSecretAllowHostCommand(i do.Injector) *cobra.Command {
+	return &cobra.Command{
+		Use:   "allow-host <host>",
+		Short: "Let secrets be sent to a host the selected environment does not name",
+		Long: "Adds a host to your own list of hosts that may receive secrets (your user settings: a collection cannot add one).\n" +
+			"  api.example.com        that host on any port\n" +
+			"  api.example.com:8443   that host on that port only\n" +
+			"  *.example.com          any subdomain of example.com\n" +
+			"An address such as https://api.example.com/v1 is cut down to its host. Allowing a host twice changes nothing.",
+		Example: "  flowi secret allow-host api.example.com",
+		Args:    cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			s, err := session(cmd, i)
+			if err != nil {
+				return err
+			}
+			host, err := s.Workspace.AllowSecretHost(args[0])
+			if err != nil {
+				return &UsageError{Err: err}
+			}
+			fmt.Fprintf(cmd.ErrOrStderr(), "Secrets may now be sent to %s.\n", host)
+			return nil
+		},
+	}
+}
+
+func newSecretDenyHostCommand(i do.Injector) *cobra.Command {
+	return &cobra.Command{
+		Use:   "deny-host <host>",
+		Short: "Take a host off the list of hosts allowed to receive secrets",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			s, err := session(cmd, i)
+			if err != nil {
+				return err
+			}
+			removed, err := s.Workspace.DenySecretHost(args[0])
+			if err != nil {
+				return &UsageError{Err: err}
+			}
+			if !removed {
+				return &UsageError{Err: fmt.Errorf("%s is not on the list; see `flowi secret hosts`", args[0])}
+			}
+			fmt.Fprintf(cmd.ErrOrStderr(), "Secrets are no longer sent to %s unless an environment names it.\n", args[0])
+			return nil
+		},
+	}
 }

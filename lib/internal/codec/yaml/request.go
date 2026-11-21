@@ -93,10 +93,12 @@ func (c *Codec) requestVersion(d *decoder, m *mapping, label string) model.Reque
 		Body:     m.body(),
 		Extract:  m.extractions(),
 		Assert:   m.strings("assert"),
+		Expect:   m.lenient("expect"),
 		Outcomes: m.outcomes(),
 		Docs:     m.str("docs"), Variables: m.keyValues("variables"),
 	}
 	m.describe(&v)
+	m.switchedOff(&v)
 	v.Auth = m.auth()
 	v.Async = m.async()
 	v.GRPC = m.grpc()
@@ -330,13 +332,39 @@ func (c *Codec) EncodeRequest(r model.Request) ([]byte, error) {
 		versions = append(versions, yaml.MapItem{Key: v.Label, Value: c.encodeVersion(v)})
 	}
 	o.put("versions", versions)
-	if r.Edit != nil {
-		o.put("edit", c.encodeVersion(*r.Edit))
-		o.put("edit_base", r.EditBase)
-		o.put("edit_overlay", r.EditOverlay)
-	}
+	// The working copy (r.Edit) is not written: it is kept apart from the tracked file (EncodeEdit), so a commit of
+	// the collection never carries a half-typed edit.
 	o.put("hooks", encodeHooks(r.Hooks))
 	return marshal(o.items)
+}
+
+// EncodeEdit is the content of the file that holds a request's working copy: its edit, the version it started from
+// and the overlay it was made with. Nil when the request has no edit.
+func (c *Codec) EncodeEdit(r model.Request) ([]byte, error) {
+	if r.Edit == nil {
+		return nil, nil
+	}
+	var o omap
+	o.put("edit", c.encodeVersion(*r.Edit))
+	o.put("edit_base", r.EditBase)
+	o.put("edit_overlay", r.EditOverlay)
+	return marshal(o.items)
+}
+
+// DecodeEdit reads what EncodeEdit wrote: the edit, the label of the version it started from and the overlay.
+func (c *Codec) DecodeEdit(file string, data []byte) (*model.RequestVersion, string, string, diag.List) {
+	d, root, ok := c.parse(file, data)
+	if !ok {
+		return nil, "", "", d.diags
+	}
+	m, ok := d.mapping(root, "$", "edit")
+	if !ok {
+		return nil, "", "", d.diags
+	}
+	v := c.editVersion(d, m)
+	base, overlay := m.versionLabel("edit_base"), m.str("edit_overlay")
+	m.closeStrict()
+	return v, base, overlay, d.diags
 }
 
 func sortedVersions(vs []model.RequestVersion) []model.RequestVersion {
@@ -382,10 +410,12 @@ func (c *Codec) encodeVersion(v model.RequestVersion) yaml.MapSlice {
 	o.put("body", encodeBody(v.Body))
 	o.put("extract", encodeExtractions(v.Extract))
 	o.put("assert", stringsToYAML(v.Assert))
+	o.put("expect", v.Expect)
 	o.put("outcomes", encodeOutcomes(v.Outcomes))
 	o.put("variables", keyValues(v.Variables))
 	o.put("docs", v.Docs)
 	o.put("notes", encodeNotes(v))
+	o.put("disabled", encodeDisabled(v))
 	o.put("settings", c.encodeSettings(v.Settings))
 	o.put("hooks", encodeHooks(v.Hooks))
 	// A version with nothing set is still a version: keep it as {}.
@@ -438,6 +468,43 @@ func (m *mapping) describe(v *model.RequestVersion) {
 		}
 	}
 	nm.closeStrict()
+}
+
+// switchedOff reads "disabled": the names of the query parameters and headers that stay in the file but are not sent.
+// A name that matches no row is ignored.
+func (m *mapping) switchedOff(v *model.RequestVersion) {
+	om, ok := m.child("disabled")
+	if !ok {
+		return
+	}
+	for key, list := range map[string][]model.KeyValue{"query": v.Query, "headers": v.Headers} {
+		for _, name := range om.strings(key) {
+			for i := range list {
+				if list[i].Key == name {
+					list[i].Disabled = true
+				}
+			}
+		}
+	}
+	om.closeStrict()
+}
+
+// encodeDisabled is the disabled mapping of v, empty when every row is on.
+func encodeDisabled(v model.RequestVersion) yaml.MapSlice {
+	var o omap
+	for _, g := range []struct {
+		key  string
+		list []model.KeyValue
+	}{{"query", v.Query}, {"headers", v.Headers}} {
+		var names []any
+		for _, kv := range g.list {
+			if kv.Disabled {
+				names = append(names, kv.Key)
+			}
+		}
+		o.put(g.key, names)
+	}
+	return o.items
 }
 
 // encodeNotes is the notes mapping of v, empty when nothing is described.

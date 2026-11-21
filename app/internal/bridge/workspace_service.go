@@ -13,12 +13,13 @@ import (
 type TreeNode struct {
 	ID       string     `json:"id"`
 	Label    string     `json:"label"`
-	Kind     string     `json:"kind"` // collection, missing, requests, folder, request, environments, environment, flows, flow
+	Kind     string     `json:"kind"` // collection, missing, requests, folder, request, environments, environment, flows, flow, broken
 	Method   string     `json:"method,omitempty"`
 	Name     string     `json:"name,omitempty"` // what a folder's order calls it: the file or folder name
 	Draft    bool       `json:"draft,omitempty"`
 	Scratch  bool       `json:"scratch,omitempty"` // the Drafts try-out space
 	Tree     string     `json:"tree,omitempty"`    // folders and groups: requests or flows; requests can be dropped only on the first
+	Detail   string     `json:"detail,omitempty"`  // a broken file: why it could not be read, with the line
 	Children []TreeNode `json:"children,omitempty"`
 }
 
@@ -29,6 +30,7 @@ type Tree struct {
 	Roots        []TreeNode        `json:"roots"`
 	Environments []string          `json:"environments"`
 	EnvColours   map[string]string `json:"envColours"` // by environment name; absent: the default colour
+	Protected    []string          `json:"protected"`  // the environments that ask before a request that changes data is sent
 	Selected     string            `json:"selected"`
 }
 
@@ -43,6 +45,7 @@ func kindNames() map[vm.NodeKind]string {
 		vm.NodeEnvironment:       "environment",
 		vm.NodeFlowsGroup:        "flows",
 		vm.NodeFlow:              "flow",
+		vm.NodeBroken:            "broken",
 	}
 }
 
@@ -158,6 +161,7 @@ func (s *WorkspaceService) tree() Tree {
 		Roots:        s.nodes(ws.Children("")),
 		Environments: append([]string{}, ws.Environments()...),
 		EnvColours:   ws.EnvColours(),
+		Protected:    ws.ProtectedEnvs(),
 		Selected:     ws.SelectedEnv(),
 	}
 }
@@ -168,7 +172,7 @@ func (s *WorkspaceService) nodes(ids []string) []TreeNode {
 		n := s.app.workspace.Node(id)
 		out = append(out, TreeNode{
 			ID: id, Label: s.app.workspace.Display(id), Kind: kindNames()[n.Kind],
-			Method: n.Method, Name: entryName(n), Draft: n.Draft, Scratch: n.Scratch, Tree: n.Tree, Children: s.nodes(s.app.workspace.Children(id)),
+			Method: n.Method, Name: entryName(n), Draft: n.Draft, Scratch: n.Scratch, Tree: n.Tree, Detail: n.Detail, Children: s.nodes(s.app.workspace.Children(id)),
 		})
 	}
 	return out

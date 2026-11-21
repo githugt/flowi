@@ -5,6 +5,7 @@ package otel
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"strings"
 )
 
 // Trace and span ids are derived from the run id and the node path, so the
@@ -40,3 +41,16 @@ func derive(domain, runID, key string, n int) string {
 
 // traceparent formats a W3C traceparent header (version 00, sampled).
 func traceparent(trace, span string) string { return "00-" + trace + "-" + span + "-01" }
+
+// TraceID is the trace id of a run, as the exporter and the traceparent header write it (32 lower-case hex).
+func TraceID(runID string) string { return traceID(runID) }
+
+// TraceURL puts a run's trace id into a tracing tool's address template, where {trace_id} stands for it. It is ""
+// for an empty template, an empty run id, or a template with no {trace_id} (which would open the same page for
+// every run).
+func TraceURL(template, runID string) string {
+	if template == "" || runID == "" || !strings.Contains(template, "{trace_id}") {
+		return ""
+	}
+	return strings.ReplaceAll(template, "{trace_id}", traceID(runID))
+}

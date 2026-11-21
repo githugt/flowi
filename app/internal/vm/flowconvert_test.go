@@ -10,7 +10,7 @@ import (
 	"github.com/githugt/flowi/lib/model"
 )
 
-func TestStepCatalog_Then_it_lists_ten_entries_in_five_groups(t *testing.T) {
+func TestStepCatalog_Then_it_lists_eleven_entries_in_five_groups(t *testing.T) {
 	// Act
 	entries := StepCatalog()
 
@@ -22,7 +22,7 @@ func TestStepCatalog_Then_it_lists_ten_entries_in_five_groups(t *testing.T) {
 			t.Errorf("entry %+v is missing its name, description or type", e)
 		}
 	}
-	if len(entries) != 10 || len(groups) != 5 {
+	if len(entries) != 11 || len(groups) != 5 {
 		t.Fatalf("%d entries in %d groups: %+v", len(entries), len(groups), entries)
 	}
 }
@@ -46,6 +46,7 @@ func TestSearchSteps_Given_a_word_from_a_description_Then_the_entry_is_found(t *
 	// Act
 	byName := SearchSteps("rout")
 	byDescription := SearchSteps("repeat")
+	byFileType := SearchSteps("delay") // Before: the file format's name for Wait was not searchable
 	none := SearchSteps("zzzz")
 
 	// Assert
@@ -55,10 +56,13 @@ func TestSearchSteps_Given_a_word_from_a_description_Then_the_entry_is_found(t *
 	if len(byDescription) == 0 || byDescription[0].Name != "Loop" {
 		t.Errorf("by description: %+v", byDescription)
 	}
+	if len(byFileType) != 1 || byFileType[0].Name != "Wait" {
+		t.Errorf("by file type: %+v", byFileType)
+	}
 	if len(none) != 0 {
 		t.Errorf("no match should find nothing: %+v", none)
 	}
-	if len(SearchSteps("  ")) != 10 {
+	if len(SearchSteps("  ")) != 11 {
 		t.Errorf("a blank search should list every entry")
 	}
 }

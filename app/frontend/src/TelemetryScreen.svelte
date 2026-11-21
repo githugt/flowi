@@ -1,7 +1,10 @@
 <script lang="ts">
+  import ScreenPage from './ScreenPage.svelte'
   import { onMount } from 'svelte'
   import { WelcomeService } from '../bindings/github.com/githugt/flowi/app/internal/bridge'
   import { live } from './lib/live'
+  import { LEVEL_CARDS } from './lib/telemetrycards'
+  import { radiogroup } from './lib/radiogroup'
 
   interface TelemetryView {
     explanation: string
@@ -10,46 +13,45 @@
     previews: Record<string, string>
   }
   let view = $state<TelemetryView | null>(null)
-  let looking = $state('off')
   onMount(() =>
     live<TelemetryView>('telemetry', () => WelcomeService.Telemetry(), (v) => {
-      if (!view) looking = v.level
       view = v
     }),
   )
-  const levels: [string, string][] = [['off', 'Off'], ['minimal', 'Minimal'], ['full', 'Full']]
 </script>
 
 {#if view}
-  <div class="page">
+  <ScreenPage width={760}>
     <h2>Usage reporting</h2>
     <p class="expl">{view.explanation}</p>
-    <div class="levels">
-      {#each levels as [id, label]}
-        <label class="lv" class:on={view.level === id}>
-          <input type="radio" name="level" checked={view.level === id} onchange={() => ((looking = id), WelcomeService.ChooseTelemetry(id))} onfocus={() => (looking = id)} />
-          {label}
-        </label>
+    <div class="levels" role="radiogroup" aria-label="Usage reporting level" use:radiogroup>
+      {#each LEVEL_CARDS as c (c.id)}
+        <div class="card" class:on={view.level === c.id}>
+          <button class="pick" role="radio" aria-checked={view.level === c.id} onclick={() => WelcomeService.ChooseTelemetry(c.id)}>
+            <strong>{c.label}</strong>
+            <span class="sum">{c.summary}</span>
+          </button>
+          <details>
+            <summary>Show exactly what is sent</summary>
+            {#if view.previews[c.id]}<pre>{view.previews[c.id]}</pre>{:else}<p class="none">Nothing.</p>{/if}
+          </details>
+        </div>
       {/each}
     </div>
     {#if view.problem}<p class="err">{view.problem}</p>{/if}
-    <h4>What “{looking}” would send</h4>
-    <div class="tabs">{#each levels as [id, label]}<button class:on={looking === id} onclick={() => (looking = id)}>{label}</button>{/each}</div>
-    {#if view.previews[looking]}<pre>{view.previews[looking]}</pre>{/if}
-  </div>
+  </ScreenPage>
 {/if}
 
 <style>
-  .page { position: absolute; inset: 0; overflow: auto; padding: 28px 32px 56px; max-width: 760px; }
   h2 { margin: 0 0 8px; }
   .expl { white-space: pre-wrap; line-height: 1.5; }
-  .levels { display: flex; gap: 10px; margin: 12px 0; }
-  .lv { display: flex; gap: 6px; align-items: center; padding: 6px 14px; border: 1px solid var(--line); border-radius: var(--r-lg); }
-  .lv.on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, transparent); }
+  .levels { display: flex; flex-direction: column; gap: 10px; margin: 12px 0; }
+  .card { border: 1px solid var(--line); border-radius: var(--r-lg); padding: 4px 12px 8px; }
+  .card.on { border-color: var(--accent); background: var(--tint-sel); }
+  .pick { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; width: 100%; padding: 8px 0 4px; background: none; border: 0; color: var(--text); font: inherit; text-align: left; }
+  .sum { color: var(--muted); font-size: var(--fs-sm); }
+  summary { cursor: pointer; color: var(--muted); font-size: var(--fs-sm); }
+  .none { color: var(--muted); margin: 6px 0 0; }
   .err { color: var(--fail); }
-  h4 { margin: 18px 0 6px; }
-  .tabs { display: flex; gap: 4px; margin-bottom: 6px; }
-  .tabs button { background: transparent; color: var(--muted); border: 0; border-radius: var(--r-md); padding: 0 12px; min-height: var(--ctl-h); font: inherit; font-weight: 500; }
-  .tabs .on { color: var(--text); border-color: var(--accent); }
   pre { background: var(--bg); border: 1px solid var(--line); border-radius: var(--r-lg); padding: 10px; font: var(--fs-sm) var(--mono); overflow: auto; -webkit-user-select: text; user-select: text; }
 </style>

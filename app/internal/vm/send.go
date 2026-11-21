@@ -47,6 +47,9 @@ type Exchange struct {
 	// judged. One added or edited since has not been tried. Nil for an exchange that was not sent by this
 	// window (a saved response, a restored history): which checks it judged is not known.
 	Checks []string
+	// Extracts are the names of the request's extractions as they were when it was sent: the ones the result
+	// tried to take from the response. Nil when not known, as for Checks.
+	Extracts []string
 }
 
 // Send sends requests and keeps the latest exchange.
@@ -107,6 +110,18 @@ func (s *Send) Running() bool { return s.running }
 // RunningFor reports a send in progress of request t: the other tabs
 // show their own state, not this one's.
 func (s *Send) RunningFor(t flowi.RequestTarget) bool { return s.running && s.target == t }
+
+// Involved lists the requests whose view depends on the send state now: the one sending, the one the trace and the
+// one the problem belong to. A request not listed looks the same whatever the send does.
+func (s *Send) Involved() []flowi.RequestTarget {
+	var out []flowi.RequestTarget
+	for _, t := range []flowi.RequestTarget{s.target, s.traceFor, s.errFor} {
+		if t != (flowi.RequestTarget{}) && !slices.Contains(out, t) {
+			out = append(out, t)
+		}
+	}
+	return out
+}
 
 // Err is the last send problem, or "".
 func (s *Send) Err() string { return s.err }
@@ -174,6 +189,7 @@ func (s *Send) Send(req *Request, o SendOptions) {
 	trace := newTraceFor(req)
 	overlay := req.OverlayName()
 	checks := slices.Clone(req.Current().Assert) // what this send will judge, whatever is typed while it runs
+	extracts := ExtractNames(req.Current().Extract)
 	req.PrepareSend(func(useEdit bool) {
 		opts.UseEdit = useEdit
 		// A stored edit already shows the overlay (the working copy is the effective request), so it is
@@ -183,7 +199,7 @@ func (s *Send) Send(req *Request, o SendOptions) {
 		} else {
 			opts.Overlay = overlay
 		}
-		s.start(req.Target(), opts, trace, checks)
+		s.start(req.Target(), opts, trace, checks, extracts)
 	})
 }
 
@@ -221,7 +237,7 @@ func HookControlOf(mode string) model.HookControl {
 
 // start runs the send on the worker: events go to the run log as they
 // arrive, the result to history.
-func (s *Send) start(t flowi.RequestTarget, opts flowi.SendOptions, trace *Trace, checks []string) {
+func (s *Send) start(t flowi.RequestTarget, opts flowi.SendOptions, trace *Trace, checks, extracts []string) {
 	ctx, cancel := context.WithCancel(context.Background())
 	s.running, s.target, s.cancel = true, t, cancel
 	s.trace, s.traceFor = trace, t
@@ -229,7 +245,7 @@ func (s *Send) start(t flowi.RequestTarget, opts flowi.SendOptions, trace *Trace
 	s.log.Begin(fmt.Sprintf("send %s", opts.Version))
 	Run(s.w, func() sendOutcome { return s.run(ctx, t, opts) }, func(o sendOutcome) {
 		cancel()
-		s.finish(t, opts, checks, o)
+		s.finish(t, opts, checks, extracts, o)
 	})
 }
 
@@ -266,7 +282,7 @@ func (s *Send) TraceFor(t flowi.RequestTarget) *Trace {
 	return s.trace
 }
 
-func (s *Send) finish(t flowi.RequestTarget, opts flowi.SendOptions, checks []string, o sendOutcome) {
+func (s *Send) finish(t flowi.RequestTarget, opts flowi.SendOptions, checks, extracts []string, o sendOutcome) {
 	s.running, s.cancel = false, nil
 	s.trace.Finish()
 	if o.err != nil {
@@ -275,7 +291,7 @@ func (s *Send) finish(t flowi.RequestTarget, opts flowi.SendOptions, checks []st
 		s.changed()
 		return
 	}
-	ex := s.history.Add(t, opts.Version, o.result, checks)
+	ex := s.history.Add(t, opts.Version, o.result, checks, extracts...)
 	s.last = &ex
 	s.shown[t] = &ex
 	if len(o.result.Diags) > 0 {
@@ -502,13 +518,13 @@ func (h *History) changed() {
 }
 
 // Add records an exchange and selects it.
-func (h *History) Add(t flowi.RequestTarget, version string, r engine.SendResult, checks []string) Exchange {
+func (h *History) Add(t flowi.RequestTarget, version string, r engine.SendResult, checks []string, extracts ...string) Exchange {
 	h.nextID++
 	title := fmt.Sprintf("v%s · %s", version, r.Status)
 	if r.Record != nil {
 		title = fmt.Sprintf("%s %s · %d · %s", historyName(r.Record), versionTitle(version, r.Record.Overlay), r.Record.Status, r.Status)
 	}
-	ex := Exchange{ID: h.nextID, At: time.Now(), Title: title, Target: t, Version: version, Result: r, Checks: checks}
+	ex := Exchange{ID: h.nextID, At: time.Now(), Title: title, Target: t, Version: version, Result: r, Checks: checks, Extracts: extracts}
 	h.items = append([]Exchange{ex}, h.items...)
 	h.selected = ex.ID
 	h.changed()

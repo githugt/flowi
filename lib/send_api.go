@@ -231,6 +231,44 @@ func (w *Workspace) PreviewRequest(t RequestTarget, v model.RequestVersion, o Se
 	return engine.PreviewSend(w.engineDeps(), in, includeSecrets), nil
 }
 
+// TestConnection tests the connection of version v of request t, as shown in an editor and not necessarily saved:
+// it connects to the broker or database the version names, signs in with the credentials it uses and disconnects,
+// without sending, publishing, reading or changing anything (see engine.ProbeSend). v replaces the saved version
+// with its label. The vault is read, and may prompt, because signing in needs the real secrets.
+func (w *Workspace) TestConnection(ctx context.Context, t RequestTarget, v model.RequestVersion, o SendOptions) (engine.Probe, error) {
+	return w.testConnection(ctx, t, &v, o)
+}
+
+// TestSavedConnection is TestConnection for the version a send would use (o.Version, o.PreferVersion or the
+// request's default), as saved.
+func (w *Workspace) TestSavedConnection(ctx context.Context, t RequestTarget, o SendOptions) (engine.Probe, error) {
+	return w.testConnection(ctx, t, nil, o)
+}
+
+func (w *Workspace) testConnection(ctx context.Context, t RequestTarget, v *model.RequestVersion, o SendOptions) (engine.Probe, error) {
+	c, r, err := w.requestFor(t)
+	if err != nil {
+		return engine.Probe{}, err
+	}
+	if err := w.unlockFor(c, o.Env); err != nil {
+		return engine.Probe{}, err
+	}
+	if v != nil {
+		r.Versions = slices.Clone(r.Versions)
+		if i := slices.IndexFunc(r.Versions, func(x model.RequestVersion) bool { return x.Label == v.Label }); i >= 0 {
+			r.Versions[i] = *v
+		} else {
+			r.Versions = append(r.Versions, *v)
+		}
+		o.Version, o.UseEdit = v.Label, false
+	}
+	in, err := sendInput(c, r, o)
+	if err != nil {
+		return engine.Probe{}, err
+	}
+	return engine.ProbeSend(ctx, w.engineDeps(), in), nil
+}
+
 // GRPCMethods lists the methods of the schema the gRPC version v of request t
 // would use: its .proto files, or what the server's reflection offers. v
 // replaces the saved version of the same label (the screen's edit). The vault
@@ -368,7 +406,7 @@ func (w *Workspace) secrets() *vault.Vault {
 	w.vaultOnce.Do(func() {
 		w.vault = vault.New(vault.Options{
 			File:        filepath.Join(workspace.Dir(w.opts.Paths, w.opts.Name), "vault.enc"),
-			WorkspaceID: w.Model().ID, Keys: w.opts.Keys, Environ: w.opts.Environ, Passphrase: w.opts.Passphrase,
+			WorkspaceID: w.Model().ID, Keys: w.opts.Keys, Environ: w.opts.Environ, Passphrase: w.opts.Passphrase, NewPassphrase: w.opts.NewPassphrase, Now: w.opts.Now,
 		})
 	})
 	return w.vault
@@ -386,6 +424,31 @@ func (w *Workspace) PinExample(rec engine.Record, name string) (string, error) {
 		return "", err
 	}
 	return engine.PinExample(rec, r.File, name)
+}
+
+// ExampleTaken reports whether pinning rec as name (empty: its status) would replace an example that is already there.
+//
+// Before: pinning wrote over an example of the same name without a word, so a second 200 replaced the first one that
+// was committed.
+func (w *Workspace) ExampleTaken(rec engine.Record, name string) (bool, error) {
+	if err := CheckExampleName(name); err != nil {
+		return false, err
+	}
+	if name == "" {
+		name = strconv.Itoa(rec.Status)
+	}
+	_, r, err := w.requestFor(RequestTarget{Collection: rec.CollectionID, Request: rec.RequestID})
+	if err != nil {
+		return false, err
+	}
+	_, err = os.Stat(engine.ExampleFile(r.File, name))
+	switch {
+	case err == nil:
+		return true, nil
+	case errors.Is(err, fs.ErrNotExist):
+		return false, nil
+	}
+	return false, err
 }
 
 // CheckExampleName refuses pin names that are not plain file names

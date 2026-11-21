@@ -1,0 +1,42 @@
+# Named trigger tokens: made with limits, shown once, listed without their values, rotated and revoked.
+# Before: the only token was one full-power value with no limits, no expiry and no way to tell callers apart.
+exec flowi workspace mount ./example
+
+exec flowi serve tokens ls
+! stdout .
+stderr 'No trigger tokens'
+
+exec flowi serve tokens new ci --flow 'smoke/*' --flow deploy --env staging --expires 30d
+stdout '^flwt_[0-9a-f]{8}_[0-9a-f]{64}$'
+stderr 'not shown again'
+
+exec flowi serve tokens ls
+stdout 'ci +[0-9a-f]{8} +smoke/\*,deploy +staging'
+! stdout 'flwt_'
+
+# The single token of earlier releases is listed beside them, as "default".
+exec flowi serve token
+exec flowi serve tokens ls
+stdout 'default +- +any +any +never'
+stdout 'ci '
+
+# A taken name, a bad name and a bad lifetime are refused, with different exit codes for bad input and bad use.
+! exec flowi serve tokens new ci
+stderr 'FLW-SERVE-003'
+! exec flowi serve tokens new 'Not A Name'
+stderr 'FLW-SERVE-003'
+! exec flowi serve tokens new quick --expires soon
+stderr 'expires'
+! exec flowi serve tokens new quick --expires 5s
+stderr 'at least a minute'
+
+exec flowi serve tokens rotate ci
+stdout '^flwt_[0-9a-f]{8}_[0-9a-f]{64}$'
+
+exec flowi serve tokens rm ci
+stderr 'Revoked ci'
+! exec flowi serve tokens rm ci
+stderr 'FLW-SERVE-003'
+exec flowi serve tokens rm default
+exec flowi serve tokens ls
+! stdout .

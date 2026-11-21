@@ -31,7 +31,12 @@ func NewRootCommand(i do.Injector) *cobra.Command {
 	}
 	g := do.MustInvoke[*GlobalOptions](i)
 	addGlobalFlags(root, g)
-	root.PersistentPreRunE = func(*cobra.Command, []string) error { return g.validate() }
+	root.PersistentPreRunE = func(cmd *cobra.Command, _ []string) error {
+		if env, err := do.Invoke[Env](i); err == nil { // a bare injector (a test) has none
+			g.applyEnv(env.Environ, cmd.Flags().Changed("output"))
+		}
+		return g.validate()
+	}
 	root.SetFlagErrorFunc(func(_ *cobra.Command, err error) error { return &UsageError{Err: err} })
 	root.AddCommand(
 		newVersionCommand(),
@@ -44,6 +49,8 @@ func NewRootCommand(i do.Injector) *cobra.Command {
 		newSendCommand(i),
 		newRunCommand(i),
 		newImpactCommand(i),
+		newDiffCommand(i),
+		newMigrateCommand(i),
 		newAccessCommand(i),
 		newCoverageCommand(i),
 		newDriftCommand(i),
@@ -51,15 +58,18 @@ func NewRootCommand(i do.Injector) *cobra.Command {
 		newExportCommand(i),
 		newSecretCommand(i),
 		newEnvCommand(i),
+		newMergeDriverCommand(i),
 		newCookiesCommand(i),
 		newServeCommand(i),
 		newScheduleCommand(i),
+		newAuthCommand(i),
 		newTelemetryCommand(i),
 		newNewCommand(i),
 		newBlueprintCommand(i),
 		newOverlayCommand(i),
 		newNewsCommand(i),
 		newChangelogCommand(g),
+		newSchemaCommand(),
 	)
 	markArgErrorsAsUsage(root)
 	return root

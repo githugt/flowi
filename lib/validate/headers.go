@@ -22,6 +22,9 @@ func checkHeaderNames(ix *index) diag.List {
 			for _, v := range r.Versions {
 				headers := yamlpath.Key(yamlpath.Key(yamlpath.Key("$", "versions"), v.Label), "headers")
 				for _, h := range v.Headers {
+					if h.Disabled {
+						continue
+					}
 					detail := invalidHeaderNameDetail(h.Key)
 					if detail == "" || strings.TrimSpace(h.Key) != h.Key && h.Key != "" {
 						// Stray whitespace around a name is a lint warning the GUI can repair.

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import Button from './Button.svelte'
   // A path typed in, or chosen with the system's dialog when there is one.
   import { SystemService } from '../bindings/github.com/githugt/flowi/app/internal/bridge'
 
@@ -23,7 +24,7 @@
   {#if label}<span>{label}</span>{/if}
   <div>
     <input bind:value spellcheck="false" placeholder={kind === 'folder' ? '/path/to/folder' : '/path/to/file'} />
-    <button type="button" onclick={browse}>Browse…</button>
+    <Button onclick={browse}>Browse…</Button>
   </div>
 </label>
 
@@ -32,6 +33,4 @@
   div { display: flex; gap: 6px; }
   input { flex: 1; min-width: 0; font: var(--fs-sm) var(--mono); }
   input:focus { border-color: var(--accent); }
-  button { background: var(--raised); color: var(--text); border: 0; box-shadow: inset 0 0 0 1px var(--line); border-radius: var(--r-md); padding: 0 12px; min-height: var(--ctl-h); font: inherit; font-weight: 500; }
-  button:hover:not(:disabled) { background: var(--raised-3); }
 </style>

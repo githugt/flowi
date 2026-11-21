@@ -10,11 +10,6 @@ export function portLine(top: number, ports: string[] | undefined, id: string | 
   return top + CARD.inPort + Math.max(i, 0) * CARD.portGap
 }
 
-/** Text cut to `max` characters, ending in an ellipsis when it was cut. */
-export function clipText(text: string, max: number): string {
-  return text.length <= max ? text : text.slice(0, Math.max(1, max - 1)) + '…'
-}
-
 /** The colour token of a port: done is green, fail red, a case the accent, else muted. */
 export function toneToken(tone: string): string {
   return { done: '--ok', fail: '--fail', case: '--accent', else: '--muted', outcome: '--info' }[tone] ?? '--muted'
@@ -44,12 +39,25 @@ export function categoryToken(type: string): string {
   return '--action'
 }
 
+/**
+ * The name the add-step popup gives a step type, so a step reads the same where it is added and where it is edited
+ * (the file's type is `batch`; the person added a Loop).
+ */
+export function typeLabel(type: string): string {
+  const labels: Record<string, string> = {
+    request: 'Request', fetch: 'Request', webhook: 'Request', subflow: 'Flow', set: 'Set value', assert: 'Check',
+    condition: 'Route', batch: 'Loop', run_till: 'Loop', parallel: 'Group', delay: 'Wait',
+    log: 'Output', save: 'Output', digest: 'Output', stop: 'Stop', note: 'Note',
+  }
+  return labels[type] ?? type
+}
+
 /** The icon of a step type for its header tile. */
 export function typeIcon(type: string): string {
   const icons: Record<string, string> = {
-    request: 'send', subflow: 'blueprint', fetch: 'send', webhook: 'send', set: 'variables', assert: 'assert',
-    condition: 'usedby', batch: 'refresh', run_till: 'refresh', parallel: 'list', delay: 'clock',
-    log: 'docs', save: 'save', digest: 'chart', stop: 'trash', note: 'docs',
+    request: 'send', subflow: 'flow', fetch: 'globe', webhook: 'hook', set: 'variables', assert: 'assert',
+    condition: 'usedby', batch: 'repeat', run_till: 'loop', parallel: 'list', delay: 'clock',
+    log: 'log', save: 'save', digest: 'chart', stop: 'stop', note: 'note',
   }
   return icons[type] ?? 'list'
 }
@@ -82,6 +90,19 @@ export function openAfterClick(current: OpenRow | null, unit: string, key: strin
 
 /** A tab of the output dock under a card. */
 export type DockTab = 'input' | 'output' | 'checks' | 'messages' | 'problems'
+
+/**
+ * The tab the dock opens on. Before: always the first one, so a failed step opened on Input and the error was one
+ * click away. A step that did not pass opens on Problems, or on Checks when a check failed and nothing else was
+ * reported.
+ */
+export function firstDockTab(tabs: DockTab[], status: string, failedChecks = 0): DockTab | '' {
+  if (['failed', 'error', 'aborted'].includes(status)) {
+    if (tabs.includes('problems')) return 'problems'
+    if (failedChecks > 0 && tabs.includes('checks')) return 'checks'
+  }
+  return tabs[0] ?? ''
+}
 
 /**
  * The tabs the dock offers for what a step did: a request has Input, Output and Checks; a message request its

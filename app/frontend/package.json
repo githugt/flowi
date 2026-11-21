@@ -8,7 +8,8 @@
     "build:dev": "vite build --minify false --mode development",
     "build": "vite build --mode production",
     "preview": "vite preview",
-    "check": "svelte-check --tsconfig ./tsconfig.json",
+    "check": "svelte-check --tsconfig ./tsconfig.json --fail-on-warnings && npm run lint:css",
+    "lint:css": "stylelint \"src/**/*.{svelte,css}\"",
     "test": "vitest run"
   },
   "dependencies": {
@@ -23,7 +24,11 @@
   },
   "devDependencies": {
     "@sveltejs/vite-plugin-svelte": "^7.0.0",
+    "@testing-library/svelte": "^5.4.2",
     "@tsconfig/svelte": "^5.0.8",
+    "happy-dom": "^21.0.4",
+    "postcss-html": "^2.0.1",
+    "stylelint": "^18.1.0",
     "svelte": "^5.57.3",
     "svelte-check": "^4.7.8",
     "tslib": "^2.9.1",

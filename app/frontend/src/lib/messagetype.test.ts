@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { typeChip } from './messagetype'
+import { positionChip, typeChip } from './messagetype'
 
 describe('typeChip', () => {
   it('shows an event name', () => {
@@ -20,5 +20,16 @@ describe('typeChip', () => {
   it('shows a frame kind that disagrees with the body', () => {
     // A binary frame whose bytes happen to be text: the body pill says text, the protocol says binary.
     expect(typeChip('binary', 'text')).toBe('binary')
+  })
+})
+
+describe('positionChip', () => {
+  // Before: the partition, offset and sequence of a broker message never reached the feed.
+  it('shows a Kafka partition and offset, or a JetStream sequence', () => {
+    expect(positionChip({ partition: 2, offset: 10345 })).toBe('p2 @ 10345')
+    expect(positionChip({ sequence: 7 })).toBe('#7')
+  })
+  it('shows nothing for a protocol that has neither', () => {
+    expect(positionChip({})).toBe('')
   })
 })

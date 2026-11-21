@@ -17,6 +17,7 @@ import (
 	flowi "github.com/githugt/flowi/lib"
 	"github.com/githugt/flowi/lib/analysis"
 	"github.com/githugt/flowi/lib/announce"
+	"github.com/githugt/flowi/lib/dataset"
 	"github.com/githugt/flowi/lib/diag"
 	"github.com/githugt/flowi/lib/engine"
 	"github.com/githugt/flowi/lib/flowioverlay"
@@ -54,27 +55,36 @@ type Backend struct {
 	SetErr            error          // SetUserSetting fails with it
 	Session           string         // SessionDir
 	SecretList        []flowi.SecretInfo
+	Vault             flowi.VaultState // what VaultState answers
+	VaultIdledOut     bool             // AutoLockVault locks an unlocked vault
+	SecretsReads      int              // how often Secrets was called
 	SaveErr           error
 	ForwardTargetList []flowi.ForwardTarget
 	ActivityResult    flowi.Activity // what RequestActivity and FlowActivity return
 	NextSend          *Sending
+	TakenExamples     map[string]bool   // example names ExampleTaken says are taken
+	SharedEnvs        map[model.ID]bool // collections whose environments folder already holds the shared environment
+	ShareNotes        []string          // what ShareEnvironment says to tell the person
 	// SendFor, when set, answers each Send from its options (a request matrix needs a different outcome per cell).
-	SendFor     func(flowi.SendOptions) (*Sending, error)
-	SendErr     error
-	Changes     chan flowi.Change
-	Calls       []string
-	Saved       []model.Request
-	SavedRecord *engine.Record             // what LastResponse and StoredRecord return
-	Stored      []flowi.StoredResponse     // what StoredResponses returns
-	Trash       []flowi.TrashedItem        // what ListTrash returns
-	StaleDrafts []flowi.TrashedItem        // what the next TrashStaleDrafts moves (an item's Name is the id open is asked about)
-	RunList     []flowi.RunSummary         // what FlowRuns returns
-	RunDetails  map[string]flowi.RunDetail // what FlowRunDetail returns, by run id
-	Compat      diag.List                  // what FlowCompatibility returns
-	SchemaStore Schemas                    // what the schema calls work on
-	SavedEnvs   []model.Environment
-	CollEnvs    map[model.ID][]model.Environment // what CollectionEnvironments returns, by collection
-	SendOpts    []flowi.SendOptions
+	SendFor      func(flowi.SendOptions) (*Sending, error)
+	SendErr      error
+	Changes      chan flowi.Change
+	WatchErr     error // Watch fails with it
+	Calls        []string
+	Saved        []model.Request
+	SavedRecord  *engine.Record             // what LastResponse and StoredRecord return
+	Stored       []flowi.StoredResponse     // what StoredResponses returns
+	Trash        []flowi.TrashedItem        // what ListTrash returns
+	StaleDrafts  []flowi.TrashedItem        // what the next TrashStaleDrafts moves (an item's Name is the id open is asked about)
+	trashedReqs  map[string]model.Request   // requests deleted into Trash, by item id, for RestoreFromTrash
+	trashedFlows map[string]model.Flow      // flows deleted into Trash, by item id
+	RunList      []flowi.RunSummary         // what FlowRuns returns
+	RunDetails   map[string]flowi.RunDetail // what FlowRunDetail returns, by run id
+	Compat       diag.List                  // what FlowCompatibility returns
+	SchemaStore  Schemas                    // what the schema calls work on
+	SavedEnvs    []model.Environment
+	CollEnvs     map[model.ID][]model.Environment // what CollectionEnvironments returns, by collection
+	SendOpts     []flowi.SendOptions
 	// Flowi overlays: OverlayList is what Overlays returns, SavedOverlays what SaveAsOverlay was
 	// given, OverlayFiles the text OverlayText returns and WriteOverlayText keeps, and OverlayErr
 	// makes the writes fail.
@@ -94,10 +104,29 @@ type Backend struct {
 	// RunFor, when set, answers each RunFlow from its options (a matrix needs a different outcome per cell).
 	RunFor         func(flowi.RunOptions) (*Running, error)
 	LastRunOptions flowi.RunOptions   // the options of the latest RunFlow
+	LastRunContext context.Context    // the context of the latest RunFlow: a test can see whether the run was cancelled
 	RunOptionsLog  []flowi.RunOptions // the options of every RunFlow, in order
 	ImpactReport   analysis.Report
 	// SaveGate, when set, makes SaveFlow wait for it to close.
 	SaveGate chan struct{}
+	// DiskSum is what FlowSum reports; SaveFlow refuses a save whose expected sum differs from it (when both are set).
+	DiskSum string
+	// MountErr is what Mount fails with.
+	MountErr error
+	// Tokens is what AuthTokens lists; ForgottenTokens collects the ids ForgetAuthToken was given, and ForgetTokenErr is
+	// what it fails with.
+	Tokens          []flowi.AuthToken
+	ForgottenTokens []string
+	ForgetTokenErr  error
+	// FlowWritesOf is what FlowWrites reports.
+	FlowWritesOf []flowi.FlowWrite
+	// Needs is what PreflightFlow reports the environment lacks.
+	Needs []flowi.Need
+	// Tables and TablesErr are what DataFileTables answers.
+	// Uses is what SecretUses answers.
+	Uses      map[string][]flowi.SecretUse
+	Tables    []dataset.TableInfo
+	TablesErr error
 	// Plan is what PreviewImport returns (with PreviewErr); ApplyErr is
 	// ApplyImport's result and ApplyOpts records its options.
 	Plan       flowi.ImportPlan
@@ -135,24 +164,27 @@ type Backend struct {
 	BlueprintDiags diag.List
 	SeedErr        error // SeedRequestHooks fails with it
 
-	GRPCMethodList []grpcx.Method      // what GRPCMethods returns
-	GRPCMethodsErr error               // GRPCMethods fails with it
-	GeneratedGRPC  flowi.GeneratedGRPC // what GenerateGRPCRequests returns
+	GRPCMethodList  []grpcx.Method      // what GRPCMethods returns
+	GRPCMethodsErr  error               // GRPCMethods fails with it
+	GeneratedGRPC   flowi.GeneratedGRPC // what GenerateGRPCRequests returns
+	ConnectionProbe engine.Probe        // what TestConnection returns
+	ConnectionErr   error               // TestConnection fails with it
 
-	ScheduleList []model.Schedule        // Schedules lists these; the schedule calls change them
-	ScheduleErr  error                   // AddSchedule, SaveSchedule and RemoveSchedule fail with it
-	TriggerSet   bool                    // a trigger token exists
-	TokenErr     error                   // NewTriggerToken fails with it
-	ArazzoNotes  diag.List               // ExportArazzo lists these as what had no Arazzo equivalent
-	ArazzoErr    error                   // ExportArazzo fails with it
-	Kept         map[model.ID]model.Flow // KeepFlowEdits stores here, by flow
-	ParsedFlow   *model.Flow             // ParseFlowSource returns this flow (else the stored flow, unchanged)
-	SourceDiags  diag.List               // ParseFlowSource reports these
-	DraftDiags   diag.List               // CheckFlowDraft reports these
-	SecretErr    error                   // SetSecret and UnsetSecret fail with it
-	SecretValues map[string]string       // RevealSecret answers from these, by "env/name"; others are FLW-SEC-001
-	CookieJar    []flowi.CookieInfo      // Cookies lists these; DeleteCookie removes from them
-	CookiesErr   error                   // Cookies fails with it
+	ScheduleList []model.Schedule           // Schedules lists these; the schedule calls change them
+	ScheduleErr  error                      // AddSchedule, SaveSchedule and RemoveSchedule fail with it
+	TriggerSet   bool                       // a trigger token exists
+	TokenErr     error                      // NewTriggerToken fails with it
+	ArazzoNotes  diag.List                  // ExportArazzo lists these as what had no Arazzo equivalent
+	ArazzoErr    error                      // ExportArazzo fails with it
+	Kept         map[model.ID]model.Flow    // KeepFlowEdits stores here, by flow
+	ParsedFlow   *model.Flow                // ParseFlowSource returns this flow (else the stored flow, unchanged)
+	SourceDiags  diag.List                  // ParseFlowSource reports these
+	EnvImpacts   map[string]flowi.EnvImpact // EnvironmentImpact answers with this, by environment file
+	DraftDiags   diag.List                  // CheckFlowDraft reports these
+	SecretErr    error                      // SetSecret and UnsetSecret fail with it
+	SecretValues map[string]string          // RevealSecret answers from these, by "env/name"; others are FLW-SEC-001
+	CookieJar    []flowi.CookieInfo         // Cookies lists these; DeleteCookie removes from them
+	CookiesErr   error                      // Cookies fails with it
 	// FailDeleteAt makes the nth (1-based) Delete* call fail with it, the others succeed.
 	FailDeleteAt int
 	// OnDelete, when set, runs inside every Delete* call (before it changes anything).
@@ -441,6 +473,62 @@ func (f *Backend) DeleteRequest(t flowi.RequestTarget) error {
 	return nil
 }
 
+// DeleteRequestToTrash removes the request and keeps it in Trash, as the real backend does.
+func (f *Backend) DeleteRequestToTrash(t flowi.RequestTarget) (flowi.TrashedItem, error) {
+	f.record("DeleteRequestToTrash " + string(t.Request))
+	f.Mu.Lock()
+	defer f.Mu.Unlock()
+	if err := f.deleteFailure(); err != nil {
+		return flowi.TrashedItem{}, err
+	}
+	var item flowi.TrashedItem
+	for ci := range f.Cols {
+		if f.Cols[ci].Manifest.ID != t.Collection {
+			continue
+		}
+		for _, r := range f.Cols[ci].Requests {
+			if r.ID == t.Request {
+				item = flowi.TrashedItem{ID: "trash-" + string(r.ID), Kind: flowi.TrashRequest, Name: r.Name, Path: r.Path, Collection: t.Collection}
+				f.Trash = append(f.Trash, item)
+				if f.trashedReqs == nil {
+					f.trashedReqs = map[string]model.Request{}
+				}
+				f.trashedReqs[item.ID] = r
+			}
+		}
+		f.Cols[ci].Requests = slices.DeleteFunc(slices.Clone(f.Cols[ci].Requests), func(r model.Request) bool { return r.ID == t.Request })
+	}
+	return item, nil
+}
+
+// DeleteFlowToTrash removes the flow and keeps it in Trash, as the real backend does.
+func (f *Backend) DeleteFlowToTrash(t flowi.FlowTarget) (flowi.TrashedItem, error) {
+	f.record("DeleteFlowToTrash " + string(t.Flow))
+	f.Mu.Lock()
+	defer f.Mu.Unlock()
+	if err := f.deleteFailure(); err != nil {
+		return flowi.TrashedItem{}, err
+	}
+	var item flowi.TrashedItem
+	for ci := range f.Cols {
+		if f.Cols[ci].Manifest.ID != t.Collection {
+			continue
+		}
+		for _, fl := range f.Cols[ci].Flows {
+			if fl.ID == t.Flow {
+				item = flowi.TrashedItem{ID: "trash-" + string(fl.ID), Kind: flowi.TrashFlow, Name: fl.Name, Path: fl.Path, Collection: t.Collection}
+				f.Trash = append(f.Trash, item)
+				if f.trashedFlows == nil {
+					f.trashedFlows = map[string]model.Flow{}
+				}
+				f.trashedFlows[item.ID] = fl
+			}
+		}
+		f.Cols[ci].Flows = slices.DeleteFunc(slices.Clone(f.Cols[ci].Flows), func(fl model.Flow) bool { return fl.ID == t.Flow })
+	}
+	return item, nil
+}
+
 // DuplicateFlow adds a copy of the flow to the fake's collection.
 func (f *Backend) DuplicateFlow(t flowi.FlowTarget, path string) (flowi.FlowTarget, error) {
 	f.record("DuplicateFlow " + path)
@@ -627,6 +715,17 @@ func (f *Backend) RestoreFromTrash(id string) (string, error) {
 	for i, item := range f.Trash {
 		if item.ID == id {
 			f.Trash = slices.Delete(f.Trash, i, i+1)
+			for ci := range f.Cols {
+				if f.Cols[ci].Manifest.ID != item.Collection {
+					continue
+				}
+				if r, ok := f.trashedReqs[id]; ok {
+					f.Cols[ci].Requests = append(slices.Clone(f.Cols[ci].Requests), r)
+				}
+				if fl, ok := f.trashedFlows[id]; ok {
+					f.Cols[ci].Flows = append(slices.Clone(f.Cols[ci].Flows), fl)
+				}
+			}
 			return item.Path, nil
 		}
 	}
@@ -699,6 +798,14 @@ func (f *Backend) DeleteEnvironment(file string) error {
 		f.Cols[ci].Environments = slices.DeleteFunc(slices.Clone(f.Cols[ci].Environments), func(e model.Environment) bool { return e.File == file })
 	}
 	return nil
+}
+
+// EnvironmentImpact returns what EnvImpacts holds for the file: nothing named when it holds nothing.
+func (f *Backend) EnvironmentImpact(file string) (flowi.EnvImpact, error) {
+	f.record("EnvironmentImpact " + file)
+	f.Mu.Lock()
+	defer f.Mu.Unlock()
+	return f.EnvImpacts[file], nil
 }
 
 // Environments are the environments of the fake's collections, each file
@@ -809,6 +916,12 @@ func (f *Backend) GRPCMethods(_ context.Context, _ flowi.RequestTarget, _ model.
 	return f.GRPCMethodList, nil
 }
 
+// TestConnection records the call and returns ConnectionProbe, or ConnectionErr when it is set.
+func (f *Backend) TestConnection(_ context.Context, _ flowi.RequestTarget, _ model.RequestVersion, _ flowi.SendOptions) (engine.Probe, error) {
+	f.record("TestConnection")
+	return f.ConnectionProbe, f.ConnectionErr
+}
+
 // SeedRequestHooks records the call and fails with SeedErr when it is set.
 func (f *Backend) SeedRequestHooks(t flowi.RequestTarget) error {
 	f.record("SeedRequestHooks " + string(t.Request))
@@ -854,6 +967,22 @@ func (f *Backend) Send(_ context.Context, _ flowi.RequestTarget, o flowi.SendOpt
 		return nil, f.SendErr
 	}
 	return f.NextSend, nil
+}
+
+// ExampleTaken says the names in TakenExamples are taken.
+func (f *Backend) ExampleTaken(_ engine.Record, name string) (bool, error) {
+	f.record("ExampleTaken " + name)
+	return f.TakenExamples[name], nil
+}
+
+// ShareEnvironment says the collections in SharedEnvs already hold the environment.
+func (f *Backend) ShareEnvironment(collection model.ID, name string, overwrite bool) (string, bool, []string, error) {
+	f.record(fmt.Sprintf("ShareEnvironment %s %s %t", collection, name, overwrite))
+	file := "/c/environments/" + name + ".yaml"
+	if f.SharedEnvs[collection] && !overwrite {
+		return file, true, nil, nil
+	}
+	return file, false, f.ShareNotes, nil
 }
 
 func (f *Backend) PinExample(_ engine.Record, name string) (string, error) {
@@ -1042,7 +1171,32 @@ func (f *Backend) Secrets() ([]flowi.SecretInfo, error) {
 	}
 	f.Mu.Lock()
 	defer f.Mu.Unlock()
+	f.SecretsReads++
 	return slices.Clone(f.SecretList), nil
+}
+
+func (f *Backend) VaultState() flowi.VaultState {
+	f.Mu.Lock()
+	defer f.Mu.Unlock()
+	return f.Vault
+}
+
+func (f *Backend) LockVault() {
+	f.record("LockVault")
+	f.Mu.Lock()
+	defer f.Mu.Unlock()
+	f.Vault.Unlocked, f.Vault.LocksIn = false, 0
+}
+
+// AutoLockVault locks the vault when the test says it has idled out (VaultIdledOut), like the library does.
+func (f *Backend) AutoLockVault() bool {
+	f.Mu.Lock()
+	defer f.Mu.Unlock()
+	if !f.Vault.Unlocked || !f.VaultIdledOut {
+		return false
+	}
+	f.Vault.Unlocked, f.Vault.LocksIn = false, 0
+	return true
 }
 
 func (f *Backend) DeclareSecret(env, name, _ string) error {
@@ -1109,7 +1263,7 @@ func (f *Backend) markSecret(env, name string, set bool) error {
 
 func (f *Backend) Mount(dir string) (model.Manifest, error) {
 	f.record("Mount " + dir)
-	return model.Manifest{}, nil
+	return model.Manifest{}, f.MountErr
 }
 
 // Checks are the canned answers the fake gives for coverage, spec impact, access and drift.
@@ -1118,12 +1272,24 @@ type Checks struct {
 	Impact   flowi.SpecImpact
 	Specs    []string
 	Access   flowi.AccessReport
+	Saved    *flowi.SavedAccess // what LastAccess finds; nil: no check kept
 	Drift    flowi.DriftReport
+	Accepted []flowi.SchemaChange // what AcceptDrift says it changed
 	Err      error
 }
 
 func (f *Backend) OpenArazzo(_ context.Context, ref string) error {
 	f.record("OpenArazzo " + ref)
+	return f.Check.Err
+}
+
+func (f *Backend) OpenExample() error {
+	f.record("OpenExample")
+	return f.Check.Err
+}
+
+func (f *Backend) AllowSecretHost(host string) error {
+	f.record("AllowSecretHost " + host)
 	return f.Check.Err
 }
 
@@ -1142,6 +1308,19 @@ func (f *Backend) SpecNames(model.ID) []string { return f.Check.Specs }
 func (f *Backend) CheckAccess(_ context.Context, _ flowi.FlowTarget, o flowi.AccessOptions) (flowi.AccessReport, error) {
 	f.record("CheckAccess " + o.Owner)
 	return f.Check.Access, f.Check.Err
+}
+
+func (f *Backend) LastAccess(flowi.FlowTarget) (flowi.SavedAccess, bool) {
+	f.record("LastAccess")
+	if f.Check.Saved == nil {
+		return flowi.SavedAccess{}, false
+	}
+	return *f.Check.Saved, true
+}
+
+func (f *Backend) AcceptDrift(_ flowi.DriftReport, requests []string) ([]flowi.SchemaChange, error) {
+	f.record("AcceptDrift " + strings.Join(requests, ","))
+	return f.Check.Accepted, f.Check.Err
 }
 
 func (f *Backend) CheckDrift(_ context.Context, _ flowi.FlowTarget, o flowi.DriftOptions) (flowi.DriftReport, error) {
@@ -1188,6 +1367,9 @@ func (f *Backend) ApplyImport(p flowi.ImportPlan, o flowi.ApplyOptions) error {
 
 func (f *Backend) Watch(ctx context.Context) (<-chan flowi.Change, error) {
 	f.record("Watch")
+	if f.WatchErr != nil {
+		return nil, f.WatchErr
+	}
 	if f.Changes == nil {
 		return nil, nil
 	}
@@ -1232,8 +1414,69 @@ func (f *Backend) Reload(flowi.Change) (diag.List, error) {
 	return nil, nil
 }
 
+// SecretUses answers with Uses.
+func (f *Backend) SecretUses() map[string][]flowi.SecretUse {
+	f.record("SecretUses")
+	f.Mu.Lock()
+	defer f.Mu.Unlock()
+	return f.Uses
+}
+
+// DataFileTables answers with Tables, or TablesErr.
+func (f *Backend) DataFileTables(context.Context, model.ID, string, string) ([]dataset.TableInfo, error) {
+	f.record("DataFileTables")
+	f.Mu.Lock()
+	defer f.Mu.Unlock()
+	return f.Tables, f.TablesErr
+}
+
+// PreflightFlow answers with Needs.
+func (f *Backend) PreflightFlow(flowi.FlowTarget, string, *model.Flow) ([]flowi.Need, error) {
+	f.record("PreflightFlow")
+	f.Mu.Lock()
+	defer f.Mu.Unlock()
+	return f.Needs, nil
+}
+
+// AuthTokens answers with Tokens.
+func (f *Backend) AuthTokens() []flowi.AuthToken {
+	f.record("AuthTokens")
+	f.Mu.Lock()
+	defer f.Mu.Unlock()
+	return f.Tokens
+}
+
+// ForgetAuthToken records the id and drops the token from Tokens.
+func (f *Backend) ForgetAuthToken(id string) error {
+	f.record("ForgetAuthToken")
+	f.Mu.Lock()
+	defer f.Mu.Unlock()
+	if f.ForgetTokenErr != nil {
+		return f.ForgetTokenErr
+	}
+	f.ForgottenTokens = append(f.ForgottenTokens, id)
+	f.Tokens = slices.DeleteFunc(slices.Clone(f.Tokens), func(t flowi.AuthToken) bool { return strings.HasPrefix(t.ID, id) })
+	return nil
+}
+
+// FlowWrites answers with FlowWritesOf.
+func (f *Backend) FlowWrites(flowi.FlowTarget, *model.Flow) ([]flowi.FlowWrite, error) {
+	f.record("FlowWrites")
+	f.Mu.Lock()
+	defer f.Mu.Unlock()
+	return f.FlowWritesOf, nil
+}
+
+// FlowSum is DiskSum: set it to stand for the flow's file being changed by someone else.
+func (f *Backend) FlowSum(flowi.FlowTarget) (string, error) {
+	f.record("FlowSum")
+	f.Mu.Lock()
+	defer f.Mu.Unlock()
+	return f.DiskSum, nil
+}
+
 // SaveFlow records the flow and replaces it in Cols.
-func (f *Backend) SaveFlow(t flowi.FlowTarget, fl model.Flow, drop bool) error {
+func (f *Backend) SaveFlow(t flowi.FlowTarget, fl model.Flow, drop bool, expect string) error {
 	f.record("SaveFlow")
 	if f.SaveGate != nil {
 		<-f.SaveGate
@@ -1243,7 +1486,13 @@ func (f *Backend) SaveFlow(t flowi.FlowTarget, fl model.Flow, drop bool) error {
 	if f.SaveErr != nil && !drop {
 		return f.SaveErr
 	}
+	if expect != "" && f.DiskSum != "" && expect != f.DiskSum {
+		return diag.List{diag.New(diag.CodeWriteChangedOnDisk, diag.Location{File: "flow.arazzo.yaml"}, map[string]string{"file": "flow.arazzo.yaml"})}.Err()
+	}
 	f.SavedFlows = append(f.SavedFlows, fl)
+	if f.DiskSum != "" {
+		f.DiskSum = fmt.Sprintf("saved-%d", len(f.SavedFlows)) // the file now holds what this save wrote
+	}
 	for ci := range f.Cols {
 		for fi := range f.Cols[ci].Flows {
 			if f.Cols[ci].Flows[fi].ID == t.Flow {
@@ -1535,11 +1784,12 @@ func (f *Backend) Completions(model.ID, model.Flow, string) ([]flowi.Completion,
 	return slices.Clone(f.CompletionList), nil
 }
 
-func (f *Backend) RunFlow(_ context.Context, _ flowi.FlowTarget, o flowi.RunOptions) (vm.Running, error) {
+func (f *Backend) RunFlow(ctx context.Context, _ flowi.FlowTarget, o flowi.RunOptions) (vm.Running, error) {
 	f.record("RunFlow")
 	f.Mu.Lock()
 	defer f.Mu.Unlock()
 	f.LastRunOptions = o
+	f.LastRunContext = ctx
 	f.RunOptionsLog = append(f.RunOptionsLog, o)
 	if f.RunFor != nil {
 		r, err := f.RunFor(o)
@@ -1558,13 +1808,21 @@ func (f *Backend) RunFlow(_ context.Context, _ flowi.FlowTarget, o flowi.RunOpti
 type Running struct {
 	EventList []engine.Event
 	Result    engine.RunResult
+	Hold      chan struct{} // when set, the event channel stays open until Hold is closed (a run that is still going)
 }
 
-// Events replays the events and closes.
+// Events replays the events and closes (after Hold, when it is set).
 func (r *Running) Events() <-chan engine.Event {
 	ch := make(chan engine.Event, len(r.EventList))
 	for _, e := range r.EventList {
 		ch <- e
+	}
+	if r.Hold != nil {
+		go func() {
+			<-r.Hold
+			close(ch)
+		}()
+		return ch
 	}
 	close(ch)
 	return ch

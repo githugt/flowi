@@ -3,8 +3,14 @@
 package cli
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
+
+	"github.com/samber/do/v2"
+
+	"github.com/githugt/flowi/lib/settings"
 )
 
 func TestPlainValue(t *testing.T) {
@@ -34,5 +40,24 @@ func TestPlainValue(t *testing.T) {
 func TestDisplayValue_should_quote_empty(t *testing.T) {
 	if got := displayValue(""); got != `""` {
 		t.Fatalf("got %q", got)
+	}
+}
+
+func TestLayerFile_Given_a_config_directory_that_does_not_exist_When_the_user_file_is_wanted_Then_it_is_created(t *testing.T) {
+	// Before: the file was created without its directory, so `config edit` failed on a fresh machine.
+	dir := filepath.Join(t.TempDir(), "not", "yet", "there")
+	i := do.New()
+	do.ProvideValue(i, Env{})
+	do.ProvideValue(i, &GlobalOptions{ConfigDir: dir})
+
+	file, err := layerFile(i, nil, settings.LayerUser)
+	if err != nil {
+		t.Fatalf("layerFile: %v", err)
+	}
+	if _, err := os.Stat(file); err != nil {
+		t.Fatalf("the settings file was not created: %v", err)
+	}
+	if filepath.Dir(file) != dir {
+		t.Fatalf("file %q is not in %q", file, dir)
 	}
 }

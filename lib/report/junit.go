@@ -48,7 +48,12 @@ type junitCase struct {
 	Failure   *junitProblem `xml:"failure"`
 	Error     *junitProblem `xml:"error"`
 	Skipped   *junitProblem `xml:"skipped"`
-	SystemErr string        `xml:"system-err,omitempty"`
+	// Flaky is the Surefire way to say a test passed only after a retry (<flakyFailure>), which CI servers that read
+	// JUnit report as flaky rather than failed.
+	Flaky *junitProblem `xml:"flakyFailure"`
+	// SystemOut lists what each check of a request said: a passed check is no test case of its own.
+	SystemOut string `xml:"system-out,omitempty"`
+	SystemErr string `xml:"system-err,omitempty"`
 }
 
 type junitProblem struct {
@@ -72,10 +77,22 @@ func WriteJUnit(w io.Writer, r Run) error {
 		suite.Timestamp = r.Started.UTC().Format(time.RFC3339)
 	}
 	classname := junitClassname(r)
+	flaky, checksPassed, checksTotal := 0, 0, 0
 	for _, n := range r.Leaves() {
+		passed, total := n.ChecksPassed()
+		checksPassed, checksTotal = checksPassed+passed, checksTotal+total
 		c := junitCaseFor(n, classname)
 		suite.count(c)
 		suite.Cases = append(suite.Cases, c)
+		if n.Flaky {
+			flaky++
+		}
+	}
+	if checksTotal > 0 {
+		suite.Properties = append(suite.Properties, junitProperty{Name: "checks", Value: fmt.Sprintf("%d/%d", checksPassed, checksTotal)})
+	}
+	if flaky > 0 {
+		suite.Properties = append(suite.Properties, junitProperty{Name: "flaky", Value: strconv.Itoa(flaky)})
 	}
 	doc := junitSuites{Name: r.FlowName, Tests: suite.Tests, Failures: suite.Failures, Errors: suite.Errors, Time: suite.Time, Suites: []junitSuite{suite}}
 	if _, err := io.WriteString(w, xml.Header); err != nil {
@@ -105,6 +122,10 @@ func junitClassname(r Run) string {
 func junitCaseFor(n Node, classname string) junitCase {
 	c := junitCase{Name: n.Path, Classname: classname, Time: seconds(n.Duration)}
 	problem := junitProblemFor(n)
+	c.SystemOut = checksListing(n)
+	if n.Flaky {
+		c.Flaky = &junitProblem{Type: "flaky", Message: fmt.Sprintf("passed on try %d: it failed before", n.Tries)}
+	}
 	switch {
 	case n.Handled:
 		c.SystemErr = problem.Text
@@ -116,6 +137,27 @@ func junitCaseFor(n Node, classname string) junitCase {
 		c.Skipped = &junitProblem{Message: n.Status}
 	}
 	return c
+}
+
+// checksListing is "3/4 checks passed" and a line for each check, for the system-out of a case; "" without checks.
+func checksListing(n Node) string {
+	passed, total := n.ChecksPassed()
+	if total == 0 {
+		return ""
+	}
+	lines := []string{fmt.Sprintf("%d/%d checks passed", passed, total)}
+	for _, c := range n.Checks {
+		mark := map[string]string{"passed": "✓", "failed": "✗"}[c.Verdict]
+		if mark == "" {
+			mark = "!"
+		}
+		line := mark + " " + c.Line
+		if c.Note != "" {
+			line += " — " + c.Note
+		}
+		lines = append(lines, line)
+	}
+	return strings.Join(lines, "\n")
 }
 
 // junitProblemFor names the first diagnostic and lists them all.

@@ -44,8 +44,8 @@ func sqlitePath(q Query) (string, error) {
 	if strings.TrimSpace(server) == "" {
 		return "", errors.New("the server is empty: give the path of the SQLite file")
 	}
-	if filepath.IsAbs(server) || q.Root == "" {
-		return server, nil
+	if !filepath.IsAbs(server) && q.Root != "" {
+		server = filepath.Join(q.Root, server)
 	}
-	return filepath.Join(q.Root, server), nil
+	return confine(q, server)
 }

@@ -11,6 +11,8 @@
   import Markdown from './Markdown.svelte'
   import Icon from './Icon.svelte'
   import Logo from './Logo.svelte'
+  import Select from './Select.svelte'
+  import { MODEL_LINE, welcomeSteps } from './lib/welcome'
 
   interface WelcomeView {
     version: string
@@ -33,11 +35,9 @@
   const firstRequest = $derived(firstOf('request', collections))
   const firstFlow = $derived(firstOf('flow', collections))
 
-  const steps = $derived([
-    { done: collections.length > 0, title: 'Open a collection', detail: collections.length ? collections.map((c) => c.label).join(', ') : 'Mount a folder of requests and flows, or start a new one.' },
-    { done: !!selected, title: 'Choose an environment', detail: selected ? `Using ${selected}.` : environments.length ? 'Requests read {{env.…}} values from it.' : 'Create one for values like base_url.' },
-    { done: false, title: 'Send a request or run a flow', detail: firstRequest ? `For example ${firstRequest.label}${firstFlow ? ` or the ${firstFlow.label} flow` : ''}.` : 'Once a collection is open.' },
-  ])
+  const steps = $derived(
+    welcomeSteps({ collections: collections.map((c) => c.label), selectedEnv: selected ?? '', environments: environments.length, firstRequest: firstRequest?.label, firstFlow: firstFlow?.label }),
+  )
 </script>
 
 <div class="page">
@@ -48,6 +48,7 @@
     <p class="muted">Version {view?.version ?? ''} · your requests and flows stay on this machine</p>
   </div>
 
+  <p class="muted model">{MODEL_LINE}</p>
   <h3><span>Get started</span><span class="progress">{steps.filter((x) => x.done).length} of {steps.length}</span></h3>
   <ol class="steps">
     {#each steps as s, i}
@@ -61,10 +62,10 @@
           <Button variant={s.done ? 'secondary' : 'primary'} onclick={() => app.openScreen('screen:manager', 'Collections')}>{s.done ? 'Collections' : 'Open…'}</Button>
         {:else if i === 1 && !s.done}
           {#if environments.length}
-            <select aria-label="Environment" value="" onchange={(e) => app.selectEnvironment(e.currentTarget.value)}>
+            <Select label="Environment" value="" onchange={(e) => app.selectEnvironment(e.currentTarget.value)}>
               <option value="" disabled>Choose…</option>
               {#each environments as name}<option value={name}>{name}</option>{/each}
-            </select>
+            </Select>
           {:else}
             <Button variant="primary" disabled={!collections.length} onclick={promptNewEnvironment}>New environment…</Button>
           {/if}
@@ -107,10 +108,9 @@
   .done strong { color: var(--muted); }
   .body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
   .detail { color: var(--muted); font-size: var(--fs-sm); }
-  li select { flex: none; padding: 4px 12px; }
   .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: var(--sp-3); }
   .cards button { text-align: left; background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: var(--r-xl); padding: 14px; font: inherit; display: flex; flex-direction: column; gap: 4px; }
-  .sq { width: 32px; height: 32px; border-radius: 9px; display: grid; place-items: center; margin-bottom: 6px; }
+  .sq { width: 32px; height: 32px; border-radius: var(--r-lg); display: grid; place-items: center; margin-bottom: 6px; }
   .cards .sq.import { background: var(--tint-accent); color: var(--accent); }
   .cards .sq.usage { background: var(--data-t); color: var(--data); }
   .cards button:hover { background: var(--raised-3); }

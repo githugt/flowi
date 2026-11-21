@@ -6,6 +6,7 @@ import (
 	"context"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/githugt/flowi/lib/diag"
 	"github.com/githugt/flowi/lib/model"
@@ -161,7 +162,7 @@ func TestRun_Given_a_step_over_a_connection_nobody_opened_Then_it_fails_and_says
 	}
 }
 
-func TestRun_Given_two_steps_open_the_same_name_Then_the_second_fails_and_its_connection_is_closed(t *testing.T) {
+func TestRun_Given_two_steps_open_the_same_name_Then_the_second_fails_without_connecting(t *testing.T) {
 	// Arrange
 	f, k, fl := chatFixture(t, func(join, _ model.Request) []model.Node {
 		return []model.Node{
@@ -177,8 +178,9 @@ func TestRun_Given_two_steps_open_the_same_name_Then_the_second_fails_and_its_co
 	if res.Status == StatusPassed || !hasCode(res.Diags, diag.CodeAsyncConn) {
 		t.Fatalf("status %s diags %v", res.Status, res.Diags)
 	}
-	if len(k.sessions) != 2 || k.sessions[1].closes() != 1 {
-		t.Fatalf("the refused connection must be closed, sessions %d", len(k.sessions))
+	// Before: the second step connected first and closed the connection when the name turned out taken.
+	if len(k.sessions) != 1 {
+		t.Fatalf("the refused step must not connect, sessions %d", len(k.sessions))
 	}
 }
 
@@ -214,5 +216,40 @@ func TestRun_Given_the_run_is_cancelled_Then_open_connections_are_closed(t *test
 		if s.closes() == 0 {
 			t.Errorf("session %d was left open", i)
 		}
+	}
+}
+
+func TestRunOpen_Given_the_step_fails_after_connecting_Then_the_connection_is_closed_and_the_name_is_free(t *testing.T) {
+	// Before: the failed step left its connection registered, so opening the name again failed with "already open".
+	k := &keepable{}
+	x := &execution{r: &runner{}}
+	x.r.deps.Clock = time.Now
+	b := builtAsync{protocol: "ws", op: transport.Operation{Receive: &transport.Receive{Count: 5}}}
+	ctx, cancel := context.WithTimeout(t.Context(), 50*time.Millisecond)
+	defer cancel()
+
+	_, err := x.runOpen(ctx, k, b, "room")
+
+	if err == nil {
+		t.Fatal("waiting for five messages that never come should fail")
+	}
+	if x.r.conns.has("room") {
+		t.Error("the failed step kept the name")
+	}
+	if k.sessions[0].closes() != 1 {
+		t.Errorf("closed %d times, want once", k.sessions[0].closes())
+	}
+}
+
+func TestRunOpen_Given_the_name_is_taken_Then_nothing_is_connected(t *testing.T) {
+	k := &keepable{}
+	x := &execution{r: &runner{}}
+	x.r.deps.Clock = time.Now
+	x.r.conns.add("room", &fakeSession{})
+
+	_, err := x.runOpen(t.Context(), k, builtAsync{protocol: "ws"}, "room")
+
+	if err == nil || k.opened != 0 {
+		t.Fatalf("err %v, connected %d times", err, k.opened)
 	}
 }

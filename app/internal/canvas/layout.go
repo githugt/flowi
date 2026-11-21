@@ -267,14 +267,7 @@ func (l *layouter) list(nodes []model.Node, path string, x, y int64, parent stri
 	if l.cards != nil {
 		groups = cardGroups(nodes)
 	}
-	top := y
-	for _, g := range groups {
-		if g.kind == KindRequest && g.end-g.start > 1 {
-			_, _, _, above := blockCells(nodes[g.start:g.end], g.core)
-			top = max(top, y+above) // the stack above a request starts where the row would
-		}
-	}
-	y0, y := y, top
+	y0, y := y, rowTop(nodes, groups, y)
 	res := listResult{}
 	unitOf := map[string]string{} // node id → unit id, for needs edges
 	var prevLasts []string
@@ -282,7 +275,8 @@ func (l *layouter) list(nodes []model.Node, path string, x, y int64, parent stri
 	var column handlerColumn
 	for _, g := range groups {
 		n := nodes[g.start]
-		source, handler := handlerSource(groupNeeds(nodes[g.start:g.end], n), unitOf)
+		needs := groupNeeds(nodes[g.start:g.end], n)
+		source, handler := handlerSource(needs, unitOf)
 		at, row := cursor, y
 		if handler {
 			at, row = column.slot(source, cursor, l.bottomOf(source)+handlerDrop)
@@ -298,22 +292,7 @@ func (l *layouter) list(nodes []model.Node, path string, x, y int64, parent stri
 		}
 		var lasts []string
 		u, lasts = l.place(u, n, at, row)
-		from, explicit := deps(groupNeeds(nodes[g.start:g.end], n), prevLasts, unitOf)
-		for _, dep := range from {
-			l.edges = append(l.edges, Edge{From: dep, To: u.ID, Needs: explicit})
-		}
-		grouped := groupNeeds(nodes[g.start:g.end], n)
-		for _, id := range grouped.AfterFailureOf {
-			if from, ok := unitOf[id]; ok && from != u.ID {
-				l.edges = append(l.edges, Edge{From: from, To: u.ID, Fail: true, FromStep: id})
-			}
-		}
-		for _, entry := range grouped.AfterOutcome {
-			id, name, _ := strings.Cut(entry, ":")
-			if from, ok := unitOf[id]; ok && from != u.ID {
-				l.edges = append(l.edges, Edge{From: from, To: u.ID, Outcome: name, FromStep: id})
-			}
-		}
+		l.connect(u, needs, prevLasts, unitOf)
 		if res.first == "" {
 			res.first = u.ID
 		}
@@ -331,6 +310,38 @@ func (l *layouter) list(nodes []model.Node, path string, x, y int64, parent stri
 	res.w = max(0, cursor-x-gapX)
 	res.lasts = prevLasts
 	return res
+}
+
+// rowTop is where the row's ports sit: the stack above the tallest request starts where the row would.
+func rowTop(nodes []model.Node, groups []groupSpan, y int64) int64 {
+	top := y
+	for _, g := range groups {
+		if g.kind == KindRequest && g.end-g.start > 1 {
+			_, _, _, above := blockCells(nodes[g.start:g.end], g.core)
+			top = max(top, y+above)
+		}
+	}
+	return top
+}
+
+// connect draws the edges into unit u: from the units before it (or those it needs), and from the steps whose failure
+// or outcome it waits for. needs is the unit's merged dependencies.
+func (l *layouter) connect(u Unit, needs model.Node, prevLasts []string, unitOf map[string]string) {
+	from, explicit := deps(needs, prevLasts, unitOf)
+	for _, dep := range from {
+		l.edges = append(l.edges, Edge{From: dep, To: u.ID, Needs: explicit})
+	}
+	for _, id := range needs.AfterFailureOf {
+		if from, ok := unitOf[id]; ok && from != u.ID {
+			l.edges = append(l.edges, Edge{From: from, To: u.ID, Fail: true, FromStep: id})
+		}
+	}
+	for _, entry := range needs.AfterOutcome {
+		id, name, _ := strings.Cut(entry, ":")
+		if from, ok := unitOf[id]; ok && from != u.ID {
+			l.edges = append(l.edges, Edge{From: from, To: u.ID, Outcome: name, FromStep: id})
+		}
+	}
 }
 
 // place sizes and positions one unit (laying out a container's lanes) and

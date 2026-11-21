@@ -91,9 +91,19 @@ func requestVersionFacts(c model.Collection, n model.Node) card.Facts {
 		f.PreHooks, f.PostHooks = hooksThatRun(n.Request.Hooks, "pre", len(r.Hooks.Pre)+len(v.Hooks.Pre)), hooksThatRun(n.Request.Hooks, "post", len(r.Hooks.Post)+len(v.Hooks.Post))
 		f.Retry, f.Timeout = settingInt(v.Settings, "retry.max"), settingText(v.Settings, "timeout")
 		f.Outcomes = outcomeFactsOf(v.Outcomes)
+		f.Expect = expectText(v.Expect)
 		return f
 	}
 	return card.Facts{Kind: "http", Target: ref.Path}
+}
+
+// expectText is the version's expect: as the card shows it; a malformed one shows as written, so it is not hidden.
+func expectText(s string) string {
+	e, err := model.ParseExpect(s)
+	if err != nil || !e.Set() {
+		return strings.TrimSpace(s)
+	}
+	return e.String()
 }
 
 // versionFor is the version a step pins, else the request's default, else its first.
@@ -138,7 +148,7 @@ func versionFacts(v model.RequestVersion) card.Facts {
 	}
 	return card.Facts{
 		Kind: "http", Method: v.Method, Target: pathOf(v.URL), Auth: auth,
-		Query: len(v.Query), Headers: len(headers), Body: bodyKind(v.Body),
+		Query: countOn(v.Query), Headers: len(headers), Body: bodyKind(v.Body),
 	}
 }
 
@@ -157,7 +167,7 @@ func grpcFacts(v model.RequestVersion) card.Facts {
 
 func datasetFacts(v model.RequestVersion) card.Facts {
 	d := v.SQL()
-	return card.Facts{Kind: "dataset", Method: datasetVerbOf(*d), Target: datasetTip(*d), Sends: true, Body: d.Driver, Props: len(d.Params)}
+	return card.Facts{Kind: "dataset", Method: datasetVerbOf(*d), Target: datasetTip(*d), Sends: true, Body: d.Driver, Props: len(d.Params), Writes: d.Writes}
 }
 
 func asyncFacts(v model.RequestVersion) card.Facts {
@@ -223,6 +233,9 @@ func binding(a *model.Async, name string) string {
 // what scheme it carried ("Bearer", "Basic"); it is shown as auth, not as a header.
 func withoutAuthorization(headers []model.KeyValue) (rest []model.KeyValue, scheme string) {
 	for _, h := range headers {
+		if h.Disabled {
+			continue
+		}
 		if !strings.EqualFold(h.Key, "Authorization") {
 			rest = append(rest, h)
 			continue
@@ -301,4 +314,15 @@ func firstText(values ...string) string {
 		}
 	}
 	return ""
+}
+
+// countOn is how many rows are switched on.
+func countOn(rows []model.KeyValue) int {
+	n := 0
+	for _, kv := range rows {
+		if !kv.Disabled {
+			n++
+		}
+	}
+	return n
 }

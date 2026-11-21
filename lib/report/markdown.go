@@ -50,7 +50,7 @@ func WriteMarkdown(w io.Writer, r Run) error {
 
 func markdownNodes(p *printer, nodes []Node, depth int) {
 	for _, n := range nodes {
-		p.line(depth, "- %s **%s** (%s) — %s, %s", statusMark(n.Status, n.Handled), n.ID, n.Type, statusLabel(n.Status, n.Handled), humanDuration(n.Duration))
+		p.line(depth, "- %s **%s** (%s) — %s, %s%s", statusMark(n.Status, n.Handled), n.ID, n.Type, statusLabel(n.Status, n.Handled), humanDuration(n.Duration), triesSuffix(n))
 		for _, d := range n.Diagnostics {
 			p.line(depth+1, "- `%s` %s", d.Code, d.Message)
 		}

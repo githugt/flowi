@@ -184,16 +184,21 @@ func (s *WorkspaceService) deleteQuestion(n vm.TreeNode, ids []string) string {
 		}
 		return fmt.Sprintf("Delete the folder %s and everything in it (%s)? This cannot be undone.", ws.Display(n.ID), strings.Join(what, ", "))
 	}
-	const maxNamed = 5
-	var names []string
+	var envs, effects []string
+	others := 0
 	for _, id := range ids {
-		names = append(names, ws.Display(id))
+		if ws.Node(id).Kind == vm.NodeEnvironment {
+			envs = append(envs, ws.Display(id))
+			if impact, err := s.app.backend.EnvironmentImpact(ws.Node(id).File); err == nil {
+				if text := envEffects(ws.Display(id), impact); text != "" {
+					effects = append(effects, text)
+				}
+			}
+		} else {
+			others++
+		}
 	}
-	list := strings.Join(names[:min(len(names), maxNamed)], ", ")
-	if more := len(names) - maxNamed; more > 0 {
-		list += fmt.Sprintf(" and %d more", more)
-	}
-	return fmt.Sprintf("Delete %s? This cannot be undone.", list)
+	return leafDeleteQuestion(envs, others, effects)
 }
 
 // Inside lists the request rows at or below a row: the tabs an action on it
@@ -247,7 +252,11 @@ func (s *WorkspaceService) do(action string, ids []string, text, protocol string
 		if n.Kind == vm.NodeFolder {
 			ws.DeleteFolder(n, fail)
 		} else {
-			ws.Delete(ids, func([]string) {}, fail)
+			ws.Delete(ids, func([]string) {}, func(items []flowi.TrashedItem) {
+				if d := deletedNotice(items); len(d.IDs) > 0 {
+					emit("deleted", d)
+				}
+			}, fail)
 		}
 	case "mermaid":
 		ws.FlowMermaid(flowi.FlowTarget{Collection: n.Collection, Flow: n.Flow}, func(chart string) { emit("clipboard", chart) }, fail)
@@ -270,8 +279,7 @@ func (s *WorkspaceService) do(action string, ids []string, text, protocol string
 			ws.CreateEnvironment(text, open, fail)
 		}
 	case "newFlow":
-		folder, _ := folderPrefix(n)
-		ws.CreateUntitledFlowIn(n.Collection, strings.TrimSuffix(folder, "/"), open, fail)
+		ws.CreateUntitledFlowIn(n.Collection, strings.TrimSuffix(prefix, "/"), open, fail)
 	case "flowFromRequests":
 		requests := ids
 		if len(ids) == 1 {

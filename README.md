@@ -17,6 +17,20 @@ used in other software; the app and the CLI are AGPL.
 Start with the [app README](app/README.md) for what Flowi does and how to run it, or the
 [development guide](lib/docs/development.md) for how the parts fit together.
 
+## What it is for
+
+Flowi is built around keeping a set of API calls correct over time, in CI as much as on a desk. The same files run in
+the app and with `flowi run`, and these checks are part of the CLI:
+
+- `flowi impact` shows which flows and hooks use a request, and whether they still fit it.
+- `flowi drift` compares a flow's live responses with the schemas learned before.
+- `flowi access` checks that another user cannot reach what a flow made as its owner.
+- `flowi coverage` shows how much of an API description the flows use.
+- `flowi secret check` fails before a run starts when a declared secret has no value, and `flowi schema <kind>` prints
+  the JSON Schema of a file kind for editor completion.
+
+Flows can be exchanged as Arazzo documents (`flowi import`, `flowi export`).
+
 ## Working in the repository
 
 `go.work` links the three modules, so a change in `lib/` shows up in `cli/` and `app/` straight away. From the root:

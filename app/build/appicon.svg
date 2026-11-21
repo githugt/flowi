@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
-  <title>Flow-I</title>
+  <title>Flowi</title>
   <desc>A rounded tile with a white Fi: the F's top bar is a wave that ends in the i's yellow dot.</desc>
   <!-- Source of appicon.png. The art is drawn on a 100 x 100 grid and scaled into an 824 px tile with the
        transparent margin macOS expects. To change the colour, edit the three reds below. -->

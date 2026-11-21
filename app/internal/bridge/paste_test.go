@@ -5,6 +5,8 @@ package bridge_test
 import (
 	"errors"
 	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 
 	flowi "github.com/githugt/flowi/lib"
@@ -269,5 +271,108 @@ func TestRequestService_FillFromPaste_Given_text_that_is_not_a_request_file_Then
 	// Assert
 	if err == nil || got.Dirty {
 		t.Fatalf("err %v dirty %v", err, got.Dirty)
+	}
+}
+
+func TestRequestService_PastedSecrets_should_name_the_secrets_a_credential_becomes_and_never_its_value(t *testing.T) {
+	// Before: "Fill from curl" dropped the pasted credential and gave no sign of it in the window.
+	app := bridge.NewApp(&vmtest.Backend{Cols: []model.Collection{vmtest.SampleCollection()}}, bridge.NewInlineActor(), (&published{}).emit)
+	cases := []struct {
+		name, kind, text string
+		want             []string
+	}{
+		{"a bearer header", "curl", "curl https://example.com -H 'Authorization: Bearer abc123-not-real'", []string{"{{secret.authorization}}"}},
+		{"no credential", "curl", "curl https://example.com -H 'Accept: application/json'", nil},
+		{"a kind that cannot fill", "openapi", "openapi: 3.0.0", nil},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			got := app.Requests().PastedSecrets(c.kind, c.text)
+
+			if len(got) != len(c.want) || (len(got) == 1 && got[0] != c.want[0]) {
+				t.Fatalf("secrets %v, want %v", got, c.want)
+			}
+			for _, g := range got {
+				if strings.Contains(g, "abc123") {
+					t.Fatalf("the credential reached %q", g)
+				}
+			}
+		})
+	}
+}
+
+func TestImportService_SetFile_Given_a_file_Then_the_kind_is_set_to_what_it_is_and_the_screen_says_so(t *testing.T) {
+	// Arrange
+	_, _, _, app, _ := openLoginWith(t)
+	importer := app.Import()
+	t.Cleanup(func() { _ = importer.Close() })
+	file := filepath.Join(t.TempDir(), "capture.json")
+	if err := os.WriteFile(file, []byte(`{"log": {"version": "1.2", "entries": []}}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	// Act
+	importer.SetFile(file)
+	got := importer.State()
+
+	// Assert
+	// Before: the kind stayed whatever it was, and a wrong choice failed at the preview.
+	if got.Kind != "har" || got.Detected != "a HAR file" || got.File != file {
+		t.Fatalf("kind %q detected %q file %q", got.Kind, got.Detected, got.File)
+	}
+}
+
+func TestImportService_SetFile_Given_a_bruno_folder_Then_it_is_recognised_by_bruno_json(t *testing.T) {
+	_, _, _, app, _ := openLoginWith(t)
+	importer := app.Import()
+	t.Cleanup(func() { _ = importer.Close() })
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "bruno.json"), []byte(`{"name": "x", "version": "1"}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	importer.SetFile(dir)
+
+	if got := importer.State(); got.Kind != "bruno" || got.Detected == "" {
+		t.Fatalf("kind %q detected %q", got.Kind, got.Detected)
+	}
+}
+
+func TestImportService_SetFile_Given_a_file_that_is_not_recognised_or_a_url_Then_the_kind_is_left_alone(t *testing.T) {
+	// Arrange
+	_, _, _, app, _ := openLoginWith(t)
+	importer := app.Import()
+	t.Cleanup(func() { _ = importer.Close() })
+	before := importer.State().Kind
+	file := filepath.Join(t.TempDir(), "notes.txt")
+	if err := os.WriteFile(file, []byte("buy milk"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	// Act
+	importer.SetFile(file)
+	afterFile := importer.State()
+	importer.SetFile("https://example.test/spec.yaml")
+	afterURL := importer.State()
+
+	// Assert
+	if afterFile.Kind != before || afterFile.Detected != "" || afterURL.Kind != before || afterURL.Detected != "" {
+		t.Fatalf("kind %q then %q, detected %q %q", afterFile.Kind, afterURL.Kind, afterFile.Detected, afterURL.Detected)
+	}
+}
+
+func TestImportService_SetKind_Given_a_detected_source_Then_a_choice_by_hand_clears_the_note(t *testing.T) {
+	_, _, _, app, _ := openLoginWith(t)
+	importer := app.Import()
+	t.Cleanup(func() { _ = importer.Close() })
+	importer.SetPaste("curl https://example.test")
+	if importer.State().Detected == "" {
+		t.Fatal("the curl command was not recognised")
+	}
+
+	importer.SetKind("openapi")
+
+	if got := importer.State(); got.Kind != "openapi" || got.Detected != "" {
+		t.Fatalf("kind %q detected %q", got.Kind, got.Detected)
 	}
 }

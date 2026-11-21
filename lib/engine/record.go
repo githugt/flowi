@@ -15,6 +15,10 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"golang.org/x/text/encoding"
+	"golang.org/x/text/encoding/htmlindex"
+	"golang.org/x/text/encoding/unicode"
+
 	"github.com/githugt/flowi/lib/internal/httpx"
 	"github.com/githugt/flowi/lib/model"
 	"github.com/githugt/flowi/lib/vault"
@@ -37,6 +41,12 @@ type Body struct {
 	Size        int64  `json:"size"`
 	RawSize     int64  `json:"raw_size,omitempty"`
 	ContentType string `json:"content_type,omitempty"`
+	// Encoding is the Content-Encoding the transport decoded ("gzip", "br"): Size is after it, RawSize before.
+	Encoding string `json:"encoding,omitempty"`
+	// Charset names the encoding Text was decoded from, when it was not UTF-8 ("windows-1252", "utf-16le").
+	Charset string `json:"charset,omitempty"`
+	// Dropped says why the content was left out of a stored copy ("over 256 KiB"); Size and SHA256 still describe it.
+	Dropped string `json:"dropped,omitempty"`
 }
 
 // SentRequest is the request as actually sent, masked.
@@ -263,25 +273,78 @@ func headerList(h http.Header) []Header {
 // JSON, and parse errors kept rather than failing the record.
 func responseBody(resp *httpx.Response) Body {
 	ctype := resp.Header.Get("Content-Type")
-	b := Body{File: resp.File, SHA256: resp.SHA256, Size: resp.Size, RawSize: resp.RawSize, ContentType: ctype}
+	b := Body{File: resp.File, SHA256: resp.SHA256, Size: resp.Size, RawSize: resp.RawSize, ContentType: ctype, Encoding: resp.Encoding}
 	if resp.File != "" {
 		return b
 	}
-	if utf8.Valid(resp.Body) {
-		b.Text = string(resp.Body)
+	text, charset, ok := decodeText(ctype, resp.Body)
+	if ok {
+		b.Text, b.Charset = text, charset
 	} else {
 		b.Base64 = base64.StdEncoding.EncodeToString(resp.Body)
 	}
-	if len(resp.Body) == 0 || !looksJSON(ctype, resp.Body) {
+	body := resp.Body
+	if ok {
+		body = []byte(text) // a byte-order mark or another charset would break the JSON decoder
+	}
+	if len(resp.Body) == 0 || !looksJSON(ctype, body) {
 		return b
 	}
-	parsed, err := decodeJSON(resp.Body)
+	parsed, err := decodeJSON(body)
 	if err != nil {
 		b.ParseErr = err.Error()
 		return b
 	}
 	b.JSON = parsed
 	return b
+}
+
+// decodeText reads a body as text: UTF-8 (a byte-order mark dropped), UTF-16 by its mark, or the charset the
+// Content-Type names. charset is "" for UTF-8. ok is false for a body that is not text in any of those.
+//
+// Before: only valid UTF-8 counted as text, so a Latin-1 or Shift-JIS page showed as binary, and a BOM made a JSON
+// body fail to parse.
+func decodeText(contentType string, body []byte) (text, charset string, ok bool) {
+	switch {
+	case bytes.HasPrefix(body, []byte{0xEF, 0xBB, 0xBF}):
+		body = body[3:]
+	case bytes.HasPrefix(body, []byte{0xFF, 0xFE}) && textual(contentType):
+		return decodeWith(unicode.UTF16(unicode.LittleEndian, unicode.UseBOM), "utf-16le", body)
+	case bytes.HasPrefix(body, []byte{0xFE, 0xFF}) && textual(contentType):
+		return decodeWith(unicode.UTF16(unicode.BigEndian, unicode.UseBOM), "utf-16be", body)
+	}
+	if _, params, err := mime.ParseMediaType(contentType); err == nil {
+		if name := params["charset"]; name != "" && !strings.EqualFold(name, "utf-8") && !strings.EqualFold(name, "utf8") {
+			if enc, err := htmlindex.Get(name); err == nil {
+				if canonical, _ := htmlindex.Name(enc); canonical != "utf-8" {
+					return decodeWith(enc, canonical, body)
+				}
+			}
+		}
+	}
+	if utf8.Valid(body) {
+		return string(body), "", true
+	}
+	return "", "", false
+}
+
+// textual is true for a media type that carries text, or none at all. Binary types are not sniffed for a UTF-16
+// mark: four bytes of a PNG or a protobuf can start with one.
+func textual(contentType string) bool {
+	media, _, err := mime.ParseMediaType(contentType)
+	if err != nil {
+		return contentType == ""
+	}
+	return strings.HasPrefix(media, "text/") || strings.Contains(media, "json") || strings.Contains(media, "xml") ||
+		strings.Contains(media, "javascript")
+}
+
+func decodeWith(enc encoding.Encoding, name string, body []byte) (string, string, bool) {
+	out, err := enc.NewDecoder().Bytes(body)
+	if err != nil || !utf8.Valid(out) {
+		return "", "", false
+	}
+	return string(out), name, true
 }
 
 // decodeJSON parses a body keeping numbers exact (json.Number): float64

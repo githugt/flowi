@@ -4,6 +4,7 @@
 
 export {
     Card,
+    Guard,
     Port,
     Row
 } from "./models.js";

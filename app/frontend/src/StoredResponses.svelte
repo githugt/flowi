@@ -1,12 +1,16 @@
 <script lang="ts">
+  import Button from './Button.svelte'
   import EmptyState from './EmptyState.svelte'
   // What is kept for a request: the responses it saved (in the workspace, for
   // the replayer and for showing again) and the examples pinned next to it (in
   // the collection, committed). One at a time can be shown, pinned and deleted.
   import { errorText } from './lib/errors'
+  import { statusTone } from './lib/statustone'
   import { RequestService } from '../bindings/github.com/githugt/flowi/app/internal/bridge'
   import { ui } from './lib/ui.svelte'
+  import { replaceExampleText } from './lib/pinexample'
   import type { RequestView, StoredView } from './lib/types'
+  import { sizeText } from './lib/bytesize'
 
   let { view }: { view: RequestView } = $props()
   const node = $derived(view.node)
@@ -39,12 +43,21 @@
       initial: r.status ? String(r.status) : '',
       warning: (await RequestService.PinStoredWarning(node, r.version, r.name)) as string,
       done: async (name) => {
-        try {
-          ui.toast('Pinned: ' + (await RequestService.PinStored(node, r.version, r.name, name)))
-          load()
-        } catch (e) {
-          fail(e)
+        const go = async () => {
+          try {
+            ui.toast('Pinned: ' + (await RequestService.PinStored(node, r.version, r.name, name)))
+            load()
+          } catch (e) {
+            fail(e)
+          }
         }
+        try {
+          if (!(await RequestService.ExampleTaken(node, r.version, r.name, name))) return go()
+        } catch (e) {
+          return fail(e)
+        }
+        const d = replaceExampleText(name, r.status)
+        ui.confirm(d.title, d.text, go, d.action)
       },
     })
   }
@@ -58,22 +71,22 @@
     })
   }
 
-  const size = (n: number) => (n < 1024 ? `${n} B` : n < 1 << 20 ? `${(n / 1024).toFixed(1)} KB` : `${(n / (1 << 20)).toFixed(1)} MB`)
+  const size = sizeText
 </script>
 
 {#snippet table(list: StoredView[], isExample: boolean)}
   {#each list as r (r.kind + r.version + r.name)}
     <div class="row">
       <span class="name">{r.name}</span>
-      <span class="status" class:ok={r.status >= 200 && r.status < 300} class:bad={r.status >= 400}>{r.status || '—'}</span>
+      <span class="status {statusTone(r.status)}">{r.status || '—'}</span>
       {#if !isExample}<span class="muted">v{r.version}</span>{/if}
       <span class="muted at">{r.at} · {size(r.size)}</span>
       <span class="spacer"></span>
       {#if !isExample}
-        <button onclick={() => show(r)} title="Show it in the response pane">Show</button>
-        <button onclick={() => pin(r)} title="Keep a copy next to the request, in the collection">Pin…</button>
+        <Button small onclick={() => show(r)} title="Show it in the response pane">Show</Button>
+        <Button small onclick={() => pin(r)} title="Keep a copy next to the request, in the collection">Pin…</Button>
       {/if}
-      <button class="del" onclick={() => remove(r)} title="Delete this response">Delete…</button>
+      <Button small danger onclick={() => remove(r)} title="Delete this response">Delete…</Button>
     </div>
   {/each}
 {/snippet}
@@ -85,11 +98,11 @@
 
 <h4>Pinned examples</h4>
 {@render table(examples, true)}
-{#if !examples.length}<p class="muted">None. Pin a response from the response pane, or from the saved responses below.</p>{/if}
+{#if !examples.length}<EmptyState icon="clock" title="No pinned examples" hint="Pin a response from the response pane, or from the saved responses below." compact />{/if}
 
 <h4>Saved responses</h4>
 {@render table(saved, false)}
-{#if !saved.length}<p class="muted">None yet. A send saves its response here; <code>responses.save</code> in Settings chooses which.</p>{/if}
+{#if !saved.length}<EmptyState icon="clock" title="No saved responses yet" hint="A send saves its response here; the setting responses.save chooses which." compact />{/if}
 {/if}
 
 <style>
@@ -99,10 +112,8 @@
   .name { font: var(--fs-sm) var(--mono); min-width: 70px; }
   .status { font: 600 var(--fs-xs) ui-monospace, Menlo, monospace; color: var(--muted); }
   .status.ok { color: var(--ok); }
+  .status.warn { color: var(--warn); }
   .status.bad { color: var(--fail); }
   .at { white-space: nowrap; }
   .spacer { flex: 1; }
-  button { background: var(--raised); color: var(--text); border: 0; box-shadow: inset 0 0 0 1px var(--line); border-radius: var(--r-md); padding: 0 10px; min-height: var(--ctl-h-sm); font: inherit; font-weight: 500; font-size: var(--fs-xs); cursor: pointer; }
-  button:hover:not(:disabled) { background: var(--raised-3); }
-  .del:hover { color: var(--fail); border-color: var(--fail); }
 </style>

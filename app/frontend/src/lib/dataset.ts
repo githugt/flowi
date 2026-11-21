@@ -34,3 +34,96 @@ export function withServerCredentials(server: string, user: string, password: st
   const info = user || password ? user + (password ? ':' + password : '') + '@' : ''
   return m[1] + info + m[3]
 }
+
+/**
+ * Why the User and Password boxes cannot write into the server field, or "" when they can.
+ * Before: with a template server such as `{{env.database_url}}` both boxes took text, stored nothing and reset to
+ * empty.
+ */
+export function credentialsBlocked(server: string): string {
+  if (serverCredentials(server)) return ''
+  const t = server.trim()
+  if (t.includes('{{')) return `The login comes from ${t.length > 60 ? 'the server template' : t}. Edit that value in Environments.`
+  return 'The server is not a connection URL (scheme://host), so there is no place for a login.'
+}
+
+/**
+ * Moves each `{{expr}}` of a statement into the Values list and puts a placeholder in its place, so the value
+ * travels apart from the statement. `$1, $2 …` drivers (PostgreSQL, SQLite and the file drivers) get the next
+ * number; `?` drivers get a `?` and the value at that position. Returns null when there is nothing to move.
+ * Before: `{{id}}` in a query was coloured as a template and then refused at send time as a dataset request error.
+ */
+export function moveTemplatesToValues(query: string, params: string[], driver: string): { query: string; params: string[] } | null {
+  const numbered = driver === 'postgres' || driver === 'sqlite' || isFileDriver(driver)
+  const values = [...params]
+  let seen = 0 // `?` placeholders so far, written or moved
+  let out = ''
+  let quote = ''
+  let moved = false
+  for (let i = 0; i < query.length; i++) {
+    const c = query[i]
+    if (quote) {
+      out += c
+      if (c === quote) quote = ''
+    } else if (c === "'" || c === '"') {
+      quote = c
+      out += c
+    } else if (c === '{' && query[i + 1] === '{' && query.indexOf('}}', i) >= 0) {
+      const end = query.indexOf('}}', i)
+      const expr = query.slice(i, end + 2)
+      if (numbered) {
+        values.push(expr)
+        out += '$' + values.length
+      } else {
+        values.splice(seen, 0, expr)
+        seen++
+        out += '?'
+      }
+      moved = true
+      i = end + 1
+    } else {
+      if (c === '?' && !numbered) seen++
+      out += c
+    }
+  }
+  return moved ? { query: out, params: values } : null
+}
+
+/**
+ * How many values a statement needs: the highest `$N` of a numbered placeholder, or the count of `?` for the drivers
+ * that use it (SQLite and the file drivers take either, so the larger of the two). Quoted text, comments and
+ * `{{templates}}` are not placeholders. PostgreSQL's `?` is an operator and is not counted.
+ * Before: adding or removing a `$3` said nothing about the Values tab, and the mismatch showed as a driver error on send.
+ */
+export function placeholderCount(query: string, driver: string): number {
+  const questions = driver !== 'postgres'
+  let highest = 0
+  let marks = 0
+  let quote = ''
+  for (let i = 0; i < query.length; i++) {
+    const c = query[i]
+    if (quote) {
+      if (c === quote) quote = ''
+    } else if (c === "'" || c === '"') quote = c
+    else if (c === '-' && query[i + 1] === '-') i = query.indexOf('\n', i) < 0 ? query.length : query.indexOf('\n', i)
+    else if (c === '/' && query[i + 1] === '*') i = query.indexOf('*/', i) < 0 ? query.length : query.indexOf('*/', i) + 1
+    else if (c === '{' && query[i + 1] === '{' && query.indexOf('}}', i) >= 0) i = query.indexOf('}}', i) + 1
+    else if (c === '$') {
+      const m = /^\d+/.exec(query.slice(i + 1))
+      if (m) {
+        highest = Math.max(highest, Number(m[0]))
+        i += m[0].length
+      }
+    } else if (c === '?' && questions) marks++
+  }
+  return Math.max(highest, marks)
+}
+
+/** What to say when the number of values is not the number of placeholders, and how many are missing; null when they agree. */
+export function valuesNote(query: string, driver: string, values: number): { text: string; missing: number } | null {
+  const need = placeholderCount(query, driver)
+  if (need === values) return null
+  const word = (n: number, w: string) => `${n} ${w}${n === 1 ? '' : 's'}`
+  const text = `The query has ${word(need, 'placeholder')} and ${word(values, 'value')}.`
+  return { text: need > values ? text : text + ' The extra values are sent and may be refused.', missing: Math.max(0, need - values) }
+}

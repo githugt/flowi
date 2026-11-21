@@ -1,4 +1,10 @@
 <script lang="ts">
+  import EmptyState from './EmptyState.svelte'
+  import { anchorAt, type MenuAt } from './lib/menuanchor'
+  import { rowFor, typeAhead, typedChar, JUMP_DELAY_MS } from './lib/typeahead'
+  import { debounced } from './lib/debounce'
+  import { isMac } from './lib/commands'
+  import { isEnter } from './lib/enterkey'
   import { tick } from 'svelte'
   import { app } from './lib/app.svelte'
   import { ui } from './lib/ui.svelte'
@@ -33,13 +39,25 @@
     seenJump = app.jumpRequests
     if (!peek) tick().then(() => (jumpField?.focus(), jumpField?.select()))
   })
-  const roots = $derived(filterTree(ordered, query))
-  const noMatches = $derived(!!query.trim() && roots.length === 0)
+  // The tree filters 80 ms after the last keystroke, not on each one: in a collection of thousands of rows every
+  // letter re-walked the whole tree. Emptying the field and Enter do not wait.
+  let filterQuery = $state('')
+  const settle = debounced((q: string) => (filterQuery = q), JUMP_DELAY_MS)
+  $effect(() => {
+    if (query) settle(query)
+    else {
+      settle.cancel()
+      filterQuery = ''
+    }
+  })
+  const roots = $derived(filterTree(ordered, filterQuery))
+  const noMatches = $derived(!!filterQuery.trim() && roots.length === 0)
 
   // Enter opens the first hit, the down arrow moves into the list, Escape empties the field.
   function jumpKeys(e: KeyboardEvent) {
     if (e.key === 'Escape' && query) query = ''
-    else if (e.key === 'Enter') {
+    else if (isEnter(e)) {
+      settle.flush()
       const hit = firstLeaf(roots)
       if (hit) app.open(hit)
     } else if (e.key === 'ArrowDown') (e.currentTarget as HTMLElement).closest('aside')?.querySelector<HTMLButtonElement>('.tree .row')?.focus()
@@ -47,13 +65,20 @@
     e.preventDefault()
   }
 
+  let typing = { buffer: '', at: -Infinity }
   // Arrow keys walk the visible rows; right and left open and close a group.
   function treeKeys(e: KeyboardEvent) {
     const rows = [...(e.currentTarget as HTMLElement).querySelectorAll<HTMLButtonElement>('.row')]
     const i = rows.indexOf(document.activeElement as HTMLButtonElement)
     if (i < 0) return
     const open = rows[i].parentElement?.getAttribute('aria-expanded')
-    if (e.key === 'ArrowDown') rows[Math.min(i + 1, rows.length - 1)].focus()
+    // Home, End and the start of a name; the buffer of typed letters empties after a short pause.
+    const ch = typedChar(e)
+    if (ch) typing = typeAhead(typing, ch, e.timeStamp)
+    const jump = e.key === 'Home' || e.key === 'End' || ch ? rowFor(rows.map((r) => r.querySelector('.label')?.textContent ?? ''), i, e.key, ch ? typing.buffer : '') : -1
+    if (jump >= 0) rows[jump].focus()
+    else if (e.key === 'Home' || e.key === 'End' || ch) return
+    else if (e.key === 'ArrowDown') rows[Math.min(i + 1, rows.length - 1)].focus()
     else if (e.key === 'ArrowUp') rows[Math.max(i - 1, 0)].focus()
     else if (e.key === 'ArrowRight' && open === 'false') rows[i].click()
     else if (e.key === 'ArrowLeft' && open === 'true') rows[i].click()
@@ -70,6 +95,7 @@
   const more = railScreens.filter((s) => !pinned.includes(s.id) && s.id !== 'screen:settings')
   const settings = railScreens.find((s) => s.id === 'screen:settings')
   let moreOpen = $state(false)
+  let moreAt = $state<MenuAt>({ x: 0, y: 0 })
   const moreActive = $derived(more.some((s) => s.id === app.active))
 
   // Marked rows get a bar saying how many, with what applies to all of them: marking was invisible beyond
@@ -84,6 +110,7 @@
 
   // The workspace's name was a label that did nothing; it opens what can be done to the workspace itself.
   let wsOpen = $state(false)
+  let wsAt = $state<MenuAt>({ x: 0, y: 0 })
   const fail = (e: unknown) => ui.toast(errorText(e), 'error')
   const renameWorkspace = () =>
     ui.prompt({ title: 'Rename workspace', label: 'Name', initial: app.tree?.name ?? '', done: (name) => WorkspaceService.RenameWorkspace(name).catch(fail) })
@@ -96,20 +123,18 @@
   ])
   // Only macOS draws its window buttons over the sidebar's top-left corner (a hidden inset title bar): elsewhere the
   // room kept for them is just empty space before the workspace selector.
-  const onMac = navigator.platform.toLowerCase().includes('mac')
+  const onMac = isMac()
   const moreItems = $derived<MenuItem[]>(more.map((t) => ({ label: t.title, icon: t.icon, active: app.active === t.id, onselect: () => app.openScreen(t.id, t.title) })))
 </script>
-
-<svelte:window onpointerdown={() => ((wsOpen = false), (moreOpen = false))} />
 
 <aside style:width={`${width}px`}>
   <div class="head" class:peeking={peek} class:mac={onMac}>
     {#if !peek}<MainMenuButton />{/if}
-    <button class="ws" aria-haspopup="menu" aria-expanded={wsOpen} title="Workspace" onpointerdown={(e) => e.stopPropagation()} onclick={() => (wsOpen = !wsOpen)}>
-      <span class="avatar" aria-hidden="true">{(app.tree?.name ?? '?').slice(0, 1).toUpperCase()}</span><span class="wsname">{app.tree?.name ?? ''}</span><span class="caret" aria-hidden="true">▾</span>
+    <button class="ws" aria-haspopup="menu" aria-expanded={wsOpen} title="Workspace" onclick={(e) => { wsAt = anchorAt(e.currentTarget.getBoundingClientRect(), { gap: -4 }); wsOpen = !wsOpen }}>
+      <span class="avatar" aria-hidden="true">{(app.tree?.name ?? '?').slice(0, 1).toUpperCase()}</span><span class="wsname">{app.tree?.name ?? ''}</span><span class="caret" aria-hidden="true"><Icon name="chevd" size={12} /></span>
     </button>
     {#if wsOpen}
-      <Menu class="wsmenu" label="Workspace" items={wsItems} onclose={() => (wsOpen = false)} />
+      <Menu at={wsAt} minWidth={200} label="Workspace" items={wsItems} onclose={() => (wsOpen = false)} />
     {/if}
     {#if peek}
       <button class="pin" title="Keep the sidebar open for this kind of tab" onclick={(e) => { e.stopPropagation(); onpin?.() }}>Pin open</button>
@@ -120,9 +145,9 @@
   <div class="jump"><SearchField bind:value={query} bind:el={jumpField} placeholder="Jump to…" label="Jump to a request, flow or environment" onkeydown={jumpKeys} /></div>
   <div class="tree" role="tree" tabindex="-1" onkeydown={treeKeys}>
     {#each roots as node, i (node.id)}
-      <TreeItem {node} depth={0} tint={app.rainbow.length ? app.rainbow[i % app.rainbow.length] : ''} {query} />
+      <TreeItem {node} depth={0} tint={app.rainbow.length ? app.rainbow[i % app.rainbow.length] : ''} query={filterQuery} />
     {/each}
-    {#if noMatches}<p class="none">Nothing matches “{query.trim()}”.</p>{/if}
+    {#if noMatches}<EmptyState kind="filtered" compact query={filterQuery.trim()} onclear={() => (query = '')} />{/if}
   </div>
   {#if app.marked.length > 1}
     <div class="selbar" role="toolbar" aria-label="Marked rows">
@@ -141,12 +166,12 @@
     {#each tools as t}
       <button title={t.title} aria-label={t.title} class:on={app.active === t.id} onclick={() => app.openScreen(t.id, t.title)}><Icon name={t.icon} /></button>
     {/each}
-    <button class="morebtn" class:on={moreActive || moreOpen} title="More tools" aria-label="More tools" aria-haspopup="menu" aria-expanded={moreOpen} onpointerdown={(e) => e.stopPropagation()} onclick={() => (moreOpen = !moreOpen)}>⋯</button>
+    <button class="morebtn" class:on={moreActive || moreOpen} title="More tools" aria-label="More tools" aria-haspopup="menu" aria-expanded={moreOpen} onclick={(e) => { moreAt = anchorAt(e.currentTarget.getBoundingClientRect(), { end: true, above: true, gap: -2 }); moreOpen = !moreOpen }}>⋯</button>
     {#if settings}
       <button class="end" title={settings.title} aria-label={settings.title} class:on={app.active === settings.id} onclick={() => app.openScreen(settings.id, settings.title)}><Icon name={settings.icon} /></button>
     {/if}
     {#if moreOpen}
-      <Menu class="moremenu" label="More tools" items={moreItems} onclose={() => (moreOpen = false)} />
+      <Menu at={moreAt} label="More tools" items={moreItems} onclose={() => (moreOpen = false)} />
     {/if}
   </nav>
   {/if}
@@ -168,21 +193,16 @@
     background: none; border: 0; border-radius: var(--r-md); color: var(--text); font: inherit; font-weight: 600;
   }
   .ws:hover, .ws[aria-expanded='true'] { background: var(--tint-hover); }
-  .avatar { flex: none; width: 22px; height: 22px; border-radius: 7px; display: grid; place-items: center; background: linear-gradient(135deg, var(--accent), var(--data)); color: var(--on-accent); font-size: var(--fs-xs); font-weight: 700; }
+  .avatar { flex: none; width: 22px; height: 22px; border-radius: var(--r-md); display: grid; place-items: center; background: linear-gradient(135deg, var(--accent), var(--data)); color: var(--on-accent); font-size: var(--fs-xs); font-weight: 700; }
   .wsname { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .caret { color: var(--muted); font-size: var(--fs-xs); }
-  /* Menu.svelte draws the menu; these say where it opens from. */
-  aside :global(.wsmenu) { top: calc(100% - 4px); left: 12px; min-width: 200px; }
-  aside .head.mac :global(.wsmenu) { left: 78px; }
+  .caret { display: inline-flex; color: var(--muted); }
   .pin { --wails-draggable: no-drag; margin-left: auto; white-space: nowrap; flex: none; background: none; border: 1px solid var(--line); border-radius: var(--r-md); color: var(--muted); font: inherit; font-size: var(--fs-sm); padding: 1px 8px; }
   .pin:hover { color: var(--text); border-color: var(--accent); }
   .jump { margin: 0 8px 6px; }
-  .none { margin: 12px 8px; color: var(--muted); font-size: var(--fs-sm); }
   /* The tools sit in a strip at the foot, out of the way of the tree; their menu opens upward. */
   .rail { position: relative; flex: none; display: flex; gap: 2px; padding: 6px 8px; border-top: 1px solid var(--line); }
   .rail .end { margin-left: auto; }
   .rail .morebtn { font-size: var(--fs-md, 15px); line-height: 1; min-width: 28px; }
-  aside :global(.moremenu) { bottom: calc(100% - 2px); right: 8px; }
   .rail button { background: none; border: 0; border-radius: var(--r-md); color: var(--muted); padding: 5px 7px; display: grid; place-items: center; }
   .rail button:hover { color: var(--text); background: var(--tint-hover); }
   .rail button.on { color: var(--accent); background: var(--tint-sel); }

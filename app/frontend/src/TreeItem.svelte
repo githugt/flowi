@@ -1,4 +1,7 @@
 <script lang="ts">
+  import { rowTitle } from './lib/rowtitle'
+  import { clamp } from './lib/clamp'
+  import { menuItemForKey } from './lib/typeahead'
   import { app } from './lib/app.svelte'
   import type { TreeNode } from './lib/types'
   import TreeItem from './TreeItem.svelte'
@@ -9,17 +12,21 @@
   import { WorkspaceService } from '../bindings/github.com/githugt/flowi/app/internal/bridge'
   import { moved } from './lib/reorder'
   import { moveRequests, movingWith } from './lib/move'
+  import { treeState } from './lib/treestate.svelte'
+  import { flowResult, requestResult } from './lib/rowmark'
 
   // query: the "Jump to…" text; while there is one, groups show open so every hit is visible, and rows keep their order.
   let { node, depth, parent, tint = '', query = '' }: { node: TreeNode; depth: number; parent?: TreeNode; tint?: string; query?: string } = $props()
   // Each level indents by this much; the guide line under a group sits at the middle of its chevron.
   const INDENT = 12
-  let open = $state(true)
+  const open = $derived(treeState.isOpen(node.id))
   const shown = $derived(open || !!query)
-  const branch = $derived(!['request', 'environment', 'flow', 'missing'].includes(node.kind))
+  const branch = $derived(!['request', 'environment', 'flow', 'missing', 'broken'].includes(node.kind))
   const active = $derived(app.active === node.id)
 
   const markable = $derived(['request', 'flow', 'environment'].includes(node.kind))
+  // How the last run or send went, for the items that are open (the others have not run in this window).
+  const result = $derived(node.kind === 'flow' ? flowResult(app.flows[node.id]?.run) : node.kind === 'request' ? requestResult(app.requests[node.id]?.response) : '')
   const marked = $derived(app.marked.includes(node.id))
 
   // Requests, flows and environments are marked for actions on several at once. Cmd/Ctrl-click marks or
@@ -52,7 +59,8 @@
     }
     app.marked = []
     app.markAnchor = node.id
-    if (branch) open = !open
+    if (node.kind === 'broken') return void ui.toast(rowTitle(node) + '. Fix the file in a text editor; Flowi reads it again when it changes.', 'warn')
+    if (branch) treeState.toggle(node.id)
     else app.open(node)
   }
 
@@ -108,26 +116,37 @@
     if (from < 0 || target < 0) return
     // Dropped after the row under it: its place, unless the dragged row was above it (the list shifts up).
     const to = d.after ? (from < target ? target : target + 1) : from < target ? target - 1 : target
-    const next = moved(names, from, Math.min(Math.max(to, 0), names.length - 1))
+    const next = moved(names, from, clamp(to, 0, names.length - 1))
     if (next.join('/') !== names.join('/')) WorkspaceService.Reorder(parent.id, next, false)
+  }
+
+  // F2 renames and Delete deletes the row in focus, through the same menu entries (and questions) as the right-click.
+  async function keys(e: KeyboardEvent) {
+    if (node.kind === 'broken') return
+    if (e.key !== 'F2' && e.key !== 'Delete') return
+    e.preventDefault()
+    menuItemForKey(await rowMenu(node.id), e.key)?.run()
   }
 
   async function contextmenu(e: MouseEvent) {
     e.preventDefault()
+    if (node.kind === 'broken') return
     ui.openMenu(e.clientX, e.clientY, await rowMenu(node.id))
   }
 </script>
 
-<div role="treeitem" aria-selected={active} aria-expanded={branch ? shown : undefined}>
-  <button class="row" class:active class:marked class:group={branch} class:heading={branch && depth === 0} class:dragging={drag?.active}
+<div role="treeitem" aria-selected={active} aria-expanded={branch ? shown : undefined} class:leaf={!branch}>
+  <button class="row" title={rowTitle(node)} class:active class:marked class:broken={node.kind === 'broken'} class:group={branch} class:heading={branch && depth === 0} class:dragging={drag?.active}
     class:dropBefore={app.treeDrop?.id === node.id && !app.treeDrop.into && !app.treeDrop.after}
     class:dropAfter={app.treeDrop?.id === node.id && !app.treeDrop.into && app.treeDrop.after}
     class:dropInto={app.treeDrop?.id === node.id && app.treeDrop.into}
     data-tree-row={node.id} style:--tint={tint || undefined} data-markable={markable ? '' : undefined} data-drop={container ? '' : undefined} style:padding-left={`${8 + depth * INDENT}px`}
-    onclick={click} oncontextmenu={contextmenu} onpointerdown={down} onpointermove={move} onpointerup={up} onpointercancel={up}>
+    onclick={click} onkeydown={keys} oncontextmenu={contextmenu} onpointerdown={down} onpointermove={move} onpointerup={up} onpointercancel={up}>
     <span class="twist" class:open={shown} aria-hidden="true">{#if branch}<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6" /></svg>{/if}</span>
-    {#if node.kind === 'request' && node.method}<span class="method"><Verb verb={node.method} short /></span>{:else if node.kind === 'flow'}<span class="method"><Verb verb="FLOW" /></span>{/if}
+    {#if node.kind === 'request' && node.method}<span class="method"><Verb verb={node.method} short pill={false} /></span>{:else if node.kind === 'flow'}<span class="method"><Verb verb="FLOW" pill={false} /></span>{:else if node.kind === 'broken'}<span class="method"><span class="unmerged" role="img" aria-label="Cannot load">⚠ unmerged</span></span>{/if}
     <span class="label">{#if query}{#each highlightParts(node.label, query) as part}{#if part.hit}<mark>{part.text}</mark>{:else}{part.text}{/if}{/each}{:else}{node.label}{/if}</span>
+    {#if markable && app.isDirty(node.id)}<span class="dirtydot" title="Unsaved changes" role="img" aria-label="Unsaved changes"></span>{/if}
+    {#if result}<span class="result {result}" title={result === 'passed' ? 'The last run passed' : 'The last run failed'} role="img" aria-label={result === 'passed' ? 'The last run passed' : 'The last run failed'}>{result === 'passed' ? '✓' : '✗'}</span>{/if}
   </button>
   {#if branch && shown}
     <div class="kids" role="group" style:--guide={`${8 + depth * INDENT + 6}px`}>
@@ -139,6 +158,8 @@
 </div>
 
 <style>
+  /* A row far off screen is not laid out or painted: a collection of thousands of requests stays quick to scroll. */
+  .leaf { content-visibility: auto; contain-intrinsic-size: auto var(--row-h); }
   /* A collection row tinted by the custom palette's rainbow (the colour is the palette's; the text stays the theme's). */
   .row[style*="--tint"] { background: color-mix(in srgb, var(--tint) 22%, transparent); }
   .row {
@@ -171,10 +192,16 @@
   .heading { font-size: var(--fs-xs); text-transform: uppercase; letter-spacing: 0.05em; }
   .twist { flex: none; width: 12px; height: 12px; color: var(--muted); display: grid; place-items: center; transition: transform var(--t-fast) var(--ease-out); }
   .twist.open { transform: rotate(90deg); }
+  .row.broken .label { color: var(--fail); text-decoration: line-through; text-decoration-color: color-mix(in srgb, var(--fail) 50%, transparent); }
+  .unmerged { color: var(--fail); font-size: var(--fs-xs); white-space: nowrap; }
   .label mark { background: none; color: var(--accent); font-weight: 700; }
+  .dirtydot { flex: none; width: 7px; height: 7px; border-radius: 50%; background: var(--accent); margin-left: var(--sp-1); }
+  .result { flex: none; font-size: var(--fs-xs); margin-left: var(--sp-1); }
+  .result.passed { color: var(--ok); }
+  .result.failed { color: var(--fail); }
   .label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   /* Wide enough for the longest short verb (KAFKA, PATCH) so the names after the pills line up. */
-  .method { flex: none; min-width: 56px; display: inline-flex; }
+  .method { flex: none; min-width: 44px; display: inline-flex; }
   /* A guide line down a group's children, shown while the pointer is over the tree. */
   .kids { position: relative; }
   .kids::before { content: ''; position: absolute; top: 0; bottom: 0; left: var(--guide); width: 1px; background: var(--line); opacity: 0; pointer-events: none; transition: opacity var(--t-base) var(--ease-out); }

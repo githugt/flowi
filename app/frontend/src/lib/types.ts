@@ -4,6 +4,8 @@ export interface TreeNode {
   label: string
   kind: string
   method?: string
+  /** A `broken` row: why the file could not be read, "unresolved git merge conflict (line 14)". */
+  detail?: string
   /** What a folder's order calls it: the file or folder name ("" for rows that cannot be reordered). */
   name?: string
   draft?: boolean
@@ -22,6 +24,8 @@ export interface Tree {
   environments: string[]
   /** By environment name; a name with the default colour is absent. */
   envColours: Record<string, string>
+  /** The environments that ask before a request that changes data is sent. */
+  protected: string[]
   selected: string
 }
 
@@ -106,16 +110,24 @@ export interface FacePort {
 }
 
 /** What a step's card shows (see internal/card). */
+/** A mark in the header of a step that does not always run: a condition, a tolerated error, a limit, a concurrent step. */
+export interface FaceGuard {
+  glyph: string
+  tip: string
+}
+
 export interface Face {
   badge: string
   subline: string
   rows: FaceRow[]
   more: FaceRow[]
   ports: FacePort[]
+  guards?: FaceGuard[]
 }
 
 export interface Card {
   title: string
+  tip?: string // the tooltip of the title: the step's id when a name hides it, then its description
   subtitle: string
   hooks?: HookTick[] // a request step: the hooks that run around it
   face?: Face
@@ -135,6 +147,20 @@ export interface WireChoices {
   reason?: string
   outputs: string[]
   fields: WireField[]
+}
+
+export interface WireChild {
+  name: string
+  path: string
+  sample: string
+  branch: boolean
+}
+
+export interface WirePreview {
+  ran: boolean
+  found: boolean
+  text: string
+  children: WireChild[]
 }
 
 export interface Pair {
@@ -166,6 +192,9 @@ export interface Call {
   outcomesOwn?: boolean
   ruleKind?: string
   ref: string
+  /** For a subflow step: the called flow's inputs and outputs, when it is in this collection. */
+  inputs?: { name: string; type?: string; default?: string; required?: boolean }[]
+  outputs?: { name: string; type?: string }[]
   choices: Choice[]
   version?: string
   /** The flowi overlay laid over the request's version, and the collection's to choose from. */
@@ -174,6 +203,8 @@ export interface Call {
   /** The connection this step opens and keeps, the one it runs over, and whether it closes that one. */
   open?: string
   over?: string
+  /** The connection names the flow's steps open: what "run over" can name. */
+  connections?: string[]
   close?: boolean
   with: Pair[]
   headers?: Pair[]
@@ -229,6 +260,10 @@ export interface StepForm {
   values?: ValueRow[] // a set step: what it writes
   when: string
   timeout: string
+  /** A request, fetch, webhook or subflow step, which may have retries. */
+  canRetry: boolean
+  retries: string
+  retryWait: string
   concurrent: boolean
   failMode: string
   failTarget: string
@@ -318,8 +353,36 @@ export interface RunView {
   running: boolean
   error?: string
   summary?: string
+  /** The last run's seed, as text; absent before a run. */
+  seed?: string
   statuses: Record<string, string>
   results: Record<string, string>
+  /** The steps that ran, placed on the run's clock and ordered by start. */
+  timeline: TimelineBar[]
+}
+
+/** One step of the last run: when it started and ended, in ms after the run began. */
+export interface TimelineBar {
+  step: string
+  status: string
+  startMs: number
+  endMs: number
+}
+
+export interface VarUse {
+  name: string
+  writers: string[]
+  readers: string[]
+}
+
+/** One table a data file request can read, with the statement that looks at it. */
+export interface DataTableView {
+  name: string
+  file: string
+  sheet?: string
+  rows: number
+  columns: { name: string; type: string }[]
+  select: string
 }
 
 export interface VarsView {
@@ -328,6 +391,8 @@ export interface VarsView {
   unset: string[]
   /** The variables as the last run ended (masked, one line each); empty before a run. */
   values: { name: string; value: string }[]
+  /** Which steps write and read each variable, by step id. */
+  uses: VarUse[]
 }
 
 export interface PartView {
@@ -357,7 +422,8 @@ export interface NodeData {
   diags: string[]
   kind: string // request, messages or step: which tabs the output dock offers
   size?: string
-  messages: { direction: string; text: string; lang?: string }[]
+  table?: TableView
+  messages: { direction: string; text: string; lang?: string; at: string; body: string; key?: string; kind?: string; type?: string; partition?: number; offset?: number; sequence?: number; headers?: Pair[]; size?: number; hex?: string }[]
 }
 
 export interface HistoryRow {
@@ -388,6 +454,9 @@ export interface Chip {
 }
 
 export interface FlowView {
+  /** The saved path and the collection's name, as `flowi run <path> --collection <name>` takes them. */
+  path: string
+  collection: string
   selection: string[]
   chips: Chip[]
   onDisk: boolean
@@ -410,6 +479,8 @@ export interface FlowView {
   dirty: boolean
   canUndo: boolean
   canRedo: boolean
+  undoLabel: string
+  redoLabel: string
   error?: string
   diagram: Diagram
   cards: Record<string, Card>
@@ -421,6 +492,8 @@ export interface KV {
   Key: string
   Value: string
   Description: string
+  /** Kept in the file but not sent (query parameters and headers only). */
+  Disabled?: boolean
 }
 
 export interface Extraction {
@@ -442,9 +515,13 @@ export interface RequestVersion {
   Body: { JSON: string; Text: string; File: string; Form: KV[] | null; Multipart: unknown[] | null }
   Extract: Extraction[] | null
   Assert: string[] | null
+  /** The status the request is meant to answer with ("401", "4xx", "200, 404"); empty: any 2xx passes. */
+  Expect?: string
   /** The named ways the request can end; null: success and failure. */
   Outcomes?: { Name: string; When: string; Disabled: boolean; Color?: string; Description?: string }[] | null
   Variables: KV[] | null
+  /** Per-request send settings (timeout, redirects…); empty or null when none is set. */
+  Settings?: Record<string, unknown> | null
   Docs: string
   Async?: unknown
   GRPC?: unknown
@@ -457,6 +534,11 @@ export interface ResponseView {
   /** How long the send took and how big the body was; "" when not known. */
   took: string
   size: string
+  /** How the response came: "HTTP/2 · gzip 12 KB → 340 KB · 2 redirects", and the redirect hops, one line each. */
+  facts: string
+  hops: string[]
+  /** Why no body shows: a large body went to a file. */
+  bodyNote?: string
   passed: boolean
   status: string
   code: string
@@ -465,13 +547,24 @@ export interface ResponseView {
   diags: string[]
   /** The checks (assert lines) this response judged; ones added or edited since are untried. */
   checks: string[]
+  /** What the send itself said about each check it ran, in order. */
+  checkResults: { line: string; verdict: string; note: string }[]
+  /** What each extraction the send tried took from the response; one added or renamed after it is not listed. */
+  extracted: { name: string; value: string; found: boolean }[]
   bodyJson?: unknown
   /** The body text of an XML response, for the tree and the multi-status list. */
   bodyXml?: string
   phases: { name: string; startMs: number; ms: number }[]
-  messages: { direction: string; at: string; body: string; key?: string; kind?: string; type?: string }[]
+  messages: { direction: string; at: string; body: string; key?: string; kind?: string; type?: string; partition?: number; offset?: number; sequence?: number; headers?: Pair[]; size?: number; hex?: string }[]
   /** The rows of a dataset response, one value per column. */
   table?: TableView
+  /** What the body is: none, json, xml, html, image, pdf, text or binary; "" for a response with no single body. */
+  bodyKind: string
+  contentType?: string
+  /** A small picture as a data address, a small page's source, and the first bytes of a binary body as a hex dump. */
+  bodyImage?: string
+  bodyHtml?: string
+  bodyHex?: string
 }
 
 /** The rows of a dataset response: a value per column (a number, text, true or false, or null). */
@@ -509,6 +602,15 @@ export interface FlowiOverlayDiff {
   names: string[]
   /** The overlay laid over the request now. */
   open: string
+}
+
+export interface ConnectionInfo {
+  busy: boolean
+  /** ok, failed or unsupported; empty when it has not been tried since the server or credentials changed. */
+  status: '' | 'ok' | 'failed' | 'unsupported'
+  target?: string
+  detail?: string
+  tookMs: number
 }
 
 export interface RequestView {
@@ -549,10 +651,12 @@ export interface RequestView {
   async?: AsyncInfo
   grpc?: GRPCInfo
   dataset?: DatasetInfo
+  /** For a message or database request: the Test connection button and what its last use found. */
+  connection?: ConnectionInfo
   pipeline: { kind: string; title: string; detail: string; method?: string; tip?: string; state: string; reason?: string; ms: number }[]
   showingHistory: boolean
   inScratch: boolean
-  live: { direction: string; at: string; body: string; key?: string; kind?: string; type?: string }[]
+  live: { direction: string; at: string; body: string; key?: string; kind?: string; type?: string; partition?: number; offset?: number; sequence?: number; headers?: Pair[]; size?: number; hex?: string }[]
   snippet: { format: string; formats: string[]; exclude: boolean; secrets?: boolean; text: string; error?: string }
 }
 
@@ -597,6 +701,8 @@ export interface EnvView {
   rows: EnvRow[]
   /** "" for the default. */
   colour: string
+  /** Ask before a request that changes data is sent with this environment. */
+  protected: boolean
   colours: string[]
   /** The environment this one builds on, or "". */
   extends: string
@@ -634,6 +740,10 @@ export interface SettingView {
   source: string
   userSet: boolean
   problem?: string
+  /** The built-in value as text, and the bounds of a whole number (max 0: none). */
+  default?: string
+  min?: number
+  max?: number
 }
 
 export interface SettingsView {
@@ -645,16 +755,31 @@ export interface SettingsView {
     sendButton: string
     density: string
     font: string
+    /** The font of URLs, code and values; "" for the system monospace. */
+    monoFont?: string
     fontSize: number
+    /** Secrets are blurred on screen (ui.hide_sensitive). */
+    hideSensitive?: boolean
     /** The palette of the custom theme, when its file reads; customProblem says why it does not. */
     custom?: { base: 'dark' | 'light'; vars: Record<string, string>; rainbow: string[] }
     customProblem?: string
   }
 }
 
+/** A file that writes {{secret.name}}: node opens it (empty for an authentication). */
+export interface SecretUseView {
+  kind: string
+  label: string
+  node: string
+}
+
 export interface SecretsView {
-  secrets: { environment: string; name: string; state: 'missing' | 'stored' | 'overridden' }[]
+  /** Whether the vault is open, and when it locks by itself. */
+  vault: { exists: boolean; unlocked: boolean; prompts: boolean; autoLockSeconds: number; locksInSeconds: number }
+  secrets: { environment: string; name: string; state: 'missing' | 'stored' | 'overridden'; usedBy: SecretUseView[] }[]
   error?: string
+  /** Values shown in this session. */
+  reveals: number
 }
 
 export interface ManagerView {
@@ -663,6 +788,8 @@ export interface ManagerView {
 }
 
 export interface ImportView {
+  /** What the source was recognised as ("OpenAPI 3.1.0"), when the kind was set from it. */
+  detected?: string
   kinds: { id: string; label: string; source: 'file' | 'folder' | 'paste'; overlay: boolean }[]
   kind: string
   file: string
@@ -692,6 +819,9 @@ export interface ScheduleView {
   inputs: string
   tz: string
   disabled: boolean
+  /** Where `flowi serve` tells when a run fails: an http(s) webhook, or env:NAME; empty tells nobody. */
+  onFailure: string
+  onSuccess: string
   flowLabel: string
   /** The cron in words, "" when it is not a common pattern. */
   when: string
@@ -699,6 +829,13 @@ export interface ScheduleView {
   nextAt: string
   /** Minutes from the moment the view was made to each firing in the next 24 hours. */
   fires: number[]
+}
+
+/** What the schedule editor shows under the cron line as it is typed. */
+export interface CronPreview {
+  words: string
+  next: string[]
+  error: string
 }
 
 export interface SchedulesView {
@@ -725,10 +862,12 @@ export interface ReplayerView {
   form: { addr: string; latency: string; sequence: boolean; cors: boolean; forward: ForwardMode; forwardTo: string; forwardOnly: string; env: string; recordTo: string; recordFolder: string; recordHar: string; faultErrorPercent: string; faultStatus: string; faultDropPercent: string; faultJitter: string }
   targets: { id: string; label: string; path?: string }[]
   traffic: { seq: number; at: string; method: string; path: string; status: number; match: string; request: string; duration: string; remote: string; version: string; example: string; source: string; delay: string }[]
+  /** What this run saved as new requests; count is 0 when nothing was saved. */
+  recorded: { count: number; requests: string[]; target: string }
 }
 
 export interface TrashView {
-  items: { id: string; kind: 'request' | 'flow'; name: string; path: string; at: string }[]
+  items: { id: string; kind: 'request' | 'flow'; name: string; path: string; at: string; deleted: boolean }[]
   after: string
   error?: string
 }
@@ -756,6 +895,19 @@ export interface NamedAuth {
   fields: AuthField[]
   /** The requests that use it. */
   uses: string[]
+}
+
+/** An OAuth token the app holds; never the token itself. */
+export interface TokenView {
+  id: string
+  /** What it is for: the grant, the token endpoint's host, the client id and the scope. */
+  label: string
+  /** "Signed in until 14:32, 4 Mar", or what the next send will do about an expired one. */
+  status: string
+  expired: boolean
+  /** Kept in the vault, so it survives a restart. */
+  stored: boolean
+  expires: string
 }
 
 export interface AuthsView {
@@ -817,6 +969,10 @@ export interface AsyncInfo {
   /** A cloud service: signs in with the provider's own lookup, or the credentials written in the request. */
   cloud: boolean
   headersAreConnection: boolean
+  /** What this protocol's server box shows as its placeholder, and the second box's name and placeholder. */
+  serverExample: string
+  channelLabel: string
+  channelHint: string
   block: AsyncBlock
 }
 
@@ -857,6 +1013,8 @@ export interface DatasetBlock {
 export interface DatasetInfo {
   block: DatasetBlock
   drivers: { id: string; label: string }[]
+  /** The server box's placeholder for the driver. */
+  serverExample: string
 }
 
 export interface GRPCInfo {
@@ -980,6 +1138,9 @@ export interface SpecUpdate {
   changed: string[]
   removed: string[]
   notes: string[]
+  source: string
+  checked: boolean
+  breakages: BreakageView[]
 }
 
 /** The flow and the flows it calls as one standalone Arazzo document. */
@@ -1049,22 +1210,32 @@ export interface MatrixView {
   dims: MatrixDimView[]
   cells: { labels: string[]; status: 'passed' | 'failed' | 'error' | 'cancelled'; why?: string; detail?: string }[]
   passed: number
+  total: number
+  cancelled: boolean
 }
 
 export interface AccessView {
   owner: string
   steps: { id: string; owner: number; attempts: { identity: string; status: number; verdict: 'denied' | 'allowed' | 'unclear' }[] }[]
   exposed: boolean
+  /** When the check ran, "2006-01-02 15:04" in local time; "" when there is none. */
+  checked: string
 }
 
 export interface DriftView {
   runStatus: string
   failing: boolean
+  /** The command that runs this check from a script or CI. */
+  ci: string
+  /** What accepting did, when worth saying. */
+  note?: string
   requests: {
     request: string
     version: string
     status: number
     noSchema: boolean
+    /** Its schema was brought up to date from this check. */
+    accepted: boolean
     differences: { path: string; kind: 'new' | 'missing' | 'changed'; detail?: string; fails: boolean }[]
   }[]
 }
@@ -1087,4 +1258,21 @@ export interface CallPart {
   headers: { name: string; value: string }[]
   body: string
   truncated: boolean
+}
+
+/** The environments side by side (EnvCompareView in the bridge). */
+export interface EnvCompareView {
+  envs: string[]
+  rows: { name: string; cells: { state: 'set' | 'inherited' | 'missing' | 'secret' | 'secret-unset'; value: string; kind: string; source: string }[]; differs: boolean; gaps: number }[]
+  error?: string
+}
+
+/** What hovering a {{variable}} chip shows (bridge.VariableHintView). */
+export interface VariableHint {
+  text: string
+  known: boolean
+  /** Where a click on an unset chip adds the variable; empty when there is nothing to add. */
+  environment: string
+  name: string
+  secret: boolean
 }

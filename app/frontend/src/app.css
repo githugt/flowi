@@ -12,6 +12,7 @@
   --text: #e8e9ec;
   --muted: #8e939d;
   --accent: #6d8afa;
+  --on-accent: #10131a; /* the light accent of the dark theme needs dark ink: white gave 3.2:1 */
   --request: #1f3a5f;
   --strip: #3a2f5f;
   --action: #2f4a3a;
@@ -30,6 +31,8 @@
     --text: #1b1d22;
     --muted: #666d7a;
     --accent: #4a63e0;
+    --on-accent: #ffffff;
+    --fail: #c62f2f; /* the dark theme's red gave 3.7:1 on white */
     --request: #dbe8fb;
     --strip: #e6defa;
     --action: #dcf0e3;
@@ -37,9 +40,45 @@
     color-scheme: light;
   }
 }
+/* Native checkboxes, radios and sliders take the accent. */
+:root { accent-color: var(--accent); }
+/* Text for a screen reader only: a mark (✓ ✗) gets its word without the word showing. */
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
+/* Forced colours (Windows high contrast) and reduced transparency: the "System" setting follows them. Borders come back on
+   controls whose edge was only a tint, the focus ring is the system's highlight, and blur and shadow give way to plain edges.
+   Before: neither was handled, so a control could lose its edge and a dialog sat on a blur the person had asked not to see. */
+@media (forced-colors: active) {
+  :focus-visible { outline: 2px solid Highlight; outline-offset: 2px; }
+  button, input, select, textarea { border: 1px solid ButtonText; }
+  .toast, .dialog { border: 2px solid CanvasText; box-shadow: none; }
+}
+/* "System" also follows the OS's more-contrast setting: strong edges and brighter muted text, in the dark and the light scheme. A
+   chosen theme is left alone. Before: only the High contrast theme did this, and it had to be picked by hand. */
+@media (prefers-contrast: more) {
+  :root:not([data-theme]) { --line: rgb(255 255 255 / 0.7); --muted: #d0d3da; }
+}
+@media (prefers-contrast: more) and (prefers-color-scheme: light) {
+  :root:not([data-theme]) { --line: rgb(0 0 0 / 0.7); --muted: #3b414d; }
+}
+/* Thin scrollbars in the window's colours; the wide system ones were the one part left unthemed. */
+* { scrollbar-width: thin; scrollbar-color: color-mix(in srgb, var(--muted) 55%, transparent) transparent; }
+*::-webkit-scrollbar { width: 10px; height: 10px; }
+*::-webkit-scrollbar-thumb { background: color-mix(in srgb, var(--muted) 55%, transparent); border-radius: var(--r-pill); border: 2px solid transparent; background-clip: content-box; }
+*::-webkit-scrollbar-thumb:hover { background: var(--muted); background-clip: content-box; }
+*::-webkit-scrollbar-corner { background: transparent; }
+@media (prefers-reduced-transparency: reduce) {
+  .scrim { backdrop-filter: none !important; background: rgb(0 0 0 / 0.75) !important; }
+}
+/* The stacking order of what floats over the page, lowest first: a side panel peeking out and the context menu, dialogs, a dialog that opens over a dialog, then toasts and the help card, then what follows the pointer while dragging. Components name the layer; none picks a number. */
+/* While the flow canvas pans or zooms its cards lose their shadows: a filter repaints on every frame. */
+svg.view-moving * { filter: none !important; transition: none !important; }
+:root { --cv-xs: 11px; --cv-sm: 12px; --cv-md: 13px; --cv-lg: 14px; --cv-tile: 26px; } /* the canvas's type scale: card text is one of these four, and the one size of a title when zoomed out to a tile */
+:root { --z-handle: 5; --z-menu: 50; --z-modal: 60; --z-modal-above: 65; --z-top: 70; --z-drag-mark: 79; --z-drag: 80; --scrim: rgb(0 0 0 / 0.4); }
+/* What a disabled control shows at: buttons, tabs and toggles one value, fields (whose value must stay readable) another; a busy one (loading) a third. */
+:root { --op-disabled: 0.4; --op-disabled-field: 0.55; --op-busy: 0.75; }
 /* Scales: every size, radius and gap in the components comes from these. Five type sizes, four radii. */
 :root {
-  --fs-xs: 11px; --fs-sm: 12px; --fs-md: 13px; --fs-lg: 15px; --fs-xl: 20px;
+  --fs-xs: calc(var(--font-size, 13px) - 2px); --fs-sm: calc(var(--font-size, 13px) - 1px); --fs-md: var(--font-size, 13px); --fs-lg: calc(var(--font-size, 13px) + 2px); --fs-xl: calc(var(--font-size, 13px) + 7px);
   /* The section tab bars of the request and response panes, which sit side by side and line up. */
   --tabbar-h: 38px;
   /* The bar over an editor (name, actions), the address bar and the field in it. */
@@ -52,6 +91,13 @@
   --sp-1: 4px; --sp-2: 8px; --sp-3: 12px; --sp-4: 16px; --sp-6: 24px;
   --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
   --shadow: 0 1px 2px rgb(0 0 0 / 0.4), 0 10px 28px rgb(0 0 0 / 0.38);
+  /* Edges and lift on filled controls and cards: a darker or lighter line, a card lifted off the page, and the drop
+     shadows of the graph's bars, edge cards and step cards (filters, for SVG). */
+  --shade: rgb(0 0 0 / 0.22); --shine: rgb(255 255 255 / 0.2);
+  --shadow-lift: 0 6px 18px rgb(0 0 0 / 0.38);
+  --float: drop-shadow(0 2px 8px rgb(0 0 0 / 0.28));
+  --float-node: drop-shadow(0 1px 1px rgb(0 0 0 / 0.3)) drop-shadow(0 6px 14px rgb(0 0 0 / 0.22));
+  --float-node-hover: drop-shadow(0 2px 2px rgb(0 0 0 / 0.34)) drop-shadow(0 10px 20px rgb(0 0 0 / 0.28));
   /* The surface ladder. Depth comes from steps of lightness, not from borders. --chrome is the window's frame
      (sidebar, tab strip, footer), --bg the pane that holds the work, --panel a card, field or popup on that pane,
      --raised something lifted (the open tab, a segmented control's selection) and --sunk a well for code and
@@ -68,8 +114,12 @@
   --tint-accent: color-mix(in srgb, var(--accent) 16%, transparent);
   /* Motion: one curve and three speeds, the same in every theme. */
   --ease-out: cubic-bezier(.2, .8, .2, 1);
+  --ease-in: cubic-bezier(.4, 0, 1, 1);
   --t-fast: 120ms; --t-base: 180ms; --t-slow: 260ms;
 }
+/* A menu or popover fades in and rises 4 px: one animation for all of them. The reduced-motion rule below makes it instant. */
+@keyframes pop-in { from { opacity: 0; transform: translateY(4px); } }
+.pop-in { animation: pop-in var(--t-fast) var(--ease-out); }
 @media (prefers-color-scheme: light) { :root:not([data-theme]) { --shadow: 0 1px 2px rgb(0 0 0 / 0.08), 0 10px 28px rgb(0 0 0 / 0.12); } }
 :root[data-mode='light'] { --shadow: 0 1px 2px rgb(0 0 0 / 0.08), 0 10px 28px rgb(0 0 0 / 0.12); }
 /* The themes that name only --bg and --panel get a frame derived from --bg: darker than the pane, and in the light
@@ -92,23 +142,18 @@
   /* No movement and no waiting, but hover and focus still change colour at once. */
   :root { --t-fast: 0ms; --t-base: 0ms; --t-slow: 0ms; }
   :where(button:not(:disabled):active) { transform: none; }
+  /* Every keyframe animation runs once and at once: the data arcs and the running pulses on the canvas looped
+     for ever, whatever the setting said. A running step still shows by its accent colour. */
+  *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; animation-delay: 0s !important; }
 }
 
 /* A small count beside a tab or heading ("Messages 3"): muted until the tab is the open one. */
 .count { display: inline-block; min-width: 16px; box-sizing: border-box; margin-left: 6px; padding: 0 5px; border-radius: var(--r-pill); background: color-mix(in srgb, var(--muted) 22%, transparent); color: var(--text); font: 600 var(--fs-xs)/16px var(--font, system-ui); text-align: center; }
 .active > .count, .on > .count, [aria-selected='true'] > .count { background: color-mix(in srgb, var(--accent) 28%, transparent); }
 
-/* A status as a pill: the HTTP code of a response, in the tone of how it went. The dot is the shape that goes
-   with the colour, so a status never rests on hue alone. */
-.status-pill { display: inline-flex; align-items: center; gap: 5px; padding: 0 9px 0 7px; border-radius: var(--r-pill); font: 600 var(--fs-xs)/20px var(--font, system-ui); background: color-mix(in srgb, var(--muted) 20%, transparent); color: var(--text); }
-.status-pill::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
-.status-pill.ok { background: var(--ok-t); color: var(--ok); }
-.status-pill.bad { background: var(--fail-t); color: var(--fail); }
-
 /* Status colours. The dark set is the default; light themes get a darker set that reads on white. */
 :root {
   --ok: #4caf84; --warn: #e0a43a; --dirty: #f0a35e; --info: #5eb0ef; --literal: #c586c0; --pending: #e0c34a; --data: #a78bfa;
-  --on-accent: #fff;
   /* The status colours as 16% tints, for pills and badges: a status is the colour on its own tint, plus a shape. */
   --ok-t: color-mix(in srgb, var(--ok) 16%, transparent); --warn-t: color-mix(in srgb, var(--warn) 16%, transparent);
   --fail-t: color-mix(in srgb, var(--fail) 16%, transparent); --info-t: color-mix(in srgb, var(--info) 16%, transparent);
@@ -135,9 +180,9 @@
 [data-send='cyan'] { --send-a: #0f8fb0; --send-b: #3a62d6; }
 /* An outline: the accent on its own tint, with a soft glow. */
 [data-send='outline'] { --send-fill: var(--tint-accent); --on-send: var(--accent); --send-glow: color-mix(in srgb, var(--accent) 35%, transparent); --send-edge: inset 0 0 0 1px var(--accent); }
-@media (prefers-color-scheme: light) { :root:not([data-theme]) { --ok: #1f8a5a; --warn: #a16207; --dirty: #c2620a; --info: #0e7490; --literal: #8b3fa0; --pending: #8a6d00; --data: #6d28d9; } }
+@media (prefers-color-scheme: light) { :root:not([data-theme]) { --ok: #187a50; --warn: #a16207; --dirty: #a8540a; --info: #0e7490; --literal: #8b3fa0; --pending: #8a6d00; --data: #6d28d9; } }
 :root[data-mode='light'] {
-  --ok: #1f8a5a; --warn: #a16207; --dirty: #c2620a; --info: #0e7490; --literal: #8b3fa0; --pending: #8a6d00; --data: #6d28d9;
+  --ok: #187a50; --warn: #a16207; --dirty: #a8540a; --info: #0e7490; --literal: #8b3fa0; --pending: #8a6d00; --data: #6d28d9;
 }
 :root[data-theme='high-contrast'], :root[data-theme='high-contrast'][data-send] { --on-accent: #000; --act-send: var(--accent); --act-receive: var(--accent); --act-both: var(--accent); --on-act: #000; --send-fill: var(--accent); --on-send: #000; --send-glow: transparent; --send-edge: inset 0 0 0 1px var(--text); }
 
@@ -197,43 +242,43 @@ body {
 /* Themes: appearance.theme sets data-theme on the root; "system" sets none and follows the OS. Not tied to :root, so a
    swatch in Settings (any element with data-theme) previews its theme. */
 [data-theme='dark'], [data-theme='classic'], [data-theme='flowi-dark'] {
-  --bg: #131519; --panel: #1a1d22; --chrome: #0c0d10; --line: rgb(255 255 255 / 0.09); --text: #e8e9ec; --muted: #8e939d; --accent: #6d8afa;
+  --bg: #131519; --panel: #1a1d22; --chrome: #0c0d10; --line: rgb(255 255 255 / 0.09); --text: #e8e9ec; --muted: #8e939d; --accent: #6d8afa; --on-accent: #10131a;
   --request: #1f3a5f; --strip: #3a2f5f; --action: #2f4a3a; --container: #4a3a2a; color-scheme: dark;
 }
 [data-theme='light'], [data-theme='flowi-light'] {
-  --bg: #ffffff; --panel: #f7f8fa; --chrome: #f1f2f5; --line: rgb(0 0 0 / 0.1); --text: #1b1d22; --muted: #666d7a; --accent: #4a63e0;
+  --bg: #ffffff; --panel: #f7f8fa; --chrome: #f1f2f5; --line: rgb(0 0 0 / 0.1); --text: #1b1d22; --muted: #666d7a; --accent: #4a63e0; --on-accent: #ffffff; --fail: #c62f2f;
   --request: #dbe8fb; --strip: #e6defa; --action: #dcf0e3; --container: #f6e8d6; color-scheme: light;
 }
 [data-theme='high-contrast'] {
-  --bg: #000000; --panel: #0a0a0a; --line: #ffffff; --text: #ffffff; --muted: #d0d0d0; --accent: #ffd700;
+  --bg: #000000; --panel: #0a0a0a; --line: #ffffff; --text: #ffffff; --muted: #d0d0d0; --accent: #ffd700; --on-accent: #000000;
   --request: #00264d; --strip: #2a0050; --action: #003d1a; --container: #4d2600; --fail: #ff5555; color-scheme: dark;
 }
 [data-theme='solarized-light'] {
-  --bg: #fdf6e3; --panel: #eee8d5; --line: #d3cbb7; --text: #073642; --muted: #657b83; --accent: #268bd2;
+  --bg: #fdf6e3; --panel: #eee8d5; --line: #d3cbb7; --text: #073642; --muted: #4f656c; --accent: #1b64a0; --fail: #b02424; --on-accent: #ffffff;
   --request: #d5e6ee; --strip: #e4def0; --action: #dde8cf; --container: #f0e1c8; color-scheme: light;
 }
 [data-theme='solarized-dark'] {
-  --bg: #002b36; --panel: #073642; --line: #17505e; --text: #eee8d5; --muted: #93a1a1; --accent: #2aa1f0;
+  --bg: #002b36; --panel: #073642; --line: #17505e; --text: #eee8d5; --muted: #93a1a1; --fail: #ff7b72; --accent: #2aa1f0; --on-accent: #10131a;
   --request: #0e4a63; --strip: #3a3a6e; --action: #1c5440; --container: #5a4424; color-scheme: dark;
 }
 [data-theme='nord'] {
-  --bg: #2e3440; --panel: #3b4252; --line: #4c566a; --text: #eceff4; --muted: #a3acbd; --accent: #88c0d0;
+  --bg: #2e3440; --panel: #3b4252; --line: #4c566a; --text: #eceff4; --muted: #aab3c4; --fail: #ff9a92; --accent: #88c0d0; --on-accent: #10131a;
   --request: #3d5a78; --strip: #5b4d7a; --action: #3f6350; --container: #6a5640; color-scheme: dark;
 }
 [data-theme='anuppuccin-dark'] {
-  --bg: #1e1e2e; --panel: #181825; --line: #313244; --text: #cdd6f4; --muted: #9399b2; --accent: #89b4fa;
+  --bg: #1e1e2e; --panel: #181825; --line: #313244; --text: #cdd6f4; --muted: #9399b2; --accent: #89b4fa; --on-accent: #10131a;
   --request: #2a3f66; --strip: #4a3a6e; --action: #2e5040; --container: #5a4430; --fail: #f38ba8; color-scheme: dark;
 }
 
 [data-theme='anuppuccin-light'] {
-  --bg: #eff1f5; --panel: #e6e9ef; --line: #ccd0da; --text: #4c4f69; --muted: #6c6f85; --accent: #1e66f5;
-  --request: #d4e1fb; --strip: #e3dcf7; --action: #d9efdf; --container: #f5e6d3; --fail: #d20f39; color-scheme: light;
+  --bg: #eff1f5; --panel: #e6e9ef; --line: #ccd0da; --text: #4c4f69; --muted: #5c5f77; --accent: #1c58e0; --on-accent: #ffffff;
+  --request: #d4e1fb; --strip: #e3dcf7; --action: #d9efdf; --container: #f5e6d3; --fail: #c00c33; color-scheme: light;
 }
 
 /* Colours of the verbs (HTTP methods and message protocols); the light set reads on a light background. */
 :root { --v-GET: #35c58a; --v-POST: #f4b84a; --v-PUT: #60a5fa; --v-PATCH: #b59af7; --v-DELETE: #f06470; --v-QUERY: #e0b0ff; --v-WS: #2dd4bf; --v-SSE: #38bdf8; --v-MQTT: #ff8a5b; --v-KAFKA: #e879f9; --v-AMQP: #a3e635; --v-NATS: #818cf8; --v-GRPC: #5eead4; --v-SQL: #f2c14e; --v-REDIS: #ff6b6b; --v-SQS: #fb923c; --v-SNS: #fb7185; --v-BUS: #4aa8ff; --v-PUBSUB: #22d3ee; --v-OTHER: #a7b3c6; --v-POSTGRES: #6aa3f0; --v-MYSQL: #f0a03c; --v-MARIADB: #d4838f; --v-SQLITE: #5fd0c5; --v-CSV: #7bd88f; --v-XLSX: #3dbb7a; --v-PARQUET: #b79cf7; }
-@media (prefers-color-scheme: light) { :root:not([data-theme]) { --v-GET: #147d57; --v-POST: #8a5700; --v-PUT: #245ddb; --v-PATCH: #7042b8; --v-DELETE: #c43142; --v-QUERY: #8e3fb8; --v-WS: #0f766e; --v-SSE: #0369a1; --v-MQTT: #b4441a; --v-KAFKA: #a21caf; --v-AMQP: #4d7c0f; --v-NATS: #4338ca; --v-GRPC: #0f766e; --v-SQL: #9a6b00; --v-REDIS: #b91c1c; --v-SQS: #b45309; --v-SNS: #be123c; --v-BUS: #0b5cad; --v-PUBSUB: #0e7490; --v-OTHER: #536178; --v-POSTGRES: #2f5fb8; --v-MYSQL: #9a5a00; --v-MARIADB: #a8485a; --v-SQLITE: #0f766e; --v-CSV: #2f7d3c; --v-XLSX: #12784a; --v-PARQUET: #6d3fc4; } }
-:root[data-mode='light'] { --v-GET: #147d57; --v-POST: #8a5700; --v-PUT: #245ddb; --v-PATCH: #7042b8; --v-DELETE: #c43142; --v-QUERY: #8e3fb8; --v-WS: #0f766e; --v-SSE: #0369a1; --v-MQTT: #b4441a; --v-KAFKA: #a21caf; --v-AMQP: #4d7c0f; --v-NATS: #4338ca; --v-GRPC: #0f766e; --v-SQL: #9a6b00; --v-REDIS: #b91c1c; --v-SQS: #b45309; --v-SNS: #be123c; --v-BUS: #0b5cad; --v-PUBSUB: #0e7490; --v-OTHER: #536178; --v-POSTGRES: #2f5fb8; --v-MYSQL: #9a5a00; --v-MARIADB: #a8485a; --v-SQLITE: #0f766e; --v-CSV: #2f7d3c; --v-XLSX: #12784a; --v-PARQUET: #6d3fc4; }
+@media (prefers-color-scheme: light) { :root:not([data-theme]) { --v-GET: #147d57; --v-POST: #8a5700; --v-PUT: #245ddb; --v-PATCH: #7042b8; --v-DELETE: #c43142; --v-QUERY: #8e3fb8; --v-WS: #0f766e; --v-SSE: #0369a1; --v-MQTT: #b4441a; --v-KAFKA: #a21caf; --v-AMQP: #4d7c0f; --v-NATS: #4338ca; --v-GRPC: #0f766e; --v-SQL: #966800; --v-REDIS: #b91c1c; --v-SQS: #b45309; --v-SNS: #be123c; --v-BUS: #0b5cad; --v-PUBSUB: #0e7490; --v-OTHER: #536178; --v-POSTGRES: #2f5fb8; --v-MYSQL: #9a5a00; --v-MARIADB: #a8485a; --v-SQLITE: #0f766e; --v-CSV: #2f7d3c; --v-XLSX: #12784a; --v-PARQUET: #6d3fc4; } }
+:root[data-mode='light'] { --v-GET: #147d57; --v-POST: #8a5700; --v-PUT: #245ddb; --v-PATCH: #7042b8; --v-DELETE: #c43142; --v-QUERY: #8e3fb8; --v-WS: #0f766e; --v-SSE: #0369a1; --v-MQTT: #b4441a; --v-KAFKA: #a21caf; --v-AMQP: #4d7c0f; --v-NATS: #4338ca; --v-GRPC: #0f766e; --v-SQL: #966800; --v-REDIS: #b91c1c; --v-SQS: #b45309; --v-SNS: #be123c; --v-BUS: #0b5cad; --v-PUBSUB: #0e7490; --v-OTHER: #536178; --v-POSTGRES: #2f5fb8; --v-MYSQL: #9a5a00; --v-MARIADB: #a8485a; --v-SQLITE: #0f766e; --v-CSV: #2f7d3c; --v-XLSX: #12784a; --v-PARQUET: #6d3fc4; }
 
 /* Flows have a pill too. */
 :root { --v-FLOW: #e0b0ff; }
@@ -249,8 +294,13 @@ body {
   transition: border-color var(--t-fast) var(--ease-out), box-shadow var(--t-fast) var(--ease-out);
 }
 :where(select, textarea, input):where(:hover:not(:focus, :disabled)) { border-color: var(--line-strong); }
-:where(select, textarea, input):where(:disabled) { opacity: .55; }
+:where(select, textarea, input):where(:disabled) { opacity: var(--op-disabled-field); }
 :where(select, textarea, input)::placeholder { color: var(--muted); }
 /* A select draws the app's own chevron in place of the platform's arrow. The room for it is !important, so a component
    that sets its own padding shorthand cannot put text under the chevron. */
 select { appearance: none; -webkit-appearance: none; padding-right: 26px !important; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='rgb(140 146 158)' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 7px center; background-size: 14px; }
+
+/* ui.hide_sensitive: values marked .sensitive are blurred for a talk or a screenshot. Only a screen filter: the text is
+   still in the page, so it cannot be selected or focused into view by accident, but it is not removed. */
+:root[data-hide-sensitive='true'] .sensitive { filter: blur(6px); user-select: none; }
+:root[data-hide-sensitive='true'] .sensitive :where(input, textarea) { pointer-events: none; }

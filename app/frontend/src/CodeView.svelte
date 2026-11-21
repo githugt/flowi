@@ -1,5 +1,8 @@
 <script lang="ts">
+  import { errorText } from './lib/errors'
+  import { glossary } from './lib/glossary'
   import Button from './Button.svelte'
+  import Tabs, { type TabItem } from './Tabs.svelte'
   // The flow as text: the flow body (editable, applied as one undoable edit)
   // and the Arazzo file saving would write (read-only).
   import { FlowService } from '../bindings/github.com/githugt/flowi/app/internal/bridge'
@@ -22,13 +25,23 @@
   let standalone = $state<StandaloneView | null>(null)
   let standaloneError = $state('')
 
+  const items: TabItem[] = [
+    { id: 'flow', label: 'Flow' },
+    { id: 'file', label: 'Arazzo file', title: glossary.arazzo },
+    { id: 'standalone', label: 'Standalone Arazzo', title: 'The flow and the flows it calls as one Arazzo document for other tools' },
+  ]
+  function pick(id: string) {
+    if (id === 'standalone') showStandalone()
+    else tab = id as 'flow' | 'file'
+  }
+
   async function showStandalone() {
     tab = 'standalone'
     standaloneError = ''
     try {
       standalone = (await FlowService.StandaloneArazzo(view.node)) as unknown as StandaloneView
     } catch (e) {
-      standaloneError = String(e)
+      standaloneError = errorText(e)
     }
   }
   async function saveStandalone() {
@@ -36,7 +49,7 @@
       const file = await FlowService.SaveStandaloneArazzo(view.node)
       if (file) ui.toast(`Saved ${file}.`)
     } catch (e) {
-      standaloneError = String(e)
+      standaloneError = errorText(e)
     }
   }
 
@@ -63,7 +76,7 @@
       problems = applied.problems
       notes = applied.notes
     } catch (e) {
-      problems = [String(e)]
+      problems = [errorText(e)]
     }
     if (problems.length) return false
     edited = false
@@ -100,23 +113,19 @@
 
 <div class="code">
   <div class="bar">
-    <div class="tabs">
-      <button class:active={tab === 'flow'} onclick={() => (tab = 'flow')}>Flow</button>
-      <button class:active={tab === 'file'} onclick={() => (tab = 'file')}>Arazzo file</button>
-      <button class:active={tab === 'standalone'} onclick={showStandalone} title="The flow and the flows it calls as one Arazzo document for other tools">Standalone Arazzo</button>
-    </div>
-    <span class="hint">
-      {#if tab === 'file'}What saving writes. Read-only.{:else if tab === 'standalone'}For other tools: standard steps only, the saved flow and the flows it calls. Read-only.{:else if editable}The flow itself. Apply to change the flow (one undo step).{:else}The flow itself. Read-only while viewing: press Edit to change it.{/if}
-    </span>
-    <span class="spacer"></span>
-    {#if tab === 'standalone' && standalone}
-      <Button onclick={saveStandalone}>Save as…</Button>
-    {/if}
-    {#if tab === 'flow' && editable}
-      <Button disabled={!edited} onclick={discard}>Discard</Button>
-      <Button variant="primary" disabled={!edited} onclick={apply}>Apply</Button>
-    {/if}
+    <Tabs label="The flow as text" size="sm" bare {items} active={tab} onpick={pick}>
+      {#if tab === 'standalone' && standalone}
+        <Button onclick={saveStandalone}>Save as…</Button>
+      {/if}
+      {#if tab === 'flow' && editable}
+        <Button disabled={!edited} onclick={discard}>Discard</Button>
+        <Button variant="primary" disabled={!edited} onclick={apply}>Apply</Button>
+      {/if}
+    </Tabs>
   </div>
+  <p class="hint">
+    {#if tab === 'file'}What saving writes. Read-only.{:else if tab === 'standalone'}For other tools: standard steps only, the saved flow and the flows it calls. Read-only.{:else if editable}The flow itself. Apply to change the flow (one undo step).{:else}The flow itself. Read-only while viewing: press Edit to change it.{/if}
+  </p>
   {#if problems.length}
     <ul class="problems">
       {#each problems as p}<li><button onclick={() => jump(p)}>{p}</button></li>{/each}
@@ -162,21 +171,8 @@
 
 <style>
   .code { position: absolute; inset: 0; display: flex; flex-direction: column; }
-  .bar { display: flex; align-items: center; gap: 8px; padding: 6px 12px; border-bottom: 1px solid var(--line); flex: none; }
-  .tabs { display: flex; gap: 2px; }
-  .hint { color: var(--muted); font-size: var(--fs-sm); }
-  .spacer { flex: 1; }
-  button {
-    background: transparent;
-    color: var(--text);
-    border: 1px solid var(--line);
-    border-radius: var(--r-md);
-    padding: 3px 12px;
-    font: inherit;
-  }
-  button:hover:not(:disabled) { background: var(--raised-3); }
-  button:disabled { opacity: 0.4; }
-  .tabs .active { border-color: var(--accent); }
+  .bar { display: flex; align-items: center; gap: 8px; padding: 0 12px; height: var(--tabbar-h); border-bottom: 1px solid var(--line); flex: none; }
+  .hint { margin: 0; padding: 4px 12px; color: var(--muted); font-size: var(--fs-sm); flex: none; }
   .problems { margin: 0; padding: 6px 12px; list-style: none; background: color-mix(in srgb, var(--fail) 12%, transparent); flex: none; max-height: 140px; overflow: auto; }
   .problems button { background: none; border: 0; color: var(--fail); padding: 1px 0; text-align: left; font: var(--fs-sm) var(--mono); }
   .notes { margin: 0; padding: 6px 12px; list-style: none; background: color-mix(in srgb, var(--warn) 14%, transparent); flex: none; max-height: 120px; overflow: auto; }

@@ -20,6 +20,7 @@ type Setup struct {
 	Blueprints   int
 	Overlays     int
 	WithHooks    int // requests with at least one hook step
+	WithChecks   int // requests with at least one check (an Assert line) in any version
 	TracingOn    bool
 }
 
@@ -58,6 +59,12 @@ func (s *Setup) countRequest(r model.Request) {
 	s.Requests++
 	if len(r.Hooks.Pre)+len(r.Hooks.Post)+len(r.Hooks.Message) > 0 {
 		s.WithHooks++
+	}
+	for _, v := range r.Versions {
+		if len(v.Assert) > 0 {
+			s.WithChecks++
+			break
+		}
 	}
 	// A request is what its first version is: versions of one request do not change its kind.
 	var v model.RequestVersion
@@ -102,11 +109,13 @@ func featureRules() []featureRule {
 			func(s Setup) bool { return s.Collections > 0 && s.Environments == 0 }},
 		{FeatureIdea{"flows", "Chain requests into a flow", "Log in, create something, check it: a flow runs several requests in order and passes values along.", "new-flow", "New flow"},
 			func(s Setup) bool { return s.Requests >= 3 && s.Flows == 0 }},
-		{FeatureIdea{"hooks", "Check responses automatically", "A hook runs after a request: capture a token for the next call, or fail the run when something is wrong.", "open-request", "Open a request"},
+		{FeatureIdea{"hooks", "Run steps before and after a request", "A hook runs around a request: capture a token for the next call, or fail the run when something is wrong.", "open-request", "Open a request"},
 			func(s Setup) bool { return s.Requests > 0 && s.WithHooks == 0 }},
+		{FeatureIdea{"checks", "Check responses automatically", "A check such as response.status == 200 fails the send when the answer is not what you expect, so a broken API shows at once.", "open-request", "Open a request"},
+			func(s Setup) bool { return s.Requests > 0 && s.WithChecks == 0 }},
 		{FeatureIdea{"schedules", "Run a flow on a schedule", "Run a flow every hour or every morning and find out when an API breaks before your users do.", "screen:schedules", "Schedules"},
 			func(s Setup) bool { return s.Flows > 0 && s.Schedules == 0 }},
-		{FeatureIdea{"secrets", "Keep tokens out of your files", "Mark a variable as secret and its value is kept in your system's keychain, never written to the collection.", "screen:secrets", "Secrets"},
+		{FeatureIdea{"secrets", "Keep tokens out of your files", "Mark a variable as secret and its value is kept in Flowi's encrypted vault on this machine, never written to the collection.", "screen:secrets", "Secrets"},
 			func(s Setup) bool { return s.Environments > 0 && s.SecretVars == 0 }},
 		{FeatureIdea{"overlays", "Try a request with changes, without editing it", "An overlay lays changes (another user, a bad input) over a request and leaves the original alone.", "open-request", "Open a request"},
 			func(s Setup) bool { return s.Requests >= 3 && s.Overlays == 0 }},

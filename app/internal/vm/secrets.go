@@ -49,6 +49,7 @@ type Secrets struct {
 	w        *Worker
 	ws       *Workspace
 	rows     []SecretRow
+	vault    flowi.VaultState
 	err      string
 	onChange listeners
 	queue    opQueue
@@ -65,6 +66,9 @@ func (s *Secrets) OnChange(f func()) (remove func()) { return s.onChange.add(f) 
 
 // Rows are the list's lines, grouped by environment.
 func (s *Secrets) Rows() []SecretRow { return s.rows }
+
+// Vault is where the vault stands: open or locked, and when it locks by itself.
+func (s *Secrets) Vault() flowi.VaultState { return s.vault }
 
 // Err is the last problem, or "".
 func (s *Secrets) Err() string { return s.err }
@@ -118,13 +122,14 @@ func (s *Secrets) run(act func() error, done func(error), finish func()) {
 		infos  []flowi.SecretInfo
 		err    error
 		actErr error
+		vault  flowi.VaultState
 	}
 	Run(s.w, func() loaded {
 		actErr := act()
 		infos, err := s.b.Secrets()
-		return loaded{infos, err, actErr}
+		return loaded{infos, err, actErr, s.b.VaultState()}
 	}, func(l loaded) {
-		s.err, s.rows = "", groupSecrets(l.infos)
+		s.err, s.rows, s.vault = "", groupSecrets(l.infos), l.vault
 		switch {
 		case l.err != nil:
 			s.err = ErrorText(l.err)
@@ -152,4 +157,49 @@ func groupSecrets(infos []flowi.SecretInfo) []SecretRow {
 		rows = append(rows, SecretRow{Info: info})
 	}
 	return rows
+}
+
+// Lock forgets the vault's key now and shows the new state. The list is not read again: that would open the vault
+// at once (and ask for the passphrase) to show what it holds.
+func (s *Secrets) Lock() {
+	s.queue.add(func(finish func()) {
+		Run(s.w, func() flowi.VaultState {
+			s.b.LockVault()
+			return s.b.VaultState()
+		}, func(st flowi.VaultState) {
+			s.vault = st
+			s.onChange.fire()
+			finish()
+		})
+	})
+}
+
+// Tick is what a clock calls from time to time: the vault locks when vault.auto_lock says it has been idle long
+// enough, and the change is shown. A vault that stays open only has its countdown refreshed when the window asks
+// (Refresh).
+func (s *Secrets) Tick() {
+	s.queue.add(func(finish func()) {
+		type result struct {
+			locked bool
+			vault  flowi.VaultState
+		}
+		Run(s.w, func() result { return result{s.b.AutoLockVault(), s.b.VaultState()} }, func(r result) {
+			if r.locked || r.vault != s.vault {
+				s.vault = r.vault
+				s.onChange.fire()
+			}
+			finish()
+		})
+	})
+}
+
+// Refresh reads the vault's state again without touching the secrets.
+func (s *Secrets) Refresh() {
+	s.queue.add(func(finish func()) {
+		Run(s.w, s.b.VaultState, func(st flowi.VaultState) {
+			s.vault = st
+			s.onChange.fire()
+			finish()
+		})
+	})
 }

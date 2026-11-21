@@ -124,23 +124,42 @@ function markHttp(text: string, mark: Mark) {
   endBody(text.length)
 }
 
-/** Splits text into runs that share one set of classes. */
+/** Above this many characters a text is shown plain: colouring a very large body costs more than it is worth. */
+export const HIGHLIGHT_LIMIT = 200_000
+
+/**
+ * Splits text into runs that share one set of classes. Each character holds the number of its class in a typed array
+ * (a later mark wins), and the runs are cut out of the text as slices.
+ * Before: one string cell per character and one concatenation per character, which made a 256 KiB body slow.
+ */
 export function highlight(text: string, lang: CodeLang): Segment[] {
-  const classes: string[] = new Array(text.length).fill('')
-  const mark: Mark = (from, to, cls) => {
-    for (let i = from; i < to; i++) classes[i] = cls
+  if (!text) return []
+  if (text.length > HIGHLIGHT_LIMIT) return [{ text, cls: '' }]
+  const names: string[] = ['']
+  const ids = new Map<string, number>([['', 0]])
+  const idOf = (cls: string) => {
+    let id = ids.get(cls)
+    if (id === undefined) {
+      id = names.length
+      names.push(cls)
+      ids.set(cls, id)
+    }
+    return id
   }
+  const classes = new Uint16Array(text.length)
+  const mark: Mark = (from, to, cls) => classes.fill(idOf(cls), Math.max(0, from), Math.min(text.length, to))
   if (lang === 'curl') markCurl(text, mark)
   else if (lang === 'http') markHttp(text, mark)
   else if (lang !== 'text') highlightTree(parsers[lang].parse(text), classHighlighter, mark)
-  for (const m of text.matchAll(templatePattern)) {
-    for (let i = m.index; i < m.index + m[0].length; i++) classes[i] = 'tok-template'
-  }
+  const template = idOf('tok-template')
+  for (const m of text.matchAll(templatePattern)) classes.fill(template, m.index, m.index + m[0].length)
   const out: Segment[] = []
-  for (let i = 0; i < text.length; i++) {
-    const last = out[out.length - 1]
-    if (last && last.cls === classes[i]) last.text += text[i]
-    else out.push({ text: text[i], cls: classes[i] })
+  let from = 0
+  for (let i = 1; i <= text.length; i++) {
+    if (i === text.length || classes[i] !== classes[from]) {
+      out.push({ text: text.slice(from, i), cls: names[classes[from]] })
+      from = i
+    }
   }
   return out
 }

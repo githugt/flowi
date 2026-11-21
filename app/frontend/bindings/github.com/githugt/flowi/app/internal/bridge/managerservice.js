@@ -20,14 +20,27 @@ import * as model$0 from "../../../lib/model/models.js";
 import * as $models from "./models.js";
 
 /**
- * ApplySpecUpdate applies the update last previewed for the spec, replacing
- * the files it rewrites (requests are merged with their edits).
- * @param {string} collection
- * @param {string} name
+ * AllowSecretHost lets secrets be sent to a host the selected environment does not name: it goes on the person's own
+ * list (secrets.allowed_hosts), which a collection cannot change. A refusal (not a host) comes back as the error.
+ * @param {string} host
  * @returns {$CancellablePromise<void>}
  */
-export function ApplySpecUpdate(collection, name) {
-    return $Call.ByID(1917256466, collection, name);
+export function AllowSecretHost(host) {
+    return $Call.ByID(2587692283, host);
+}
+
+/**
+ * ApplySpecUpdate applies the update last previewed for the spec, replacing
+ * the files it rewrites (requests are merged with their edits). source is the
+ * one the preview was of: an update never applies a different document than the
+ * one the person looked at.
+ * @param {string} collection
+ * @param {string} name
+ * @param {string} source
+ * @returns {$CancellablePromise<void>}
+ */
+export function ApplySpecUpdate(collection, name, source) {
+    return $Call.ByID(1917256466, collection, name, source);
 }
 
 /**
@@ -51,7 +64,7 @@ export function KeptSpecs(collection) {
 }
 
 /**
- * Mount mounts the collection in dir.
+ * Mount mounts the collection in dir. A refusal comes back as the error.
  * @param {string} dir
  * @returns {$CancellablePromise<void>}
  */
@@ -90,9 +103,19 @@ export function OpenBundle(path) {
 }
 
 /**
+ * OpenExample opens the example collection with a demo server of its own (made in this process, on a free port, gone
+ * when the app quits) and a "demo" environment that points at it, so its flows run with nothing set up.
+ * @returns {$CancellablePromise<void>}
+ */
+export function OpenExample() {
+    return $Call.ByID(345364362);
+}
+
+/**
  * PreviewSpecUpdate previews importing the kept spec name again: from the
  * kept copy when source is "", else from a newer document at source (a
- * file or an http(s) URL), which then becomes the kept copy.
+ * file or an http(s) URL), which then becomes the kept copy. For a newer
+ * spec the preview also says what it would break in the collection's flows.
  * @param {string} collection
  * @param {string} name
  * @param {string} source
@@ -112,6 +135,18 @@ export function PreviewSpecUpdate(collection, name, source) {
  */
 export function Relocate(id, dir) {
     return $Call.ByID(1400227599, id, dir);
+}
+
+/**
+ * RepoAdvice says what to do about the generated files of a collection kept in a git repository (empty when
+ * nothing needs doing, or the collection is not in a repository).
+ * @param {string} id
+ * @returns {$CancellablePromise<string[]>}
+ */
+export function RepoAdvice(id) {
+    return $Call.ByID(2692214068, id).then(/** @type {($result: any) => any} */(($result) => {
+        return $$createType3($result);
+    }));
 }
 
 /**
@@ -142,7 +177,7 @@ export function SetVariables(collection, rows, dropComments) {
  */
 export function State() {
     return $Call.ByID(3250375241).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType3($result);
+        return $$createType4($result);
     }));
 }
 
@@ -162,7 +197,7 @@ export function Unmount(id) {
  */
 export function Variables(collection) {
     return $Call.ByID(501735277, collection).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType5($result);
+        return $$createType6($result);
     }));
 }
 
@@ -170,6 +205,7 @@ export function Variables(collection) {
 const $$createType0 = $models.KeptSpecView.createFrom;
 const $$createType1 = $Create.Array($$createType0);
 const $$createType2 = $models.SpecUpdateView.createFrom;
-const $$createType3 = $models.ManagerView.createFrom;
-const $$createType4 = model$0.KeyValue.createFrom;
-const $$createType5 = $Create.Array($$createType4);
+const $$createType3 = $Create.Array($Create.Any);
+const $$createType4 = $models.ManagerView.createFrom;
+const $$createType5 = model$0.KeyValue.createFrom;
+const $$createType6 = $Create.Array($$createType5);

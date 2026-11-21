@@ -1,4 +1,5 @@
 <script lang="ts">
+  import Popover from './Popover.svelte'
   import Button from './Button.svelte'
   // What the flow has to tell: errors, steps out of order, Flowi-only steps,
   // a change on disk, unsaved edits. A chip opens its message under it.
@@ -7,6 +8,7 @@
 
   let { view }: { view: FlowView } = $props()
   let open = $state<string | null>(null)
+  let at = $state({ x: 0, y: 0 })
   const node = $derived(view.node)
 
   const label = (c: Chip) =>
@@ -19,14 +21,12 @@
     })[c.kind]
 </script>
 
-<svelte:window onpointerdown={() => (open = null)} />
-
 <div class="chips">
   {#each view.chips as c (c.kind)}
     <span class="chip">
-      <button class={c.kind} onpointerdown={(e) => e.stopPropagation()} onclick={() => (open = open === c.kind ? null : c.kind)}>{label(c)}</button>
+      <button class={c.kind} aria-haspopup="dialog" aria-expanded={open === c.kind} onclick={(e) => { const r = e.currentTarget.getBoundingClientRect(); at = { x: r.left, y: r.bottom }; open = open === c.kind ? null : c.kind }}>{label(c)}</button>
       {#if open === c.kind && c.kind !== 'unsaved'}
-        <div class="pop" role="dialog" tabindex="-1" onpointerdown={(e) => e.stopPropagation()}>
+        <Popover x={at.x} y={at.y} width={320} height={160} label={label(c)} onclose={() => (open = null)}>
           {#if c.kind === 'error'}
             <p>{c.text}</p>
           {:else if c.kind === 'needs'}
@@ -38,7 +38,7 @@
             <p>This file changed on disk.</p>
             <Button variant="primary" small onclick={() => { open = null; FlowService.Revert(node) }}>Load from disk</Button>
           {/if}
-        </div>
+        </Popover>
       {/if}
     </span>
   {/each}
@@ -46,12 +46,10 @@
 
 <style>
   .chips { display: flex; gap: 6px; flex: none; }
-  .chip > button { white-space: nowrap; }
   .chip { position: relative; }
-  .chip > button { border-radius: var(--r-pill); padding: 1px 10px; font: inherit; font-size: var(--fs-xs); background: transparent; border: 1px solid var(--line); color: var(--muted); }
+  .chip > button { white-space: nowrap; border-radius: var(--r-pill); padding: 1px 10px; font: inherit; font-size: var(--fs-xs); background: transparent; border: 1px solid var(--line); color: var(--muted); }
   .error, .needs { color: var(--fail) !important; border-color: var(--fail) !important; }
   .warning, .disk { color: var(--warn) !important; border-color: var(--warn) !important; }
   .unsaved { color: var(--accent) !important; }
-  .pop { position: absolute; top: 100%; left: 0; margin-top: 6px; width: 320px; padding: 10px 12px; background: var(--raised); border: 1px solid var(--line); border-radius: var(--r-lg); box-shadow: var(--shadow); z-index: 25; font-size: var(--fs-sm); }
-  .pop p { margin: 0 0 6px; line-height: 1.45; }
+  p { margin: 0; font-size: var(--fs-sm); line-height: 1.45; }
 </style>

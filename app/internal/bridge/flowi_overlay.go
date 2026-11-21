@@ -5,6 +5,7 @@ package bridge
 import (
 	"fmt"
 	"os"
+	"slices"
 
 	flowi "github.com/githugt/flowi/lib"
 	"github.com/githugt/flowi/lib/flowioverlay"
@@ -171,6 +172,53 @@ func (s *RequestService) SaveFlowiOverlayText(node, name, text string) string {
 	}
 	s.refreshFlowiOverlays()
 	return ""
+}
+
+// FlowiOverlayUses lists the flows of the request's collection that have a step laying the flowi overlay name over a
+// request, by flow path, so the delete dialog can say what will stop finding it.
+//
+// Before: the dialog said only that responses stay in the data folder; the flows that name the overlay found out when
+// they next ran.
+func (s *RequestService) FlowiOverlayUses(node, name string) ([]string, error) {
+	collection, err := s.collectionOf(node)
+	if err != nil {
+		return nil, err
+	}
+	var uses []string
+	s.app.actor.Do(func() {
+		for _, c := range s.app.workspace.Collections() {
+			if c.Manifest.ID == collection {
+				uses = flowsUsingOverlay(c, name)
+			}
+		}
+	})
+	return uses, nil
+}
+
+// flowsUsingOverlay is the paths of the flows of c with a request step that names the overlay, sorted, once each.
+func flowsUsingOverlay(c model.Collection, name string) []string {
+	out := []string{}
+	for _, f := range c.Flows {
+		if nodesUseOverlay(f.Nodes, name) {
+			out = append(out, f.Path)
+		}
+	}
+	slices.Sort(out)
+	return out
+}
+
+func nodesUseOverlay(list []model.Node, name string) bool {
+	for _, n := range list {
+		if n.Request != nil && n.Request.Overlay == name {
+			return true
+		}
+		for _, child := range n.Children() {
+			if nodesUseOverlay(child, name) {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // DeleteFlowiOverlay removes the flowi overlay name. Responses kept for it stay.

@@ -145,10 +145,12 @@ func newOperation(r model.Request, v model.RequestVersion, id string) operation 
 		}
 	}
 	for _, kv := range v.Query {
-		op.query = appendUnique(op.query, kv.Key)
+		if !kv.Disabled {
+			op.query = appendUnique(op.query, kv.Key)
+		}
 	}
 	for _, kv := range v.Headers {
-		if k := strings.ToLower(kv.Key); k != "content-type" && k != "accept" {
+		if k := strings.ToLower(kv.Key); k != "content-type" && k != "accept" && !kv.Disabled {
 			op.headers = appendUnique(op.headers, kv.Key)
 		}
 	}
@@ -301,7 +303,8 @@ func parametersOf(op operation) []any {
 
 func requestBodyOf(op operation, schemas SchemaLookup) any {
 	b := op.version.Body
-	media, schema := "", any(yaml.MapSlice{})
+	var media string
+	schema := any(yaml.MapSlice{})
 	switch {
 	case b.JSON != "":
 		media = "application/json"

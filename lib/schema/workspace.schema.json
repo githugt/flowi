@@ -78,6 +78,14 @@
           },
           "disabled": {
             "type": "boolean"
+          },
+          "on_failure": {
+            "type": "string",
+            "description": "Where to tell when a run fails: an http(s) address that gets a Slack-compatible JSON POST, or env:NAME to read it from that environment variable."
+          },
+          "on_success": {
+            "type": "string",
+            "description": "Where to tell when a run passes: as on_failure."
           }
         }
       }

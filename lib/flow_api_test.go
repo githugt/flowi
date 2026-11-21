@@ -274,3 +274,61 @@ func TestCheckFlowDraft_Given_a_sound_flow_Then_nothing_is_reported(t *testing.T
 		t.Fatalf("got %v", got)
 	}
 }
+
+// Before: a save wrote over whatever was on disk, so a change made by an editor or git after the flow was opened was lost
+// without a word.
+func TestSaveFlow_Given_the_file_changed_since_it_was_loaded_When_saving_with_Expect_Then_FLW_WRITE_005_and_the_file_is_kept(t *testing.T) {
+	w := demoWorkspace(t)
+	target, f := userCreation(t, w)
+	loaded, err := w.FlowSum(target)
+	if err != nil || loaded == "" {
+		t.Fatalf("sum %q err %v", loaded, err)
+	}
+	data, _ := os.ReadFile(f.File)
+	changed := strings.Replace(string(data), "\n", "\n\n", 1) // an outside edit, no comments added
+	if err := os.WriteFile(f.File, []byte(changed), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	f.Description = "Mine."
+
+	err = w.SaveFlow(target, f, SaveOptions{Expect: loaded})
+
+	after, _ := os.ReadFile(f.File)
+	if codes := codesOfErr(err); !slices.Equal(codes, []diag.Code{diag.CodeWriteChangedOnDisk}) || string(after) != changed {
+		t.Fatalf("got %v, file kept: %v", err, string(after) == changed)
+	}
+}
+
+func TestSaveFlow_Given_an_unchanged_file_or_no_Expect_Then_it_saves(t *testing.T) {
+	w := demoWorkspace(t)
+	target, f := userCreation(t, w)
+	loaded, _ := w.FlowSum(target)
+	f.Description = "First."
+	first := w.SaveFlow(target, f, SaveOptions{Expect: loaded})
+	stale := w.SaveFlow(target, f, SaveOptions{Expect: loaded}) // the first save changed the file: this one is stale
+	overwrite := w.SaveFlow(target, f, SaveOptions{})           // no Expect: an overwrite on purpose
+
+	if first != nil || overwrite != nil || !slices.Equal(codesOfErr(stale), []diag.Code{diag.CodeWriteChangedOnDisk}) {
+		t.Fatalf("first %v stale %v overwrite %v", first, stale, overwrite)
+	}
+}
+
+func TestFlowSource_Given_only_some_steps_Then_the_text_reads_back_as_those_steps_and_a_url_is_not_steps(t *testing.T) {
+	// Before: the app copied steps to the clipboard through this text with nothing showing it holds up for a flow
+	// that is only steps, or that a stray paste is refused.
+	w := demoWorkspace(t)
+	c := w.Collections()[0]
+	target := FlowTarget{Collection: c.Manifest.ID, Flow: c.Flows[0].ID}
+	some := model.Flow{Nodes: c.Flows[0].Nodes[:1]}
+
+	text, err := w.FlowSource(target, some)
+	back, diags, readErr := w.ParseFlowSource(target, text.Flow)
+	_, junk, _ := w.ParseFlowSource(target, "https://example.com/x")
+
+	if err != nil || readErr != nil || diags.HasErrors() || len(back.Nodes) != 1 || back.Nodes[0].ID != some.Nodes[0].ID {
+		t.Fatalf("text %q: read back %d nodes, %v, %v, %v", text.Flow, len(back.Nodes), diags, err, readErr)
+	}
+	if !junk.HasErrors() {
+		t.Error("a url was read as steps")
+	}
+}

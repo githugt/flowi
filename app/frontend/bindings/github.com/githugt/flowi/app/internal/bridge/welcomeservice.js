@@ -35,6 +35,14 @@ export function Dismiss(id) {
 }
 
 /**
+ * DismissUpgrade remembers that the release notes of this build were read; the Home strip goes away.
+ * @returns {$CancellablePromise<void>}
+ */
+export function DismissUpgrade() {
+    return $Call.ByID(4032092507);
+}
+
+/**
  * Home counts the workspace as it is now. The page asks again when the workspace changes.
  * @returns {$CancellablePromise<$models.HomeView>}
  */

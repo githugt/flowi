@@ -19,7 +19,7 @@ import (
 // offers it. field says where it goes: "with.<name>" or "headers.<name>" of a
 // request or flow step, "param.<name>" of any step, "values.<n>" for the value
 // row n of a set step. It is refused, with the reason, when toStep cannot read
-// what fromStep makes (it runs before it, or in another lane); nothing changes
+// what fromStep makes (it runs before it, or in another branch); nothing changes
 // then.
 func (s *FlowService) ConnectData(node, fromStep, outPath, toStep, field string) error {
 	return s.edit(node, func(o *openFlow) error {
@@ -227,4 +227,39 @@ func cmpOr(a, b string) string {
 		return a
 	}
 	return b
+}
+
+// WireChildView is one thing inside the value a wire would take, to click.
+type WireChildView struct {
+	Name   string `json:"name"`
+	Path   string `json:"path"` // what to take to read it
+	Sample string `json:"sample"`
+	Branch bool   `json:"branch"` // it holds more to click into
+}
+
+// WirePreviewView is what taking a path of a step would pass, by the step's last run.
+type WirePreviewView struct {
+	Ran      bool            `json:"ran"`   // the step has run: without a run there is nothing to show
+	Found    bool            `json:"found"` // the last run's values have something at the path
+	Text     string          `json:"text"`
+	Children []WireChildView `json:"children"`
+}
+
+// WirePreview reads path in the values step `from` made in the last run, for the wire dialog's live preview and the
+// tree to click through. An empty step (the flow's own input) has no run to read.
+func (s *FlowService) WirePreview(node, from, path string) WirePreviewView {
+	out := WirePreviewView{Children: []WireChildView{}}
+	if from == "" {
+		return out
+	}
+	_ = s.edit(node, func(o *openFlow) error {
+		d, ran := o.run.Detail(from)
+		p := vm.PreviewWire(d, ran, path)
+		out.Ran, out.Found, out.Text = p.Ran, p.Found, p.Text
+		for _, c := range p.Children {
+			out.Children = append(out.Children, WireChildView{Name: c.Name, Path: c.Path, Sample: c.Sample, Branch: c.Branch})
+		}
+		return nil
+	})
+	return out
 }

@@ -5,12 +5,18 @@
   import Icon from './Icon.svelte'
   import type { Face, Unit } from './lib/types'
   import { verbKey } from './lib/verbs'
-  import { CARD, COLOUR_NAMES, categoryToken, clipText, colourToken, portToken, rowIcon, typeIcon } from './lib/card'
+  import { CARD, COLOUR_NAMES, categoryToken, colourToken, portToken, rowIcon, typeIcon } from './lib/card'
+  import { clipWidth } from './lib/measure'
+  import { PORT_HIT, startsLink } from './lib/porthit'
+  import type { Detail } from './lib/detail'
+  import { stepMark } from './lib/stepstate'
+  import { placeGuards } from './lib/guards'
 
   let {
     u,
     face,
     title,
+    tip = '',
     selected = false,
     status = '',
     result = '',
@@ -27,10 +33,13 @@
     onaddon,
     pickedPorts = [],
     ondataport,
+    detail = 'full',
+    portR = 6,
   }: {
     u: Unit
     face: Face
     title: string
+    tip?: string // the tooltip of the title: the step's id and description
     selected?: boolean
     status?: string
     result?: string
@@ -47,9 +56,13 @@
     pickedPorts?: string[] // outcome ports picked together with shift-click: dragging one takes them all
     onaddon?: (port: string, e: MouseEvent) => void // the + beside a port was clicked: add a step that runs on that outcome
     ondataport?: (e: PointerEvent) => void // …on the data port: a value wire starts
+    detail?: Detail // 'tile' when zoomed far out: a big title and the status mark, no rows, labels or sub-line
+    portR?: number // the radius of a port, larger when zoomed out so it can still be hit
   } = $props()
+  const tiled = $derived(detail === 'tile')
 
   const w = $derived(u.headW || u.w)
+  const mark = $derived(stepMark(status))
   const h = $derived(u.headH || u.h)
   const type = $derived(u.types[0] ?? '')
   const tile = $derived(colourToken(type, colour))
@@ -60,7 +73,8 @@
   const headX = $derived(chipInHeader ? 12 + chipW + 10 : 50)
   const badgeW = $derived(face.badge ? 10 + face.badge.length * 7.4 : 0)
   const subX = $derived(14 + (face.badge && !chipInHeader ? badgeW + 8 : 0))
-  const subChars = $derived(Math.max(8, Math.floor((w - subX - 14) / 7.2)))
+  const guards = $derived(placeGuards(face.guards, w, subX))
+  const subChars = $derived(Math.max(8, Math.floor((w - subX - 14 - guards.used) / 7.2)))
   const NAMES: Record<string, string> = {
     inputs: 'Inputs', send: 'Message', receive: 'Receive', connection: 'Connection', hooks: 'Hooks',
     settings: 'Settings', values: 'Values', checks: 'Checks', steps: 'Steps', message: 'Message',
@@ -90,6 +104,8 @@
 </script>
 
 <g class="stepcard {status}" class:selected class:skipped role="group" aria-label={`${title}, ${type}`}>
+  <!-- A ring outside the card marks the selected one, so a card that failed keeps its red edge and still reads as chosen. -->
+  {#if selected}<rect class="selring" x="-4" y="-4" width={w + 8} height={h + 8} rx="18" />{/if}
   <rect class="body" width={w} height={h} rx="14" />
   <!-- The header is a band a step lighter than the card; a step that has run tints it with how it went. -->
   <path class="band" d={`M0,${CARD.header} V14 a14,14 0 0 1 14,-14 H${w - 14} a14,14 0 0 1 14,14 V${CARD.header} Z`} />
@@ -111,55 +127,65 @@
     <rect class="tile" x="12" y="9" width="28" height="28" rx="8" style:fill={`var(${tile})`} />
     <g class="tileicon" transform="translate(16 13)" style:color={colour ? 'var(--on-tile)' : 'var(--text)'}><Icon name={typeIcon(type)} size={20} /></g>
   {/if}
-  <text class="title" x={headX} y="28">{clipText(title, Math.floor((w - headX - 30) / 7.6))}<title>{title}</title></text>
+  <text class="title" class:big={tiled} x={headX} y={tiled ? 31 : 28}>{clipWidth(title, Math.floor((w - headX - 30) / (tiled ? 11 : 7.6)))}<title>{tip || title}</title></text>
   <!-- How it went is a shape as well as a colour: a tick, a cross, or a ring for a step still running. -->
-  {#if status}
+  {#if mark !== 'none'}
     <g class="state {status}" transform={`translate(${w - 28} 12)`} aria-hidden="true">
-      {#if status === 'passed'}
+      {#if mark === 'tick'}
         <circle cx="10" cy="10" r="9" /><path d="M5.8,10.4 L8.8,13.2 L14.4,7.2" />
-      {:else if status === 'failed' || status === 'error' || status === 'aborted'}
+      {:else if mark === 'cross'}
         <circle cx="10" cy="10" r="9" /><path d="M6.8,6.8 L13.2,13.2 M13.2,6.8 L6.8,13.2" />
+      {:else if mark === 'dash'}
+        <circle cx="10" cy="10" r="9" /><path d="M6,10 L14,10" />
       {:else}
         <circle class="ring" cx="10" cy="10" r="7" />
       {/if}
     </g>
   {/if}
 
-  <g transform={`translate(0 ${CARD.header})`}>
+  {#if !tiled}<g transform={`translate(0 ${CARD.header})`}>
     {#if face.badge && !chipInHeader}
       <rect class="badge" x="14" y="4" width={badgeW} height="19" rx="5" />
       <text class="badgetext" x={14 + badgeW / 2} y="17.5" text-anchor="middle">{face.badge}</text>
     {/if}
-    <text class="subtext" x={subX} y="18">{clipText(face.subline, subChars)}<title>{face.subline}</title></text>
-  </g>
+    <text class="subtext" x={subX} y="18">{clipWidth(face.subline, subChars)}<title>{face.subline}</title></text>
+    {#each guards.chips as gd (gd.glyph)}
+      <g class="guard"><rect x={gd.x} y="4" width={gd.w} height="19" rx="5" /><text x={gd.x + gd.w / 2} y="17.5" text-anchor="middle">{gd.glyph}</text><title>{gd.tip}</title></g>
+    {/each}
+  </g>{/if}
 
-  {#each face.rows as row, i (row.key + i)}
+  {#each tiled ? [] : face.rows as row, i (row.key + i)}
     {@const y = rowsTop + i * CARD.row}
     <g class="row" role="button" tabindex="-1" aria-label={`${nameOf(row.key)}: ${row.summary}`}
       onpointerdown={(e) => e.stopPropagation()} onclick={() => onrow?.(row.key)} onkeydown={() => {}}>
       <title>{`${nameOf(row.key)}: ${row.summary}`}</title>
       <rect class="rowhit" x="6" {y} width={w - 12} height={CARD.row} rx="8" />
       <g class="rowicon" transform={`translate(16 ${y + 9})`}><Icon name={rowIcon(row.key)} size={16} /></g>
-      <text class="rowtext" x="42" y={y + 22}>{clipText(row.summary, Math.floor((w - 42 - 34) / 7.2))}</text>
+      <text class="rowtext" x="42" y={y + 22}>{clipWidth(row.summary, Math.floor((w - 42 - 34) / 7.2))}</text>
       <path class="chev" d={`M${w - 26},${y + 13} l5,4 l-5,4`} />
     </g>
   {/each}
 
   {#each face.ports as p, i (p.id)}
     {@const py = CARD.inPort + i * CARD.portGap}
-    <circle class="port {p.tone}" class:picked={pickedPorts.includes(p.id)} cx={w} cy={py} r="6" style:stroke={`var(${portToken(p)})`}
-      role="button" tabindex="-1" aria-label={p.label} onpointerdown={(e) => (p.id === 'done' || p.id === 'fail' || p.id.startsWith('outcome-')) && onport?.(e, p.id)}>
+    <!-- An invisible target of 24px behind the port: the circle itself is 12px, too small to hit. -->
+    <circle class="porthit" cx={w} cy={py} r={PORT_HIT} aria-hidden="true" onpointerdown={(e) => startsLink(p.id) && onport?.(e, p.id)} />
+    <circle class="port {p.tone}" class:picked={pickedPorts.includes(p.id)} cx={w} cy={py} r={portR} style:stroke={`var(${portToken(p)})`}
+      role="button" tabindex="-1" aria-label={p.label} onpointerdown={(e) => startsLink(p.id) && onport?.(e, p.id)}>
       <title>{(p.description ? p.description + '. ' : '') + (p.id === 'done' ? 'Drag onto another step to make it wait for this one' : p.id === 'fail' ? 'Drag onto a step to run it when this one fails' : p.id.startsWith('outcome-') ? `Drag onto a step to run it on ${p.label}` : p.label)}</title>
     </circle>
-    {#if p.tone === 'case' && oncase}
+    {#if tiled}
+      <!-- zoomed out: the port is a dot, its label unreadable -->
+    {:else if p.tone === 'case' && oncase}
       <text class="portlabel edit" x={w + 12} y={py + 4} style:fill={`var(${portToken(p)})`} role="button" tabindex="-1" aria-label={`Edit the test ${p.label}`}
-        onpointerdown={(e) => e.stopPropagation()} onclick={(e) => oncase(Number(p.id.replace('case-', '')), e)} onkeydown={() => {}}>{clipText(p.label, 22)}<title>Edit this test</title></text>
-    {:else if p.tone !== 'done'}<text class="portlabel" x={w + 12} y={py + 4} style:fill={`var(${portToken(p)})`}>{clipText(p.label, 22)}</text>{/if}
+        onpointerdown={(e) => e.stopPropagation()} onclick={(e) => oncase(Number(p.id.replace('case-', '')), e)} onkeydown={() => {}}>{clipWidth(p.label, 22)}<title>Edit this test</title></text>
+    {:else if p.tone !== 'done'}<text class="portlabel" x={w + 12} y={py + 4} style:fill={`var(${portToken(p)})`}>{clipWidth(p.label, 22)}</text>{/if}
     <!-- a + beside the failure and each named outcome: a new step that runs on it, joined by an arrow of that outcome -->
-    {#if onaddon && (p.tone === 'fail' || p.tone === 'outcome')}
+    {#if !tiled && onaddon && (p.tone === 'fail' || p.tone === 'outcome')}
       {@const px = w + 24 + Math.min(p.label.length, 22) * 7.4}
       <g class="portadd" role="button" tabindex="-1" aria-label={`Add a step that runs on ${p.label}`} onpointerdown={(e) => e.stopPropagation()} onclick={(e) => onaddon(p.id, e)} onkeydown={() => {}}>
         <title>{`Add a step that runs on ${p.label}`}</title>
+        <circle class="addhit" cx={px} cy={py} r={PORT_HIT} />
         <circle cx={px} cy={py} r="8" style:stroke={`var(${portToken(p)})`} />
         <path d={`M${px - 3.5},${py} h7 M${px},${py - 3.5} v7`} style:stroke={`var(${portToken(p)})`} />
       </g>
@@ -178,7 +204,7 @@
   {/if}
 
   {#if note}
-    <g class="note"><rect x="10" y="-34" width={w - 20} height="26" rx="8" /><text x="20" y="-17">{clipText(note, Math.floor((w - 40) / 6.2))}<title>{note}</title></text></g>
+    <g class="note"><rect x="10" y="-34" width={w - 20} height="26" rx="8" /><text x="20" y="-17">{clipWidth(note, Math.floor((w - 40) / 6.2))}<title>{note}</title></text></g>
   {/if}
   {#if toolbar}
     <g class="toolbar" transform={`translate(0 ${barTop})`} role="toolbar" aria-label="Step tools">
@@ -215,12 +241,14 @@
 </g>
 
 <style>
-  .body { fill: var(--panel); stroke: var(--line-strong); stroke-width: 1; filter: drop-shadow(0 1px 1px rgb(0 0 0 / 0.3)) drop-shadow(0 6px 14px rgb(0 0 0 / 0.22)); transition: stroke var(--t-base) var(--ease-out), filter var(--t-base) var(--ease-out); }
+  .body { fill: var(--panel); stroke: var(--line-strong); stroke-width: 1; filter: var(--float-node); transition: stroke var(--t-base) var(--ease-out), filter var(--t-base) var(--ease-out); }
   .band { fill: var(--raised); pointer-events: none; }
   .bandline { stroke: var(--line); stroke-width: 1; pointer-events: none; }
   .passed .band { fill: color-mix(in srgb, var(--ok) 11%, var(--raised)); }
   .failed .band, .error .band, .aborted .band { fill: color-mix(in srgb, var(--fail) 14%, var(--raised)); }
   .running .band { fill: color-mix(in srgb, var(--accent) 12%, var(--raised)); }
+  .stepcard:hover .body { filter: var(--float-node-hover); }
+  .selring { fill: none; stroke: var(--accent); stroke-width: 2; opacity: 0.85; pointer-events: none; }
   .selected .body { stroke: var(--accent); stroke-width: 1.6; filter: drop-shadow(0 0 0 transparent) drop-shadow(0 0 10px color-mix(in srgb, var(--accent) 45%, transparent)); }
   .passed .body { stroke: color-mix(in srgb, var(--ok) 55%, var(--line-strong)); }
   .failed .body, .error .body, .aborted .body { stroke: var(--fail); stroke-width: 1.6; }
@@ -229,14 +257,22 @@
   .state circle { fill: var(--ok); stroke: none; }
   .state path { fill: none; stroke: var(--on-tile); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
   .state.failed circle, .state.error circle, .state.aborted circle { fill: var(--fail); }
+  .state.cancelled circle, .state.skipped circle { fill: var(--muted); }
   .state circle.ring { fill: none; stroke: var(--accent); stroke-width: 2.2; stroke-dasharray: 22 22; stroke-linecap: round; }
   .hatch { fill: url(#skiphatch); pointer-events: none; }
   .skipped .body { stroke-dasharray: 5 4; }
+  /* Forced colours drop the shadows and the status tints: the edges are drawn in the system's own colours. */
+  @media (forced-colors: active) {
+    .body { stroke: CanvasText; filter: none; }
+    .failed .body, .error .body, .aborted .body { stroke-width: 3; }
+    .selring { stroke: Highlight; stroke-width: 3; opacity: 1; }
+    .band { fill: Canvas; }
+  }
   .bpdot { fill: var(--fail); stroke: var(--bg); stroke-width: 2; pointer-events: none; }
-  .skiptag { fill: var(--muted); font-size: 12px; font-weight: 600; pointer-events: none; }
+  .skiptag { fill: var(--muted); font-size: var(--cv-sm); font-weight: 600; pointer-events: none; }
   .note rect { fill: color-mix(in srgb, var(--warn, var(--fail)) 18%, var(--panel)); stroke: var(--warn, var(--fail)); stroke-width: 1; }
-  .note text { fill: var(--text); font-size: 12.5px; pointer-events: none; }
-  .bar { fill: var(--panel); stroke: var(--line); stroke-width: 1.2; filter: drop-shadow(0 2px 8px rgb(0 0 0 / 0.28)); }
+  .note text { fill: var(--text); font-size: var(--cv-sm); pointer-events: none; }
+  .bar { fill: var(--panel); stroke: var(--line); stroke-width: 1.2; filter: var(--float); }
   .tool { cursor: pointer; }
   .tool rect { fill: transparent; }
   .tool:hover rect, .tool.on rect { fill: var(--tint-hover); }
@@ -249,18 +285,23 @@
   .tile { stroke: none; }
   .verbtile { fill: color-mix(in srgb, var(--v) 16%, var(--raised)); stroke: color-mix(in srgb, var(--v) 50%, transparent); stroke-width: 1; }
   .tileicon { pointer-events: none; }
-  .chip { font-size: 12px; font-weight: 700; letter-spacing: 0.04em; pointer-events: none; }
-  .title { fill: var(--text); font-size: 14px; font-weight: 600; pointer-events: none; }
+  .chip { font-size: var(--cv-sm); font-weight: 700; letter-spacing: 0.04em; pointer-events: none; }
+  .title { fill: var(--text); font-size: var(--cv-lg); font-weight: 600; pointer-events: none; }
+  .title.big { font-size: var(--cv-tile); }
   .badge { fill: color-mix(in srgb, var(--accent) 24%, transparent); }
-  .badgetext { fill: var(--accent); font-size: 11px; font-weight: 700; letter-spacing: 0.04em; pointer-events: none; }
-  .subtext { fill: var(--muted); font-size: 13px; pointer-events: none; }
+  .badgetext { fill: var(--accent); font-size: var(--cv-xs); font-weight: 700; letter-spacing: 0.04em; pointer-events: none; }
+  .subtext { fill: var(--muted); font-size: var(--cv-md); pointer-events: none; }
+  .guard rect { fill: color-mix(in srgb, var(--warn) 20%, transparent); }
+  .guard text { fill: var(--text); font-size: var(--cv-xs); font-weight: 600; }
   .row { cursor: pointer; }
   .rowhit { fill: transparent; }
   .row:hover .rowhit { fill: var(--tint-hover); }
   .rowicon { color: var(--muted); pointer-events: none; }
-  .rowtext { fill: var(--text); font-size: 13.5px; pointer-events: none; }
+  .rowtext { fill: var(--text); font-size: var(--cv-md); pointer-events: none; }
   .chev { fill: none; stroke: var(--muted); stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; opacity: 0; pointer-events: none; }
   .row:hover .chev { opacity: 1; }
+  .porthit, .addhit { fill: transparent; stroke: none; pointer-events: all; cursor: crosshair; }
+  .addhit { cursor: pointer; }
   .port { fill: var(--bg); stroke-width: 2; cursor: crosshair; }
   .port:hover { fill: var(--tint-sel); }
   .port.picked { fill: var(--accent); stroke-width: 3; }
@@ -274,9 +315,9 @@
   .portadd path { fill: none; stroke-width: 1.6; stroke-linecap: round; pointer-events: none; }
   .portadd:hover circle { fill: var(--tint-hover); }
   .stepcard:hover .portadd, .selected .portadd, .portadd:hover { opacity: 1; }
-  .portlabel { font-size: 12px; font-weight: 600; pointer-events: none; }
+  .portlabel { font-size: var(--cv-sm); font-weight: 600; pointer-events: none; }
   .portlabel.edit { pointer-events: auto; cursor: text; }
   .portlabel.edit:hover { text-decoration: underline; }
-  .result { fill: var(--muted); font-size: 12px; pointer-events: none; }
+  .result { fill: var(--muted); font-size: var(--cv-sm); pointer-events: none; }
   .result.failed, .result.error { fill: var(--fail); }
 </style>

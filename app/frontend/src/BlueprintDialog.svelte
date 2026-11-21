@@ -1,11 +1,15 @@
 <script lang="ts">
+  import Modal from './Modal.svelte'
+  import Select from './Select.svelte'
   import TextInput from './TextInput.svelte'
   import Button from './Button.svelte'
+  import EmptyState from './EmptyState.svelte'
   // "New flow from blueprint": pick a blueprint, where the flow goes, and its
   // parameters. Opened from the New menu, from a folder's menu and from the
   // Blueprints screen.
   import { BlueprintsService } from '../bindings/github.com/githugt/flowi/app/internal/bridge'
   import { ui } from './lib/ui.svelte'
+  import { missingParams } from './lib/blueprintform'
   import type { BlueprintsView } from './lib/types'
 
   let view = $state<BlueprintsView>({ blueprints: [], collections: [] })
@@ -17,6 +21,7 @@
   const open = $derived(ui.blueprint)
   const flows = $derived(view.blueprints.filter((b) => b.kind === 'flow'))
   const chosen = $derived(flows.find((b) => b.key === key))
+  const missing = $derived(chosen ? missingParams(chosen.params, values) : [])
 
   $effect(() => {
     const ask = ui.blueprint
@@ -40,46 +45,45 @@
 
   function create() {
     const b = chosen
-    if (!b || !path.trim()) return
+    if (!b || !path.trim() || missing.length) return
     ui.blueprint = null
     BlueprintsService.CreateFlow(b.key, collection, path.trim(), $state.snapshot(values))
   }
 </script>
 
 {#if open}
-  <div class="scrim" role="presentation" onpointerdown={() => (ui.blueprint = null)}>
-    <form class="dialog" onpointerdown={(e) => e.stopPropagation()} onsubmit={(e) => { e.preventDefault(); create() }}>
-      <h3>New flow from blueprint</h3>
+  <Modal title="New flow from blueprint" scroll onclose={() => (ui.blueprint = null)} onsubmit={() => create()}>
       {#if !flows.length}
-        <p class="muted">No collection has a flow blueprint yet. Open a flow's ⋯ menu and choose "Save as blueprint…" to make one.</p>
+        <EmptyState compact icon="flow" title="No flow blueprints yet" hint={'Open a flow\'s ⋯ menu and choose "Save as blueprint…" to make one.'} />
       {:else}
         <label><span>Blueprint</span>
-          <select value={key} onchange={(e) => pick(e.currentTarget.value)}>
+          <Select value={key} onchange={(e) => pick(e.currentTarget.value)}>
             {#each flows as b}<option value={b.key}>{b.name}{view.collections.length > 1 ? ` · ${b.collectionName}` : ''}</option>{/each}
-          </select>
+          </Select>
         </label>
         {#if chosen?.description}<p class="muted">{chosen.description}</p>{/if}
         <label><span>Collection</span>
-          <select bind:value={collection}>{#each view.collections as c}<option value={c.id}>{c.label}</option>{/each}</select>
+          <Select bind:value={collection}>{#each view.collections as c}<option value={c.id}>{c.label}</option>{/each}</Select>
         </label>
         <label><span>Flow path</span><TextInput bind:value={path} label="Flow path" /></label>
         {#each Object.keys(values) as name}
-          <label><span>{name}</span><TextInput bind:value={values[name]} label={name} /></label>
+          {@const spec = chosen?.params.find((p) => p.name === name)}
+          <label><span>{name}{spec && spec.default === '' ? ' *' : ''}</span><TextInput bind:value={values[name]} label={name} /></label>
+          {#if spec?.description}<p class="muted">{spec.description}</p>{/if}
         {/each}
+        {#if chosen?.steps.length}
+          <p class="muted">Makes {chosen.steps.length} {chosen.steps.length === 1 ? 'step' : 'steps'}: {chosen.steps.map((x) => x.name).join(' → ')}</p>
+        {/if}
+        {#if missing.length}<p class="muted" role="note">Fill in {missing.join(', ')} first.</p>{/if}
       {/if}
-      <div class="actions">
-        <Button type="button" onclick={() => (ui.blueprint = null)}>Cancel</Button>
-        <Button variant="primary" type="submit" disabled={!chosen}>Create</Button>
-      </div>
-    </form>
-  </div>
+    {#snippet actions()}
+      <Button type="button" onclick={() => (ui.blueprint = null)}>Cancel</Button>
+      <Button variant="primary" type="submit" disabled={!chosen || missing.length > 0}>Create</Button>
+    {/snippet}
+  </Modal>
 {/if}
 
 <style>
-  .scrim { position: fixed; inset: 0; background: rgb(0 0 0 / 0.4); display: grid; place-items: center; z-index: 60; }
-  .dialog { width: 420px; max-height: 80vh; overflow: auto; display: flex; flex-direction: column; gap: 10px; padding: 16px; background: var(--panel); border: 1px solid var(--line); border-radius: var(--r-lg); }
-  .dialog h3 { margin: 0; }
   .muted { color: var(--muted); font-size: var(--fs-sm); margin: 0; }
   label { display: flex; flex-direction: column; gap: 3px; color: var(--muted); font-size: var(--fs-xs); }
-  .actions { display: flex; justify-content: flex-end; gap: 8px; }
 </style>

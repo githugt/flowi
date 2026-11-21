@@ -5,16 +5,30 @@
 // collection can never choose a path outside them.
 package names
 
-import "unicode/utf8"
+import (
+	"strings"
+	"unicode"
+	"unicode/utf8"
 
-// maxRunes bounds a name so a file name stays well under OS limits.
-const maxRunes = 64
+	"golang.org/x/text/unicode/norm"
+)
 
-// Valid reports whether name is safe as a single file name: letters,
-// digits, '.', '_' and '-', not starting with '.', at most 64 runes. It
-// rules out separators, "..", hidden files and absolute paths.
+// maxRunes bounds a name so a file name stays well under OS limits; maxBytes does the same for names whose letters
+// take several bytes each (a file name is limited in bytes, not characters).
+const (
+	maxRunes = 64
+	maxBytes = 200
+)
+
+// Valid reports whether name is safe as a single file name: letters (of any script), marks, digits, '.', '_' and '-',
+// not starting with '.' nor ending in one, at most 64 characters, in Unicode normal form C, and not a name Windows
+// reserves (CON, NUL, COM1…). It rules out separators, "..", hidden files, absolute paths, control and bidi
+// characters (they are not letters) and a name that macOS would store under another spelling.
+//
+// Before: only ASCII letters were accepted although the messages said "letters", so a request called "Café" or a
+// flow in Japanese could not be saved under its own name.
 func Valid(name string) bool {
-	if name == "" || name[0] == '.' || utf8.RuneCountInString(name) > maxRunes {
+	if name == "" || name[0] == '.' || name[len(name)-1] == '.' || len(name) > maxBytes || utf8.RuneCountInString(name) > maxRunes {
 		return false
 	}
 	for _, r := range name {
@@ -22,11 +36,29 @@ func Valid(name string) bool {
 			return false
 		}
 	}
-	return true
+	return norm.NFC.IsNormalString(name) && !reservedOnWindows(name)
 }
 
+// Normalize returns name in Unicode normal form C, the spelling Valid accepts. Callers that turn what a person typed
+// into a name run it first, so "e" + a combining accent and "é" are one name.
+func Normalize(name string) string { return norm.NFC.String(name) }
+
 func nameRune(r rune) bool {
-	return r == '.' || r == '_' || r == '-' || (r >= '0' && r <= '9') || (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z')
+	if r < utf8.RuneSelf {
+		return r == '.' || r == '_' || r == '-' || (r >= '0' && r <= '9') || (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z')
+	}
+	return unicode.IsLetter(r) || unicode.IsMark(r) || unicode.IsDigit(r)
+}
+
+// reservedOnWindows reports the device names Windows will not create a file under, with or without an extension.
+func reservedOnWindows(name string) bool {
+	stem, _, _ := strings.Cut(name, ".")
+	switch s := strings.ToUpper(stem); s {
+	case "CON", "PRN", "AUX", "NUL":
+		return true
+	default:
+		return len(s) == 4 && (strings.HasPrefix(s, "COM") || strings.HasPrefix(s, "LPT")) && s[3] >= '1' && s[3] <= '9'
+	}
 }
 
 // AllValid reports whether every name is Valid. Ids and version labels

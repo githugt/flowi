@@ -1,9 +1,14 @@
 <script lang="ts">
+  import Checkbox from './Checkbox.svelte'
+  import Modal from './Modal.svelte'
+  import Button from './Button.svelte'
   // Sends the saved request once for every combination of environments, overlays and the values of one of its
   // {{names}}, and shows a grid of passes and failures. The responses are not kept: a matrix is a check.
   import { errorText } from './lib/errors'
+  import { matrixNote } from './lib/matrixlimit'
   import { RequestService } from '../bindings/github.com/githugt/flowi/app/internal/bridge'
   import MatrixResult from './MatrixResult.svelte'
+  import MatrixRunning from './MatrixRunning.svelte'
   import type { MatrixView, RequestMatrixChoices } from './lib/types'
 
   let { node, onclose }: { node: string; onclose: () => void } = $props()
@@ -30,7 +35,7 @@
     if (valueName.trim() && vals.length) out.push({ name: `with.${valueName.trim()}`, values: vals })
     return out
   })
-  const cellCount = $derived(dims.reduce((n, d) => n * d.values.length, 1))
+  const note = $derived(matrixNote(dims, 'send'))
 
   async function run() {
     busy = true
@@ -46,16 +51,14 @@
   }
 </script>
 
-<div class="scrim" role="presentation" onpointerdown={onclose}>
-  <div class="dialog" role="dialog" aria-label="Run a matrix" tabindex="-1" onpointerdown={(e) => e.stopPropagation()}>
-    <h3>Run a matrix</h3>
+<Modal title="Run a matrix" width="min(760px, 94vw)" maxHeight="88vh" scroll {onclose}>
     <p class="note">Sends the saved request once for every combination you pick, one after the other, and shows a grid of passes and failures. The responses are not saved. Pick at least one thing to vary.</p>
     <div class="group"><strong>Environments</strong>
-      {#each choices.envs as e}<label class="opt"><input type="checkbox" checked={byEnv.includes(e)} onchange={() => (byEnv = toggle(byEnv, e))} /> {e}</label>{/each}
+      {#each choices.envs as e}<span class="opt"><Checkbox checked={byEnv.includes(e)} onchange={() => (byEnv = toggle(byEnv, e))}>{e}</Checkbox></span>{/each}
       {#if !choices.envs.length}<span class="muted">none yet</span>{/if}
     </div>
     <div class="group"><strong>Overlays</strong> <span class="muted">laid over the request</span>
-      {#each choices.overlays as o}<label class="opt"><input type="checkbox" checked={byOverlay.includes(o)} onchange={() => (byOverlay = toggle(byOverlay, o))} /> {o}</label>{/each}
+      {#each choices.overlays as o}<span class="opt"><Checkbox checked={byOverlay.includes(o)} onchange={() => (byOverlay = toggle(byOverlay, o))}>{o}</Checkbox></span>{/each}
       {#if !choices.overlays.length}<span class="muted">this collection has none</span>{/if}
     </div>
     <div class="group"><strong>A value</strong> <span class="muted">for a name the request uses, such as {'{{id}}'}</span>
@@ -64,23 +67,19 @@
       {#if valueName}<input placeholder="values, separated by commas" bind:value={values} spellcheck="false" />{/if}
     </div>
     <div class="actions">
-      <span class="muted">{dims.length ? `${cellCount} send${cellCount > 1 ? 's' : ''}` : ''}</span>
-      <button class="primary" disabled={busy || !dims.length || cellCount > 100} onclick={run}>{busy ? 'Sending…' : 'Run'}</button>
-      <button onclick={onclose}>Close</button>
+      {#if busy}
+        <MatrixRunning {node} oncancel={() => RequestService.CancelMatrix(node)} />
+      {:else}
+        <span class={note.over ? 'bad' : 'muted'} role={note.over ? 'alert' : undefined}>{note.text}</span>
+      {/if}
+      <Button variant="go" loading={busy} disabled={!dims.length || note.over} onclick={run}>{busy ? 'Sending…' : 'Run'}</Button>
+      <Button onclick={onclose}>Close</Button>
     </div>
     {#if matrix}<MatrixResult {matrix} />{/if}
     {#if error}<p class="bad">{error}</p>{/if}
-  </div>
-</div>
+</Modal>
 
 <style>
-  button { background: var(--raised); color: var(--text); border: 0; box-shadow: inset 0 0 0 1px var(--line); border-radius: var(--r-md); padding: 0 12px; min-height: var(--ctl-h); font: inherit; font-weight: 500; }
-  button:hover:not(:disabled) { background: var(--raised-3); }
-  button:disabled { opacity: 0.4; }
-  .primary { background: var(--send-fill); color: var(--on-send); border: 0; font-weight: 600; box-shadow: var(--send-edge), 0 4px 14px var(--send-glow); }
-  .scrim { position: fixed; inset: 0; z-index: 40; background: rgba(0, 0, 0, 0.45); display: flex; align-items: center; justify-content: center; }
-  .dialog { width: min(760px, 94vw); max-height: 88vh; overflow: auto; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 16px 20px; display: flex; flex-direction: column; gap: 8px; box-shadow: var(--shadow); }
-  h3 { margin: 0; }
   .note, .muted { color: var(--muted); font-size: var(--fs-sm); margin: 0; }
   .group { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 14px; font-size: var(--fs-sm); }
   .group > strong { min-width: 90px; }

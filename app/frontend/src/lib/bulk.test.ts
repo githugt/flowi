@@ -35,3 +35,34 @@ describe('rowsToText', () => {
     expect(got).toEqual(rows)
   })
 })
+
+describe('switched-off rows', () => {
+  const off = (Key: string, Value: string) => ({ Key, Value, Description: '', Disabled: true })
+
+  it('should write a switched-off row with a leading # and read it back switched off', () => {
+    // Before: a row could not be switched off, so bulk edit had nothing to say about one.
+    const rows = [kv('a', '1'), off('debug', '1')]
+
+    const text = rowsToText(rows, true)
+    const got = textToRows(text, rows, true)
+
+    expect(text).toBe('a: 1\n# debug: 1')
+    expect(got).toEqual(rows)
+  })
+
+  it('should read # lines as ordinary names when switching off is not offered', () => {
+    const got = textToRows('# note: x', [])
+
+    expect(got).toEqual([kv('# note', 'x')])
+  })
+
+  it('should let a hand-typed #name switch a row off and removing the # switch it on', () => {
+    const before = [kv('a', '1')]
+
+    const offNow = textToRows('#a: 1', before, true)
+    const onAgain = textToRows('a: 1', offNow, true)
+
+    expect(offNow).toEqual([off('a', '1')])
+    expect(onAgain).toEqual([kv('a', '1')])
+  })
+})

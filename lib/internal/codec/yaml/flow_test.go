@@ -180,3 +180,31 @@ func TestDecodeFlow_should_round_trip_the_connection_a_request_step_opens_uses_a
 		}
 	}
 }
+
+// Before: a step could not say that it may be retried.
+func TestDecodeFlow_should_round_trip_retries_and_the_wait_between_them(t *testing.T) {
+	// Arrange
+	data := []byte("id: 01J9ZB3M4N5P6Q7R8S9T0VWXYZ\nnodes:\n  - id: call\n    type: request\n    timeout: 5s\n    retries: 3\n    retry_wait: 2s\n    request:\n      id: 01J9ZB3M4N5P6Q7R8S9T0VW000\n")
+	c := newCodec()
+
+	// Act
+	f, diags := c.DecodeFlow("f.flow.yaml", "f", data)
+	requireNoDiagnostics(t, diags)
+	out, err := c.EncodeFlow(f)
+
+	// Assert
+	if n := f.Nodes[0]; err != nil || n.Retries != 3 || n.RetryWait != 2*time.Second || n.Timeout != 5*time.Second {
+		t.Fatalf("err %v node %+v", err, n)
+	}
+	for _, want := range []string{"retries: 3", "retry_wait: 2s"} {
+		if !bytes.Contains(out, []byte(want)) {
+			t.Errorf("output lacks %q:\n%s", want, out)
+		}
+	}
+	plain := []byte("id: 01J9ZB3M4N5P6Q7R8S9T0VWXYZ\nnodes:\n  - id: call\n    type: note\n    text: x\n")
+	g, _ := c.DecodeFlow("g.flow.yaml", "g", plain)
+	again, _ := c.EncodeFlow(g)
+	if bytes.Contains(again, []byte("retries")) || bytes.Contains(again, []byte("retry_wait")) {
+		t.Errorf("a step without retries must not write them:\n%s", again)
+	}
+}

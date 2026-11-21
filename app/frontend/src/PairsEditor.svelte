@@ -1,4 +1,6 @@
 <script lang="ts">
+  import Button from './Button.svelte'
+  import IconButton from './IconButton.svelte'
   import HiddenChars from './HiddenChars.svelte'
   import type { Pair } from './lib/types'
 
@@ -32,17 +34,10 @@
     <div class="row">
       <input class="k" placeholder={keyLabel} bind:value={row.key} oninput={commit} spellcheck="false" />
       <span class="cell"><input class="v" placeholder={valueLabel} bind:value={row.value} oninput={commit} spellcheck="false" /><HiddenChars value={row.value} onclean={(t) => { row.value = t; commit() }} /></span>
-      <button
-        class="x"
-        aria-label="Remove row"
-        onclick={() => {
-          local.splice(i, 1)
-          commit()
-        }}>×</button
-      >
+      <IconButton icon="close" size={12} danger label="Remove row" onclick={() => { local.splice(i, 1); commit() }} />
     </div>
   {/each}
-  <button class="add" onclick={() => local.push({ key: '', value: '' })}>+ Add</button>
+  <Button variant="link" onclick={() => local.push({ key: '', value: '' })}>+ Add</Button>
 </div>
 
 <style>
@@ -66,7 +61,4 @@
   input:hover:not(:focus) { border-color: var(--line); }
   .k { flex: 0 0 38%; }
   .cell { position: relative; flex: 1; display: flex; min-width: 0; }
-  button { background: none; border: 0; color: var(--muted); font: inherit; }
-  .add { align-self: flex-start; color: var(--accent); padding: 2px 0; }
-  .x:hover { color: var(--fail); }
 </style>

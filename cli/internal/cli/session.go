@@ -79,7 +79,7 @@ func OpenSession(ctx context.Context, g *GlobalOptions, env Env, keys vault.KeyS
 	}
 	wsOpts := flowi.WorkspaceOptions{
 		Paths: paths, Environ: env.Environ, Flags: g.FlagLayer(), Home: env.Home,
-		Keys: keys, Passphrase: passphrase, UserAgent: "Flowi-CLI/" + buildinfo.Version(),
+		Keys: keys, Passphrase: passphrase, UserAgent: "Flowi-CLI/" + buildinfo.Version(), Version: buildinfo.Version(),
 	}
 	traces, err := startTracing(cfg, g, paths, env, &wsOpts)
 	if err != nil {

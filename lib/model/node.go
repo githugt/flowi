@@ -18,6 +18,16 @@ func NodeTypes() []NodeType {
 	}
 }
 
+// CanRetry says whether a step of this type can have retries: the ones that send something and may fail for a
+// reason that a moment later has gone. A container or a check has no such reason, and running it again changes nothing.
+func (t NodeType) CanRetry() bool {
+	switch t {
+	case "request", "fetch", "webhook", "subflow":
+		return true
+	}
+	return false
+}
+
 // NodeColors are the colours a person may give a step on the canvas. A step
 // with no colour is drawn in its category's colour.
 func NodeColors() []string {
@@ -132,6 +142,11 @@ type Node struct {
 	Concurrent bool
 	OnError    string
 	Timeout    time.Duration
+	// Retries is how many more times a failed request, fetch, webhook or subflow step runs again before the step
+	// is taken as failed (0: it runs once). RetryWait is the pause before each new try. A step that passes only
+	// after a retry passes, and is reported as flaky. Timeout applies to each try.
+	Retries   int
+	RetryWait time.Duration
 	// Attach names a request or subflow node of the same list that this node is shown
 	// with: the canvas draws them as one block. It is a view only; the run order is
 	// the list order, as always.

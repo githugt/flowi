@@ -49,11 +49,41 @@ type Port struct {
 // Card is what one step shows. More lists the rows the person can add or open
 // (empty parts), plus any filled row that did not fit under the four.
 type Card struct {
-	Badge   string `json:"badge"`
-	Subline string `json:"subline"`
-	Rows    []Row  `json:"rows"`
-	More    []Row  `json:"more"`
-	Ports   []Port `json:"ports"`
+	Badge   string  `json:"badge"`
+	Subline string  `json:"subline"`
+	Rows    []Row   `json:"rows"`
+	More    []Row   `json:"more"`
+	Ports   []Port  `json:"ports"`
+	Guards  []Guard `json:"guards"`
+}
+
+// Guard is a mark in the header of a step that does not always run, or does not stop the run when it fails: a
+// condition, a tolerated error, a time limit, a concurrent step. Before, such a step looked like any other.
+type Guard struct {
+	Glyph string `json:"glyph"` // one short symbol: "if", "continue", "5s" or "∥"
+	Tip   string `json:"tip"`   // what it means, with the expression
+}
+
+// guardsOf lists the guards of n, in a fixed order.
+func guardsOf(n model.Node) []Guard {
+	out := []Guard{}
+	if n.When != "" {
+		out = append(out, Guard{Glyph: "if", Tip: "Runs only when " + n.When})
+	}
+	switch {
+	case n.OnError == "continue":
+		out = append(out, Guard{Glyph: "continue", Tip: "A failure here does not stop the flow: the next step runs"})
+	case strings.HasPrefix(n.OnError, "goto:"):
+		target := strings.TrimPrefix(n.OnError, "goto:")
+		out = append(out, Guard{Glyph: "→ " + target, Tip: "A failure here jumps to the step " + target})
+	}
+	if n.Timeout > 0 {
+		out = append(out, Guard{Glyph: n.Timeout.String(), Tip: "Stops this step after " + n.Timeout.String()})
+	}
+	if n.Concurrent {
+		out = append(out, Guard{Glyph: "∥", Tip: "Runs at the same time as the step before it"})
+	}
+	return out
 }
 
 // Facts are the things about a step that live outside the step itself: for a
@@ -86,8 +116,14 @@ type Facts struct {
 	Timeout             string
 	Region              string
 
+	// Writes marks a query that may change data: its card says so.
+	Writes bool
+
 	// Returns is the number of values a flow step returns.
 	Returns int
+
+	// Expect is the status the version says it expects ("401", "4xx"), normalised; "" when it says none.
+	Expect string
 
 	// Outcomes are the outcomes the request's version writes; none when it writes none, which is success
 	// and failure (the Done and Fail ports).
@@ -109,6 +145,13 @@ func Summarize(n model.Node, f Facts) Card {
 		c = summarizeRequest(n, f)
 	} else {
 		c = summarizeStep(n, f)
+	}
+	c.Guards = guardsOf(n)
+	if f.Expect != "" {
+		c.Guards = append(c.Guards, Guard{Glyph: "expects " + f.Expect, Tip: "Passes on a response of " + f.Expect + " and fails on any other: the usual check for a 2xx stands aside"})
+	}
+	if f.Writes {
+		c.Guards = append(c.Guards, Guard{Glyph: "✎ writes", Tip: "This query may change data: its read-only guards are off"})
 	}
 	return finish(c)
 }
@@ -132,6 +175,9 @@ func finish(c Card) Card {
 	}
 	if c.Ports == nil {
 		c.Ports = []Port{}
+	}
+	if c.Guards == nil {
+		c.Guards = []Guard{}
 	}
 	return c
 }

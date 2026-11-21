@@ -45,6 +45,12 @@ func (c *connections) add(name string, s transport.Session) bool {
 	return true
 }
 
+// has reports whether a connection of that name is open.
+func (c *connections) has(name string) bool {
+	_, ok := c.get(name)
+	return ok
+}
+
 func (c *connections) get(name string) (transport.Session, bool) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -93,6 +99,11 @@ func (x *execution) runOpen(ctx context.Context, tr transport.Transport, b built
 	if !ok {
 		return transport.Result{}, connectionError{fmt.Sprintf("a %s request cannot be kept open between steps (WebSocket, MQTT 5 and core NATS can): send and receive in one step", b.protocol)}
 	}
+	// Before: the name was checked after connecting, so a taken name still cost a
+	// connection, and a step that failed after opening kept its name for good.
+	if x.r.conns.has(name) {
+		return transport.Result{}, connectionError{fmt.Sprintf("a connection named %q is already open", name)}
+	}
 	started := x.r.deps.Clock()
 	openCtx, cancel := withBudget(ctx, x.cfg.timeout)
 	sess, err := opener.Open(openCtx, b.op)
@@ -107,6 +118,9 @@ func (x *execution) runOpen(ctx context.Context, tr transport.Transport, b built
 	res := transport.Result{Connect: x.r.deps.Clock().Sub(started)}
 	err = x.useSession(ctx, sess, b, &res)
 	res.Total = x.r.deps.Clock().Sub(started)
+	if err != nil {
+		x.r.conns.close(name) // a step that failed leaves no half-used connection under its name
+	}
 	return res, err
 }
 

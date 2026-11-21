@@ -157,6 +157,16 @@ func (t *Tracing) Test() {
 	t.changed()
 }
 
+// TraceURL is the address of a run's trace in the person's tracing tool, from the otel.trace_url setting; "" when
+// the setting is empty or has no {trace_id} in it.
+func (t *Tracing) TraceURL(runID string) string {
+	template := ""
+	if v, ok := t.b.Settings("").Get("otel.trace_url"); ok {
+		template, _ = v.Value.(string)
+	}
+	return otel.TraceURL(template, runID)
+}
+
 // readTracingSettings returns the endpoint, the header names (never the
 // values) and the propagate flag.
 func readTracingSettings(r settings.Resolved) (endpoint string, headerNames []string, propagate bool) {

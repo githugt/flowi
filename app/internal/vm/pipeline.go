@@ -121,15 +121,18 @@ func (t *Trace) Apply(e engine.Event) {
 			t.results["api"] = stepResult{state: StepRunning}
 		}
 	case engine.ResponseReceived:
-		if ev.Depth == 0 && ev.Error != "" {
-			t.results["api"] = stepResult{state: StepFailed, reason: ev.Error}
-		} else if ev.Depth == 0 {
-			detail := strconv.Itoa(ev.Status)
-			if ev.Outcome != "" {
-				detail = ev.Outcome // an async request has no status
-			}
-			t.results["api"] = stepResult{state: StepPassed, detail: detail, took: ev.Duration}
+		if ev.Depth != 0 {
+			break
 		}
+		if ev.Error != "" {
+			t.results["api"] = stepResult{state: StepFailed, reason: ev.Error}
+			break
+		}
+		detail := strconv.Itoa(ev.Status)
+		if ev.Outcome != "" {
+			detail = ev.Outcome // an async request has no status
+		}
+		t.results["api"] = stepResult{state: StepPassed, detail: detail, took: ev.Duration}
 	}
 }
 

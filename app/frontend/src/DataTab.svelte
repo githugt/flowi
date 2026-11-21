@@ -1,7 +1,9 @@
 <script lang="ts">
+  import EmptyState from './EmptyState.svelte'
   import { FlowService } from '../bindings/github.com/githugt/flowi/app/internal/bridge'
   import type { FlowView, NodeData } from './lib/types'
   import Parts from './Parts.svelte'
+  import Select from './Select.svelte'
 
   let { view }: { view: FlowView } = $props()
   let data = $state<NodeData | null>(null)
@@ -24,9 +26,9 @@
 
 <div class="data">
   {#if !step}
-    <p class="muted">Select a step to see what the last run did there.</p>
+    <EmptyState icon="flow" title="No step selected" hint="Select a step to see what the last run did there." compact />
   {:else if !data || !data.status}
-    <p class="muted">{step} has not run yet.</p>
+    <EmptyState icon="clock" title="{step} has not run yet" compact />
   {:else}
     <h3>{step} <span class="status {data.status}">{data.status}</span></h3>
     <p class="muted">{data.instances} {data.instances === 1 ? 'instance' : 'instances'} · {data.duration}</p>
@@ -43,11 +45,11 @@
     {#if data.output.length}
       <h4>
         Output
-        <select bind:value={format} aria-label="Body format">
+        <Select bind:value={format} label="Body format" size="sm">
           <option value="json">JSON</option>
           <option value="text">Text</option>
           <option value="raw">Raw</option>
-        </select>
+        </Select>
       </h4>
       <Parts parts={data.output} />
     {/if}
@@ -71,5 +73,4 @@
   .test.fail { color: var(--fail); }
   pre { margin: 2px 0 0; font: var(--fs-xs) var(--mono); white-space: pre-wrap; -webkit-user-select: text; user-select: text; }
   .diag { color: var(--fail); }
-  select { font-size: var(--fs-xs); }
 </style>

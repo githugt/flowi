@@ -1,4 +1,9 @@
 <script lang="ts">
+  import Field from './Field.svelte'
+  import { listKeyTarget } from './lib/listkeys'
+  import { contains } from './lib/fold'
+  import { isEnter } from './lib/enterkey'
+  import Modal from './Modal.svelte'
   import TextInput from './TextInput.svelte'
   import Button from './Button.svelte'
   // Where it goes: one chooser for New request, New message request, New gRPC request, New flow, Save and
@@ -36,8 +41,8 @@
 
   const targets = $derived(d?.collectionsOnly ? all.filter((t) => t.depth === 0) : all)
   const shown = $derived.by(() => {
-    const q = query.trim().toLowerCase()
-    return q ? targets.filter((t) => t.label.toLowerCase().includes(q)) : targets
+    const q = query.trim()
+    return q ? targets.filter((t) => contains(t.label, q)) : targets
   })
   const place = $derived(targets.find((t) => t.row === chosen))
   const ready = $derived(!!place && (!d?.name?.required || name.trim() !== ''))
@@ -77,11 +82,11 @@
     if (e.key === 'Escape') {
       if (making) making = null
       else close()
-    } else if (e.key === 'Enter' && making) make()
-    else if (e.key === 'Enter' && (!typing || e.target !== filter)) accept()
+    } else if (isEnter(e) && making) make()
+    else if (isEnter(e) && (!typing || e.target !== filter)) accept()
     else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
       const i = shown.findIndex((t) => t.row === chosen)
-      const next = shown[Math.min(Math.max(i + (e.key === 'ArrowDown' ? 1 : -1), 0), shown.length - 1)]
+      const next = shown[listKeyTarget(e.key, i, shown.length)!]
       if (next) chosen = next.row
     } else return
     e.preventDefault()
@@ -89,19 +94,17 @@
 </script>
 
 {#if d}
-  <div class="scrim" role="presentation" onpointerdown={close}>
-    <div class="dialog" role="dialog" aria-label={d.title} tabindex="-1" onpointerdown={(e) => e.stopPropagation()} onkeydown={keys}>
-      <h3>{d.title}</h3>
+  <Modal title={d.title} width={440} maxHeight="86vh" layer="above" onclose={close} onkeydown={keys}>
       {#if d.note}<p class="muted">{d.note}</p>{/if}
       {#if d.name}
-        <label class="f"><span>{d.name.label}</span>
+        <Field label={`${d.name.label}`}>
           <TextInput bind:el={nameBox} bind:value={name} label={d.name.label} />
-        </label>
+        </Field>
       {/if}
       {#if d.protocols}
-        <label class="f"><span>{d.protocolsLabel ?? 'Protocol'}</span>
+        <Field label={`${d.protocolsLabel ?? 'Protocol'}`}>
           <Dropdown pill options={d.protocols.map((p) => ({ value: p.id, label: p.label, tone: protocolVerb(p.id) }))} value={protocol} onpick={(p) => (protocol = p)} />
-        </label>
+        </Field>
       {/if}
       <div class="where">
         <span class="label">{d.collectionsOnly ? 'Collection' : 'Collection or folder'}</span>
@@ -129,21 +132,16 @@
         {/each}
       </div>
       {#if place && d.name}<p class="muted at">Goes to <strong>{place.label}</strong> as <code>{name.trim() || 'untitled'}</code></p>{/if}
-      <div class="actions">
-        <Button type="button" onclick={close}>Cancel</Button>
-        <Button type="button" variant="primary" disabled={!ready} onclick={accept}>{d.action}</Button>
-      </div>
-    </div>
-  </div>
+    {#snippet actions()}
+      <Button type="button" onclick={close}>Cancel</Button>
+      <Button type="button" variant="primary" disabled={!ready} onclick={accept}>{d.action}</Button>
+    {/snippet}
+  </Modal>
 {/if}
 
 <style>
-  .scrim { position: fixed; inset: 0; background: rgb(0 0 0 / 0.4); display: grid; place-items: center; z-index: 65; }
-  .dialog { width: 440px; max-width: calc(100vw - 32px); max-height: 86vh; display: flex; flex-direction: column; gap: 10px; padding: 16px; background: var(--panel); border: 1px solid var(--line); border-radius: var(--r-lg); outline: none; }
-  h3 { margin: 0; }
   .muted { color: var(--muted); font-size: var(--fs-sm); margin: 0; }
   .at code { font: var(--fs-xs) var(--mono); }
-  .f { display: flex; flex-direction: column; gap: 3px; color: var(--muted); font-size: var(--fs-xs); }
   input:focus { border-color: var(--accent); }
   .where { display: flex; align-items: center; justify-content: space-between; gap: 8px; color: var(--muted); font-size: var(--fs-xs); }
   .make { display: flex; gap: 6px; }
@@ -151,9 +149,8 @@
   .list { flex: 1; min-height: 120px; max-height: 280px; overflow: auto; border: 1px solid var(--line); border-radius: var(--r-md); padding: 4px; background: var(--bg); }
   .list button { width: 100%; display: flex; align-items: center; gap: 6px; text-align: left; background: none; border: 0; border-radius: var(--r-sm); color: var(--text); font: inherit; padding-block: 4px; padding-right: 10px; }
   .list button:hover { background: var(--tint-hover); }
-  .list button.on { background: color-mix(in srgb, var(--accent) 24%, transparent); }
+  .list button.on { background: var(--tint-sel); }
   .list button.top { font-weight: 600; }
   .tag { margin-left: auto; color: var(--muted); font-size: var(--fs-xs); font-weight: 400; }
   .empty { padding: 8px; }
-  .actions { display: flex; justify-content: flex-end; gap: 8px; }
 </style>

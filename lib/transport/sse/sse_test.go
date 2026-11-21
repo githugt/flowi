@@ -170,3 +170,17 @@ func TestRun_should_name_the_type_of_each_event(t *testing.T) {
 		t.Fatalf("types %q and %q", res.Received[0].Type, res.Received[1].Type)
 	}
 }
+
+func TestProbe_should_open_the_stream_and_say_when_it_is_refused(t *testing.T) {
+	// Before: a stream that refused the request showed only after waiting for an event.
+	open := stream(t, "", nil)
+	refusing := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { http.Error(w, "no", http.StatusForbidden) }))
+	t.Cleanup(refusing.Close)
+
+	good := transport.Probe(t.Context(), sse.New(), transport.Operation{Server: open})
+	bad := transport.Probe(t.Context(), sse.New(), transport.Operation{Server: refusing.URL})
+
+	if good != nil || bad == nil || !strings.Contains(bad.Error(), "403") {
+		t.Fatalf("good %v, bad %v", good, bad)
+	}
+}

@@ -60,3 +60,26 @@ func TestSplitURL_should_not_split_inside_a_template(t *testing.T) {
 		t.Fatalf("base %q query %+v", base, query)
 	}
 }
+
+func TestURLBar_Given_switched_off_params_Then_the_bar_shows_only_what_is_sent_and_typing_keeps_the_rest(t *testing.T) {
+	// Before: a parameter could not be switched off, so the bar and the Params list always agreed.
+	query := []model.KeyValue{{Key: "page", Value: "1"}, {Key: "debug", Value: "1", Disabled: true, Description: "noisy"}}
+
+	shown := URLWithQuery("http://x/a", query)
+	_, edited := SplitURL("http://x/a?page=2", query)
+	_, cleared := SplitURL("http://x/a", query)
+	_, retyped := SplitURL("http://x/a?debug=7", query)
+
+	if shown != "http://x/a?page=1" {
+		t.Errorf("bar %q", shown)
+	}
+	if len(edited) != 2 || edited[0].Value != "2" || edited[1].Key != "debug" || !edited[1].Disabled || edited[1].Description != "noisy" {
+		t.Errorf("edited %+v", edited)
+	}
+	if len(cleared) != 1 || cleared[0].Key != "debug" || !cleared[0].Disabled {
+		t.Errorf("cleared %+v", cleared)
+	}
+	if len(retyped) != 1 || retyped[0].Disabled || retyped[0].Value != "7" {
+		t.Errorf("typing a switched-off name again turns it on once, not twice: %+v", retyped)
+	}
+}

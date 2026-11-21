@@ -183,3 +183,18 @@ func TestTracing_Save_Given_a_comma_in_a_header_value_Then_it_is_stored_escaped_
 		t.Fatalf("calls %v problem %q", b.Calls, tr.View().Problem)
 	}
 }
+
+// Before: a run had no link to its trace in the person's tool.
+func TestTracing_TraceURL_should_fill_the_runs_trace_id_into_the_setting(t *testing.T) {
+	b := &vmtest.Backend{Values: map[string]any{"otel.trace_url": "http://localhost:16686/trace/{trace_id}"}}
+	tr, _, _ := newTracing(b)
+
+	got := tr.TraceURL("run-7")
+
+	if want := "http://localhost:16686/trace/" + otel.TraceID("run-7"); got != want {
+		t.Fatalf("got %q, want %q", got, want)
+	}
+	if none, _, _ := newTracing(&vmtest.Backend{}); none.TraceURL("run-7") != "" {
+		t.Fatal("an unset template should give no link")
+	}
+}

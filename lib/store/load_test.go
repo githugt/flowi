@@ -196,6 +196,52 @@ func TestReloadFile_should_drop_deleted_and_add_new_files(t *testing.T) {
 	}
 }
 
+// Before: a request or flow file that could not be read was dropped, so it looked deleted.
+func TestLoad_Given_conflict_markers_or_a_syntax_error_Then_the_file_is_listed_as_broken_until_it_is_fixed(t *testing.T) {
+	root := copyTree(t, "basic")
+	s := newStore()
+	c, _, err := s.Load(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	login := c.Requests[0].File
+	flow := c.Flows[0].File
+	good, err := os.ReadFile(login)
+	if err != nil {
+		t.Fatal(err)
+	}
+	writeFile(t, login, "id: 01J9ZA3M4N5P6Q7R8S9T0VWXYZ\nname: Login\n<<<<<<< HEAD\nversions: {}\n=======\nversions: {x: 1}\n>>>>>>> theirs\n")
+	writeFile(t, flow, "arazzo: [unclosed\n")
+
+	broken, _, err := s.ReloadFile(c, login)
+	if err == nil {
+		broken, _, err = s.ReloadFile(broken, flow)
+	}
+
+	if err != nil || len(broken.Broken) != 2 || len(broken.Requests) != len(c.Requests)-1 {
+		t.Fatalf("err %v broken %+v requests %d", err, broken.Broken, len(broken.Requests))
+	}
+	var req, fl = broken.Broken[0], broken.Broken[1]
+	if req.Kind != "flow" {
+		req, fl = fl, req
+	}
+	if fl.Kind != "request" || fl.Code != string(diag.CodeFileConflict) || fl.File != login || fl.Path == "" || !contains(fl.Message, "line 3") {
+		t.Fatalf("request entry %+v", fl)
+	}
+	if req.Kind != "flow" || req.File != flow || req.Code == "" {
+		t.Fatalf("flow entry %+v", req)
+	}
+
+	writeFile(t, login, string(good))
+	fixed, _, err := s.ReloadFile(broken, login)
+
+	if err != nil || len(fixed.Broken) != 1 || fixed.Broken[0].File != flow || len(fixed.Requests) != len(c.Requests) {
+		t.Fatalf("err %v broken %+v requests %d", err, fixed.Broken, len(fixed.Requests))
+	}
+}
+
+func contains(s, sub string) bool { return bytes.Contains([]byte(s), []byte(sub)) }
+
 func TestLoad_should_report_unreadable_entries_and_keep_loading(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("symlinks and permission bits differ on Windows")
@@ -347,5 +393,90 @@ func TestLoad_should_report_an_old_flow_yaml_as_unrecognised_and_not_load_it(t *
 
 	if err != nil || len(c.Flows) != 1 || !slices.Contains(codesOf(diags), diag.CodeFileUnrecognised) {
 		t.Fatalf("flows %d err %v codes %v", len(c.Flows), err, codesOf(diags))
+	}
+}
+
+func TestFormat_Given_canonical_content_in_CRLF_Then_it_needs_no_change(t *testing.T) {
+	// Before: a CRLF file always needed formatting, and a save changed every line ending.
+	root := copyTree(t, "basic")
+	login := filepath.Join(root, "requests", "auth", "login.req.yaml")
+	canonical, _ := os.ReadFile(login)
+	writeFile(t, login, string(bytes.ReplaceAll(canonical, []byte("\n"), []byte("\r\n"))))
+	s := newStore()
+	c, _, err := s.Load(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	changes, err := s.Format(c)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(changes) != 0 {
+		t.Fatalf("got %d changes: %+v", len(changes), changes)
+	}
+}
+
+func TestEncodeRequest_Given_a_CRLF_file_Then_the_save_keeps_CRLF(t *testing.T) {
+	// Before: the first save of a CRLF file changed every line ending to LF.
+	root := copyTree(t, "basic")
+	login := filepath.Join(root, "requests", "auth", "login.req.yaml")
+	canonical, _ := os.ReadFile(login)
+	writeFile(t, login, string(bytes.ReplaceAll(canonical, []byte("\n"), []byte("\r\n"))))
+	s := newStore()
+	c, _, err := s.Load(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	data, err := s.EncodeRequest(c.Requests[0])
+
+	if err != nil {
+		t.Fatal(err)
+	}
+	if bytes.Count(data, []byte("\n")) != bytes.Count(data, []byte("\r\n")) || bytes.Contains(data, []byte("\r\r")) {
+		t.Fatalf("line endings changed: %q", data)
+	}
+}
+
+func TestLoad_Given_a_collection_that_needs_a_newer_release_Then_only_FLW_FMT_003_names_both(t *testing.T) {
+	// Before: a collection written for a newer Flowi failed in an older CI CLI with an unrelated error.
+	root := copyTree(t, "basic")
+	writeFile(t, filepath.Join(root, "flowi.yaml"), "format: 1\nid: 01J9Z8K3M4N5P6Q7R8S9T0VWXY\nmin_version: 1.4.0\n")
+	writeFile(t, filepath.Join(root, "requests", "bad.req.yaml"), "::: not yaml")
+	s := newStore()
+	s.SetRunning("1.3.2")
+
+	_, diags, err := s.Load(root)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(diags) != 1 || diags[0].Code != diag.CodeFormatNeedsNewer || diags[0].Args["min"] != "1.4.0" || diags[0].Args["have"] != "1.3.2" {
+		t.Fatalf("got %v", diags)
+	}
+	if diags[0].Pos.Line != 3 {
+		t.Errorf("FLW-FMT-003 should point at the min_version line: %+v", diags[0].Pos)
+	}
+}
+
+func TestLoad_Given_a_new_enough_or_development_release_Then_the_collection_loads(t *testing.T) {
+	root := copyTree(t, "basic")
+	writeFile(t, filepath.Join(root, "flowi.yaml"), "format: 1\nid: 01J9Z8K3M4N5P6Q7R8S9T0VWXY\nmin_version: 1.4.0\n")
+	for _, running := range []string{"1.4.0", "2.0.0", "dev", ""} {
+		s := newStore()
+		s.SetRunning(running)
+
+		_, diags, err := s.Load(root)
+
+		for _, d := range diags {
+			if d.Code == diag.CodeFormatNeedsNewer {
+				t.Errorf("running %q refused: %v", running, d)
+			}
+		}
+		if err != nil {
+			t.Fatal(err)
+		}
 	}
 }

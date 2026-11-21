@@ -67,7 +67,24 @@ func writeAndClose(f *os.File, data []byte, mode fs.FileMode) error {
 func fileBase(file string) string { return filepath.Base(file) }
 
 // EncodeRequest is the canonical file content of r.
-func (s *Store) EncodeRequest(r model.Request) ([]byte, error) { return s.codec.EncodeRequest(r) }
+// A file that is stored with CRLF line endings keeps them.
+func (s *Store) EncodeRequest(r model.Request) ([]byte, error) {
+	data, err := s.codec.EncodeRequest(r)
+	if err != nil {
+		return nil, err
+	}
+	old, _ := s.source(r.File)
+	return inLineEndingOf(old, data), nil
+}
+
+// EncodeEdit is the content of the file that keeps r's working copy (nil when r has none), and DecodeEdit reads it
+// back: the edit, the label of the version it started from and the overlay it was made with.
+func (s *Store) EncodeEdit(r model.Request) ([]byte, error) { return s.codec.EncodeEdit(r) }
+
+// DecodeEdit reads a file EncodeEdit wrote.
+func (s *Store) DecodeEdit(file string, data []byte) (*model.RequestVersion, string, string, diag.List) {
+	return s.codec.DecodeEdit(file, data)
+}
 
 // DecodeEnvironment reads the content of an environment file.
 func (s *Store) DecodeEnvironment(file string, data []byte) (model.Environment, diag.List) {
@@ -88,7 +105,11 @@ func (s *Store) HasComments(data []byte) bool { return s.codec.HasComments(data)
 // steps name c's requests by operationId (see EncodeFlow in package arazzo).
 func (s *Store) EncodeFlow(c model.Collection, f model.Flow) ([]byte, error) {
 	data, _, err := arazzo.EncodeFlow(f, s.flowOptions(c, f.Path))
-	return data, err
+	if err != nil {
+		return nil, err
+	}
+	old, _ := s.source(f.File)
+	return inLineEndingOf(old, data), nil
 }
 
 // EncodeFlowBody is the flow's own data in canonical form: the text kept in

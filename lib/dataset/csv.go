@@ -103,6 +103,10 @@ func dataFiles(q Query, ext string) ([]string, error) {
 	if !filepath.IsAbs(server) && q.Root != "" {
 		server = filepath.Join(q.Root, server)
 	}
+	server, err := confine(q, server)
+	if err != nil {
+		return nil, err
+	}
 	info, err := os.Stat(server)
 	if err != nil {
 		return nil, fmt.Errorf("the path %q cannot be read: %w", q.Server, errors.Unwrap(err))
@@ -258,9 +262,10 @@ func scalar(v any) any {
 	return fmt.Sprint(v)
 }
 
-func loadTable(db *sql.DB, t table, file string) (loadedTable, error) {
-	ctx := context.Background() // an in-memory database: nothing here waits on the network
-	cols := make([]string, len(t.cols))
+// columnsOf are a table's column names as they are loaded (blank ones numbered, repeats suffixed) and the type each
+// column gets.
+func columnsOf(t table) (cols, kinds []string) {
+	cols = make([]string, len(t.cols))
 	for i, n := range t.cols {
 		cols[i] = strings.TrimSpace(n)
 		if cols[i] == "" {
@@ -268,10 +273,16 @@ func loadTable(db *sql.DB, t table, file string) (loadedTable, error) {
 		}
 	}
 	cols = uniqueNames(cols)
-	kinds := make([]string, len(cols))
+	kinds = make([]string, len(cols))
 	for c := range cols {
 		kinds[c] = columnKind(t.rows, c)
 	}
+	return cols, kinds
+}
+
+func loadTable(db *sql.DB, t table, file string) (loadedTable, error) {
+	ctx := context.Background() // an in-memory database: nothing here waits on the network
+	cols, kinds := columnsOf(t)
 	var ddl strings.Builder
 	ddl.WriteString("CREATE TABLE " + quoteIdent(t.name) + " (")
 	for c, n := range cols {

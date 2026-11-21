@@ -296,7 +296,7 @@ func safeHeader(h header) bool {
 	if !tokenName.MatchString(h.name) || skippedHeader(strings.ToLower(h.name)) {
 		return false
 	}
-	for i := 0; i < len(h.value); i++ {
+	for i := range len(h.value) {
 		if c := h.value[i]; (c < 0x20 && c != '\t') || c == 0x7f {
 			return false
 		}

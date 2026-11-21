@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/githugt/flowi/lib/importers"
 	"github.com/githugt/flowi/lib/internal/names"
 	"github.com/githugt/flowi/lib/vault"
 )
@@ -20,6 +21,13 @@ func (x *execution) saveDir() string {
 	key := ResponseKey(x.version.Label, x.c.overlayName())
 	return filepath.Join(x.r.deps.DataDir(x.c.collection.Manifest.ID), "responses", string(x.c.request.ID), key)
 }
+
+// File modes. Before: every file written here was 0644, so saved responses, run reports and saved data in the data
+// directory were readable by other users of the machine, though they can hold server-issued tokens.
+const (
+	dataFileMode   os.FileMode = 0o600 // the data directory: private to the person
+	sharedFileMode os.FileMode = 0o644 // pinned examples: they live in the collection and are committed
+)
 
 // ResponseKey names the folder that keeps a version's saved responses. A send
 // with a flowi overlay keeps its own, so a VIP response never overwrites the
@@ -50,7 +58,7 @@ func saveRecord(rec *Record, dir, policy string, m vault.Masker) ([]string, erro
 	var written []string
 	for _, name := range names {
 		file := filepath.Join(dir, name)
-		if err := writeFileAtomic(file, append(data, '\n')); err != nil {
+		if err := writeFileAtomic(file, append(data, '\n'), dataFileMode); err != nil {
 			return written, err
 		}
 		written = append(written, file)
@@ -97,15 +105,49 @@ func PinExample(rec Record, requestFile, name string) (string, error) {
 	if rec.Body.JSON != nil {
 		body = rec.Body.JSON
 	}
-	data, err := json.MarshalIndent(example{Version: rec.Version, Status: rec.Status, Headers: rec.Header, Body: body}, "", "  ")
+	// Before: only the values of known vault secrets were masked, so a login response put its access_token,
+	// refresh_token and Set-Cookie into the repository. The importers' rule for credential names (the one that keeps
+	// credentials out of imported files) now applies: the shape stays, which is all a contract check needs.
+	body, _ = importers.RedactJSON(body)
+	data, err := json.MarshalIndent(example{Version: rec.Version, Status: rec.Status, Headers: redactedHeaders(rec.Header), Body: body}, "", "  ")
 	if err != nil {
 		return "", fmt.Errorf("encoding example: %w", err)
 	}
 	file := ExampleFile(requestFile, name)
-	if err := writeFileAtomic(file, append(data, '\n')); err != nil {
+	if err := writeFileAtomic(file, append(data, '\n'), sharedFileMode); err != nil {
 		return "", err
 	}
 	return file, nil
+}
+
+// pinLargeBody is the size from which a pinned body is worth a warning: it is committed with the collection.
+const pinLargeBody = 256 << 10
+
+// PinWarning says what is wrong with pinning rec, or "" when nothing is. A binary body is not written (the example
+// keeps its headers and an empty body), and a big one lands in the repository.
+//
+// Before: a binary response pinned as an empty body and a 10 MiB JSON was committed, with no word on either.
+func PinWarning(rec Record) string {
+	b := rec.Body
+	if b.Text == "" && b.JSON == nil && (b.Base64 != "" || b.File != "" || b.Size > 0) {
+		return "The body is binary or a file, so the example keeps the headers and no body."
+	}
+	if b.Size > pinLargeBody {
+		return fmt.Sprintf("The body is %d KiB: the example is committed with the collection.", b.Size>>10)
+	}
+	return ""
+}
+
+// redactedHeaders is headers with the value of each credential header (Set-Cookie, Authorization, X-Api-Key) replaced.
+func redactedHeaders(headers []Header) []Header {
+	out := make([]Header, len(headers))
+	for i, h := range headers {
+		if importers.SensitiveHeader(h.Name) {
+			h.Value = importers.Redacted
+		}
+		out[i] = h
+	}
+	return out
 }
 
 // autoPin pins a finished send as an example, as the responses.pin setting
@@ -132,8 +174,9 @@ func ExampleFile(requestFile, name string) string {
 }
 
 // writeFileAtomic writes through a temp file and a rename, so a reader
-// never sees half a file.
-func writeFileAtomic(file string, data []byte) error {
+// never sees half a file. mode is dataFileMode for what lives in the data directory (responses, run reports: they
+// can hold tokens the server issued) and sharedFileMode for what is meant to sit in a repository.
+func writeFileAtomic(file string, data []byte, mode os.FileMode) error {
 	dir := filepath.Dir(file)
 	if err := os.MkdirAll(dir, 0o750); err != nil {
 		return fmt.Errorf("creating %s: %w", dir, err)
@@ -145,7 +188,7 @@ func writeFileAtomic(file string, data []byte) error {
 	defer os.Remove(tmp.Name()) //nolint:errcheck // removes the temp file only if the rename did not happen
 	_, err = tmp.Write(data)
 	if err == nil {
-		err = tmp.Chmod(0o644)
+		err = tmp.Chmod(mode)
 	}
 	if closeErr := tmp.Close(); err == nil {
 		err = closeErr

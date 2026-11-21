@@ -29,6 +29,9 @@ jobs:
         env:
           OUTPUT: cli/RELEASE_NOTES.md
           GITHUB_REPO: ${{ github.repository }}
+      # A tag releases only code that passes its tests: before, a tag pushed on a red commit was published.
+      - name: test
+        run: go vet ./... && go test ./...
       # The tag is cli/v1.2.3; the archives are named and stamped with 1.2.3.
       - name: build the archives
         run: scripts/dist.sh "${GITHUB_REF_NAME#cli/v}"

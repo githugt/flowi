@@ -116,3 +116,23 @@ func TestPreviewSend_should_use_request_variables_as_defaults_that_the_environme
 		t.Fatalf("url %q, want %q", got.Masked.URL, want)
 	}
 }
+
+func TestPreviewSend_Given_a_multipart_part_built_from_a_secret_When_previewed_Then_only_the_real_form_carries_it(t *testing.T) {
+	f := newFixture(t)
+	r := f.addRequest("up", model.RequestVersion{Method: "POST", URL: "http://x", Body: model.Body{Multipart: []model.Field{
+		{Key: "token", Value: "t={{secret.password}}"},
+	}}})
+
+	plain := PreviewSend(f.deps(), f.input(r), false)
+	withSecrets := PreviewSend(f.deps(), f.input(r), true)
+
+	if len(plain.Masked.Parts) != 1 || strings.Contains(plain.Masked.Parts[0].Value, secretV) {
+		t.Fatalf("a masked-only preview must not read the vault, got %+v", plain.Masked.Parts)
+	}
+	if got := withSecrets.Masked.Parts[0].Value; got != vault.Mask {
+		t.Fatalf("the masked form of the real preview must hide the part, got %q", got)
+	}
+	if got := withSecrets.Real.Parts[0].Value; got != "t="+secretV {
+		t.Fatalf("the real form should carry the value, got %q", got)
+	}
+}

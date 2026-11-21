@@ -1,8 +1,10 @@
 <script lang="ts">
+  import Banner from './Banner.svelte'
+  import Button from './Button.svelte'
   // Notices from the project's signed feed. Quiet by design: with no feed, or
   // announcements off, nothing shows.
   import { onMount } from 'svelte'
-  import { Browser } from '@wailsio/runtime'
+  import { openExternal } from './lib/openurl'
   import { WelcomeService } from '../bindings/github.com/githugt/flowi/app/internal/bridge'
   import { live } from './lib/live'
 
@@ -18,19 +20,12 @@
 </script>
 
 {#each items.slice(0, 1) as it (it.id)}
-  <div class="note {it.level}" role="status">
-    <div class="text"><strong>{it.title}</strong>{#if it.body} <span>{it.body}</span>{/if}</div>
-    {#if it.url}<button onclick={() => Browser.OpenURL(it.url)}>Read more</button>{/if}
-    <button onclick={() => WelcomeService.Dismiss(it.id)}>Got it</button>
-    <button class="quiet" onclick={() => WelcomeService.TurnOffAnnouncements()}>Turn off announcements</button>
-  </div>
+  <Banner tone={it.level === 'warning' ? 'warn' : 'info'}>
+    <strong>{it.title}</strong>{#if it.body} <span>{it.body}</span>{/if}
+    {#snippet actions()}
+      {#if it.url}<Button small onclick={() => openExternal(it.url)}>Read more</Button>{/if}
+      <Button small onclick={() => WelcomeService.Dismiss(it.id)}>Got it</Button>
+      <Button small variant="ghost" onclick={() => WelcomeService.TurnOffAnnouncements()}>Turn off announcements</Button>
+    {/snippet}
+  </Banner>
 {/each}
-
-<style>
-  .note { display: flex; align-items: center; gap: 8px; padding: 6px 12px; background: color-mix(in srgb, var(--accent) 14%, var(--panel)); border-bottom: 1px solid var(--line); font-size: var(--fs-sm); }
-  .note.warning { background: color-mix(in srgb, var(--warn) 18%, var(--panel)); }
-  .text { flex: 1; }
-  button { background: var(--raised); color: var(--text); border: 0; box-shadow: inset 0 0 0 1px var(--line); border-radius: var(--r-md); padding: 0 10px; min-height: var(--ctl-h-sm); font: inherit; font-weight: 500; font-size: var(--fs-sm); }
-  button:hover:not(:disabled) { background: var(--raised-3); }
-  .quiet { color: var(--muted); border: 0; }
-</style>

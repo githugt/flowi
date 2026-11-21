@@ -116,15 +116,20 @@ func (s *ChecksService) SpecChange(collection, name, ref string) (SpecChangeView
 	if err != nil {
 		return SpecChangeView{}, err
 	}
-	v := SpecChangeView{Spec: res.Spec, Broken: res.Broken(), Breakages: []BreakageView{}}
+	return SpecChangeView{Spec: res.Spec, Broken: res.Broken(), Breakages: breakagesOf(res)}, nil
+}
+
+// breakagesOf lists what a changed description breaks, one entry per consumer.
+func breakagesOf(res flowi.SpecImpact) []BreakageView {
+	out := []BreakageView{}
 	for _, b := range res.Breakages {
 		bv := BreakageView{Request: b.Request, Version: b.Version, Where: consumerWhere(b.Consumer), Reason: b.Consumer.Reason, Reads: []ReadView{}}
 		for _, r := range b.Consumer.Reads {
 			bv.Reads = append(bv.Reads, ReadView{Expr: r.Expr, Why: r.Reason})
 		}
-		v.Breakages = append(v.Breakages, bv)
+		out = append(out, bv)
 	}
-	return v, nil
+	return out
 }
 
 // readSpec reads the description from a file, or downloads it.

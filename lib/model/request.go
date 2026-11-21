@@ -37,6 +37,9 @@ type RequestVersion struct {
 	Body    Body
 	Extract []Extraction
 	Assert  []string
+	// Expect is the HTTP status the request is meant to answer with: "401", "400-499", "4xx" or a list ("200, 404").
+	// Set, the response must match it and the seeded "fail unless 2xx" hook stands aside (see ParseExpect).
+	Expect string
 	// Outcomes are the named ways the request can end (see Outcome). None (or an empty list): success and failure.
 	Outcomes []Outcome
 	Settings Settings

@@ -20,6 +20,7 @@ type RunSummary struct {
 	File     string // the report file
 	ID       string
 	Env      string
+	Trigger  string // what started the run, "" for a report that does not say
 	Status   string
 	Seed     uint64
 	Started  time.Time
@@ -80,6 +81,7 @@ func readRunSummary(file string) (RunSummary, bool) {
 	var raw struct {
 		ID         string    `json:"id"`
 		Env        string    `json:"env"`
+		Trigger    string    `json:"trigger"`
 		Status     string    `json:"status"`
 		Seed       uint64    `json:"seed"`
 		Started    time.Time `json:"started"`
@@ -95,7 +97,7 @@ func readRunSummary(file string) (RunSummary, bool) {
 	if json.Unmarshal(data, &raw) != nil || raw.ID == "" {
 		return RunSummary{}, false
 	}
-	s := RunSummary{File: file, ID: raw.ID, Env: raw.Env, Status: raw.Status, Seed: raw.Seed, Started: raw.Started,
+	s := RunSummary{File: file, ID: raw.ID, Env: raw.Env, Trigger: raw.Trigger, Status: raw.Status, Seed: raw.Seed, Started: raw.Started,
 		Duration: time.Duration(raw.DurationMS) * time.Millisecond}
 	for _, n := range raw.Nodes {
 		s.Nodes = append(s.Nodes, RunNodeSummary{ID: n.ID, Name: n.Name, Type: n.Type, Status: n.Status,

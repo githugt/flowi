@@ -28,6 +28,7 @@ export const screens: Screen[] = [
   { id: 'screen:home', title: 'Home', icon: 'home', menu: 'home', rail: false },
   { id: 'screen:welcome', title: 'Welcome', icon: 'home', menu: 'welcome', rail: false },
   { id: 'screen:about', title: 'About', icon: 'home', menu: 'about', rail: false },
+  { id: 'screen:envcompare', title: 'Compare environments', icon: 'key', menu: 'envcompare', rail: false },
   { id: 'screen:telemetry', title: 'Telemetry', icon: 'chart', menu: 'telemetry', rail: false },
 ]
 

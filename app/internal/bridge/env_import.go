@@ -63,23 +63,54 @@ func (s *WorkspaceService) ImportEnvironments(collection string) ([]string, erro
 	}
 	_, have := s.collectionsAndEnvNames()
 	added := []string{}
-	for _, e := range envs {
+	// A child comes after its base, so its "builds on" can be written when it is created.
+	for _, e := range inBaseOrder(envs, have) {
 		if slices.Contains(have, e.Name) {
 			continue
 		}
-		if err := s.copyEnvironment(e); err != nil {
+		if err := s.copyEnvironment(e, have); err != nil {
 			s.app.actor.Do(s.app.workspace.Load)
 			return added, fmt.Errorf("adding environment %q: %w", e.Name, err)
 		}
+		have = append(have, e.Name)
 		added = append(added, e.Name)
 	}
 	s.app.actor.Do(s.app.workspace.Load) // nothing watches the environments directory
 	return added, nil
 }
 
-// copyEnvironment creates e in the workspace with its variables. It calls the
-// backend, so it runs off the actor.
-func (s *WorkspaceService) copyEnvironment(e model.Environment) error {
+// inBaseOrder puts every environment after the one it builds on, when both are in envs. Environments that build on
+// nothing, or on one the workspace already has, keep their order. A loop stays as it is: the engine reports it.
+func inBaseOrder(envs []model.Environment, have []string) []model.Environment {
+	out := make([]model.Environment, 0, len(envs))
+	placed := map[string]bool{}
+	for _, n := range have {
+		placed[n] = true
+	}
+	pending := slices.Clone(envs)
+	for len(pending) > 0 {
+		progress := false
+		rest := pending[:0:0]
+		for _, e := range pending {
+			waits := e.Extends != "" && !placed[e.Extends] && slices.ContainsFunc(pending, func(x model.Environment) bool { return x.Name == e.Extends })
+			if waits {
+				rest = append(rest, e)
+				continue
+			}
+			out, placed[e.Name], progress = append(out, e), true, true
+		}
+		if !progress {
+			return append(out, rest...)
+		}
+		pending = rest
+	}
+	return out
+}
+
+// copyEnvironment creates e in the workspace with its colour, its base and its variables with their kinds. have
+// is what the workspace holds: a base it lacks is left out, because the file would name an environment that does
+// not exist. It calls the backend, so it runs off the actor.
+func (s *WorkspaceService) copyEnvironment(e model.Environment, have []string) error {
 	file, err := s.app.backend.NewEnvironment(e.Name)
 	if err != nil {
 		return err
@@ -88,9 +119,14 @@ func (s *WorkspaceService) copyEnvironment(e model.Environment) error {
 	if i := slices.IndexFunc(s.app.backend.Environments(), func(x model.Environment) bool { return x.File == file }); i >= 0 {
 		created = s.app.backend.Environments()[i] // keeps the fresh id NewEnvironment gave it
 	}
+	// Before: colour, "builds on" and kinds were dropped, so a shipped prod lost its colour and numbers became text.
+	created.Colour = e.Colour
+	if slices.Contains(have, e.Extends) {
+		created.Extends = e.Extends
+	}
 	created.Vars = make([]model.EnvVar, len(e.Vars))
 	for i, v := range e.Vars {
-		created.Vars[i] = model.EnvVar{Name: v.Name, Value: v.Value, Secret: v.Secret}
+		created.Vars[i] = model.EnvVar{Name: v.Name, Value: v.Value, Secret: v.Secret, Kind: v.Kind}
 	}
 	return s.app.backend.SaveEnvironment(created, false)
 }
@@ -196,4 +232,44 @@ func appendValueTexts(texts []string, v any) []string {
 		return appendFieldTexts(texts, x)
 	}
 	return texts
+}
+
+// EnvShareView is how sharing an environment with a collection ended.
+type EnvShareView struct {
+	File   string   `json:"file"`
+	Exists bool     `json:"exists"` // a file of that name is already there and was not touched: ask, then share with overwrite
+	Notes  []string `json:"notes"`
+}
+
+// ShareTargets are the mounted collections an environment can be shared with: not the drafts, which have no folder to
+// commit.
+func (s *EnvironmentService) ShareTargets() []Choice {
+	cols, _ := (&WorkspaceService{app: s.app}).collectionsAndEnvNames()
+	out := []Choice{}
+	for _, c := range cols {
+		out = append(out, Choice{ID: string(c.Manifest.ID), Label: c.Manifest.Name, Path: c.Manifest.Name})
+	}
+	return out
+}
+
+// Share writes the open environment into the collection's own environments folder, so it travels with the collection.
+// Secrets go as declarations with no values. The environment must be saved: what is shared is the file's content, not
+// the edits on the screen. A file already there is kept unless overwrite is set.
+//
+// Before: environments could be imported from a collection but never exported to one.
+func (s *EnvironmentService) Share(node, collection string, overwrite bool) (EnvShareView, error) {
+	var name string
+	var dirty, found bool
+	s.with(node, func(e *vm.Environment) { name, dirty, found = e.Name(), e.Dirty(), true })
+	switch {
+	case !found:
+		return EnvShareView{}, fmt.Errorf("%q is not open", node)
+	case dirty:
+		return EnvShareView{}, fmt.Errorf("save %s first: sharing writes what is saved, not the edits on the screen", name)
+	}
+	file, exists, notes, err := s.app.backend.ShareEnvironment(model.ID(collection), name, overwrite)
+	if err != nil {
+		return EnvShareView{}, err
+	}
+	return EnvShareView{File: file, Exists: exists, Notes: nonNil(notes)}, nil
 }

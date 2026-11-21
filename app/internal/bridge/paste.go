@@ -6,7 +6,9 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	"slices"
+	"time"
 
 	flowi "github.com/githugt/flowi/lib"
 	"github.com/githugt/flowi/lib/diag"
@@ -67,6 +69,28 @@ func (s *RequestService) FillFromPaste(node, kind, text string) (int, error) {
 		})
 	})
 	return count, err
+}
+
+// PastedSecrets are the secret variables a fill from text of the given kind would reference in place of a
+// credential in the text ("{{secret.authorization}}"), without the credential itself: the window says so before
+// the fill and points to Secrets for the value. Nil for text that holds none, or that cannot fill.
+// Before: the credential was dropped and the request got a reference to a secret that had no value, with only a
+// hint about a command line tool in the diagnostics that the window did not show.
+func (s *RequestService) PastedSecrets(kind, text string) []string {
+	parse, ok := pasteFillers()[kind]
+	if !ok {
+		return nil
+	}
+	res, _ := parse([]byte(text), "pasted text")
+	var out []string
+	for _, it := range res.Items {
+		for _, d := range it.Diags {
+			if p := d.Args["placeholder"]; d.Code == diag.CodeImportSensitive && p != "" && !slices.Contains(out, p) {
+				out = append(out, p)
+			}
+		}
+	}
+	return out
 }
 
 // pasteKindRequestFile is the kind of text that is a Flowi request file (the YAML of a `*.req.yaml`).
@@ -206,4 +230,31 @@ func (s *ImportService) Close() error {
 		return fmt.Errorf("removing the pasted text: %w", err)
 	}
 	return nil
+}
+
+// stalePasteAge is how old a pasted-text file must be before a launch removes it: a file of a window that is still
+// open is much younger.
+const stalePasteAge = 12 * time.Hour
+
+// sweepPasted removes the pasted-text files an earlier run left in dir (a crash or a kill skips Close), and
+// returns how many it removed. Only files this service names and that are older than olderThan go.
+//
+// Before: a pasted collection or HAR stayed in the temp folder until the app quit cleanly, and after a crash
+// it stayed for good.
+func sweepPasted(dir string, olderThan time.Duration, now time.Time) int {
+	files, err := filepath.Glob(filepath.Join(dir, "flowi-paste-*"))
+	if err != nil {
+		return 0
+	}
+	removed := 0
+	for _, f := range files {
+		info, err := os.Lstat(f)
+		if err != nil || !info.Mode().IsRegular() || now.Sub(info.ModTime()) < olderThan {
+			continue
+		}
+		if os.Remove(f) == nil {
+			removed++
+		}
+	}
+	return removed
 }

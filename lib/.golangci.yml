@@ -13,6 +13,10 @@ linters:
     - noctx
     - revive
   settings:
+    misspell:
+      # Mosquitto is the MQTT broker's name, not a typo.
+      ignore-rules:
+        - mosquitto
     forbidigo:
       forbid:
         - pattern: '^fmt\.Print(f|ln)?$'

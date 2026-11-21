@@ -1,4 +1,5 @@
 <script lang="ts">
+  import Banner from './Banner.svelte'
   import Button from './Button.svelte'
   // A mounted collection that ships environments the workspace does not have
   // (an example, a colleague's folder) offers to add them. The workspace's
@@ -34,17 +35,12 @@
 </script>
 
 {#if offer}
-  <div class="note" role="status">
-    <div class="text">
-      <strong>{offer.name}</strong> comes with {offer.environments.length === 1 ? 'an environment' : `${offer.environments.length} environments`}
-      ({list(offer.environments)}) that this workspace does not have yet.
-    </div>
-    <Button variant="primary" small onclick={() => add(offer)}>Add {offer.environments.length === 1 ? 'it' : 'them'}</Button>
-    <Button variant="ghost" small onclick={() => (declined = [...declined, offer.collection])}>Not now</Button>
-  </div>
+  <Banner>
+    <strong>{offer.name}</strong> comes with {offer.environments.length === 1 ? 'an environment' : `${offer.environments.length} environments`}
+    ({list(offer.environments)}) that this workspace does not have yet.
+    {#snippet actions()}
+      <Button variant="primary" small onclick={() => add(offer)}>Add {offer.environments.length === 1 ? 'it' : 'them'}</Button>
+      <Button variant="ghost" small onclick={() => (declined = [...declined, offer.collection])}>Not now</Button>
+    {/snippet}
+  </Banner>
 {/if}
-
-<style>
-  .note { display: flex; align-items: center; gap: var(--sp-2); padding: 6px 12px; background: color-mix(in srgb, var(--accent) 14%, var(--panel)); border-bottom: 1px solid var(--line); font-size: var(--fs-sm); }
-  .text { flex: 1; }
-</style>

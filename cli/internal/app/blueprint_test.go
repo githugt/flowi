@@ -184,3 +184,18 @@ func TestFmt_should_rewrite_a_blueprint_in_canonical_form(t *testing.T) {
 		t.Fatalf("exit %d\n%s\nfile:\n%s", code, errOut, data)
 	}
 }
+
+// Before: `flowi validate` could not say whether the flows could run in an environment, so a teammate or a CI job found
+// the missing secret halfway through a run.
+func TestValidate_with_env_should_warn_about_a_secret_the_environment_does_not_declare(t *testing.T) {
+	e := newSendEnv(t)
+	writeFile(t, filepath.Join(e.dir, "example", "flows", "needs-key.arazzo.yaml"),
+		arazzoFlow("id: 01JA0000000000000000000041\nnodes:\n  - id: peek\n    type: log\n    value: \"{{secret.undeclared_key}}\"\n"))
+
+	plain, _, _ := e.run(context.Background(), "validate")
+	code, out, errOut := e.run(context.Background(), "validate", "--env", "staging")
+
+	if plain != 0 || code != 0 || !strings.Contains(out, "FLW-RUN-028") || !strings.Contains(out, "undeclared_key") {
+		t.Fatalf("plain exit %d, exit %d\nstdout:\n%s\nstderr:\n%s", plain, code, out, errOut)
+	}
+}

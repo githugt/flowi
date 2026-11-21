@@ -1,5 +1,6 @@
 <script lang="ts">
-  import { Browser } from '@wailsio/runtime'
+  import { claimedOtherHost, linkHost, openExternal } from './lib/openurl'
+  import { ui } from './lib/ui.svelte'
   import { renderMarkdown } from './lib/markdown'
 
   let { text }: { text: string } = $props()
@@ -9,7 +10,11 @@
     const a = (e.target as HTMLElement).closest('a[data-href]')
     if (a) {
       e.preventDefault()
-      Browser.OpenURL(a.getAttribute('data-href')!)
+      // The attribute holds the address as escaped HTML; the DOM has already decoded it.
+      const url = a.getAttribute('data-href')!
+      const claimed = claimedOtherHost(a.textContent ?? '', url)
+      if (!claimed) return void openExternal(url)
+      ui.confirm('Open this link?', `The link says ${claimed}, but it goes to ${linkHost(url)}.`, () => void openExternal(url), 'Open')
     }
   }
 </script>

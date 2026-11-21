@@ -1,4 +1,9 @@
 <script lang="ts">
+  import Checkbox from './Checkbox.svelte'
+  import { anchorAt, type MenuAt } from './lib/menuanchor'
+  import IconButton from './IconButton.svelte'
+  import { radiogroup } from './lib/radiogroup'
+  import { isLetter } from './lib/keymatch'
   import Button from './Button.svelte'
   import HiddenChars from './HiddenChars.svelte'
   import { EnvironmentService } from '../bindings/github.com/githugt/flowi/app/internal/bridge'
@@ -6,12 +11,21 @@
   import FileBanner from './FileBanner.svelte'
   import Hint from './Hint.svelte'
   import { envSwatch } from './lib/envcolours'
+  import { secretLike } from './lib/secretname'
+  import { envRowMatches, FILTER_FROM } from './lib/envfilter'
+  import SearchField from './SearchField.svelte'
+  import Menu, { type MenuItem } from './Menu.svelte'
+  import Select from './Select.svelte'
+  import { ui } from './lib/ui.svelte'
+  import { errorText } from './lib/errors'
+  import { replaceShareText, sharedNotice } from './lib/envshare'
 
   let { view }: { view: EnvView } = $props()
   const node = $derived(view.node)
 
   let rows = $state<EnvRow[]>([])
   let within = $state(false)
+  let filter = $state('')
   $effect(() => {
     if (!within) rows = view.rows.map((r) => ({ ...r }))
   })
@@ -23,6 +37,38 @@
   }
 
   const push = () => EnvironmentService.SetRows(node, $state.snapshot(rows))
+
+  // Share with a collection: the file goes into the collection's own environments folder, so it travels with it.
+  let shareOpen = $state(false)
+  let shareAt = $state<MenuAt>({ x: 0, y: 0 })
+  let shareItems = $state<MenuItem[]>([])
+  async function openShare(e: MouseEvent) {
+    if (shareOpen) return void (shareOpen = false)
+    const at = anchorAt((e.currentTarget as HTMLElement).getBoundingClientRect(), { end: true })
+    try {
+      const targets = (await EnvironmentService.ShareTargets()) as unknown as { id: string; label: string }[]
+      shareItems = targets.length
+        ? targets.map((t) => ({ label: t.label, onselect: () => share(t.id, t.label, false) }))
+        : [{ label: 'Open a collection first', onselect: () => {}, disabled: true }]
+      shareAt = at
+      shareOpen = true
+    } catch (e) {
+      ui.toast(errorText(e), 'error')
+    }
+  }
+  async function share(collection: string, label: string, overwrite: boolean) {
+    shareOpen = false
+    try {
+      const r = await EnvironmentService.Share(node, collection, overwrite)
+      if (r.exists) {
+        const d = replaceShareText(view.name, label)
+        return ui.confirm(d.title, d.text, () => share(collection, label, true), d.action)
+      }
+      ui.toast(sharedNotice(view.name, label, (r.notes ?? []) as string[]))
+    } catch (e) {
+      ui.toast(errorText(e), 'error')
+    }
+  }
 
   // Variables the requests and flows use that this environment does not set yet, offered as rows.
   let unset = $state<MissingVar[]>([])
@@ -39,7 +85,7 @@
   }
 
   function onkeydown(e: KeyboardEvent) {
-    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 's') {
+    if ((e.metaKey || e.ctrlKey) && isLetter(e, 's')) {
       e.preventDefault()
       EnvironmentService.Save(node)
     }
@@ -55,21 +101,27 @@
     <span class="spacer"></span>
     <label class="base" title="Variables of the base apply unless this environment sets the same name. Secrets are not inherited.">
       <span>Builds on</span>
-      <select value={view.extends} onchange={(e) => EnvironmentService.SetExtends(node, e.currentTarget.value)}>
+      <Select value={view.extends} onchange={(e) => EnvironmentService.SetExtends(node, e.currentTarget.value)}>
         <option value="">nothing</option>
         {#each view.bases as b}<option value={b}>{b}</option>{/each}
-      </select>
+      </Select>
     </label>
-    <div class="swatches" role="radiogroup" aria-label="Colour">
+    <div class="swatches" role="radiogroup" use:radiogroup aria-label="Colour">
       <button class="sw none" class:on={!view.colour} role="radio" aria-checked={!view.colour} title="Default colour" aria-label="Default colour" onclick={() => EnvironmentService.SetColour(node, '')}></button>
       {#each view.colours as c}
         <button class="sw" class:on={view.colour === c} role="radio" aria-checked={view.colour === c} title={c} aria-label={c} style:background={envSwatch(c)} onclick={() => EnvironmentService.SetColour(node, c)}></button>
       {/each}
     </div>
+    <span class="base"><Checkbox checked={view.protected} onchange={(v) => EnvironmentService.SetProtected(node, v)} title="Ask before a request that changes data (anything but GET, HEAD or OPTIONS) is sent with this environment, and before a flow runs in it.">Ask before writes</Checkbox></span>
+    <span class="share">
+      <Button aria-haspopup="menu" aria-expanded={shareOpen} title={view.dirty ? 'Save first: sharing writes what is saved' : "Write this environment into a collection's own environments folder, so it travels with the collection"} disabled={view.dirty || !view.onDisk} onclick={openShare}>Share with…</Button>
+      {#if shareOpen}<Menu at={shareAt} label="Share with a collection" items={shareItems} onclose={() => (shareOpen = false)} />{/if}
+    </span>
     <Button variant="primary" disabled={!view.dirty} onclick={() => EnvironmentService.Save(node)}>Save</Button>
   </header>
   <FileBanner
     onDisk={view.onDisk}
+    dirty={view.dirty}
     needsDrop={view.needsDrop}
     revert={() => EnvironmentService.Revert(node)}
     saveDropping={() => EnvironmentService.SaveDroppingComments(node)}
@@ -81,15 +133,17 @@
       <div class="unset">
         <span>Used by your requests and flows but not set here:</span>
         {#each unset as v}<button class="chip" title="Add a row for it" onclick={() => addRows([v])}>+ {v.name}{v.secret ? ' 🔒' : ''}</button>{/each}
-        {#if unset.length > 1}<button class="all" onclick={() => addRows(unset)}>Add all</button>{/if}
+        {#if unset.length > 1}<Button variant="link" onclick={() => addRows(unset)}>Add all</Button>{/if}
       </div>
     {/if}
     <p class="muted">Secrets (🔒) are kept in the encrypted workspace vault, never in the file, and are not shown again once saved. To change one, type a new value; leave the box blank to keep the saved one.<Hint>To see a stored secret again, open <b>Workspace → Secrets…</b> and choose <b>Show</b> on that secret, or run <code>flowi secret get &lt;env&gt; &lt;name&gt; --reveal</code> in a terminal. It shows one secret for a few seconds.</Hint></p>
+    {#if rows.length >= FILTER_FROM}<div class="find"><SearchField bind:value={filter} placeholder="Filter variables…" label="Filter variables" small /></div>{/if}
     <div class="head"><span>Name</span><span>Value</span><span>Type</span><span>Secret</span><span></span></div>
     {#each rows as r, i}
+      {#if envRowMatches(r, filter)}
       <div class="row">
         <input placeholder="name" bind:value={r.name} oninput={push} spellcheck="false" />
-        <span class="cell">
+        <span class="cell sensitive">
           <input
             type={r.secret ? 'password' : 'text'}
             placeholder={r.secret ? (r.secretSet ? '•••••• (stored; type to replace)' : 'value (stored in the vault)') : 'value'}
@@ -99,26 +153,30 @@
           />
           <HiddenChars value={r.value} onclean={(t) => { r.value = t; push() }} />
         </span>
-        <select class="kind" aria-label="Type of {r.name || 'variable'}" bind:value={r.kind} onchange={push} disabled={r.secret} title="A number, true/false or an object keeps its type when used on its own, so a JSON body gets 5 and not &quot;5&quot;.">
+        <Select fill label="Type of {r.name || 'variable'}" bind:value={r.kind} onchange={push} disabled={r.secret} title="A number, true/false or an object keeps its type when used on its own, so a JSON body gets 5 and not &quot;5&quot;.">
           <option value="">text</option>
           <option value="number">number</option>
           <option value="boolean">true/false</option>
           <option value="json">object</option>
-        </select>
-        <label class="secret" title={r.override ? 'Overridden by an environment variable' : ''}>
-          <input type="checkbox" bind:checked={r.secret} onchange={push} />{r.override ? 'override' : ''}
-        </label>
-        <button class="x" aria-label="Remove variable" onclick={() => { rows.splice(i, 1); push() }}>×</button>
+        </Select>
+        <span class="secret"><Checkbox bind:checked={r.secret} onchange={push} label="Secret: {r.name || 'variable'}" title={r.override ? 'Overridden by an environment variable' : ''}>{r.override ? 'override' : 'secret'}</Checkbox></span>
+        <IconButton icon="close" size={12} danger label="Remove variable" onclick={() => { rows.splice(i, 1); push() }} />
       </div>
+      {#if !r.secret}
+        {@const why = secretLike(r.name, r.value)}
+        {#if why}
+          <p class="looks">⚠ {why} It is saved in the file as plain text. <Button variant="link" onclick={() => { r.secret = true; push() }}>Make secret</Button></p>
+        {/if}
+      {/if}
+      {/if}
     {/each}
-    <button class="add" onclick={() => rows.push({ name: '', value: '', secret: false, secretSet: false, override: false, kind: '' })}>+ Add variable</button>
+    <Button variant="link" onclick={() => rows.push({ name: '', value: '', secret: false, secretSet: false, override: false, kind: '' })}>+ Add variable</Button>
   </div>
 </div>
 
 <style>
   .env { position: absolute; inset: 0; display: flex; flex-direction: column; }
   .base { display: flex; align-items: center; gap: 6px; margin-right: 12px; font-size: var(--fs-sm); color: var(--muted); }
-  .base select { height: var(--ctl-h); }
   .swatches { display: flex; align-items: center; gap: 6px; margin-right: 8px; }
   .sw { width: 16px; height: 16px; padding: 0; border-radius: 50%; border: 2px solid transparent; box-sizing: border-box; background: var(--bg); }
   .sw.none { border: 1px dashed var(--muted); }
@@ -130,6 +188,7 @@
   .muted { color: var(--muted); font-size: var(--fs-sm); margin: 0 0 6px; }
   .err { margin: 0; padding: 6px 12px; color: var(--fail); }
   .head, .row { display: grid; grid-template-columns: 1fr 1.6fr 96px 70px 24px; gap: 6px; align-items: center; }
+  .find { max-width: 280px; }
   .head { color: var(--muted); font-size: var(--fs-xs); }
   input[type='text'], input[type='password'], input:not([type]) {
     min-width: 0; background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); padding: 5px 8px;
@@ -138,15 +197,12 @@
   input:focus { border-color: var(--accent); }
   .cell { position: relative; display: flex; min-width: 0; }
   .cell input { flex: 1; min-width: 0; }
-  .kind { height: var(--ctl-h); min-width: 0; }
   .secret { display: flex; align-items: center; gap: 4px; font-size: var(--fs-xs); color: var(--muted); }
   button { background: var(--raised); color: var(--text); border: 0; box-shadow: inset 0 0 0 1px var(--line); border-radius: var(--r-md); padding: 0 12px; min-height: var(--ctl-h); font: inherit; font-weight: 500; }
   button:hover:not(:disabled) { background: var(--raised-3); }
-  button:disabled { opacity: 0.4; }
-  .x { border: 0; color: var(--muted); padding: 0; }
+  button:disabled { opacity: var(--op-disabled); }
+  .looks { margin: -2px 0 2px; font-size: var(--fs-xs); color: var(--warn); display: flex; align-items: center; gap: var(--sp-2); flex-wrap: wrap; }
   .unset { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-1) var(--sp-2); padding: var(--sp-2) var(--sp-3); margin-bottom: var(--sp-2); border: 1px solid color-mix(in srgb, var(--warn) 45%, var(--line)); border-radius: var(--r-lg); background: color-mix(in srgb, var(--warn) 8%, transparent); font-size: var(--fs-sm); }
   .chip { font-family: var(--mono); font-size: var(--fs-xs); border-radius: var(--r-pill); padding: 1px 10px; }
-  .chip:hover, .all:hover { border-color: var(--accent); }
-  .all { border: 0; color: var(--accent); padding: 1px 4px; }
-  .add { align-self: flex-start; border: 0; color: var(--accent); padding: 4px 0; }
+  .chip:hover { border-color: var(--accent); }
 </style>

@@ -3,6 +3,9 @@
 package bridge
 
 import (
+	"fmt"
+	"strings"
+
 	"github.com/githugt/flowi/lib/settings"
 
 	"github.com/githugt/flowi/app/internal/palette"
@@ -19,6 +22,25 @@ type SettingView struct {
 	Source      string   `json:"source"`
 	UserSet     bool     `json:"userSet"` // the user layer sets it: Reset removes it
 	Problem     string   `json:"problem,omitempty"`
+	// Default is the built-in value as text, and Min and Max the bounds of a whole number (Max 0: no upper bound).
+	Default string `json:"default,omitempty"`
+	Min     int64  `json:"min,omitempty"`
+	Max     int64  `json:"max,omitempty"`
+}
+
+// defaultText is a setting's built-in value as the page shows it: a list joined by commas.
+func defaultText(k settings.Key) string {
+	if list, ok := k.Default.([]any); ok {
+		parts := make([]string, len(list))
+		for i, v := range list {
+			parts[i] = fmt.Sprint(v)
+		}
+		return strings.Join(parts, ", ")
+	}
+	if k.Default == nil {
+		return ""
+	}
+	return fmt.Sprint(k.Default)
 }
 
 // SettingGroup is a group of settings, in schema order.
@@ -42,9 +64,13 @@ type Appearance struct {
 	// SendButton is the colour of the Send button: orange, violet, emerald, cyan or outline.
 	SendButton string `json:"sendButton"`
 	// Density is how much room rows and controls take: comfortable or compact.
-	Density  string `json:"density"`
-	Font     string `json:"font"`
+	Density string `json:"density"`
+	Font    string `json:"font"`
+	// MonoFont is the font of URLs, code and values; "" uses the system monospace.
+	MonoFont string `json:"monoFont"`
 	FontSize int    `json:"fontSize"`
+	// HideSensitive blurs secrets on screen (ui.hide_sensitive), for a talk or a screenshot.
+	HideSensitive bool `json:"hideSensitive"`
 	// Custom is the palette of the "custom" theme when its file is read; CustomProblem says why it
 	// is not (the window then keeps the theme it has).
 	Custom        *CustomPalette `json:"custom,omitempty"`
@@ -112,6 +138,7 @@ func (s *SettingsService) view() SettingsView {
 			group.Fields = append(group.Fields, SettingView{
 				Name: f.Key.Name, Description: f.Key.Description, Kind: kindNamesOfSetting()[f.Key.Kind], Enum: f.Key.Enum,
 				Value: f.Value, Source: f.Source, UserSet: f.UserSet, Problem: f.Problem,
+				Default: defaultText(f.Key), Min: f.Key.Min, Max: f.Key.Max,
 			})
 			s.fillAppearance(&v.Appearance, f)
 		}
@@ -152,6 +179,10 @@ func (s *SettingsService) fillAppearance(a *Appearance, f vm.SettingField) {
 		a.Density = f.Value
 	case "appearance.font":
 		a.Font = f.Value
+	case "appearance.mono_font":
+		a.MonoFont = f.Value
+	case "ui.hide_sensitive":
+		a.HideSensitive = f.Value == "true"
 	case "appearance.font_size":
 		for _, c := range f.Value {
 			a.FontSize = a.FontSize*10 + int(c-'0')

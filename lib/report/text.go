@@ -76,9 +76,32 @@ func envSuffix(env string) string {
 
 func handledSuffix(n Node) string {
 	if n.Handled {
-		return "  (failed, continued)"
+		return "  (failed, continued)" + checksSuffix(n)
 	}
-	return ""
+	return triesSuffix(n)
+}
+
+// checksSuffix tells how many of a request's checks passed ("3/4 checks"), when it ran any.
+func checksSuffix(n Node) string {
+	passed, total := n.ChecksPassed()
+	switch total {
+	case 0:
+		return ""
+	case 1:
+		return fmt.Sprintf("  (%d/1 check)", passed)
+	}
+	return fmt.Sprintf("  (%d/%d checks)", passed, total)
+}
+
+// triesSuffix says that a node ran more than once: flaky when it passed only after a retry.
+func triesSuffix(n Node) string {
+	switch {
+	case n.Flaky:
+		return fmt.Sprintf("  (flaky: passed on try %d)", n.Tries) + checksSuffix(n)
+	case n.Tries > 1:
+		return fmt.Sprintf("  (%d tries)", n.Tries) + checksSuffix(n)
+	}
+	return checksSuffix(n)
 }
 
 // printer writes indented lines and keeps the first error.

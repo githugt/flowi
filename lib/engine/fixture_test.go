@@ -31,7 +31,11 @@ const (
 )
 
 // fakeLookup serves in-memory collections the way the facade will.
-type fakeLookup struct{ collections []model.Collection }
+type fakeLookup struct {
+	collections []model.Collection
+	// user is the person's own settings, the only layer that can set the personal ones (secrets.host_check).
+	user model.Settings
+}
 
 func (l *fakeLookup) Collection(id model.ID) (model.Collection, bool) {
 	for _, c := range l.collections {
@@ -67,6 +71,10 @@ func (l *fakeLookup) Flow(ref model.Ref, _ model.ID) (model.Collection, model.Fl
 func (l *fakeLookup) Settings(collection model.ID, folder string, version model.Settings) settings.Resolved {
 	schema := settings.Schema()
 	var layers []settings.LayerValues
+	if l.user != nil {
+		ul, _ := settings.FromBlock(schema, settings.LayerUser, "user", l.user)
+		layers = append(layers, ul)
+	}
 	if c, ok := l.Collection(collection); ok {
 		lv, _ := settings.FromBlock(schema, settings.LayerCollection, "flowi.yaml", c.Manifest.Settings)
 		layers = append(layers, lv)
@@ -134,7 +142,7 @@ func newFixture(t *testing.T) *fixture {
 		Manifest: model.Manifest{Format: 1, Meta: model.Meta{ID: collID, Name: "Test"}, Settings: model.Settings{}},
 		Environments: []model.Environment{{
 			Meta: model.Meta{ID: envID, Name: "local"},
-			Vars: []model.EnvVar{{Name: "base_url", Value: f.srv.URL}, {Name: "password", Secret: true}, {Name: "api_key", Secret: true}},
+			Vars: []model.EnvVar{{Name: "base_url", Value: f.srv.URL}, {Name: "broker_url", Value: "mqtt://broker:1883"}, {Name: "password", Secret: true}, {Name: "api_key", Secret: true}},
 		}},
 	}
 	f.lookup = &fakeLookup{collections: []model.Collection{coll}}
@@ -175,6 +183,14 @@ func (f *fixture) handler() http.Handler {
 		w.Header().Set("Sunset", "Sat, 31 Dec 2033 23:59:59 GMT")
 		w.Header().Set("Link", `</v2/legacy>; rel="successor-version"`)
 		writeJSON(w, map[string]any{"ok": true})
+	})
+	mux.HandleFunc("POST /graphql", func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		if strings.Contains(string(body), "broken") { // a GraphQL server answers 200 when the query failed
+			writeJSON(w, map[string]any{"data": nil, "errors": []any{map[string]any{"message": "Cannot query field \"broken\""}, map[string]any{"message": "second"}}})
+			return
+		}
+		writeJSON(w, map[string]any{"data": map[string]any{"ok": true}})
 	})
 	mux.HandleFunc("/limited", func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("RateLimit-Policy", `"default";q=100;w=60`)

@@ -43,6 +43,32 @@ type Param struct {
 	Complex  bool     `json:"complex,omitempty"` // a list or mapping: edited in the file
 }
 
+// FlowIO is an input or an output of a flow, as a subflow step shows it.
+type FlowIO struct {
+	Name     string `json:"name"`
+	Type     string `json:"type,omitempty"`
+	Default  string `json:"default,omitempty"`
+	Required bool   `json:"required,omitempty"` // an input with no default
+}
+
+// subflowIO lists the inputs and outputs of the flow ref in c; both empty when the flow is not there.
+//
+// Before: the inputs and outputs of the called flow were invisible on the step, so "with" was free text.
+func subflowIO(c model.Collection, ref model.ID) (ins, outs []FlowIO) {
+	for _, f := range c.Flows {
+		if f.ID != ref {
+			continue
+		}
+		for _, in := range f.Inputs {
+			ins = append(ins, FlowIO{Name: in.Name, Type: in.Type, Default: in.Default, Required: in.Default == ""})
+		}
+		for _, out := range f.Outputs {
+			outs = append(outs, FlowIO{Name: out.Name, Type: out.Type})
+		}
+	}
+	return ins, outs
+}
+
 // Call is what a request or subflow step calls.
 type Call struct {
 	Kind    string   `json:"kind"` // request or subflow
@@ -54,12 +80,18 @@ type Call struct {
 	Overlay  string   `json:"overlay,omitempty"`
 	Overlays []string `json:"overlays,omitempty"`
 	// Open, Over and Close are the step's use of a connection kept open between steps.
-	Open    string `json:"open,omitempty"`
-	Over    string `json:"over,omitempty"`
-	Close   bool   `json:"close,omitempty"`
-	With    []Pair `json:"with"`
-	Headers []Pair `json:"headers,omitempty"`
-	Hooks   string `json:"hooks,omitempty"`
+	Open string `json:"open,omitempty"`
+	Over string `json:"over,omitempty"`
+	// Connections are the names the flow's steps open, offered as the ones a step can run over.
+	Connections []string `json:"connections,omitempty"`
+	Close       bool     `json:"close,omitempty"`
+	With        []Pair   `json:"with"`
+	Headers     []Pair   `json:"headers,omitempty"`
+	Hooks       string   `json:"hooks,omitempty"`
+	// Inputs and Outputs are the called flow's, for a subflow step in the same collection: what "with" can set and
+	// what later steps can read as nodes.<id>.<name>.
+	Inputs  []FlowIO `json:"inputs,omitempty"`
+	Outputs []FlowIO `json:"outputs,omitempty"`
 	// Outcomes are the step's outcomes: its own when OutcomesOwn, else its request's (success and failure when
 	// the request writes none). RuleKind says which help the rules get: http, message or dataset.
 	Outcomes    []model.Outcome `json:"outcomes"`
@@ -89,6 +121,9 @@ type StepForm struct {
 	UsedBy      []Use      `json:"usedBy"`      // steps that read values it makes
 	When        string     `json:"when"`
 	Timeout     string     `json:"timeout"`
+	CanRetry    bool       `json:"canRetry"`  // a request, fetch, webhook or subflow step, which may have retries
+	Retries     string     `json:"retries"`   // how many more tries a failed step gets; "" for none
+	RetryWait   string     `json:"retryWait"` // the pause before each new try; "" for none
 	Concurrent  bool       `json:"concurrent"`
 	FailMode    string     `json:"failMode"` // fail, continue, goto
 	FailTarget  string     `json:"failTarget"`
@@ -198,6 +233,7 @@ func (s *FlowService) stepFormOf(d *vm.FlowDoc, run *vm.FlowRun, n model.Node) S
 		ID: n.ID, Type: string(n.Type), Group: spec.Group, Summary: spec.Summary,
 		Name: n.Name, Description: n.Description, Needs: nonNil(n.Needs), Previous: d.Previous(n.ID), NeedChoices: nonNil(d.EarlierIDs(n.ID)), When: n.When,
 		Timeout: durationText(n.Timeout), Concurrent: n.Concurrent,
+		CanRetry: n.Type.CanRetry(), Retries: countText(n.Retries), RetryWait: durationText(n.RetryWait),
 		FailMode: string(mode), FailTarget: target, Steps: others, Attach: n.Attach, AttachAt: n.AttachAt, AttachTo: attachChoices(d, n), Attached: attachedTo(d, n),
 		Call: s.callOf(d, n), Params: paramsOf(n, spec),
 	}
@@ -258,11 +294,12 @@ func (s *FlowService) callOf(d *vm.FlowDoc, n model.Node) *Call {
 		outcomes, own, kind := s.outcomesOf(d.Collection(), n)
 		return &Call{
 			Kind: "request", Ref: string(n.Request.Request.ID), Choices: s.requestChoices(d.Collection()),
-			Version: n.Request.Version, Overlay: n.Request.Overlay, Overlays: overlayNames(d.Collection()), Open: n.Request.Open, Over: n.Request.Over, Close: n.Request.Close, With: pairsOf(n.Request.With), Headers: pairsOf(n.Request.Headers), Hooks: hookMode(n.Request.Hooks),
+			Version: n.Request.Version, Overlay: n.Request.Overlay, Overlays: overlayNames(d.Collection()), Open: n.Request.Open, Over: n.Request.Over, Connections: d.OpenConnections(), Close: n.Request.Close, With: pairsOf(n.Request.With), Headers: pairsOf(n.Request.Headers), Hooks: hookMode(n.Request.Hooks),
 			Outcomes: outcomes, OutcomesOwn: own, RuleKind: kind,
 		}
 	case n.Subflow != nil:
-		return &Call{Kind: "subflow", Ref: string(n.Subflow.Flow.ID), Choices: flowChoices(d.Collection()), With: pairsOf(n.Subflow.With)}
+		ins, outs := subflowIO(d.Collection(), n.Subflow.Flow.ID)
+		return &Call{Kind: "subflow", Ref: string(n.Subflow.Flow.ID), Choices: flowChoices(d.Collection()), With: pairsOf(n.Subflow.With), Inputs: ins, Outputs: outs}
 	}
 	return nil
 }
@@ -331,6 +368,14 @@ func hookMode(h model.HookControl) string {
 
 func intText(n int) string {
 	if n == 0 {
+		return ""
+	}
+	return strconv.Itoa(n)
+}
+
+// countText is a whole number for a form, "" for none.
+func countText(n int) string {
+	if n <= 0 {
 		return ""
 	}
 	return strconv.Itoa(n)

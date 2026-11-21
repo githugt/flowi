@@ -134,7 +134,19 @@ func writeEnvelope(path string, env envelope) error {
 	if err := os.Rename(tmp.Name(), path); err != nil {
 		return fmt.Errorf("writing vault: %w", err)
 	}
+	syncDir(filepath.Dir(path))
 	return nil
+}
+
+// syncDir makes the rename itself durable: without it a crash right after can bring back the old vault. It is
+// best effort, since some platforms (Windows) cannot sync a directory and the vault is already safe on disk.
+func syncDir(dir string) {
+	d, err := os.Open(dir) //nolint:gosec // the directory the vault was just written in
+	if err != nil {
+		return
+	}
+	_ = d.Sync()
+	_ = d.Close()
 }
 
 func writeAndClose(f *os.File, data []byte) error {

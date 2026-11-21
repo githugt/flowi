@@ -1,5 +1,6 @@
 <script lang="ts">
   import FileTree from './FileTree.svelte'
+  import Icon from './Icon.svelte'
   import type { FileNode } from './lib/filetree'
 
   // Folders show open for the first two levels; deeper ones fold until asked for.
@@ -20,7 +21,7 @@
     <li role="treeitem" aria-selected="false" aria-expanded={n.folder ? isOpen(n) : undefined}>
       {#if n.folder}
         <button class="dir" style:padding-left={`${depth * 14 + 4}px`} onclick={() => toggle(n)}>
-          <span class="twist" class:open={isOpen(n)} aria-hidden="true">▸</span>
+          <span class="twist" class:open={isOpen(n)} aria-hidden="true"><Icon name="chevr" size={12} /></span>
           <span class="name">{n.name}/</span>
           <span class="n">{counts(n)}</span>
           {#if n.existing}<span class="warn">{n.existing} exist</span>{/if}
@@ -39,7 +40,7 @@
   .tree { list-style: none; margin: 0; padding: 0; font: var(--fs-sm) var(--mono); }
   .dir { all: unset; box-sizing: border-box; display: flex; align-items: center; gap: 6px; width: 100%; height: var(--row-h); border-radius: var(--r-sm); cursor: pointer; color: var(--text); }
   .dir:hover { background: var(--tint-hover); }
-  .twist { color: var(--muted); display: inline-block; width: 12px; transition: transform var(--t-fast) var(--ease-out); }
+  .twist { color: var(--muted); display: inline-flex; width: 12px; transition: transform var(--t-fast) var(--ease-out); }
   .twist.open { transform: rotate(90deg); }
   .n { color: var(--muted); font-size: var(--fs-xs); }
   .file { display: flex; align-items: center; gap: 6px; height: var(--row-h); color: var(--text); }

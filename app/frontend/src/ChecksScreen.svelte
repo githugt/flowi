@@ -1,11 +1,16 @@
 <script lang="ts">
+  import EmptyState from './EmptyState.svelte'
+  import ScreenPage from './ScreenPage.svelte'
   import Button from './Button.svelte'
+  import Hint from './Hint.svelte'
   // Two questions about the API descriptions you imported: how much of them do your flows use (coverage), and what would
   // a changed description break (before you import it). Neither writes anything.
   import { onMount } from 'svelte'
   import { errorText } from './lib/errors'
+  import { latest } from './lib/latest'
   import { ChecksService } from '../bindings/github.com/githugt/flowi/app/internal/bridge'
   import PathField from './PathField.svelte'
+  import Select from './Select.svelte'
   import type { CoverageView, SpecChangeView } from './lib/types'
 
   let targets = $state<{ id: string; label: string }[]>([])
@@ -28,38 +33,65 @@
     if (targets.length) collection = targets[0].id
   })
 
+  // What was measured belongs to the collection it was measured for. Before: choosing another collection left the
+  // numbers of the first on screen, and a slow answer could land under the wrong one.
+  const loadSpecs = latest()
+  const loadCoverage = latest()
+  const loadChange = latest()
+  let measuredFor = $state('')
+
   $effect(() => {
     const c = collection
+    loadCoverage() // an answer still on its way for the previous collection is dropped
+    loadChange()
+    coverage = null
+    coverageError = ''
+    coverageBusy = false
+    change = null
+    changeError = ''
+    changeBusy = false
     if (!c) return
+    const current = loadSpecs()
     ChecksService.Specs(c).then((names) => {
+      if (!current()) return
       specs = names as string[]
       spec = specs.length === 1 ? specs[0] : ''
     })
   })
 
   async function measure() {
+    const current = loadCoverage()
+    const label = targets.find((t) => t.id === collection)?.label ?? ''
     coverageBusy = true
     coverageError = ''
     try {
-      coverage = (await ChecksService.Coverage(collection)) as unknown as CoverageView
+      const got = (await ChecksService.Coverage(collection)) as unknown as CoverageView
+      if (!current()) return
+      coverage = got
+      measuredFor = label
     } catch (e) {
+      if (!current()) return
       coverageError = errorText(e)
       coverage = null
     } finally {
-      coverageBusy = false
+      if (current()) coverageBusy = false
     }
   }
 
   async function check() {
+    const current = loadChange()
     changeBusy = true
     changeError = ''
     try {
-      change = (await ChecksService.SpecChange(collection, spec, newSpec)) as unknown as SpecChangeView
+      const got = (await ChecksService.SpecChange(collection, spec, newSpec)) as unknown as SpecChangeView
+      if (!current()) return
+      change = got
     } catch (e) {
+      if (!current()) return
       changeError = errorText(e)
       change = null
     } finally {
-      changeBusy = false
+      if (current()) changeBusy = false
     }
   }
 
@@ -69,22 +101,22 @@
   const belowThreshold = $derived(!!coverage && failUnder > 0 && pct(coverage.operationsUsed, coverage.operationsTotal) < failUnder)
 </script>
 
-<div class="page">
-  <p class="note">Checks look at the OpenAPI descriptions you imported. Use Coverage to see which API operations your flows never call, and Spec change before importing a newer description, to see which flows and requests it would break. Both only read: nothing is changed. If the lists below are empty, import an OpenAPI description first (Import).</p>
+<ScreenPage width={860}>
+  <p class="note">Read-only checks of the OpenAPI descriptions you imported.<Hint>Coverage shows which API operations your flows never call. Spec change shows, before you import a newer description, which flows and requests it would break. Both only read: nothing is changed. If the lists below are empty, import an OpenAPI description first (Import).</Hint></p>
   <label class="f"><span>Collection</span>
-    <select bind:value={collection}>{#each targets as t}<option value={t.id}>{t.label}</option>{/each}</select>
+    <Select bind:value={collection}>{#each targets as t}<option value={t.id}>{t.label}</option>{/each}</Select>
   </label>
 
-  <h3>Coverage: how much of the spec do your flows use?</h3>
-  <p class="note">For every operation of an imported API description: which flows call it, which of its documented statuses a saved run ever got, and which response fields a flow reads. Statuses come from the run history, so a flow that never ran leaves them unseen.</p>
+  <h3>Coverage: how much of the spec do your flows use?<Hint>For every operation of an imported API description: which flows call it, which of its documented statuses a saved run ever got, and which response fields a flow reads. Statuses come from the run history, so a flow that never ran leaves them unseen.</Hint></h3>
   <div class="line">
     <Button variant="primary" disabled={!collection || coverageBusy} onclick={measure}>{coverageBusy ? 'Measuring…' : 'Measure'}</Button>
     <label class="inline">Flag it below <input class="num" type="number" min="0" max="100" bind:value={failUnder} /> % of operations used</label>
   </div>
   {#if coverageError}<p class="err">{coverageError}</p>{/if}
   {#if coverage}
+    <p class="muted">Measured for {measuredFor}.</p>
     {#if !coverage.operations.length}
-      <p class="muted">No operation to measure: this collection has no request imported from an OpenAPI description with response schemas.</p>
+      <EmptyState icon="checks" title="No operation to measure" hint="This collection has no request imported from an OpenAPI description with response schemas." compact />
     {:else}
       <div class="totals" class:bad={belowThreshold}>
         <div><strong>{coverage.operationsUsed} of {coverage.operationsTotal}</strong> operations used by a flow ({pct(coverage.operationsUsed, coverage.operationsTotal)}%)</div>
@@ -108,13 +140,13 @@
     {/if}
   {/if}
 
-  <h3>Spec change: what would a new description break?</h3>
-  <p class="note">Choose the changed OpenAPI description (a file or an address). It is compared with the one this collection kept when you imported it, in memory: nothing is written. Each flow, hook and check that uses a request is judged by the response schemas the new description gives, and everything that uses a request the new description dropped is broken. Only what the change breaks is listed.</p>
+  <h3>Spec change: what would a new description break?<Hint>Choose the changed OpenAPI description (a file or an address). It is compared with the one this collection kept when you imported it, in memory: nothing is written. Each flow, hook and check that uses a request is judged by the response schemas the new description gives, and everything that uses a request the new description dropped is broken. Only what the change breaks is listed.</Hint></h3>
+  <p class="note">Compare a changed description with the one this collection kept.</p>
   <div class="grid">
     <label class="f wide"><span>New description</span><PathField bind:value={newSpec} label="" kind="file" /></label>
     {#if specs.length > 1}
       <label class="f"><span>Compare with the kept description</span>
-        <select bind:value={spec}><option value="">choose…</option>{#each specs as s}<option value={s}>{s}</option>{/each}</select>
+        <Select bind:value={spec}><option value="">choose…</option>{#each specs as s}<option value={s}>{s}</option>{/each}</Select>
       </label>
     {/if}
   </div>
@@ -138,10 +170,9 @@
       {/each}
     {/if}
   {/if}
-</div>
+</ScreenPage>
 
 <style>
-  .page { position: absolute; inset: 0; overflow: auto; padding: 28px 32px 56px; max-width: 860px; }
   h3 { margin: 22px 0 4px; }
   h4 { margin: 14px 0 4px; color: var(--muted); }
   .note, .muted { color: var(--muted); font-size: var(--fs-sm); margin: 0 0 6px; }

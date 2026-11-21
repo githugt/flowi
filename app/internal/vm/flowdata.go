@@ -3,12 +3,14 @@
 package vm
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"slices"
 	"sort"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/githugt/flowi/lib/engine"
 	"github.com/githugt/flowi/lib/model"
@@ -60,11 +62,22 @@ func RenderBody(b engine.Body, f ViewFormat) (text, lang string, ok bool) {
 		if b.JSON == nil {
 			return "", "", false
 		}
-		pretty, err := json.MarshalIndent(b.JSON, "", "  ")
-		if err != nil {
+		// Before: the view was json.MarshalIndent of the parsed map, which sorts keys, writes & and < as \u0026 and \u003c
+		// and drops repeated keys, so the "JSON" view was not the body. The body's own text is indented instead.
+		if b.Text != "" && json.Valid([]byte(b.Text)) {
+			var out bytes.Buffer
+			if err := json.Indent(&out, []byte(b.Text), "", "  "); err == nil {
+				return capText(out.String()), LangJSON, true
+			}
+		}
+		var out bytes.Buffer
+		enc := json.NewEncoder(&out)
+		enc.SetEscapeHTML(false)
+		enc.SetIndent("", "  ")
+		if err := enc.Encode(b.JSON); err != nil {
 			return "", "", false
 		}
-		return capText(string(pretty)), LangJSON, true
+		return capText(strings.TrimRight(out.String(), "\n")), LangJSON, true
 	case ViewText:
 		if b.Text == "" && b.Base64 != "" {
 			return "", "", false
@@ -89,7 +102,16 @@ func capText(s string) string {
 	if len(s) <= bodyShowLimit {
 		return s
 	}
-	return s[:bodyShowLimit] + fmt.Sprintf("\n… %d more bytes left out", len(s)-bodyShowLimit)
+	// Cut at the last line break before the limit, or else at a character boundary: before, s[:bodyShowLimit] could
+	// end in the middle of a UTF-8 character.
+	cut := bodyShowLimit
+	if i := strings.LastIndexByte(s[:cut], '\n'); i > cut/2 {
+		cut = i
+	}
+	for cut > 0 && !utf8.RuneStart(s[cut]) {
+		cut--
+	}
+	return s[:cut] + fmt.Sprintf("\n… %d more bytes left out", len(s)-cut)
 }
 
 // InputParts is what went into node n in the last run: for a request node the
@@ -174,6 +196,10 @@ func MessageRows(d NodeDetail) []MessageRow {
 	return rows
 }
 
+// sensitiveHeaders are request headers that always carry a credential; any other header whose name looks like one
+// (engine.LooksLikeCredential: a token, a key, a session, a password) is masked too.
+// Before: only these six names were hidden, so X-Access-Token or X-Session-Id showed in full.
+//
 // sensitiveHeaders are request headers that carry a credential. The engine
 // masks the secrets a run knows of; a token typed into a header by hand is not
 // one, and the input view of a step is often on screen where others look.
@@ -186,7 +212,7 @@ func sensitiveHeaders() []string {
 func maskedHeaderRows(hs []engine.Header) []model.KeyValue {
 	rows := headerRows(hs)
 	for i, row := range rows {
-		if !slices.Contains(sensitiveHeaders(), strings.ToLower(row.Key)) || strings.Contains(row.Value, "••") {
+		if (!slices.Contains(sensitiveHeaders(), strings.ToLower(row.Key)) && !engine.LooksLikeCredential(row.Key)) || strings.Contains(row.Value, "••") {
 			continue
 		}
 		scheme, rest, found := strings.Cut(strings.TrimSpace(row.Value), " ")
@@ -211,23 +237,22 @@ func RecordSize(d NodeDetail) string {
 	for _, m := range rec.Messages {
 		size += m.Body.Size
 	}
-	return byteSize(size)
-}
-
-func byteSize(n int64) string {
-	switch {
-	case n < 1024:
-		return fmt.Sprintf("%d B", n)
-	case n < 1024*1024:
-		return fmt.Sprintf("%.1f KB", float64(n)/1024)
-	}
-	return fmt.Sprintf("%.1f MB", float64(n)/(1024*1024))
+	// Before: this counted in 1024 and the response pane in 1000, so the dock and the pane gave one body two sizes.
+	return SizeText(size)
 }
 
 // OutputParts is what node n produced in the last run: for a request node the
 // response (status, headers, body in format f, timings, extracted values); for
 // the others their outputs. Nil when there is nothing.
-func OutputParts(_ model.Node, d NodeDetail, f ViewFormat) []Part {
+func OutputParts(n model.Node, d NodeDetail, f ViewFormat) []Part {
+	parts := outputParts(d, f)
+	if p, ok := outcomePart(n, d); ok {
+		parts = slices.Insert(parts, min(1, len(parts)), p) // after the status line of a response, else first
+	}
+	return parts
+}
+
+func outputParts(d NodeDetail, f ViewFormat) []Part {
 	if rec := d.Record; rec != nil {
 		return receivedParts(*rec, f)
 	}
@@ -241,10 +266,29 @@ func OutputParts(_ model.Node, d NodeDetail, f ViewFormat) []Part {
 	return []Part{{Heading: "Outputs", Kind: PartCode, Code: string(pretty), Lang: LangJSON}}
 }
 
+// outcomePart says which exit of the step the last run took and on which try: "failure · try 2 of 3". A request step
+// always has one; any other step only when it ran more than once, because its single "success" says nothing.
+// Before: the Data tab showed what a step produced and not how it ended, so a retry or a named outcome could only be
+// read from the card's ports.
+func outcomePart(n model.Node, d NodeDetail) (Part, bool) {
+	if len(d.Outcomes) == 0 || (n.Type != "request" && d.Tries <= 1) {
+		return Part{}, false
+	}
+	line := "Ended as " + strings.Join(d.Outcomes, ", ")
+	if d.Tries > 1 {
+		line += fmt.Sprintf(" · try %d of %d", d.Tries, max(n.Retries, d.Tries-1)+1)
+	}
+	return Part{Heading: "Outcome", Kind: PartLines, Lines: []string{line}}, true
+}
+
 func receivedParts(rec engine.Record, f ViewFormat) []Part {
 	parts := []Part{{Kind: PartLines, Lines: []string{statusLine(rec)}}}
 	if len(rec.Header) > 0 {
 		parts = append(parts, Part{Heading: "Headers", Kind: PartTable, Rows: headerRows(rec.Header), Collapsed: true})
+	}
+	// Before: a gRPC call's trailers were recorded and never shown.
+	if len(rec.Trailers) > 0 {
+		parts = append(parts, Part{Heading: "Trailers", Kind: PartTable, Rows: headerRows(rec.Trailers), Collapsed: true})
 	}
 	if rec.HasMessages() {
 		for _, m := range rec.Messages {
@@ -278,6 +322,9 @@ func receivedParts(rec engine.Record, f ViewFormat) []Part {
 func statusLine(rec engine.Record) string {
 	total := rec.Timings.Total.Round(time.Millisecond)
 	switch {
+	case rec.GRPCCode != "" && rec.GRPCMessage != "":
+		// Before: a failed call showed "NOT_FOUND · 12ms" and the server's own explanation stayed out of sight.
+		return fmt.Sprintf("%s · %s · %s", rec.GRPCCode, oneLine(rec.GRPCMessage, 120), total)
 	case rec.GRPCCode != "":
 		return fmt.Sprintf("%s · %s", rec.GRPCCode, total)
 	case rec.HasMessages():
@@ -289,6 +336,15 @@ func statusLine(rec engine.Record) string {
 		return fmt.Sprintf("%s · %d rows · %s", rec.Outcome, rows, total)
 	}
 	return fmt.Sprintf("%d · %s", rec.Status, total)
+}
+
+// oneLine is text on one line, cut to at most n characters with an ellipsis.
+func oneLine(text string, n int) string {
+	text = strings.Join(strings.Fields(text), " ")
+	if r := []rune(text); len(r) > n {
+		return string(r[:n-1]) + "…"
+	}
+	return text
 }
 
 func timingLines(t engine.Timings) []string {

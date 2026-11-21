@@ -3,7 +3,12 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <!-- What the window may load: only its own files (no remote script, no eval). Inline styles stay allowed:
+         the editor and Svelte write them. A response preview (a sandboxed srcdoc frame) inherits this, so it cannot
+         fetch remote images or styles either. -->
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' ws://127.0.0.1:* ws://localhost:*; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'self' about:" />
     <title>Flowi</title>
+    <script src="/theme-boot.js"></script>
   </head>
   <body>
     <div id="app"></div>

@@ -14,6 +14,7 @@ import (
 	"github.com/githugt/flowi/lib/engine"
 	"github.com/githugt/flowi/lib/internal/bundle"
 	"github.com/githugt/flowi/lib/internal/tapeplayer"
+	"github.com/githugt/flowi/lib/model"
 )
 
 func runToEnd(t *testing.T, w *Workspace, target FlowTarget, o RunOptions) engine.RunResult {
@@ -226,4 +227,30 @@ func readEntry(t *testing.T, data []byte, name string) []byte {
 	}
 	t.Fatalf("no entry %s", name)
 	return nil
+}
+
+// Before: only HTTP was stubbed, so a gRPC, message or database request in a bundle ran against the real network or a
+// local file when the bundle was replayed.
+func TestFirstNonHTTPRequest_should_name_a_request_a_recording_cannot_replace(t *testing.T) {
+	http := model.Request{Meta: model.Meta{Name: "Login"}, Versions: []model.RequestVersion{{Label: "1", Method: "GET", URL: "https://x"}}}
+	tests := []struct {
+		name string
+		req  model.Request
+		want string
+	}{
+		{"http", http, ""},
+		{"grpc", model.Request{Meta: model.Meta{Name: "Call"}, Versions: []model.RequestVersion{{Label: "1", GRPC: &model.GRPC{}}}}, "Call"},
+		{"message", model.Request{Meta: model.Meta{Name: "Listen"}, Versions: []model.RequestVersion{{Label: "1", Async: &model.Async{}}}}, "Listen"},
+		{"database", model.Request{Meta: model.Meta{Name: "Query"}, Versions: []model.RequestVersion{{Label: "1", Dataset: &model.Dataset{}}}}, "Query"},
+		{"data file", model.Request{Meta: model.Meta{Name: "Sheet"}, Versions: []model.RequestVersion{{Label: "1", File: &model.DataFile{}}}}, "Sheet"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := firstNonHTTPRequest(model.Collection{Requests: []model.Request{http, tt.req}})
+
+			if got != tt.want {
+				t.Fatalf("got %q, want %q", got, tt.want)
+			}
+		})
+	}
 }

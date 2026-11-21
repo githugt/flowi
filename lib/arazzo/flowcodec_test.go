@@ -181,3 +181,15 @@ func TestEncodeFlow_should_produce_a_document_a_standard_parser_accepts(t *testi
 		}
 	}
 }
+
+// Before: a flow file git could not merge was reported as "the document is invalid" with a YAML parser message about
+// a mapping value, which sent people looking at their indentation.
+func TestDecodeFlow_Given_unresolved_merge_markers_Then_it_says_so_with_the_line(t *testing.T) {
+	data := []byte("arazzo: 1.1.0\nworkflows:\n  - workflowId: a\n<<<<<<< HEAD\n    x-flowi-digest: sha256:aaa\n=======\n    x-flowi-digest: sha256:bbb\n>>>>>>> topic\n")
+
+	_, diags := DecodeFlow("a.arazzo.yaml", "a", data, flowCodecOptions())
+
+	if len(diags) != 1 || diags[0].Code != diag.CodeFileConflict || diags[0].Pos.Line != 4 {
+		t.Fatalf("%+v", diags)
+	}
+}

@@ -167,3 +167,105 @@ func TestRestoreFromTrash_Given_a_tampered_item_When_restoring_Then_refuses_and_
 		})
 	}
 }
+
+// Before: deleting a request or flow in the tree removed its files at once and nothing could bring them back.
+func TestDeleteRequestToTrash_should_keep_the_files_and_restore_them_to_the_same_collection(t *testing.T) {
+	w := demoWorkspace(t)
+	target := loginTarget(t, w)
+	source := requestOf(t, w, target)
+
+	item, err := w.DeleteRequestToTrash(target)
+
+	_, _, gone := w.requestFor(target)
+	_, statErr := os.Stat(source.File)
+	if err != nil || gone == nil || !os.IsNotExist(statErr) || item.Collection != target.Collection || item.Path != source.Path {
+		t.Fatalf("err %v still found %v stat %v item %+v", err, gone == nil, statErr, item)
+	}
+	path, err := w.RestoreFromTrash(item.ID)
+	back, backErr := os.Stat(source.File)
+	if err != nil || path != source.Path || backErr != nil || back.Size() == 0 {
+		t.Fatalf("restored as %q, %v; file %v", path, err, backErr)
+	}
+	if trash, _ := w.ListTrash(); len(trash) != 0 {
+		t.Fatalf("the restored item is still in the trash: %+v", trash)
+	}
+}
+
+func TestRestoreFromTrash_should_use_a_free_name_when_a_new_request_took_the_old_one(t *testing.T) {
+	w := demoWorkspace(t)
+	target := loginTarget(t, w)
+	source := requestOf(t, w, target)
+	item, err := w.DeleteRequestToTrash(target)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := w.NewRequest(target.Collection, source.Path); err != nil {
+		t.Fatalf("making a new request at the freed path: %v", err)
+	}
+
+	path, err := w.RestoreFromTrash(item.ID)
+
+	if err != nil || path != source.Path+"-restored" {
+		t.Fatalf("restored as %q, %v", path, err)
+	}
+}
+
+func TestDeleteFlowToTrash_should_take_the_layout_along_and_bring_both_back(t *testing.T) {
+	w := demoWorkspace(t)
+	target, source := userCreation(t, w)
+	layout := layoutFile(source.File)
+	if err := os.WriteFile(layout, []byte("nodes: {}\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	item, err := w.DeleteFlowToTrash(target)
+
+	_, flowStat := os.Stat(source.File)
+	_, layoutStat := os.Stat(layout)
+	if err != nil || !os.IsNotExist(flowStat) || !os.IsNotExist(layoutStat) || len(item.Files) != 2 {
+		t.Fatalf("err %v flow %v layout %v item %+v", err, flowStat, layoutStat, item)
+	}
+	if _, err := w.RestoreFromTrash(item.ID); err != nil {
+		t.Fatal(err)
+	}
+	_, flowBack := os.Stat(source.File)
+	_, layoutBack := os.Stat(layout)
+	if flowBack != nil || layoutBack != nil {
+		t.Fatalf("after restoring: flow %v layout %v", flowBack, layoutBack)
+	}
+}
+
+func TestRestoreFromTrash_Given_the_collection_is_gone_Then_puts_the_deleted_request_in_Scratch(t *testing.T) {
+	w := demoWorkspace(t)
+	target := loginTarget(t, w)
+	item, err := w.DeleteRequestToTrash(target)
+	if err != nil {
+		t.Fatal(err)
+	}
+	item.Collection = "no-such-collection"
+	data, _ := json.Marshal(item)
+	if err := os.WriteFile(filepath.Join(w.trashDir(), item.ID, "item.json"), data, 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	path, err := w.RestoreFromTrash(item.ID)
+
+	if err != nil || path == "" || len(scratchRequests(t, w)) != 1 {
+		t.Fatalf("restored %q, %v; Scratch holds %d", path, err, len(scratchRequests(t, w)))
+	}
+}
+
+func TestDeleteRequestToTrash_Given_an_unknown_request_Then_nothing_is_trashed(t *testing.T) {
+	w := demoWorkspace(t)
+	target := loginTarget(t, w)
+	target.Request = "nope"
+
+	_, err := w.DeleteRequestToTrash(target)
+
+	if err == nil {
+		t.Fatal("an unknown request must be an error")
+	}
+	if trash, _ := w.ListTrash(); len(trash) != 0 {
+		t.Fatalf("trash %+v", trash)
+	}
+}

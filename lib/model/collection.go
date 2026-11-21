@@ -13,7 +13,10 @@ type Dependency struct {
 type Manifest struct {
 	Format int
 	Meta
-	DependsOn []Dependency
+	// MinVersion is the oldest Flowi release that can read this collection correctly, as "1.4.0"; "" for any.
+	// A release older than it refuses the collection with a message that says which release to install.
+	MinVersion string
+	DependsOn  []Dependency
 	// Variables are the collection's own values, read as {{collection_var.name}}
 	// by its requests and flows. The selected environment overrides one of
 	// the same name, so the value that differs per API (a base URL) can still
@@ -50,4 +53,17 @@ type Collection struct {
 	Blueprints   []Blueprint
 	Auths        []NamedAuth
 	Overlays     []Overlay
+	// Broken lists the request and flow files that could not be read at all (a syntax error, git's conflict markers),
+	// so they are not among Requests and Flows. Before: such a file simply vanished from the collection, which
+	// looked like a deleted one.
+	Broken []BrokenFile
+}
+
+// BrokenFile is a request or flow file that could not be read.
+type BrokenFile struct {
+	File    string // the file's path on disk
+	Path    string // its path in the collection, as a request or flow of that path would have
+	Kind    string // "request" or "flow"
+	Code    string // the diagnostic code that said why, e.g. FLW-FILE-003 for conflict markers
+	Message string // that diagnostic in words, with the line when it has one
 }

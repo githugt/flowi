@@ -15,6 +15,12 @@ func exprFunctions() []Suggestion {
 		{"hasPrefix(", "starts with"}, {"hasSuffix(", "ends with"},
 		{"int(", "convert to a whole number"}, {"float(", "convert to a decimal number"},
 		{"string(", "convert to text"}, {"toJSON(", "value as JSON text"}, {"fromJSON(", "JSON text as a value"},
+		{"sum(", "add up a list of numbers"}, {"mean(", "average of a list"}, {"max(", "largest number"}, {"min(", "smallest number"},
+		{"abs(", "distance from zero"}, {"round(", "nearest whole number"},
+		{"first(", "first item of a list"}, {"last(", "last item of a list"}, {"sort(", "put a list in order"}, {"uniq(", "drop repeated items"},
+		{"concat(", "join lists"}, {"keys(", "the names of a map"}, {"values(", "the values of a map"},
+		{"now(", "the current time"}, {"date(", "read a date or date-time"}, {"duration(", "read a length of time such as 90s"},
+		{"toBase64(", "encode text as Base64"}, {"fromBase64(", "decode Base64 text"},
 	}
 }
 
@@ -22,6 +28,7 @@ func exprFunctions() []Suggestion {
 func exprKeywords() []Suggestion {
 	return []Suggestion{
 		{"empty", "null, an empty text, list or map"}, {"contains", "text contains text"},
+		{"matches", "text matches a pattern"}, {"startsWith", "text starts with text"}, {"endsWith", "text ends with text"},
 		{"and", "both tests are true"}, {"or", "either test is true"}, {"not", "the test is false"},
 		{"in", "is one of a list"}, {"true", ""}, {"false", ""}, {"null", ""},
 	}

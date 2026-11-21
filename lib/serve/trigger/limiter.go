@@ -21,7 +21,8 @@ const (
 
 // failureLimiter counts failed token checks per remote address. The token is
 // 256 random bits, so guessing is not a realistic attack; the limiter keeps
-// an exposed endpoint from being hammered and its log from being flooded.
+// an exposed endpoint from being hammered and its log from being flooded. The table never holds more than
+// maxTracked addresses.
 type failureLimiter struct {
 	now func() time.Time
 
@@ -59,6 +60,25 @@ func (l *failureLimiter) recordFailure(addr string) {
 	l.seen[addr] = f
 	if len(l.seen) > maxTracked {
 		l.dropExpired(now)
+		l.dropOldest(addr)
+	}
+}
+
+// dropOldest keeps the table at maxTracked when every entry is still inside its window (a flood of addresses),
+// forgetting those whose window began first. keep, the address just counted, stays. Callers hold mu.
+func (l *failureLimiter) dropOldest(keep string) {
+	for len(l.seen) > maxTracked {
+		var oldest string
+		var at time.Time
+		for addr, f := range l.seen {
+			if addr != keep && (oldest == "" || f.since.Before(at)) {
+				oldest, at = addr, f.since
+			}
+		}
+		if oldest == "" {
+			return
+		}
+		delete(l.seen, oldest)
 	}
 }
 

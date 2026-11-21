@@ -1,5 +1,6 @@
 // What the replayer will do with a call, worked out from the form, for the preview on the replayer screen.
 import type { ForwardMode, ForwardPreview } from './types'
+import { plural } from './plural'
 
 export interface ForwardForm { forward: ForwardMode; forwardTo: string; forwardOnly: string; recordTo: string; recordFolder?: string; recordHar: string }
 
@@ -18,8 +19,20 @@ export function within(base: string, allowed: string): boolean {
 
 const modeName = (m: ForwardMode) => (m === 'save' ? 'pass through and save' : m === 'pass' ? 'pass through' : 'replay only')
 
-// A short line for the replay bar.
-export function forwardLabel(f: { forward: ForwardMode; forwardTo: string; forwardOnly: string }): string {
+// A short line for the replay bar: where unanswered calls go, then the faults and the in-turn answering that are on.
+// Before: it said only "listening", so a replayer set to fail 20% of calls looked like a plain one.
+export function forwardLabel(f: { forward: ForwardMode; forwardTo: string; forwardOnly: string; sequence?: boolean; faultErrorPercent?: string; faultDropPercent?: string }): string {
+  const extras: string[] = []
+  if (!f.forward) {
+    const errors = Number(f.faultErrorPercent), drops = Number(f.faultDropPercent)
+    if (errors > 0) extras.push(`errors ${errors}%`)
+    if (drops > 0) extras.push(`drops ${drops}%`)
+  }
+  if (f.sequence) extras.push('answers in turn')
+  return [where(f), ...extras].join(' · ')
+}
+
+function where(f: { forward: ForwardMode; forwardTo: string; forwardOnly: string }): string {
   if (!f.forward) return 'listening'
   const verb = f.forward === 'save' ? 'saving calls with no saved answer from ' : 'passing calls with no saved answer to '
   const to = f.forwardTo.trim()
@@ -46,7 +59,7 @@ export function forwardPreview(form: ForwardForm, p: ForwardPreview | null, labe
     out.push({ text: `Every call with no saved answer is sent to ${to}${save ? ' and its answer is saved' : ''}.`, tone: 'ok' })
     if (only.length) out.push({ text: '"Only these APIs" is ignored while one API is set.', tone: 'warn' })
     if (save) {
-      out.push({ text: `A call matching no request becomes a new request in ${labelOf(form.recordTo) || 'the Scratch draft'}, folder ${form.recordFolder?.trim() || 'recorded'}.`, tone: 'plain' })
+      out.push({ text: `A call matching no request becomes a new request in ${labelOf(form.recordTo) || 'Drafts'}, folder ${form.recordFolder?.trim() || 'recorded'}.`, tone: 'plain' })
     } else {
       out.push({ text: 'Answers are relayed; nothing is saved, so stopping the replayer returns those calls to "not found".', tone: 'plain' })
     }
@@ -56,7 +69,7 @@ export function forwardPreview(form: ForwardForm, p: ForwardPreview | null, labe
     const targets = p?.targets ?? []
     if (!targets.length) out.push({ text: 'No saved request has a base URL to forward to.', tone: 'warn' })
     for (const t of targets) {
-      const n = `${t.requests} request${t.requests === 1 ? '' : 's'}`
+      const n = plural(t.requests, 'request')
       if (t.problem) out.push({ text: `${t.base} (${n}): ${t.problem}`, tone: 'bad' })
       else if (only.length && !only.some((o) => within(t.base, o))) out.push({ text: `${t.base} (${n}): not in the list, so calls stay "not found".`, tone: 'warn' })
       else out.push({ text: `${t.base} (${n}): ${save ? 'forwarded and saved' : 'forwarded'}.`, tone: 'ok' })

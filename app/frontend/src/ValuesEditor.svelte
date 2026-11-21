@@ -1,4 +1,7 @@
 <script lang="ts">
+  import Button from './Button.svelte'
+  import IconButton from './IconButton.svelte'
+  import Select from './Select.svelte'
   // The values a set step writes, one row each: a name, where the value comes from, and what that source needs.
   import type { ValueRow } from './lib/types'
 
@@ -30,17 +33,17 @@
     <div class="row">
       <div class="line">
         <input class="k" placeholder="name" aria-label="Variable name" bind:value={row.name} oninput={commit} spellcheck="false" />
-        <select aria-label="Where the value comes from" bind:value={row.from} onchange={commit}>
+        <Select label="Where the value comes from" bind:value={row.from} onchange={commit}>
           {#each SOURCES as [id, label]}<option value={id}>{label}</option>{/each}
-        </select>
-        <button class="x" aria-label="Remove this value" onclick={() => { local.splice(i, 1); commit() }}>×</button>
+        </Select>
+        <IconButton icon="close" size={12} danger label="Remove this value" onclick={() => { local.splice(i, 1); commit() }} />
       </div>
       {#if row.from === 'response'}
         <div class="line">
-          <select aria-label="Which part of the response" bind:value={row.in} onchange={commit}>
+          <Select label="Which part of the response" bind:value={row.in} onchange={commit}>
             <option value="">choose…</option>
             <option value="body">body</option><option value="header">header</option><option value="cookie">cookie</option><option value="status">status</option>
-          </select>
+          </Select>
           {#if row.in === 'body'}<input class="v" placeholder="$.path.to.value" aria-label="JSONPath" bind:value={row.path} oninput={commit} spellcheck="false" />{/if}
           {#if row.in === 'header'}<input class="v" placeholder="header name" aria-label="Header" bind:value={row.header} oninput={commit} spellcheck="false" />{/if}
           {#if row.in === 'cookie'}<input class="v" placeholder="cookie name" aria-label="Cookie" bind:value={row.cookie} oninput={commit} spellcheck="false" />{/if}
@@ -54,7 +57,7 @@
       {/if}
     </div>
   {/each}
-  <button class="add" onclick={() => local.push(blank())}>+ Add value</button>
+  <Button variant="link" onclick={() => local.push(blank())}>+ Add value</Button>
 </div>
 
 <style>
@@ -62,13 +65,8 @@
   .row { display: flex; flex-direction: column; gap: 4px; padding-bottom: 8px; border-bottom: 1px solid var(--line); }
   .row:last-of-type { border-bottom: 0; }
   .line { display: flex; gap: 4px; align-items: center; }
-  input, select { min-width: 0; font: var(--fs-md) var(--mono); }
-  select { font-family: inherit; }
-  input { flex: 1; }
-  input:focus, select:focus { border-color: var(--accent); }
+  input { flex: 1; min-width: 0; font: var(--fs-md) var(--mono); }
+  input:focus { border-color: var(--accent); }
   .k { flex: 0 0 34%; }
   .narrow { flex: 0 0 38%; }
-  button { background: none; border: 0; color: var(--muted); font: inherit; }
-  .add { align-self: flex-start; color: var(--accent); padding: 2px 0; }
-  .x:hover { color: var(--fail); }
 </style>

@@ -11,6 +11,7 @@ import (
 	"github.com/goccy/go-yaml"
 
 	"github.com/githugt/flowi/lib/diag"
+	"github.com/githugt/flowi/lib/internal/mergeconflict"
 	"github.com/githugt/flowi/lib/model"
 )
 
@@ -67,6 +68,9 @@ func sourceList(sources []SourceDescription) []any {
 func DecodeFlow(file, path string, data []byte, o FlowOptions) (model.Flow, diag.List) {
 	var root map[string]any
 	if err := yaml.Unmarshal(data, &root); err != nil {
+		if line, ok := mergeconflict.Find(data); ok {
+			return model.Flow{Path: path, File: file}, diag.List{diag.New(diag.CodeFileConflict, diag.Location{File: file, Pos: diag.Position{Line: line, Column: 1}}, nil)}
+		}
 		return model.Flow{Path: path, File: file}, invalid(err.Error())
 	}
 	workflows := mapsOf(root["workflows"])
@@ -154,6 +158,10 @@ func CustomSteps(f model.Flow, r Resolver) []CustomStep {
 	}
 	return out
 }
+
+// OwnBody is the flow's own data, the x-flowi-flow of the first workflow, as YAML in the order it was written: the part
+// of a flow file that a person's edit changes. ok is false for a document with none (a foreign one, or a hand-written one).
+func OwnBody(data []byte) (body []byte, ok bool, err error) { return ownFlowBytes(data) }
 
 // ownFlowBytes is the x-flowi-flow of the first workflow, as YAML in the order
 // it was written (a node's params are ordered). ok is false when there is none.

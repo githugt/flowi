@@ -1,8 +1,15 @@
 <script lang="ts">
-  import { FlowService } from '../bindings/github.com/githugt/flowi/app/internal/bridge'
+  import EmptyState from './EmptyState.svelte'
+  import Button from './Button.svelte'
+  import Select from './Select.svelte'
+  import Icon from './Icon.svelte'
+  import { openExternal } from './lib/openurl'
+  import { FlowService, TracingService } from '../bindings/github.com/githugt/flowi/app/internal/bridge'
   import { app } from './lib/app.svelte'
   import { errorText } from './lib/errors'
   import type { DiffView, FlowView, RunComparison } from './lib/types'
+  import { statusMark } from './lib/statusmark'
+  import { lastGreenIndex } from './lib/lastgreen'
 
   let { view }: { view: FlowView } = $props()
   const runs = $derived(app.history[view.node] ?? [])
@@ -14,6 +21,13 @@
   let depth = $state<RunComparison | null>(null)
   let open = $state<string | null>(null)
   let problem = $state('')
+
+  // Where each run's trace is in the person's tracing tool (the otel.trace_url setting), when one is set.
+  let traces = $state<Record<string, string>>({})
+  $effect(() => {
+    const ids = runs.map((r) => r.id)
+    Promise.all(ids.map((id) => TracingService.TraceURL(id))).then((urls) => (traces = Object.fromEntries(ids.map((id, i) => [id, urls[i]]))))
+  })
 
   // The list is read when the tab opens and after each run ends.
   $effect(() => {
@@ -39,30 +53,55 @@
     }
   }
   const changedBody = (step: string) => !!depth?.steps?.[step]
+
+  // When the latest run went wrong, the run to blame is the last one that worked: it is compared at once, and the card
+  // says so. It is done once for each latest run, so a comparison the person picks is not replaced.
+  const green = $derived(lastGreenIndex(runs.map((r) => r.status)))
+  let autoFor = ''
+  $effect(() => {
+    const latest = runs[0]?.id ?? ''
+    if (latest && green > 0 && autoFor !== latest) {
+      autoFor = latest
+      void compare(green, 0)
+    }
+  })
 </script>
 
 <div>
   {#if view.run.summary || view.run.error}
     <p class:err={!!view.run.error} class="last">{view.run.error || view.run.summary}</p>
   {/if}
+  {#if app.trends[view.node]?.trend}
+    <p class="trend" title="How the latest runs ended, oldest first, and how long they usually take">{app.trends[view.node].trend}</p>
+    {#if app.trends[view.node].slowNote}<p class="muted">{app.trends[view.node].slowNote}</p>{/if}
+  {/if}
+  {#if green > 0}
+    <p class="since" role="status">
+      <strong>The latest run went wrong.</strong> Since the last run that passed ({runs[green].label}):
+      <Button small variant="ghost" onclick={() => compare(green, 0)}>Compare with it</Button>
+    </p>
+  {/if}
   {#if !runs.length}
-    <p class="muted">No saved runs yet.</p>
+    <EmptyState icon="clock" title="No saved runs yet" hint="Each run of this flow is kept here, so two runs can be compared." compact />
   {/if}
   {#each runs as r, i}
-    <button class="run" class:active={i === from || i === to} onclick={() => compare(i, 0)}>
-      <span class="dot {r.status}"></span>{r.label}{i === 0 ? ' (latest)' : ''}
-    </button>
+    <div class="runrow">
+      <button class="run" class:active={i === from || i === to} onclick={() => compare(i, 0)}>
+        <span class="dot {r.status}" role="img" aria-label={r.status} title={r.status}>{statusMark(r.status)}</span>{r.label}{i === 0 ? ' (latest)' : ''}
+      </button>
+      {#if traces[r.id]}<Button small variant="ghost" title="Open this run's trace in your tracing tool" onclick={() => openExternal(traces[r.id])}>Open trace</Button>{/if}
+    </div>
   {/each}
   {#if from >= 0 && from !== to}
     <h5>Compare</h5>
     <div class="pick">
-      <select aria-label="Earlier run" value={from} onchange={(e) => compare(Number(e.currentTarget.value), to)}>
+      <Select fill label="Earlier run" value={from} onchange={(e) => compare(Number(e.currentTarget.value), to)}>
         {#each runs as r, i}<option value={i}>{r.label}{i === 0 ? ' (latest)' : ''}</option>{/each}
-      </select>
+      </Select>
       <span>→</span>
-      <select aria-label="Later run" value={to} onchange={(e) => compare(from, Number(e.currentTarget.value))}>
+      <Select fill label="Later run" value={to} onchange={(e) => compare(from, Number(e.currentTarget.value))}>
         {#each runs as r, i}<option value={i}>{r.label}{i === 0 ? ' (latest)' : ''}</option>{/each}
-      </select>
+      </Select>
     </div>
     {#if problem}<p class="err">{problem}</p>{/if}
     <table>
@@ -73,7 +112,7 @@
             <td>{d.before || '–'}</td>
             <td>→</td>
             <td>{d.after || '–'}</td>
-            <td class="gap">{d.gap}{#if changedBody(d.step)}<span class="chev" title="Its outputs differ: click to see how">{open === d.step ? '▾' : '▸'} outputs</span>{/if}</td>
+            <td class="gap">{d.gap}{#if changedBody(d.step)}<span class="chev" title="Its outputs differ: click to see how"><Icon name={open === d.step ? 'chevd' : 'chevr'} size={12} /> outputs</span>{/if}</td>
           </tr>
           {#if open === d.step && depth?.steps?.[d.step]}
             <tr class="lines"><td colspan="5">
@@ -105,6 +144,10 @@
 <style>
   .muted, .last { color: var(--muted); font-size: var(--fs-sm); margin: 0 0 6px; }
   .err { color: var(--fail); }
+  .since { margin: 0 0 var(--sp-2); font-size: var(--fs-sm); padding: 4px 8px; border-radius: var(--r-md); background: var(--fail-t); }
+  .trend { margin: 0 0 var(--sp-2); font-family: var(--mono); font-size: var(--fs-sm); }
+  .runrow { display: flex; align-items: center; gap: var(--sp-2); }
+  .runrow .run { flex: 1; min-width: 0; }
   .run {
     display: flex;
     align-items: center;
@@ -120,8 +163,8 @@
     border-radius: var(--r-md);
   }
   .run:hover { background: var(--tint-hover); }
-  .run.active { background: color-mix(in srgb, var(--accent) 22%, transparent); }
-  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); flex: none; }
+  .run.active { background: var(--tint-sel); }
+  .dot { width: 14px; height: 14px; border-radius: 50%; background: var(--muted); color: var(--bg); font-size: 9px; font-weight: 700; line-height: 14px; text-align: center; flex: none; }
   .dot.passed { background: var(--ok); }
   .dot.failed, .dot.error, .dot.aborted { background: var(--fail); }
   h5 { margin: 10px 0 4px; color: var(--muted); font-size: var(--fs-xs); text-transform: uppercase; letter-spacing: 0.05em; }
@@ -130,10 +173,9 @@
   .changed td { color: var(--accent); }
   .gap { color: var(--muted); text-align: right; }
   .pick { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
-  .pick select { flex: 1; min-width: 0; padding: 3px 4px; font-size: var(--fs-sm); }
   tr.body { cursor: default; }
   tr.body:hover td { background: var(--tint-hover); }
-  .chev { margin-left: 8px; color: var(--accent); }
+  .chev { display: inline-flex; align-items: center; gap: var(--sp-1); margin-left: 8px; color: var(--accent); }
   .val { font-family: var(--mono); word-break: break-all; }
   .lines pre { margin: 0 0 6px; padding: 6px 8px; background: var(--bg); border: 1px solid var(--line); border-radius: var(--r-md); font: var(--fs-xs) var(--mono); overflow: auto; max-height: 260px; }
   .lines span { display: block; white-space: pre; }

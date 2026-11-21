@@ -29,6 +29,7 @@ func newScheduleCommand(i do.Injector) *cobra.Command {
 
 type scheduleFlags struct {
 	flow, collection, cron, env, tz string
+	onFailure, onSuccess            string
 	inputs                          []string
 	disabled                        bool
 }
@@ -40,7 +41,11 @@ func newScheduleAddCommand(i do.Injector) *cobra.Command {
 		Short: "Add a schedule",
 		Long: "Add a schedule that runs a flow. --cron takes five fields (minute hour day-of-month month day-of-week)\n" +
 			"with lists, ranges, steps and month/weekday names, or @hourly, @daily, @weekly, @monthly, @yearly.\n" +
-			"Missed runs (the machine was off or asleep) are not made up.",
+			"Missed runs (the machine was off or asleep) are not made up.\n\n" +
+			"--on-failure and --on-success name where to tell when a run ends: a webhook address that takes a Slack-compatible\n" +
+			"{\"text\": …} POST, or env:NAME to read the address from an environment variable when it is needed. A webhook\n" +
+			"address is a credential: prefer env:NAME, and note that workspace.yaml is not committed. `flowi serve` sends the alert\n" +
+			"(a failed delivery is logged, with the host only, and never changes the run's result).",
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error { return runScheduleAdd(cmd, i, args[0], f) },
 	}
@@ -51,6 +56,8 @@ func newScheduleAddCommand(i do.Injector) *cobra.Command {
 	fl.StringVar(&f.env, "env", "", "environment to run in (default: the defaults.environment setting)")
 	fl.StringArrayVar(&f.inputs, "input", nil, "value for a flow input, as name=value (a template; repeatable)")
 	fl.StringVar(&f.tz, "tz", "", "time zone of the cron expression, such as Europe/Berlin (default: this machine's)")
+	fl.StringVar(&f.onFailure, "on-failure", "", "tell this address when a run fails: an http(s) webhook (Slack-compatible JSON), or env:NAME to read it from that environment variable")
+	fl.StringVar(&f.onSuccess, "on-success", "", "tell this address when a run passes (as --on-failure)")
 	fl.BoolVar(&f.disabled, "disabled", false, "save the schedule switched off")
 	return cmd
 }
@@ -65,7 +72,7 @@ func runScheduleAdd(cmd *cobra.Command, i do.Injector, name string, f scheduleFl
 		return err
 	}
 	err = s.Workspace.AddSchedule(model.Schedule{Name: name, Flow: f.flow, Collection: f.collection, Cron: f.cron,
-		Env: f.env, Inputs: inputs, TZ: f.tz, Disabled: f.disabled})
+		Env: f.env, Inputs: inputs, TZ: f.tz, Disabled: f.disabled, OnFailure: f.onFailure, OnSuccess: f.onSuccess})
 	if err != nil {
 		return err
 	}
@@ -96,6 +103,7 @@ type scheduleRow struct {
 	Inputs     map[string]string `json:"inputs,omitempty"`
 	TZ         string            `json:"tz,omitempty"`
 	Disabled   bool              `json:"disabled"`
+	AlertsOn   []string          `json:"alerts,omitempty"`
 	Next       string            `json:"next,omitempty"`
 }
 
@@ -122,6 +130,12 @@ func scheduleRows(list []model.Schedule, now time.Time) []scheduleRow {
 	rows := make([]scheduleRow, 0, len(list))
 	for _, s := range list {
 		row := scheduleRow{Name: s.Name, Flow: s.Flow, Collection: s.Collection, Cron: s.Cron, Env: s.Env, TZ: s.TZ, Disabled: s.Disabled}
+		if s.OnFailure != "" {
+			row.AlertsOn = append(row.AlertsOn, "failure")
+		}
+		if s.OnSuccess != "" {
+			row.AlertsOn = append(row.AlertsOn, "success")
+		}
 		if len(s.Inputs) > 0 {
 			row.Inputs = map[string]string{}
 			for _, kv := range s.Inputs {

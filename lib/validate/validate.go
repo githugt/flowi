@@ -36,6 +36,7 @@ func checks() []check {
 		checkParams,
 		checkExecution,
 		checkGotos,
+		checkRetries,
 		checkAttach,
 		checkColors,
 		checkConcurrentWrites,
@@ -45,6 +46,7 @@ func checks() []check {
 		checkSubflowCycles,
 		checkHookCycles,
 		checkTemplates,
+		checkShadowing,
 		checkSetTargets,
 		checkSetValues,
 		checkLint,
@@ -53,6 +55,7 @@ func checks() []check {
 		checkAsync,
 		checkDataset,
 		checkOutcomes,
+		checkExpect,
 		checkAuth,
 		checkBlueprints,
 	}

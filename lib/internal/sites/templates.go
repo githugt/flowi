@@ -143,9 +143,12 @@ func grpcTemplates(file, base string, g model.GRPC) []Site {
 }
 
 func keyValueSites(file, parent, prefix string, kvs []model.KeyValue) []Site {
-	out := make([]Site, len(kvs))
-	for i, kv := range kvs {
-		out[i] = Site{File: file, Path: yamlpath.Key(parent, kv.Key), Field: prefix + kv.Key, Src: kv.Value}
+	var out []Site
+	for _, kv := range kvs {
+		if kv.Disabled { // not sent, so a name it cannot resolve is no problem
+			continue
+		}
+		out = append(out, Site{File: file, Path: yamlpath.Key(parent, kv.Key), Field: prefix + kv.Key, Src: kv.Value})
 	}
 	return out
 }

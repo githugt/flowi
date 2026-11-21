@@ -1,10 +1,16 @@
 <script lang="ts">
+  import Button from './Button.svelte'
+  import { listKeyTarget } from './lib/listkeys'
+  import { contains } from './lib/fold'
+  import { isEnter } from './lib/enterkey'
   // The method of a gRPC request: a field to type it in, and a list of the schema's methods under
   // their services, each with the kind of call. It replaced a datalist, which the window wrapped at
   // the slash, so long names showed only "package.Service/", and which could show no kinds.
   import Icon from './Icon.svelte'
   import { ui } from './lib/ui.svelte'
   import { errorText } from './lib/errors'
+  import { plural } from './lib/plural'
+  import { sourceKey } from './lib/methodsource'
   import { RequestService } from '../bindings/github.com/githugt/flowi/app/internal/bridge'
   import type { GRPCInfo, GRPCMethod } from './lib/types'
 
@@ -38,8 +44,8 @@
   const kindOf = (m: GRPCMethod) => (m.clientStream ? (m.serverStream ? 'bidi' : 'client') : m.serverStream ? 'server' : 'unary')
 
   const shown = $derived.by(() => {
-    const q = query.trim().toLowerCase()
-    return q ? info.methods.filter((m) => m.full.toLowerCase().includes(q)) : info.methods
+    const q = query.trim()
+    return q ? info.methods.filter((m) => contains(m.full, q)) : info.methods
   })
   const groups = $derived.by(() => {
     const out: { service: string; methods: GRPCMethod[] }[] = []
@@ -51,15 +57,27 @@
     return out
   })
 
+  // Where the list on screen came from; '' while nothing was loaded yet.
+  let loadedFrom = ''
+  const key = $derived(sourceKey(info.block))
   function load() {
     loading = true
+    loadedFrom = key
     RequestService.LoadMethods(node)
   }
+  // A changed server or .proto list makes the loaded methods (or the loaded error) stale: load again once typing stops.
+  $effect(() => {
+    const now = key
+    if (!loadedFrom && (info.methods.length || info.methodsError)) loadedFrom = now
+    if (!loadedFrom || now === loadedFrom || !now) return
+    const t = setTimeout(load, 500)
+    return () => clearTimeout(t)
+  })
   function show() {
     open = true
     query = ''
     active = Math.max(0, info.methods.findIndex((m) => m.full === info.block.Method))
-    if (!info.methods.length && !info.methodsError && !loading) load()
+    if ((!info.methods.length && !info.methodsError) || (loadedFrom && loadedFrom !== key)) if (!loading) load()
   }
   function pick(m: GRPCMethod) {
     open = false
@@ -77,9 +95,9 @@
       open = false
     } else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
       if (!open) show()
-      else active = (active + (e.key === 'ArrowDown' ? 1 : -1) + shown.length) % Math.max(shown.length, 1)
+      else active = listKeyTarget(e.key, active, shown.length)!
       queueMicrotask(() => list?.querySelector('.on')?.scrollIntoView({ block: 'nearest' }))
-    } else if (e.key === 'Enter' && open && shown[active]) {
+    } else if (isEnter(e) && open && shown[active]) {
       pick(shown[active])
     } else {
       return
@@ -91,7 +109,7 @@
     try {
       const g = await RequestService.GenerateRequests(node)
       const skipped = g.skipped.length ? ` Skipped: ${g.skipped.join('; ')}` : ''
-      ui.toast(`${g.created} request${g.created === 1 ? '' : 's'} made under grpc/.${skipped}`)
+      ui.toast(`${plural(g.created, 'request')} made under grpc/.${skipped}`)
     } catch (e) {
       ui.toast(errorText(e), 'error')
     }
@@ -120,10 +138,10 @@
       oninput={(e) => type(e.currentTarget.value)}
       onkeydown={keys}
     />
-    <button class="toggle" type="button" aria-label="Choose a method" title="Choose a method" onclick={() => (open ? (open = false) : show())}>▾</button>
+    <button class="toggle" type="button" aria-label="Choose a method" title="Choose a method" onclick={() => (open ? (open = false) : show())}><Icon name="chevd" size={12} /></button>
   </div>
   {#if open}
-    <div class="pop" id="grpc-methods" role="listbox" bind:this={list}>
+    <div class="pop pop-in" id="grpc-methods" role="listbox" bind:this={list}>
       <div class="rows">
         {#if loading}
           <p class="note">{loadingText}</p>
@@ -161,7 +179,7 @@
         <span class="muted">{sourceText}</span>
         <button type="button" class="icon" title="Reload methods" aria-label="Reload methods" onclick={load}><Icon name="refresh" size={14} /></button>
         <span class="grow"></span>
-        <button type="button" class="link" disabled={!info.methods.length} title="Make a request for each method, under grpc/" onclick={generate}>Generate collection</button>
+        <Button type="button" variant="link" disabled={!info.methods.length} title="Make a request for each method, under grpc/" onclick={generate}>Generate collection</Button>
       </div>
     </div>
   {/if}
@@ -176,7 +194,7 @@
   .field.focus { border-color: var(--accent); }
   input { flex: 1; min-width: 0; background: none; border: 0; outline: none; color: var(--text); padding: 5px 8px; font: inherit; -webkit-user-select: text; user-select: text; }
   input.mono { font-family: var(--mono); font-size: var(--fs-sm); }
-  .toggle { background: none; border: 0; color: var(--muted); padding: 0 8px; align-self: stretch; }
+  .toggle { display: inline-flex; align-items: center; background: none; border: 0; color: var(--muted); padding: 0 8px; align-self: stretch; }
   .toggle:hover { color: var(--text); }
   .pop {
     position: absolute; top: calc(100% + 4px); left: 0; z-index: 30; width: max(100%, 380px);
@@ -189,7 +207,7 @@
     width: 100%; display: flex; align-items: center; gap: 8px; padding: 5px 8px 5px 12px; text-align: left;
     background: none; border: 0; border-radius: var(--r-sm); color: var(--text); font: inherit;
   }
-  .rows button.on { background: color-mix(in srgb, var(--accent) 16%, transparent); }
+  .rows button.on { background: var(--tint-sel); }
   .rows button.current .name { font-weight: 600; }
   .kind { display: grid; place-items: center; color: var(--accent); flex: none; }
   .name { font-family: var(--mono); font-size: var(--fs-sm); overflow-wrap: anywhere; }
@@ -201,6 +219,4 @@
   .muted { color: var(--muted); }
   .icon { display: grid; place-items: center; background: none; border: 0; color: var(--muted); padding: 3px; border-radius: var(--r-sm); }
   .icon:hover { color: var(--text); background: var(--tint-hover); }
-  .link { background: none; border: 0; color: var(--accent); padding: 3px 4px; font: inherit; }
-  .link:disabled { opacity: 0.4; }
 </style>

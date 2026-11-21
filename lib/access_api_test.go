@@ -6,8 +6,11 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/githugt/flowi/lib/model"
 )
@@ -174,5 +177,53 @@ func TestCheckAccess_Given_an_unknown_identity_Then_FLW_OVL_002(t *testing.T) {
 
 	if err == nil || !strings.Contains(err.Error(), "mallory") {
 		t.Fatalf("err %v", err)
+	}
+}
+
+func TestLastAccess_Given_a_check_was_run_When_asked_Then_the_report_and_its_time_are_kept(t *testing.T) {
+	// Before: the table of results was lost when the dialog closed, and nothing said when a check was last run.
+	w, target := accessWorkspace(t, accessServer(t, true))
+	_, none := w.LastAccess(target)
+	before := time.Now().Add(-time.Second)
+
+	rep, err := w.CheckAccess(context.Background(), target, AccessOptions{Env: "local", Owner: "alice", Others: []string{"bob"}})
+	got, ok := w.LastAccess(target)
+
+	if err != nil || none || !ok {
+		t.Fatalf("err %v, kept before %t, kept after %t", err, none, ok)
+	}
+	if got.At.Before(before) || got.Report.Owner != "alice" || !got.Report.Exposed() || len(got.Report.Steps) != len(rep.Steps) {
+		t.Fatalf("saved %+v", got)
+	}
+}
+
+func TestLastAccess_Given_a_second_check_When_asked_Then_it_replaces_the_first(t *testing.T) {
+	w, target := accessWorkspace(t, accessServer(t, false))
+	if _, err := w.CheckAccess(context.Background(), target, AccessOptions{Env: "local", Owner: "alice", Others: []string{"bob"}}); err != nil {
+		t.Fatal(err)
+	}
+
+	_, err := w.CheckAccess(context.Background(), target, AccessOptions{Env: "local", Owner: "bob", Others: []string{"alice"}})
+	got, _ := w.LastAccess(target)
+
+	if err != nil || got.Report.Owner != "bob" {
+		t.Fatalf("err %v, saved owner %q", err, got.Report.Owner)
+	}
+}
+
+func TestLastAccess_Given_a_damaged_file_or_a_bad_id_When_asked_Then_nothing_is_kept(t *testing.T) {
+	w, target := accessWorkspace(t, accessServer(t, false))
+	if err := os.MkdirAll(filepath.Dir(w.accessFile(target)), 0o750); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(w.accessFile(target), []byte("{not json"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	_, damaged := w.LastAccess(target)
+	_, bad := w.LastAccess(FlowTarget{Collection: target.Collection, Flow: "../x"})
+
+	if damaged || bad {
+		t.Fatalf("damaged %t, bad id %t", damaged, bad)
 	}
 }

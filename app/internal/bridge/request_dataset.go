@@ -3,9 +3,12 @@
 package bridge
 
 import (
+	"context"
+	"fmt"
 	"path/filepath"
 	"strings"
 
+	"github.com/githugt/flowi/lib/dataset"
 	"github.com/githugt/flowi/lib/engine"
 	"github.com/githugt/flowi/lib/model"
 
@@ -22,6 +25,8 @@ type DriverChoice struct {
 type DatasetInfo struct {
 	Block   model.Dataset  `json:"block"`
 	Drivers []DriverChoice `json:"drivers"`
+	// ServerExample is what the server box shows as its placeholder for the driver.
+	ServerExample string `json:"serverExample"`
 }
 
 // driverLabels are the names a person knows each driver by.
@@ -56,7 +61,8 @@ func datasetInfoOf(r *vm.Request) *DatasetInfo {
 	if !r.IsDataset() {
 		return nil
 	}
-	return &DatasetInfo{Block: r.Dataset(), Drivers: driverChoices()}
+	b := r.Dataset()
+	return &DatasetInfo{Block: b, Drivers: driverChoices(), ServerExample: model.DatasetServerExample(b.Driver)}
 }
 
 // SetDataset replaces the dataset block of the selected version.
@@ -142,6 +148,62 @@ func stringsOf(v any) []string {
 	for _, item := range list {
 		text, _ := item.(string)
 		out = append(out, text)
+	}
+	return out
+}
+
+// DataColumnView is one column of a table of a data file.
+type DataColumnView struct {
+	Name string `json:"name"`
+	Type string `json:"type"`
+}
+
+// DataTableView is one table a data file request can read, with the statement that looks at it.
+type DataTableView struct {
+	Name    string           `json:"name"`
+	File    string           `json:"file"`
+	Sheet   string           `json:"sheet,omitempty"`
+	Rows    int              `json:"rows"`
+	Columns []DataColumnView `json:"columns"`
+	Select  string           `json:"select"` // SELECT * FROM name LIMIT 100
+}
+
+// DataTablesView is the tables of a data file request, or why they cannot be shown.
+type DataTablesView struct {
+	Tables []DataTableView `json:"tables"`
+	Note   string          `json:"note,omitempty"`
+}
+
+// dataTablesLimit is how many rows the statement a table chip inserts asks for.
+const dataTablesLimit = 100
+
+// DataTables lists the tables, columns and row counts of the files the selected data file request reads, for the chip
+// row above its statement. The files are read off the actor. A server with a template, a missing path or a database
+// request gives no tables and a note, never an error: the chips are help, not a requirement.
+func (s *RequestService) DataTables(node string) DataTablesView {
+	var collection model.ID
+	var d model.Dataset
+	var file bool
+	s.with(node, func(o *openRequest) {
+		collection, d, file = o.req.Target().Collection, o.req.Dataset(), o.req.IsDataFile()
+	})
+	out := DataTablesView{Tables: []DataTableView{}}
+	if !file {
+		return out
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), dataset.DefaultTimeout)
+	defer cancel()
+	tables, err := s.app.backend.DataFileTables(ctx, collection, d.Driver, d.Server)
+	if err != nil {
+		out.Note = vm.ErrorText(err)
+		return out
+	}
+	for _, t := range tables {
+		v := DataTableView{Name: t.Name, File: t.File, Sheet: t.Sheet, Rows: t.Rows, Columns: []DataColumnView{}, Select: fmt.Sprintf("SELECT * FROM %s LIMIT %d", t.Name, dataTablesLimit)}
+		for _, c := range t.Columns {
+			v.Columns = append(v.Columns, DataColumnView{Name: c.Name, Type: c.Type})
+		}
+		out.Tables = append(out.Tables, v)
 	}
 	return out
 }

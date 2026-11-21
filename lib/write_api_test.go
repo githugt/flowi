@@ -320,6 +320,23 @@ func TestNewRequest_Given_a_name_with_spaces_When_created_Then_the_file_is_a_pla
 	}
 }
 
+// Before: only ASCII letters were file-name letters, so "Café menu" became "Caf-menu" and a name in Japanese had no
+// file name at all.
+func TestPathForName_Given_letters_of_any_script_Then_they_stay_in_the_file_name(t *testing.T) {
+	tests := []struct{ in, path, name string }{
+		{"db/Café menu", "db/Café-menu", "Café menu"},
+		{"e\u0301cole", "\u00e9cole", "\u00e9cole"}, // typed with a combining accent: one normalised spelling
+		{"日本語 テスト", "日本語-テスト", "日本語 テスト"},
+		{"notes.", "notes", "notes."}, // a name may not end in a dot
+	}
+	for _, tt := range tests {
+		path, name := pathForName(tt.in)
+		if path != tt.path || name != tt.name {
+			t.Errorf("pathForName(%q) = %q, %q; want %q, %q", tt.in, path, name, tt.path, tt.name)
+		}
+	}
+}
+
 // Before: a flow called "Sign up journey" was refused (FLW-WRITE-002) though a request of that name was accepted.
 func TestNewFlow_Given_a_name_with_spaces_Then_the_file_is_dashed_and_the_name_kept(t *testing.T) {
 	w := demoWorkspace(t)

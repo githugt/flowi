@@ -78,7 +78,8 @@ export function SetCollection(id) {
 }
 
 /**
- * SetFile chooses the document: a file path, a folder (Bruno), or an http(s) URL.
+ * SetFile chooses the document: a file path, a folder (Bruno), or an http(s) URL. A file or folder on disk is
+ * recognised, and the kind is set to what it is: the screen says so.
  * @param {string} path
  * @returns {$CancellablePromise<void>}
  */
@@ -105,7 +106,7 @@ export function SetOverlay(refs) {
 }
 
 /**
- * SetPaste sets pasted text, used instead of the file when not empty.
+ * SetPaste sets pasted text, used instead of the file when not empty. Text that is recognised sets the kind.
  * @param {string} text
  * @returns {$CancellablePromise<void>}
  */

@@ -36,15 +36,40 @@ type MatrixCell struct {
 // and reports each. Cells run one after the other; a cell that cannot start (an unknown environment) is an error cell
 // and the others still run. It must be called off the UI goroutine, since it waits for every run.
 func RunMatrix(ctx context.Context, b Backend, t flowi.FlowTarget, base flowi.RunOptions, dims []MatrixDim) ([]MatrixCell, error) {
+	return RunMatrixProgress(ctx, b, t, base, dims, nil)
+}
+
+// MatrixProgress is told how many cells have ended and how many there are, before the first cell and after each.
+type MatrixProgress func(done, total int)
+
+// RunMatrixProgress is RunMatrix that reports progress (nil for none). When ctx is cancelled it returns the cells that
+// ended with ctx's error, so what ran is not lost.
+// Before: a matrix showed only "busy" until the last cell, and the cells already run were thrown away when it stopped.
+func RunMatrixProgress(ctx context.Context, b Backend, t flowi.FlowTarget, base flowi.RunOptions, dims []MatrixDim, progress MatrixProgress) ([]MatrixCell, error) {
 	if err := checkMatrix(dims, "input"); err != nil {
 		return nil, err
 	}
+	return eachCell(ctx, dims, progress, func(labels []string) MatrixCell {
+		return runCell(ctx, b, t, cellOptions(base, dims, labels), labels)
+	})
+}
+
+// eachCell runs one cell for every combination, one after the other, and stops at a cancelled context.
+func eachCell(ctx context.Context, dims []MatrixDim, progress MatrixProgress, cell func(labels []string) MatrixCell) ([]MatrixCell, error) {
+	all := combinations(dims)
+	note := func(done int) {
+		if progress != nil {
+			progress(done, len(all))
+		}
+	}
 	var out []MatrixCell
-	for _, labels := range combinations(dims) {
+	note(0)
+	for _, labels := range all {
 		if ctx.Err() != nil {
 			return out, ctx.Err()
 		}
-		out = append(out, runCell(ctx, b, t, cellOptions(base, dims, labels), labels))
+		out = append(out, cell(labels))
+		note(len(out))
 	}
 	return out, nil
 }
@@ -53,18 +78,19 @@ func RunMatrix(ctx context.Context, b Backend, t flowi.FlowTarget, base flowi.Ru
 // with.<name>, a value for one of the request's bare names) and reports each. The responses are not saved: a matrix is
 // a check, not a history. It must be called off the UI goroutine, since it waits for every send.
 func RunRequestMatrix(ctx context.Context, b Backend, t flowi.RequestTarget, base flowi.SendOptions, dims []MatrixDim) ([]MatrixCell, error) {
+	return RunRequestMatrixProgress(ctx, b, t, base, dims, nil)
+}
+
+// RunRequestMatrixProgress is RunRequestMatrix that reports progress (nil for none) and returns the cells that ended
+// when ctx is cancelled.
+func RunRequestMatrixProgress(ctx context.Context, b Backend, t flowi.RequestTarget, base flowi.SendOptions, dims []MatrixDim, progress MatrixProgress) ([]MatrixCell, error) {
 	if err := checkMatrix(dims, "with"); err != nil {
 		return nil, err
 	}
 	base.Save = "none"
-	var out []MatrixCell
-	for _, labels := range combinations(dims) {
-		if ctx.Err() != nil {
-			return out, ctx.Err()
-		}
-		out = append(out, sendCell(ctx, b, t, sendCellOptions(base, dims, labels), labels))
-	}
-	return out, nil
+	return eachCell(ctx, dims, progress, func(labels []string) MatrixCell {
+		return sendCell(ctx, b, t, sendCellOptions(base, dims, labels), labels)
+	})
 }
 
 // checkMatrix checks the dimensions; valueDim is what a dimension of the form <valueDim>.<name> is called: input for
@@ -205,8 +231,7 @@ func firstProblem(res engine.RunResult) string { return problemOf(res.Status, re
 func problemOf(status engine.Status, diags diag.List) string {
 	for _, d := range diags {
 		if d.Severity == diag.SeverityError {
-			msg, _ := diag.English().Message(d)
-			return string(d.Code) + " " + msg
+			return string(d.Code) + " " + diag.Text(d)
 		}
 	}
 	return "the run " + string(status)

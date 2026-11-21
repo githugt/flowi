@@ -3,7 +3,9 @@
 package flowi
 
 import (
+	"bytes"
 	"os"
+	"runtime"
 	"slices"
 	"strings"
 	"testing"
@@ -24,8 +26,57 @@ func TestStoreEdit_should_keep_exactly_one_slot(t *testing.T) {
 
 	r := requestOf(t, w, target)
 	data, _ := os.ReadFile(r.File)
-	if first != nil || second != nil || r.Edit == nil || r.Edit.URL != "http://two" || r.EditBase != base || strings.Count(string(data), "\nedit:") != 1 {
-		t.Fatalf("errs %v %v, edit %+v, file:\n%s", first, second, r.Edit, data)
+	kept, _ := os.ReadFile(w.editFile(target.Collection, target.Request))
+	info, _ := os.Stat(w.editFile(target.Collection, target.Request))
+	if first != nil || second != nil || r.Edit == nil || r.Edit.URL != "http://two" || r.EditBase != base {
+		t.Fatalf("errs %v %v, edit %+v", first, second, r.Edit)
+	}
+	// Before: the edit was written into the tracked request file, so `git add -A` committed half-typed edits.
+	if strings.Contains(string(data), "edit") || strings.Count(string(kept), "\nedit:")+strings.Count(string(kept), "edit:") < 1 || !strings.Contains(string(kept), "http://two") || strings.Contains(string(kept), "http://one") {
+		t.Fatalf("request file:\n%s\nkept edit:\n%s", data, kept)
+	}
+	if info == nil || (runtime.GOOS != "windows" && info.Mode().Perm() != 0o600) { // Windows has no owner-only mode bits
+		t.Fatalf("the kept edit must be private to the person: %v", info)
+	}
+}
+
+func TestStoreEdit_should_not_write_the_request_file_at_all(t *testing.T) {
+	w := demoWorkspace(t)
+	target := loginTarget(t, w)
+	r := requestOf(t, w, target)
+	before, _ := os.ReadFile(r.File)
+
+	err := w.StoreEdit(target, r.Versions[0].Label, editOf("http://typing"), SaveOptions{})
+
+	after, _ := os.ReadFile(r.File)
+	if err != nil || !bytes.Equal(before, after) {
+		t.Fatalf("err %v; the tracked file changed:\n%s", err, after)
+	}
+}
+
+func TestEdit_Given_an_earlier_release_wrote_it_into_the_request_file_Then_loading_moves_it_out(t *testing.T) {
+	w := demoWorkspace(t)
+	target := loginTarget(t, w)
+	r := requestOf(t, w, target)
+	original, _ := os.ReadFile(r.File)
+	legacy := append(append([]byte{}, original...), []byte("edit:\n  method: POST\n  url: http://legacy-edit\nedit_base: \""+r.Versions[0].Label+"\"\n")...)
+	if err := os.WriteFile(r.File, legacy, 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := w.Reload(Change{Root: w.collections[0].Root, File: r.File, Op: ChangeModified}); err != nil {
+		t.Fatal(err)
+	}
+	loaded := requestOf(t, w, target)
+	kept, _ := os.ReadFile(w.editFile(target.Collection, target.Request))
+	saveErr := w.SaveRequest(target, loaded, SaveOptions{}) // the next write of the file leaves the edit out
+	file, _ := os.ReadFile(r.File)
+
+	if loaded.Edit == nil || loaded.Edit.URL != "http://legacy-edit" || !strings.Contains(string(kept), "http://legacy-edit") {
+		t.Fatalf("loaded edit %+v, kept:\n%s", loaded.Edit, kept)
+	}
+	if saveErr != nil || strings.Contains(string(file), "legacy-edit") || requestOf(t, w, target).Edit == nil {
+		t.Fatalf("save %v, file:\n%s", saveErr, file)
 	}
 }
 
@@ -123,7 +174,7 @@ func TestDiscardEdit_should_clear_the_slot(t *testing.T) {
 	}
 }
 
-func TestStoreEdit_Given_comments_Then_refused_with_FLW_WRITE_001(t *testing.T) {
+func TestStoreEdit_Given_the_file_has_comments_Then_the_edit_is_still_kept_and_the_comments_stay(t *testing.T) {
 	w := demoWorkspace(t)
 	target := loginTarget(t, w)
 	r := requestOf(t, w, target)
@@ -133,7 +184,7 @@ func TestStoreEdit_Given_comments_Then_refused_with_FLW_WRITE_001(t *testing.T) 
 	err := w.StoreEdit(target, r.Versions[0].Label, editOf("http://x"), SaveOptions{})
 
 	after, _ := os.ReadFile(r.File)
-	if codes := codesOfErr(err); !slices.Equal(codes, []diag.Code{diag.CodeWriteDropsComments}) || !strings.HasPrefix(string(after), "# keep me") {
+	if err != nil || !strings.HasPrefix(string(after), "# keep me") || requestOf(t, w, target).Edit == nil {
 		t.Fatalf("err %v", err)
 	}
 }
@@ -181,5 +232,52 @@ func TestPromoteEdit_Given_a_label_with_a_version_word_Then_it_is_saved_without_
 	i := slices.IndexFunc(r.Versions, func(v model.RequestVersion) bool { return v.Label == "9.9" })
 	if err != nil || i < 0 {
 		t.Fatalf("err %v, versions %v", err, r.Versions)
+	}
+}
+
+func TestEdit_should_survive_a_full_reload_and_go_away_with_a_promotion_or_a_discard(t *testing.T) {
+	w := demoWorkspace(t)
+	target := loginTarget(t, w)
+	r := requestOf(t, w, target)
+	base := r.Versions[0].Label
+	_ = w.StoreEdit(target, base, editOf("http://typed"), SaveOptions{})
+	root := w.collections[0].Root
+
+	_, rescanErr := w.Reload(Change{Root: root, File: root, Op: ChangeRescan})
+	afterRescan := requestOf(t, w, target)
+	_, statKept := os.Stat(w.editFile(target.Collection, target.Request))
+	discardErr := w.DiscardEdit(target, SaveOptions{})
+	_, statDiscarded := os.Stat(w.editFile(target.Collection, target.Request))
+	_ = w.StoreEdit(target, base, editOf("http://again"), SaveOptions{})
+	promoteErr := w.PromoteEdit(target, "", SaveOptions{})
+	_, statPromoted := os.Stat(w.editFile(target.Collection, target.Request))
+	promoted := requestOf(t, w, target)
+
+	if rescanErr != nil || afterRescan.Edit == nil || afterRescan.Edit.URL != "http://typed" || statKept != nil {
+		t.Fatalf("rescan %v edit %+v kept %v", rescanErr, afterRescan.Edit, statKept)
+	}
+	if discardErr != nil || !os.IsNotExist(statDiscarded) {
+		t.Fatalf("discard %v stat %v", discardErr, statDiscarded)
+	}
+	if promoteErr != nil || !os.IsNotExist(statPromoted) || promoted.Edit != nil || promoted.Versions[0].URL != "http://again" {
+		t.Fatalf("promote %v stat %v request %+v", promoteErr, statPromoted, promoted)
+	}
+}
+
+func TestEdit_Given_the_kept_file_is_unreadable_Then_the_request_loads_without_an_edit(t *testing.T) {
+	w := demoWorkspace(t)
+	target := loginTarget(t, w)
+	r := requestOf(t, w, target)
+	_ = w.StoreEdit(target, r.Versions[0].Label, editOf("http://typed"), SaveOptions{})
+	if err := os.WriteFile(w.editFile(target.Collection, target.Request), []byte("edit: [broken\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	root := w.collections[0].Root
+
+	_, err := w.Reload(Change{Root: root, File: root, Op: ChangeRescan})
+
+	got := requestOf(t, w, target)
+	if err != nil || got.Edit != nil || len(got.Versions) == 0 {
+		t.Fatalf("err %v request %+v", err, got)
 	}
 }

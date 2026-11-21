@@ -54,12 +54,7 @@ func (w *Workspace) SeedRequestHooks(t RequestTarget) error {
 			if outcomes == nil && len(bp.Outcomes) > 0 {
 				outcomes = slices.Clone(bp.Outcomes) // the first blueprint that lists outcomes decides them
 			}
-			step := model.HookStep{Inline: slices.Clone(bp.Body.Nodes)}
-			if bp.Phase == "pre" && len(r.Hooks.Pre) == 0 {
-				hooks.Pre = append(hooks.Pre, step)
-			} else if bp.Phase != "pre" && len(r.Hooks.Post) == 0 {
-				hooks.Post = append(hooks.Post, step)
-			}
+			addSeedStep(&hooks, r.Hooks, bp)
 		}
 	}
 	seeded := seedOutcomes(&r, outcomes)
@@ -68,6 +63,18 @@ func (w *Workspace) SeedRequestHooks(t RequestTarget) error {
 	}
 	r.Hooks = hooks
 	return w.SaveRequest(t, r, SaveOptions{})
+}
+
+// addSeedStep adds the blueprint's body as a hook step of its phase to hooks, unless the request already had hooks in
+// that phase (own is what the request had): seeding never adds to hooks the user wrote.
+func addSeedStep(hooks *model.Hooks, own model.Hooks, bp model.Blueprint) {
+	step := model.HookStep{Inline: slices.Clone(bp.Body.Nodes)}
+	switch {
+	case bp.Phase == "pre" && len(own.Pre) == 0:
+		hooks.Pre = append(hooks.Pre, step)
+	case bp.Phase != "pre" && len(own.Post) == 0:
+		hooks.Post = append(hooks.Post, step)
+	}
 }
 
 // CreateHookBlueprint saves nodes, the hooks of one phase ("pre" or "post")

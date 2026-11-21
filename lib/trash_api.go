@@ -25,13 +25,16 @@ const (
 	TrashFlow    = "flow"
 )
 
-// TrashedItem is a request or flow moved out of the drafts and not deleted yet.
+// TrashedItem is a request or flow moved out of the drafts, or deleted from a collection, and not removed for good yet.
 type TrashedItem struct {
-	ID        string
-	Kind      string // TrashRequest or TrashFlow
-	Name      string // what it was called
-	Path      string // where it was in its collection, "untitled-2"
-	TrashedAt time.Time
+	ID   string
+	Kind string // TrashRequest or TrashFlow
+	Name string // what it was called
+	Path string // where it was in its collection, "untitled-2"
+	// Collection is the collection a deleted item came from, so restoring it puts it back there. It is empty for a
+	// stale draft, which always goes back to Scratch.
+	Collection model.ID `json:",omitempty"`
+	TrashedAt  time.Time
 	// Files are its files, relative to the collection root (the request or flow file, and what sat beside it).
 	Files []string
 }
@@ -64,7 +67,7 @@ func (w *Workspace) TrashStaleDrafts(olderThan time.Duration, open func(kind str
 		if open != nil && open(TrashRequest, r.ID) || !staleSince(r.File, cutoff) {
 			continue
 		}
-		item, err := w.trashFiles(c, TrashRequest, r.Name, r.Path, requestFiles(c, r))
+		item, err := w.trashFiles(c, TrashRequest, r.Name, r.Path, requestFiles(c, r), "")
 		if err != nil {
 			return moved, err
 		}
@@ -74,7 +77,7 @@ func (w *Workspace) TrashStaleDrafts(olderThan time.Duration, open func(kind str
 		if open != nil && open(TrashFlow, f.ID) || !staleSince(f.File, cutoff) {
 			continue
 		}
-		item, err := w.trashFiles(c, TrashFlow, f.Name, f.Path, flowFiles(c, f))
+		item, err := w.trashFiles(c, TrashFlow, f.Name, f.Path, flowFiles(c, f), "")
 		if err != nil {
 			return moved, err
 		}
@@ -120,8 +123,9 @@ func relativeExisting(root string, candidates ...string) []string {
 }
 
 // trashFiles moves files (relative to the root of c) into a new trash item.
-func (w *Workspace) trashFiles(c model.Collection, kind, name, path string, files []string) (TrashedItem, error) {
-	item := TrashedItem{ID: string(w.newID()), Kind: kind, Name: name, Path: path, TrashedAt: time.Now().UTC(), Files: files}
+// origin is the collection to restore into, or empty for a stale draft.
+func (w *Workspace) trashFiles(c model.Collection, kind, name, path string, files []string, origin model.ID) (TrashedItem, error) {
+	item := TrashedItem{ID: string(w.newID()), Kind: kind, Name: name, Path: path, Collection: origin, TrashedAt: time.Now().UTC(), Files: files}
 	dir := filepath.Join(w.trashDir(), item.ID)
 	for _, rel := range files {
 		to := filepath.Join(dir, "files", filepath.FromSlash(rel))
@@ -206,9 +210,54 @@ func validRelPath(p string) bool {
 	return p != "" && !slices.ContainsFunc(strings.Split(p, "/"), func(seg string) bool { return !names.Valid(seg) })
 }
 
-// RestoreFromTrash puts a trashed request or flow back into Scratch, under its
-// old name or, when that is taken, the next free "<name>-restored". It returns
-// the path it got.
+// DeleteRequestToTrash takes request t out of its collection into the trash instead of removing it for good: its
+// file and what sits beside it (examples, schemas) can come back with RestoreFromTrash. Flows that use it are not
+// rewritten; Validate reports them. An unknown request is FLW-REQ-001.
+//
+// Before: a delete in the tree removed the files at once and nothing could bring them back.
+func (w *Workspace) DeleteRequestToTrash(t RequestTarget) (TrashedItem, error) {
+	c, r, err := w.requestFor(t)
+	if err != nil {
+		return TrashedItem{}, err
+	}
+	item, err := w.trashDeleted(c, TrashRequest, r.Name, r.Path, requestFiles(c, r))
+	if err != nil {
+		return TrashedItem{}, err
+	}
+	w.forgetActivity(t.Collection, activityRequest, r.ID)
+	return item, nil
+}
+
+// DeleteFlowToTrash is DeleteRequestToTrash for a flow and its canvas layout. An unknown flow is FLW-FLOW-002.
+func (w *Workspace) DeleteFlowToTrash(t FlowTarget) (TrashedItem, error) {
+	c, f, err := w.flowFor(t)
+	if err != nil {
+		return TrashedItem{}, err
+	}
+	item, err := w.trashDeleted(c, TrashFlow, f.Name, f.Path, flowFiles(c, f))
+	if err != nil {
+		return TrashedItem{}, err
+	}
+	w.forgetActivity(t.Collection, activityFlow, f.ID)
+	return item, nil
+}
+
+// trashDeleted moves files of a deleted item into the trash, remembers which collection they came from, and refreshes
+// the collection's view.
+func (w *Workspace) trashDeleted(c model.Collection, kind, name, path string, files []string) (TrashedItem, error) {
+	item, err := w.trashFiles(c, kind, name, path, files, c.Manifest.ID)
+	if err != nil {
+		return TrashedItem{}, err
+	}
+	if _, err := w.Reload(Change{Root: c.Root, File: c.Root, Op: store.ChangeRescan}); err != nil {
+		return item, err
+	}
+	return item, nil
+}
+
+// RestoreFromTrash puts a trashed request or flow back: into the collection a deleted item came from while that is
+// still mounted, otherwise into Scratch. It keeps the old name or, when that is taken, the next free
+// "<name>-restored". It returns the path it got.
 func (w *Workspace) RestoreFromTrash(id string) (string, error) {
 	item, ok := w.readTrashed(id)
 	if !ok {
@@ -216,15 +265,9 @@ func (w *Workspace) RestoreFromTrash(id string) (string, error) {
 	}
 	w.draftsMu.Lock()
 	defer w.draftsMu.Unlock()
-	m, err := w.scratch()
+	c, err := w.restoreTarget(item)
 	if err != nil {
-		return "", fmt.Errorf("opening Scratch: %w", err)
-	}
-	w.mu.RLock()
-	c, ok := w.collection(m.ID)
-	w.mu.RUnlock()
-	if !ok {
-		return "", fmt.Errorf("the Scratch draft is not loaded")
+		return "", err
 	}
 	tree, _ := trashTree(item.Kind) // readTrashed has vetted the kind
 	path := freeRestoredPath(c.Root, tree, item.Path, item.Kind)
@@ -243,6 +286,26 @@ func (w *Workspace) RestoreFromTrash(id string) (string, error) {
 	}
 	_, err = w.Reload(Change{Root: c.Root, File: c.Root, Op: store.ChangeRescan})
 	return path, err
+}
+
+// restoreTarget is the collection an item is restored into. The caller holds draftsMu.
+func (w *Workspace) restoreTarget(item TrashedItem) (model.Collection, error) {
+	if item.Collection != "" {
+		if c, ok := w.loadedCollection(item.Collection); ok {
+			return c, nil
+		}
+	}
+	m, err := w.scratch()
+	if err != nil {
+		return model.Collection{}, fmt.Errorf("opening Scratch: %w", err)
+	}
+	w.mu.RLock()
+	c, ok := w.collection(m.ID)
+	w.mu.RUnlock()
+	if !ok {
+		return model.Collection{}, fmt.Errorf("the Scratch draft is not loaded")
+	}
+	return c, nil
 }
 
 // freeRestoredPath is path, or path-restored, path-restored-2 … the first not taken in tree.

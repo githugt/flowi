@@ -1,7 +1,10 @@
 <script lang="ts">
+  import IconButton from './IconButton.svelte'
+  import Button from './Button.svelte'
   // The parts of a multipart body: a name and either text or a file, so one request can send several
   // files. A row without a name is not kept. Paths are relative to the collection.
   import EmptyState from './EmptyState.svelte'
+  import Select from './Select.svelte'
   import { tick } from 'svelte'
 
   interface Part {
@@ -42,18 +45,18 @@
   {#each local as p, i}
     <div class="row">
       <input class="name" aria-label="Part name" placeholder="name" bind:value={p.name} onchange={send} spellcheck="false" />
-      <select aria-label="Part kind" bind:value={p.file} onchange={send}>
+      <Select label="Part kind" bind:value={p.file} onchange={send}>
         <option value={false}>text</option>
         <option value={true}>file</option>
-      </select>
+      </Select>
       <input class="value" aria-label={p.file ? 'File path' : 'Text'} placeholder={p.file ? 'path/in/the/collection.csv' : 'value'} bind:value={p.value} onchange={send} spellcheck="false" />
       {#if p.file}<input class="type" aria-label="Content type" placeholder="content type" bind:value={p.contentType} onchange={send} spellcheck="false" />{/if}
-      <button aria-label="Remove part" title="Remove the part" onclick={() => remove(i)}>×</button>
+      <IconButton icon="close" size={12} danger label="Remove part" hint="Remove the part" onclick={() => remove(i)} />
     </div>
   {/each}
   <div class="add">
-    <button onclick={() => add(false)}>Add text part</button>
-    <button onclick={() => add(true)}>Add file part</button>
+    <Button onclick={() => add(false)}>Add text part</Button>
+    <Button onclick={() => add(true)}>Add file part</Button>
   </div>
 </div>
 
@@ -61,12 +64,9 @@
   .parts { display: flex; flex-direction: column; gap: 6px; }
   /* Name, kind and remove on one line; the text or path, and a file's content type, each on a line of their own. */
   .row { display: grid; grid-template-columns: minmax(80px, 1fr) auto auto; gap: 6px; align-items: center; padding-bottom: 8px; border-bottom: 1px solid var(--line); }
-  .row button { grid-column: 3; grid-row: 1; }
+  .row :global(.iconbtn) { grid-column: 3; grid-row: 1; }
   .name { min-width: 0; }
   .value, .type { grid-column: 1 / -1; min-width: 0; }
   .value { font-family: var(--mono); font-size: var(--fs-sm); }
-  button { background: var(--raised); color: var(--text); border: 0; box-shadow: inset 0 0 0 1px var(--line); border-radius: var(--r-md); padding: 0 10px; min-height: var(--ctl-h); font: inherit; font-weight: 500; }
-  button:hover:not(:disabled) { background: var(--raised-3); }
-  .row button { padding: 2px 8px; color: var(--muted); }
   .add { display: flex; gap: 6px; }
 </style>

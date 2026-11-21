@@ -131,6 +131,18 @@ func allIDs(list []model.Node, out map[string]bool) {
 	}
 }
 
+// openedConnections lists, sorted, the connection names the request steps of list (and of the steps inside it) open.
+func openedConnections(list []model.Node, out map[string]bool) {
+	for _, n := range list {
+		if n.Request != nil && n.Request.Open != "" {
+			out[n.Request.Open] = true
+		}
+		for _, child := range n.Children() {
+			openedConnections(child, out)
+		}
+	}
+}
+
 // cloneFlow deep-copies everything an edit can change.
 func cloneFlow(f model.Flow) model.Flow {
 	f.Inputs, f.Outputs = slices.Clone(f.Inputs), slices.Clone(f.Outputs)

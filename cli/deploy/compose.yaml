@@ -1,0 +1,20 @@
+# `flowi serve` under Docker Compose. Put FLOWI_VAULT_KEY and the other secrets in a .env file beside this one.
+services:
+  flowi:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    environment:
+      FLOWI_VAULT_KEY: ${FLOWI_VAULT_KEY:?set FLOWI_VAULT_KEY}
+      FLOWI_SECRET_SERVE_TRIGGER_TOKEN: ${FLOWI_SECRET_SERVE_TRIGGER_TOKEN:-}
+    volumes:
+      - ./data:/data
+    ports:
+      # The replayer and the triggers are published on the host's loopback only; add a TLS proxy to go further.
+      - "127.0.0.1:8525:8525"
+      - "127.0.0.1:8526:8526"
+    restart: unless-stopped
+    # A few seconds more than serve.shutdown_timeout.
+    stop_grace_period: 45s
+    # The image has no shell or curl, so the probe is the binary's own HTTP client: use an orchestrator's probe
+    # against :8527 (see kubernetes.yaml), or add a sidecar that polls /readyz.

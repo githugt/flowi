@@ -9,3 +9,15 @@ export function typeChip(type: string | undefined, kind: string | undefined): st
   const saysNothingNew = (type === 'text' && (kind === 'json' || kind === 'text')) || (type === 'binary' && kind === 'binary')
   return saysNothingNew ? '' : type
 }
+
+/**
+ * Where a broker put a message, as a chip: "p2 @ 10345" for a Kafka partition and offset, "#7" for a JetStream
+ * sequence, "" for a protocol with neither. Partition 0 with offset 0 is the very first message, which is real, so it
+ * shows when an offset is given by the broker (the bridge sends zero for "none", which cannot be told apart from the
+ * first message; a first message shows nothing).
+ */
+export function positionChip(m: { partition?: number; offset?: number; sequence?: number }): string {
+  if (m.offset) return `p${m.partition ?? 0} @ ${m.offset}`
+  if (m.sequence) return `#${m.sequence}`
+  return ''
+}

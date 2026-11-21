@@ -74,3 +74,20 @@ func TestResponseOf_should_show_no_table_for_a_response_that_is_not_a_dataset(t 
 		t.Fatalf("table %+v", got.Table)
 	}
 }
+
+func TestResponseOf_should_say_where_a_large_body_went(t *testing.T) {
+	t.Parallel()
+	// Before: a body over the stream threshold went to a file and the Body tab was empty, with no reason given.
+	rec := &engine.Record{Status: 200}
+	rec.Body.File = "downloads/export.bin"
+	rec.Body.Size = 52_000_000
+
+	got := responseOf(exchangeWith(rec), vm.ViewJSON)
+
+	if want := "52.0 MB saved to downloads/export.bin."; len(got.BodyNote) < len(want) || got.BodyNote[:len(want)] != want {
+		t.Fatalf("note %q, want it to start %q", got.BodyNote, want)
+	}
+	if note := responseOf(exchangeWith(&engine.Record{Status: 200}), vm.ViewJSON).BodyNote; note != "" {
+		t.Fatalf("note %q for a small body, want none", note)
+	}
+}

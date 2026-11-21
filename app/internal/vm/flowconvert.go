@@ -22,9 +22,12 @@ type StepEntry struct {
 	Mode        string
 }
 
-// StepCatalog lists the ten things a person can add, in five groups. The
+// StepCatalog lists the eleven things a person can add, in five groups. The
 // file format still has more node types (fetch, webhook, run_till, save and
-// digest, note); the popup offers them as modes of these ten.
+// digest); the popup offers them as modes of these.
+//
+// Before: a note step could be written in the file but not added from the popup, so a flow could not be annotated
+// where it was drawn.
 func StepCatalog() []StepEntry {
 	return []StepEntry{
 		{Group: "Call", Name: "Request", Description: "Send a saved request, or call a URL", Type: "request"},
@@ -37,16 +40,17 @@ func StepCatalog() []StepEntry {
 		{Group: "Order", Name: "Wait", Description: "Pause for a fixed or random time", Type: "delay"},
 		{Group: "Finish", Name: "Output", Description: "Write a value to the run log, a file or a webhook", Type: "log"},
 		{Group: "Finish", Name: "Stop", Description: "End the run here, as passed or as failed", Type: "stop"},
+		{Group: "Finish", Name: "Note", Description: "Leave a comment for whoever reads the flow; it runs nothing", Type: "note"},
 	}
 }
 
-// SearchSteps lists the entries whose name or description contains every
+// SearchSteps lists the entries whose name, description or file type contains every
 // word of query, ignoring case; a blank query lists them all.
 func SearchSteps(query string) []StepEntry {
 	words := strings.Fields(strings.ToLower(query))
 	var out []StepEntry
 	for _, e := range StepCatalog() {
-		text := strings.ToLower(e.Name + " " + e.Description)
+		text := strings.ToLower(e.Name + " " + e.Description + " " + e.Type) // the file format's name too: "delay" finds Wait
 		if allIn(words, text) {
 			out = append(out, e)
 		}

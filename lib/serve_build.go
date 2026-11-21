@@ -4,15 +4,19 @@ package flowi
 
 import (
 	"context"
+	"crypto/tls"
 	"errors"
 	"fmt"
 	"io"
 	"log/slog"
 	"net"
 	"net/http"
+	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
+	"github.com/githugt/flowi/lib/serve/health"
 	"github.com/githugt/flowi/lib/serve/replay"
 	"github.com/githugt/flowi/lib/serve/runs"
 	"github.com/githugt/flowi/lib/serve/scheduler"
@@ -44,13 +48,15 @@ type serveBuild struct {
 	s   *Server
 	log *slog.Logger
 
-	replayLn, triggerLn net.Listener
-	replayH             *replay.Handler
-	triggerH            http.Handler
-	mgr                 *runs.Manager
-	servers             []namedServer
-	store               shared.Store // nil when instances do not share state
-	harTape             *replay.Tape // the one tape of the session, made on first use
+	replayLn, triggerLn, healthLn net.Listener
+	healthSrv                     *http.Server // shut down last, so a probe sees the drain
+	draining                      atomic.Bool
+	replayH                       *replay.Handler
+	triggerH                      http.Handler
+	mgr                           *runs.Manager
+	servers                       []namedServer
+	store                         shared.Store // nil when instances do not share state
+	harTape                       *replay.Tape // the one tape of the session, made on first use
 }
 
 type namedServer struct {
@@ -74,6 +80,9 @@ func (b *serveBuild) assemble() error {
 	if err := b.assembleShared(); err != nil {
 		return err
 	}
+	if err := b.assembleHealthListener(); err != nil {
+		return err
+	}
 	if b.replayLn != nil || b.triggerLn != nil || !b.o.NoSchedules {
 		opts := runs.Options{
 			Start: b.w.startRun, Max: b.o.MaxRuns, NewID: func() string { return string(b.w.newID()) },
@@ -88,6 +97,7 @@ func (b *serveBuild) assemble() error {
 		return err
 	}
 	b.assembleSchedules()
+	b.assembleHealth()
 	return nil
 }
 
@@ -123,7 +133,7 @@ func (b *serveBuild) assembleReplay() error {
 		if err != nil {
 			return err
 		}
-		if upstream.Host == b.s.replayAddr {
+		if replay.SameHost(upstream.Host, b.s.replayAddr) {
 			return fmt.Errorf("%w: the record upstream is the replayer itself; give the real API's URL", ErrInvalidServeOptions)
 		}
 		rec := &replay.Recorder{Upstream: upstream}
@@ -181,19 +191,50 @@ func (b *serveBuild) assembleTriggers() error {
 	if b.o.NoTriggers {
 		return nil
 	}
-	if _, ok, err := b.w.TriggerToken(); err != nil {
-		return fmt.Errorf("reading the trigger token: %w", err)
-	} else if !ok {
-		b.s.notes = append(b.s.notes, "triggers are off: no trigger token is set (create one with: flowi serve token)")
+	if has, err := b.w.anyTriggerToken(); err != nil {
+		return fmt.Errorf("reading the trigger tokens: %w", err)
+	} else if !has {
+		b.s.notes = append(b.s.notes, "triggers are off: no trigger token is set (create one with: flowi serve tokens new <name>)")
 		return nil
+	}
+	cfg, err := triggerTLS(b.o)
+	if err != nil {
+		return err
+	}
+	if note := exposure("the trigger endpoint", b.o.TriggerAddr); note != "" && cfg == nil && !b.o.InsecureListen {
+		return fmt.Errorf("%w: %s, and without TLS its bearer token would cross the network in clear text; "+
+			"give --tls-cert and --tls-key, listen on 127.0.0.1, or pass --insecure-listen when a proxy in front terminates TLS", ErrInvalidServeOptions, note)
 	}
 	ln, err := listen(b.o.TriggerAddr)
 	if err != nil {
 		return fmt.Errorf("triggers: %w", addrError(err))
 	}
-	b.triggerLn, b.s.triggerAddr = ln, ln.Addr().String()
-	b.s.notes = appendNonEmpty(b.s.notes, exposure("the trigger endpoint", b.s.triggerAddr))
+	b.s.triggerAddr = ln.Addr().String()
+	if cfg != nil {
+		ln, b.s.triggerTLS = tls.NewListener(ln, cfg), true
+	}
+	b.triggerLn = ln
+	note := exposure("the trigger endpoint", b.s.triggerAddr)
+	if cfg == nil && note != "" { // only with --insecure-listen: say that the operator took the risk
+		note += " (plain HTTP: --insecure-listen says TLS ends in front of it)"
+	}
+	b.s.notes = appendNonEmpty(b.s.notes, note)
 	return nil
+}
+
+// triggerTLS loads the certificate the trigger endpoint serves HTTPS with, nil when none was given.
+func triggerTLS(o ServeOptions) (*tls.Config, error) {
+	if o.TLSCert == "" && o.TLSKey == "" {
+		return nil, nil
+	}
+	if o.TLSCert == "" || o.TLSKey == "" {
+		return nil, fmt.Errorf("%w: --tls-cert and --tls-key go together", ErrInvalidServeOptions)
+	}
+	pair, err := tls.LoadX509KeyPair(o.TLSCert, o.TLSKey)
+	if err != nil {
+		return nil, fmt.Errorf("%w: reading the TLS certificate and key: %w", ErrInvalidServeOptions, err)
+	}
+	return &tls.Config{Certificates: []tls.Certificate{pair}, MinVersion: tls.VersionTLS12}, nil
 }
 
 func (b *serveBuild) assembleTriggerHandler() error {
@@ -204,8 +245,46 @@ func (b *serveBuild) assembleTriggerHandler() error {
 	if err != nil {
 		return fmt.Errorf("reading the trigger token: %w", err)
 	}
-	b.triggerH, err = trigger.New(trigger.Options{Token: token, Runs: b.mgr, Logger: b.log})
+	// The named tokens are read from their file on each call, so one made, revoked or rotated while this runs takes
+	// effect at once; the single token is read once, so replacing it needs a restart.
+	b.triggerH, err = trigger.New(trigger.Options{Token: token, Tokens: b.w.triggerTokens(), Runs: b.mgr, Logger: b.log})
 	return err
+}
+
+// assembleHealthListener opens the health address, when one was asked for.
+func (b *serveBuild) assembleHealthListener() error {
+	if b.o.HealthAddr == "" {
+		return nil
+	}
+	ln, err := listen(b.o.HealthAddr)
+	if err != nil {
+		return fmt.Errorf("health: %w", addrError(err))
+	}
+	b.healthLn, b.s.healthAddr = ln, ln.Addr().String()
+	b.s.notes = appendNonEmpty(b.s.notes, exposure("the health endpoint", b.s.healthAddr))
+	return nil
+}
+
+// assembleHealth builds the health handler over what the other parts know. It is served until the very end of the
+// shutdown, so /readyz can say "draining" while runs finish.
+func (b *serveBuild) assembleHealth() {
+	if b.healthLn == nil {
+		return
+	}
+	src := health.Source{
+		Draining:   b.draining.Load,
+		RunsMax:    b.o.MaxRuns,
+		Schedules:  func() int { return len(b.s.Upcoming()) },
+		Replaying:  b.replayLn != nil,
+		Triggering: b.triggerLn != nil,
+	}
+	if b.mgr != nil {
+		src.RunsInFlight = b.mgr.InFlight
+	}
+	if b.replayLn != nil {
+		src.ReplayCalls = b.s.traffic.Total
+	}
+	b.healthSrv = newHTTPServer(health.New(health.Options{Source: src, Metrics: b.o.Metrics}))
 }
 
 func (b *serveBuild) assembleSchedules() {
@@ -224,7 +303,7 @@ func (b *serveBuild) assembleSchedules() {
 		}
 		jobs = append(jobs, job)
 	}
-	so := scheduler.Options{Jobs: jobs, Runs: b.mgr, Now: b.o.Now, Sleep: b.o.Sleep, Logger: b.log}
+	so := scheduler.Options{Jobs: jobs, Runs: b.mgr, Await: b.mgr.Await, Now: b.o.Now, Sleep: b.o.Sleep, Logger: b.log}
 	if b.store != nil {
 		so.Claim = b.store.Claim
 	}
@@ -239,7 +318,8 @@ func loopbackHosts(addr string) []string {
 	if err != nil {
 		return nil
 	}
-	if ip := net.ParseIP(host); ip == nil || !ip.IsLoopback() {
+	// "localhost" is a name, not an address, and is what a listener asked for by name carries.
+	if ip := net.ParseIP(host); !strings.EqualFold(host, "localhost") && (ip == nil || !ip.IsLoopback()) {
 		return nil
 	}
 	return []string{"localhost", "127.0.0.1", "::1"}
@@ -260,7 +340,7 @@ func (b *serveBuild) closeStore() {
 
 func (b *serveBuild) closeListeners() {
 	b.closeStore()
-	for _, ln := range []net.Listener{b.replayLn, b.triggerLn} {
+	for _, ln := range []net.Listener{b.replayLn, b.triggerLn, b.healthLn} {
 		if ln != nil {
 			_ = ln.Close() // setup failed: the original error is the one to report
 		}
@@ -288,6 +368,13 @@ func (b *serveBuild) start(ctx context.Context) {
 		wg.Go(func() {
 			if err := ns.srv.Serve(ns.ln); err != nil && !errors.Is(err, http.ErrServerClosed) {
 				stop(fmt.Errorf("%s: %w", ns.name, err))
+			}
+		})
+	}
+	if b.healthSrv != nil {
+		wg.Go(func() {
+			if err := b.healthSrv.Serve(b.healthLn); err != nil && !errors.Is(err, http.ErrServerClosed) {
+				stop(fmt.Errorf("health: %w", err))
 			}
 		})
 	}
@@ -339,6 +426,7 @@ func (b *serveBuild) startReload(ctx context.Context, wg *sync.WaitGroup) {
 // shutdown stops accepting, drains, then cancels what is left, all within
 // ShutdownTimeout.
 func (b *serveBuild) shutdown() error {
+	b.draining.Store(true)
 	ctx, cancel := context.WithTimeout(context.Background(), b.o.ShutdownTimeout)
 	defer cancel()
 	var mu sync.Mutex
@@ -365,6 +453,12 @@ func (b *serveBuild) shutdown() error {
 		})
 	}
 	wg.Wait()
+	if b.healthSrv != nil {
+		// Last, so a probe during the drain gets "not ready" rather than a refused connection.
+		if err := b.healthSrv.Shutdown(ctx); err != nil {
+			_ = b.healthSrv.Close()
+		}
+	}
 	return errors.Join(errs...)
 }
 

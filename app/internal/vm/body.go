@@ -98,7 +98,7 @@ func formatOfType(contentType string) BodyFormat {
 }
 
 func headerOf(hs []model.KeyValue, name string) string {
-	if i := slices.IndexFunc(hs, func(kv model.KeyValue) bool { return strings.EqualFold(kv.Key, name) }); i >= 0 {
+	if i := slices.IndexFunc(hs, func(kv model.KeyValue) bool { return !kv.Disabled && strings.EqualFold(kv.Key, name) }); i >= 0 {
 		return hs[i].Value
 	}
 	return ""

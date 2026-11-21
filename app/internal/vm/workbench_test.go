@@ -8,6 +8,7 @@ import (
 
 	flowi "github.com/githugt/flowi/lib"
 	"github.com/githugt/flowi/lib/engine"
+	"github.com/githugt/flowi/lib/model"
 
 	"github.com/githugt/flowi/app/internal/vm"
 	"github.com/githugt/flowi/app/internal/vm/vmtest"
@@ -126,5 +127,20 @@ func TestRunLog_Entries_should_leave_the_time_blank_for_lines_restored_from_an_e
 
 	if !entries[0].At.IsZero() || entries[1].At.IsZero() {
 		t.Fatalf("times %v %v, want blank then set", entries[0].At, entries[1].At)
+	}
+}
+
+func TestRequestVM_Configured_Given_every_param_and_header_switched_off_Then_the_sections_show_no_dot(t *testing.T) {
+	r, _ := newRequestVM(t, sampleBackend())
+
+	r.Edit(func(v *model.RequestVersion) {
+		v.Query = []model.KeyValue{{Key: "a", Value: "1", Disabled: true}}
+		v.Headers = []model.KeyValue{{Key: "X-A", Value: "1", Disabled: true}}
+	})
+	off := [2]bool{r.Configured(vm.SectionParams), r.Configured(vm.SectionHeaders)}
+	r.Edit(func(v *model.RequestVersion) { v.Query[0].Disabled, v.Headers[0].Disabled = false, false })
+
+	if off != [2]bool{} || !r.Configured(vm.SectionParams) || !r.Configured(vm.SectionHeaders) {
+		t.Fatalf("off %v, on: params %v headers %v", off, r.Configured(vm.SectionParams), r.Configured(vm.SectionHeaders))
 	}
 }

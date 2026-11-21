@@ -151,3 +151,9 @@ func (rd *reader) stop() {
 	rd.cancel()
 	rd.wg.Wait()
 }
+
+// Probe makes the handshake and closes; no frame is sent.
+func (t Transport) Probe(ctx context.Context, op transport.Operation) error {
+	_, err := t.Run(ctx, op)
+	return err
+}

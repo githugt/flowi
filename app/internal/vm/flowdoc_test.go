@@ -838,3 +838,189 @@ func TestFlowDoc_ConnectOutcome_Given_success_to_a_step_that_follows_the_one_bef
 		t.Fatalf("err %v, needs %v", err, p.Needs)
 	}
 }
+
+func TestFlowDoc_MoveCase_should_reorder_cases_with_their_steps_and_ignore_the_ends(t *testing.T) {
+	// Before: cases could not be reordered, though the first true case wins.
+	b, f := flowFixture()
+	f.Nodes = []model.Node{{ID: "cond", Type: "condition", Cases: []model.Case{
+		{When: "x > 0"}, {When: "x > 10", Nodes: []model.Node{{ID: "s", Type: "log"}}},
+	}}}
+	w := vmtest.SyncWorker()
+	d := vm.NewFlowDoc(b, w, b.Cols[0], f)
+	w.Wait()
+
+	d.MoveCase("cond", 1, -1)
+	d.MoveCase("cond", 0, -1) // already first: no change
+	d.MoveCase("cond", 5, 1)  // out of range: no change
+
+	cases := d.Draft().Nodes[0].Cases
+	if cases[0].When != "x > 10" || len(cases[0].Nodes) != 1 || cases[1].When != "x > 0" {
+		t.Fatalf("cases %+v", cases)
+	}
+}
+
+func TestFlowDoc_OpenConnections_should_list_the_names_steps_open_inside_containers_too(t *testing.T) {
+	// Before: "Run over connection" was free text with no list of the names the flow opens.
+	b, f := flowFixture()
+	f.Nodes = []model.Node{
+		{ID: "a", Type: "request", Request: &model.RequestCall{Open: "ws"}},
+		{ID: "grp", Type: "parallel", Branches: []model.Branch{{ID: "b1", Nodes: []model.Node{{ID: "c", Type: "request", Request: &model.RequestCall{Open: "bus"}}}}}},
+		{ID: "d", Type: "request", Request: &model.RequestCall{Over: "ws"}},
+	}
+	w := vmtest.SyncWorker()
+	d := vm.NewFlowDoc(b, w, b.Cols[0], f)
+	w.Wait()
+
+	got := d.OpenConnections()
+
+	if !slices.Equal(got, []string{"bus", "ws"}) {
+		t.Fatalf("got %v", got)
+	}
+}
+
+func TestFlowDoc_LanePath_should_name_each_lane_and_Insert_should_add_there(t *testing.T) {
+	// Before: a step could be dropped into a lane but not added there.
+	b, f := flowFixture()
+	f.Nodes = []model.Node{
+		{ID: "loop", Type: "batch"},
+		{ID: "route", Type: "condition", Cases: []model.Case{{When: "a"}, {When: "b"}}},
+		{ID: "plain", Type: "condition"},
+		{ID: "par", Type: "parallel", Branches: []model.Branch{{ID: "b1"}, {ID: "b2"}}},
+		{ID: "leaf", Type: "log"},
+	}
+	w := vmtest.SyncWorker()
+	d := vm.NewFlowDoc(b, w, b.Cols[0], f)
+	w.Wait()
+	cases := []struct {
+		id   string
+		lane int
+		want string
+	}{
+		{"loop", 0, "$.nodes[0].body"}, {"route", 1, "$.nodes[1].cases[1].nodes"}, {"route", 2, "$.nodes[1].else"},
+		{"plain", 0, "$.nodes[2].then"}, {"plain", 1, "$.nodes[2].else"}, {"par", 1, "$.nodes[3].branches[1].nodes"},
+	}
+
+	for _, c := range cases {
+		if got, ok := d.LanePath(c.id, c.lane); !ok || got != c.want {
+			t.Errorf("%s lane %d = %q %v, want %q", c.id, c.lane, got, ok, c.want)
+		}
+	}
+	if _, ok := d.LanePath("leaf", 0); ok {
+		t.Error("a plain step has no lane")
+	}
+	if _, ok := d.LanePath("loop", 1); ok {
+		t.Error("a loop has one lane")
+	}
+	path, _ := d.LanePath("par", 1)
+	id := d.Insert("log", path, 0, nil)
+	if got := d.Draft().Nodes[3].Branches[1].Nodes; len(got) != 1 || got[0].ID != id {
+		t.Fatalf("branch 2 = %+v", got)
+	}
+}
+
+func TestFlowDoc_Rename_should_rewrite_the_templates_and_checks_that_read_the_step(t *testing.T) {
+	// Before: renaming left {{nodes.login.status}} and a check on it pointing at a step that no longer existed.
+	b, f := flowFixture()
+	f.Nodes = []model.Node{
+		{ID: "login", Type: "log"},
+		{ID: "check", Type: "assert", When: `nodes.login.status == 200`, Params: []model.Field{{Key: "check", Value: `nodes["login"].body.ok == true and nodes.login_extra.x == 1`}, {Key: "message", Value: "{{nodes.login.body.token}}"}}},
+	}
+	w := vmtest.SyncWorker()
+	d := vm.NewFlowDoc(b, w, b.Cols[0], f)
+	w.Wait()
+
+	if err := d.Rename("login", "signin"); err != nil {
+		t.Fatal(err)
+	}
+
+	n := d.Draft().Nodes[1]
+	if n.When != "nodes.signin.status == 200" || n.Params[0].Value != `nodes["signin"].body.ok == true and nodes.login_extra.x == 1` || n.Params[1].Value != "{{nodes.signin.body.token}}" {
+		t.Fatalf("node %+v", n)
+	}
+}
+
+func TestFlowDoc_DeleteImpact_should_count_the_steps_that_go_and_name_those_that_read_them(t *testing.T) {
+	b, f := flowFixture()
+	f.Nodes = []model.Node{
+		{ID: "loop", Type: "batch", Body: []model.Node{{ID: "a", Type: "log"}, {ID: "b", Type: "log"}}},
+		{ID: "use", Type: "assert", Params: []model.Field{{Key: "check", Value: "nodes.a.status == 200"}}},
+		{ID: "other", Type: "log"},
+	}
+	w := vmtest.SyncWorker()
+	d := vm.NewFlowDoc(b, w, b.Cols[0], f)
+	w.Wait()
+
+	gone, readBy := d.DeleteImpact("loop")
+
+	if gone != 3 || !slices.Equal(readBy, []string{"use"}) {
+		t.Fatalf("gone %d readBy %v", gone, readBy)
+	}
+	if gone, readBy := d.DeleteImpact("other"); gone != 1 || len(readBy) != 0 {
+		t.Fatalf("other: gone %d readBy %v", gone, readBy)
+	}
+}
+
+func TestFlowDoc_Rename_should_refuse_in_the_words_the_window_uses(t *testing.T) {
+	// Before: the errors said "node" and "id", where the window says "step" and "name".
+	b, f := flowFixture()
+	f.Nodes = []model.Node{{ID: "a", Type: "log"}, {ID: "b", Type: "log"}}
+	w := vmtest.SyncWorker()
+	d := vm.NewFlowDoc(b, w, b.Cols[0], f)
+	w.Wait()
+
+	taken := d.Rename("a", "b")
+	empty := d.Rename("a", "")
+	missing := d.Rename("zzz", "q")
+
+	for _, c := range []struct {
+		err  error
+		want string
+	}{{taken, `a step named "b" already exists`}, {empty, "a step needs a name"}, {missing, "there is no step zzz"}} {
+		if c.err == nil || c.err.Error() != c.want {
+			t.Errorf("got %v, want %q", c.err, c.want)
+		}
+	}
+}
+
+// Before: a save wrote over a change made to the file outside Flowi without a word.
+func TestFlowDoc_Given_the_file_changed_on_disk_When_saving_Then_it_waits_until_Keep_mine(t *testing.T) {
+	b, f := flowFixture()
+	b.DiskSum = "loaded"
+	w := vmtest.SyncWorker()
+	d := vm.NewFlowDoc(b, w, b.Cols[0], f)
+	w.Wait()
+	d.Insert("log", "$.nodes", 1, nil)
+	b.Mu.Lock()
+	b.DiskSum = "edited elsewhere" // an editor or git rewrote the file
+	b.Mu.Unlock()
+
+	d.Save(false)
+	w.Wait()
+	refused := len(b.SavedFlows) == 0 && d.ChangedOnDisk() && d.Dirty() && d.Err() == ""
+	d.KeepMine()
+	d.Save(false)
+	w.Wait()
+
+	if !refused || len(b.SavedFlows) != 1 || d.Dirty() {
+		t.Fatalf("refused %v, saved %d, dirty %v", refused, len(b.SavedFlows), d.Dirty())
+	}
+}
+
+func TestFlowDoc_Given_an_unchanged_file_When_saving_twice_Then_both_saves_go_through(t *testing.T) {
+	b, f := flowFixture()
+	b.DiskSum = "loaded"
+	w := vmtest.SyncWorker()
+	d := vm.NewFlowDoc(b, w, b.Cols[0], f)
+	w.Wait()
+
+	d.Insert("log", "$.nodes", 1, nil)
+	d.Save(false)
+	w.Wait()
+	d.Insert("log", "$.nodes", 1, nil)
+	d.Save(false)
+	w.Wait()
+
+	if len(b.SavedFlows) != 2 || d.ChangedOnDisk() {
+		t.Fatalf("saved %d, onDisk %v", len(b.SavedFlows), d.ChangedOnDisk())
+	}
+}

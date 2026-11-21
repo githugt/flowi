@@ -53,5 +53,15 @@ export function Test() {
     return $Call.ByID(2605720269);
 }
 
+/**
+ * TraceURL is the address of a run's trace in the person's tracing tool (the otel.trace_url setting), or "" when
+ * none is set. The run id is a saved run's id from the Runs tab.
+ * @param {string} runID
+ * @returns {$CancellablePromise<string>}
+ */
+export function TraceURL(runID) {
+    return $Call.ByID(654845495, runID);
+}
+
 // Private type creation functions
 const $$createType0 = $models.TracingView.createFrom;

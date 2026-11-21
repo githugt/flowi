@@ -89,3 +89,15 @@ func TestServe_Given_a_fault_rate_over_one_Then_it_exits_2_before_listening(t *t
 		t.Fatalf("exit %d\n%s", code, errOut)
 	}
 }
+
+func TestServe_Given_triggers_on_an_exposed_address_without_TLS_Then_it_refuses_to_start_and_names_the_way_out(t *testing.T) {
+	// Before: it started, with a note, and the bearer token crossed the network in clear text.
+	e := newSendEnv(t)
+	e.environ = append(e.environ, "FLOWI_SECRET_SERVE_TRIGGER_TOKEN=test-only-token")
+
+	code, _, errOut := e.run(t.Context(), "serve", "--replay-addr", "127.0.0.1:0", "--trigger-addr", "0.0.0.0:0")
+
+	if code == 0 || !strings.Contains(errOut, "--insecure-listen") || !strings.Contains(errOut, "--tls-cert") {
+		t.Fatalf("exit %d\n%s", code, errOut)
+	}
+}

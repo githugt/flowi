@@ -27,7 +27,8 @@ type EnvView struct {
 	Node      string   `json:"node"`
 	Name      string   `json:"name"`
 	Rows      []EnvRow `json:"rows"`
-	Colour    string   `json:"colour"`  // "" for the default
+	Colour    string   `json:"colour"` // "" for the default
+	Protected bool     `json:"protected"`
 	Colours   []string `json:"colours"` // what it can be set to
 	Extends   string   `json:"extends"` // the environment this one builds on, or ""
 	Bases     []string `json:"bases"`   // what it may build on
@@ -83,6 +84,11 @@ func (s *EnvironmentService) SetColour(node, colour string) {
 	s.with(node, func(e *vm.Environment) { e.SetColour(colour) })
 }
 
+// SetProtected turns on or off the confirmation before a request that changes data is sent with this environment.
+func (s *EnvironmentService) SetProtected(node string, on bool) {
+	s.with(node, func(e *vm.Environment) { e.SetProtected(on) })
+}
+
 // SetExtends chooses the environment this one builds on; "" builds on none.
 func (s *EnvironmentService) SetExtends(node, base string) {
 	s.with(node, func(e *vm.Environment) { e.SetExtends(base) })
@@ -124,7 +130,7 @@ func envViewOf(node string, e *vm.Environment) EnvView {
 	for _, r := range e.Rows() {
 		rows = append(rows, EnvRow{Name: r.Name, Value: r.Value, Secret: r.Secret, SecretSet: r.SecretSet, Override: r.Override, Kind: string(r.Kind)})
 	}
-	return EnvView{Node: node, Name: e.Name(), Rows: rows, Colour: e.Colour(), Colours: model.EnvColours(), Extends: e.Extends(), Bases: bases(e), Dirty: e.Dirty(), OnDisk: e.ChangedOnDisk(), NeedsDrop: e.NeedsDropConfirm(), Error: e.Err()}
+	return EnvView{Node: node, Name: e.Name(), Rows: rows, Colour: e.Colour(), Protected: e.Protected(), Colours: model.EnvColours(), Extends: e.Extends(), Bases: bases(e), Dirty: e.Dirty(), OnDisk: e.ChangedOnDisk(), NeedsDrop: e.NeedsDropConfirm(), Error: e.Err()}
 }
 
 // bases is never nil, so the front end can loop over it.

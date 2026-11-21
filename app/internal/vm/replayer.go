@@ -81,6 +81,8 @@ type Replayer struct {
 	err      string
 	notes    []string
 	entries  []replay.Entry
+	seqBase  int // the last number given before this run: each run's log counts from 1, so its numbers are shifted
+	lastSeq  int
 	cancel   context.CancelFunc
 	onChange []func()
 }
@@ -257,6 +259,9 @@ func parseLatency(text string) (time.Duration, error) {
 }
 
 func (r *Replayer) running(ctx context.Context, cancel context.CancelFunc, srv Serving) {
+	// Before: a restarted server numbered its calls from 1 again, so old and new calls shared numbers and opening
+	// one showed the other's headers and body.
+	r.seqBase = r.lastSeq
 	r.state, r.cancel, r.addr, r.notes = ReplayerRunning, cancel, srv.ReplayAddr(), srv.Notes()
 	r.changed()
 	traffic := srv.Traffic().Subscribe(ctx)
@@ -272,6 +277,8 @@ func (r *Replayer) running(ctx context.Context, cancel context.CancelFunc, srv S
 }
 
 func (r *Replayer) add(e replay.Entry) {
+	e.Seq += r.seqBase
+	r.lastSeq = max(r.lastSeq, e.Seq)
 	r.entries = append(r.entries, e)
 	if over := len(r.entries) - MaxReplayerEntries; over > 0 {
 		r.entries = r.entries[over:]

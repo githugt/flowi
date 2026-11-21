@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
-  <title>Flow-I, Windows</title>
+  <title>Flowi, Windows</title>
   <!-- Source of appicon-windows.png, which makes windows/icon.ico. The same art as appicon.svg, but the tile fills
        the whole canvas: Windows icons do not carry the transparent margin macOS wants, so the margin would only make
        the icon look small in the taskbar. Keep the colours in step with appicon.svg. -->

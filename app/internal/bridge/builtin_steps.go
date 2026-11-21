@@ -40,8 +40,7 @@ func builtInRows(on bool, last *vm.Exchange, hasPost bool) []PipelineRowView {
 		step.State = "passed"
 		for _, d := range last.Result.Diags {
 			if schemaFindings()[d.Code] {
-				msg, _ := diag.English().Message(d) // a code without English text still marks the step failed
-				step.State, step.Reason = "failed", msg
+				step.State, step.Reason = "failed", diag.Text(d) // a code without English text still marks the step failed
 				break
 			}
 		}

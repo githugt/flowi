@@ -52,3 +52,31 @@ function parseObject(text: string): Record<string, any> | null {
     return null // not JSON after all: the YAML rules still look at it
   }
 }
+
+/** The bits of an element `isEditable` looks at: a DOM element has all of them. */
+interface Targetish {
+  tagName?: string
+  isContentEditable?: boolean
+  closest?: (selector: string) => unknown
+}
+
+/** True for a place text is typed into: a field, a text area, a select, a contenteditable or the code editor. */
+export function isEditable(target: unknown): boolean {
+  const t = target as Targetish | null
+  if (!t) return false
+  if (['INPUT', 'TEXTAREA', 'SELECT'].includes((t.tagName ?? '').toUpperCase())) return true
+  if (t.isContentEditable) return true
+  return !!t.closest?.('.cm-editor, [contenteditable="true"]')
+}
+
+/**
+ * What a paste anywhere in the window (the canvas, the sidebar, Home) is, when it should open the import offer: the
+ * text is recognised and it was not pasted into a place that takes text. A paste into the request's address bar has
+ * its own handler, which has already taken it.
+ * Before: only the request address bar looked at a paste, so a curl pasted on the canvas or Home did nothing.
+ */
+export function windowPaste(target: unknown, text: string, handled: boolean): PastedKind | null {
+  if (handled || isEditable(target)) return null
+  const kind = recognise(text)
+  return kind?.id === 'flowi' ? null : kind // a request file only fills an open request: there is none to fill here
+}

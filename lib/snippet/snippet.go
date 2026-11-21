@@ -4,6 +4,7 @@ package snippet
 
 import (
 	"fmt"
+	"net/http"
 	"strings"
 
 	"github.com/githugt/flowi/lib/engine"
@@ -18,10 +19,13 @@ const (
 	Wget       Format = "wget"
 	PowerShell Format = "powershell"
 	Xh         Format = "xh"
+	HTTPFile   Format = "http"
+	Fetch      Format = "fetch"
+	Python     Format = "python"
 )
 
 // Formats lists every format, in display order.
-func Formats() []Format { return []Format{Curl, Wget, PowerShell, Xh} }
+func Formats() []Format { return []Format{Curl, Wget, PowerShell, Xh, HTTPFile, Fetch, Python} }
 
 // Label is a format's display name.
 func Label(f Format) string {
@@ -34,12 +38,24 @@ func Label(f Format) string {
 		return "PowerShell – Invoke-RestMethod"
 	case Xh:
 		return "xh / HTTPie"
+	case HTTPFile:
+		return ".http file"
+	case Fetch:
+		return "JavaScript – fetch"
+	case Python:
+		return "Python – requests"
+	}
+	if l, ok := otherLabels()[f]; ok {
+		return l
 	}
 	return string(f)
 }
 
 // Generate renders r as format f.
 func Generate(f Format, r engine.PreviewRequest) (string, error) {
+	if text, ok, err := generateOther(f, r); ok {
+		return text, err
+	}
 	switch f {
 	case Curl:
 		return curl(r), nil
@@ -49,6 +65,12 @@ func Generate(f Format, r engine.PreviewRequest) (string, error) {
 		return powerShell(r), nil
 	case Xh:
 		return xh(r), nil
+	case HTTPFile:
+		return httpFile(r), nil
+	case Fetch:
+		return fetchJS(r), nil
+	case Python:
+		return pythonRequests(r), nil
 	}
 	return "", fmt.Errorf("unknown snippet format %q", f)
 }
@@ -67,8 +89,8 @@ const (
 func curl(r engine.PreviewRequest) string {
 	args := []string{"curl"}
 	switch r.Method {
-	case "", "GET":
-	case "HEAD":
+	case "", http.MethodGet:
+	case http.MethodHead:
 		args[0] = "curl -I"
 	default:
 		args[0] = "curl -X " + r.Method
@@ -106,7 +128,7 @@ func wget(r engine.PreviewRequest) string {
 		return "# wget cannot send multipart/form-data; use the cURL or xh snippet instead."
 	}
 	args := []string{"wget -O -"}
-	if r.Method != "" && r.Method != "GET" {
+	if r.Method != "" && r.Method != http.MethodGet {
 		args[0] += " --method=" + r.Method
 	}
 	for _, h := range r.Headers {
@@ -173,7 +195,7 @@ func psParts(parts []engine.PreviewPart) []string {
 
 func xh(r engine.PreviewRequest) string {
 	head := "xh"
-	if r.Method != "" && r.Method != "GET" {
+	if r.Method != "" && r.Method != http.MethodGet {
 		head += " " + r.Method
 	}
 	args := []string{head + " " + shellQuote(r.URL)}

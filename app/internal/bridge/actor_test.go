@@ -48,3 +48,21 @@ func TestInlineActor_should_run_at_once_on_the_caller(t *testing.T) {
 		t.Fatal("inline actor did not run the function")
 	}
 }
+
+// Before: a panic in a posted function ended the whole process; now the actor logs it, tells OnPanic and runs the
+// functions that come after.
+func TestActor_should_survive_a_panic_and_run_the_next_function(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	a := bridge.NewActor(ctx)
+	recovered := make(chan any, 1)
+	a.OnPanic = func(r any) { recovered <- r }
+
+	a.Post(func() { panic("boom") })
+	ran := false
+	a.Do(func() { ran = true })
+
+	if !ran || <-recovered != "boom" {
+		t.Fatalf("ran %v", ran)
+	}
+}

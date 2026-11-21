@@ -27,9 +27,16 @@ type NodeDetail struct {
 	Status    string // the worst instance's status, or running
 	Instances int
 	Duration  time.Duration
-	Outputs   map[string]any // the last finished instance's, masked by the engine
-	Diags     []string
-	Record    *engine.Record // the last instance's request and response, for a request node
+	// Began and Ended bracket every instance of the step on the run's clock: the first start and the last finish. They
+	// are zero for a step the run did not reach.
+	Began, Ended time.Time
+	Outputs      map[string]any // the last finished instance's, masked by the engine
+	Diags        []string
+	Record       *engine.Record // the last instance's request and response, for a request node
+	// Tries is how many times the last instance ran (more than 1 only for a step with retries), and Outcomes the
+	// names of the outcomes it ended with: which exit of the step the run took.
+	Tries    int
+	Outcomes []string
 }
 
 // FlowRun runs a flow from the canvas and tracks node statuses.
@@ -40,6 +47,8 @@ type FlowRun struct {
 	running  bool
 	cancel   context.CancelFunc
 	details  map[string]*NodeDetail
+	starts   map[string]time.Time         // an instance's start by its path, until it finishes
+	began    time.Time                    // when the last run started, by the engine's clock; zero before a run
 	hooks    map[string]map[string]string // request node → "phase:level:index" → how that hook went
 	result   engine.RunResult
 	vars     map[string]any // the flow's variables when the last run ended (masked)
@@ -79,6 +88,9 @@ func (r *FlowRun) Running() bool { return r.running }
 
 // Err is the last problem, or "".
 func (r *FlowRun) Err() string { return r.err }
+
+// Began is when the last run started, by the engine's clock; zero before a run. A step's Began and Ended count from it.
+func (r *FlowRun) Began() time.Time { return r.began }
 
 // Result is the last finished run's result.
 func (r *FlowRun) Result() engine.RunResult { return r.result }
@@ -138,7 +150,7 @@ func (r *FlowRun) RunPart(env string, inputs map[string]string, node string, sco
 
 // start runs the flow, all of it when only is nil.
 func (r *FlowRun) start(env string, inputs map[string]string, only []string) {
-	opts := flowi.RunOptions{Env: env, Inputs: inputs, Only: only}
+	opts := flowi.RunOptions{Env: env, Inputs: inputs, Only: only, Trigger: "app"}
 	if r.doc.Dirty() {
 		draft := r.doc.Draft() // try the edits without saving them
 		opts.Draft = &draft
@@ -155,6 +167,8 @@ func (r *FlowRun) start(env string, inputs map[string]string, only []string) {
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	r.running, r.cancel, r.err = true, cancel, ""
+	r.began = time.Time{}
+	clear(r.starts)
 	r.changed()
 	target, own := r.doc.Target(), ownNodes(r.doc.Draft())
 	Run(r.w, func() runOutcome { return r.execute(ctx, target, opts, own) }, func(o runOutcome) {
@@ -230,13 +244,25 @@ func (r *FlowRun) execute(ctx context.Context, t flowi.FlowTarget, o flowi.RunOp
 		mu.Lock()
 		batch = append(batch, e)
 		mu.Unlock()
-		if time.Since(last) >= refreshEvery {
+		// Before: only the 33 ms timer flushed, and only when another event arrived. A NodeStarted that came right after a
+		// flush waited until the step ended, so a slow request never showed "running". A start, and a sign-in prompt
+		// (the step then waits for the person), go out at once.
+		if time.Since(last) >= refreshEvery || startsOrWaits(e) {
 			flush()
 			last = time.Now()
 		}
 	}
 	flush()
 	return runOutcome{result: running.Wait()}
+}
+
+// startsOrWaits tells the events that must reach the screen at once: the run may now stay quiet for a long time.
+func startsOrWaits(e engine.Event) bool {
+	switch e.(type) {
+	case engine.NodeStarted, engine.AuthPrompted:
+		return true
+	}
+	return false
 }
 
 func (r *FlowRun) finish(o runOutcome) {
@@ -270,8 +296,21 @@ func (r *FlowRun) apply(events []engine.Event) {
 	}()
 	for _, e := range events {
 		switch ev := e.(type) {
+		case engine.RunStarted:
+			if r.began.IsZero() { // the first one is the run's; a nested run must not move the clock
+				r.began = ev.At
+			}
 		case engine.NodeStarted:
 			d := r.detail(ev.Node)
+			if !ev.At.IsZero() {
+				if r.starts == nil {
+					r.starts = map[string]time.Time{}
+				}
+				r.starts[ev.Path] = ev.At
+				if d.Began.IsZero() || ev.At.Before(d.Began) {
+					d.Began = ev.At
+				}
+			}
 			if d.Status == "" || d.Status == "passed" || d.Status == "skipped" {
 				r.setStatus(ev.Node, "running")
 			}
@@ -293,7 +332,14 @@ func (r *FlowRun) apply(events []engine.Event) {
 			d := r.detail(ev.Node)
 			d.Instances++
 			d.Duration += ev.Duration
+			if at, ok := r.starts[ev.Path]; ok {
+				delete(r.starts, ev.Path)
+				if end := at.Add(ev.Duration); end.After(d.Ended) {
+					d.Ended = end
+				}
+			}
 			d.Outputs = ev.Outputs
+			d.Tries, d.Outcomes = ev.Tries, ev.Outcomes
 			d.Diags = append(d.Diags, DiagLines(ev.Diags)...)
 			status := string(ev.Status)
 			if d.Status != "running" && statusRank(d.Status) > statusRank(status) {
@@ -326,8 +372,7 @@ func (r *FlowRun) setStatus(node, status string) {
 func DiagLines(l diag.List) []string {
 	var out []string
 	for _, d := range l {
-		msg, _ := diag.English().Message(d)
-		out = append(out, string(d.Code)+": "+msg)
+		out = append(out, string(d.Code)+": "+diag.Text(d))
 	}
 	return out
 }
@@ -372,6 +417,8 @@ func (o ownership) concerns(e engine.Event) bool {
 		node, path, depth = ev.Node, ev.Path, ev.Depth
 	case engine.HookFinished:
 		node, path, depth = nodeOfPath(ev.Path), ev.Path, ev.Depth // path is the request node's own
+	case engine.RunStarted:
+		return true // the clock the steps' start times count from
 	case engine.AuthPrompted:
 		return true // a person is waited for wherever in the flow (a hook flow's request too)
 	default:

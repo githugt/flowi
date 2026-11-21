@@ -20,7 +20,10 @@ import (
 // Options configures a client. Every request it sends uses them.
 type Options struct {
 	// Transport, when set, sends every attempt instead of the network: a run played back from a recording.
-	Transport       http.RoundTripper
+	Transport http.RoundTripper
+	// Pool, when set and Transport is not, supplies the transport: requests with the same transport options share one,
+	// so they reuse connections. The pool's owner closes it; Client.Close leaves a pooled transport open.
+	Pool            *Pool
 	Version         string // auto | 1.1 | 2 | h2c | 3
 	FollowRedirects bool
 	MaxRedirects    int
@@ -117,6 +120,8 @@ type Client struct {
 	opts Options
 	http *http.Client
 	rt   http.RoundTripper
+	// shared is a pool's transport, not the client's own: closing the client leaves it.
+	shared bool
 }
 
 // NewClient builds a client. Unreadable or invalid CA files are errors.
@@ -130,24 +135,36 @@ func NewClient(o Options) (*Client, error) {
 	if o.Rand == nil {
 		o.Rand = rand.New(rand.NewPCG(rand.Uint64(), rand.Uint64())) //nolint:gosec // jitter, not security
 	}
-	tr := o.Transport
+	tr, shared := o.Transport, o.Pool != nil
 	if tr == nil {
 		var err error
-		if tr, err = newRoundTripper(o); err != nil {
+		if o.Pool != nil {
+			tr, err = o.Pool.transport(o)
+		} else {
+			tr, err = newRoundTripper(o)
+		}
+		if err != nil {
 			return nil, err
 		}
 	}
 	hc := &http.Client{Transport: tr, Jar: o.Jar, CheckRedirect: redirectPolicy(o)}
-	return &Client{opts: o, http: hc, rt: tr}, nil
+	return &Client{opts: o, http: hc, rt: tr, shared: shared}, nil
 }
 
 // CloseIdleConnections releases pooled connections.
-func (c *Client) CloseIdleConnections() { c.http.CloseIdleConnections() }
+func (c *Client) CloseIdleConnections() {
+	if !c.shared {
+		c.http.CloseIdleConnections()
+	}
+}
 
 // Close releases everything the client holds. Call it when the client is
 // done: an HTTP/3 transport owns a UDP socket that idle-connection cleanup
 // does not close.
 func (c *Client) Close() {
+	if c.shared {
+		return
+	}
 	c.http.CloseIdleConnections()
 	if t, ok := c.rt.(*http3.Transport); ok {
 		_ = t.Close() // the client is being discarded; a close error has no one to act on it

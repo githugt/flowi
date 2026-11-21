@@ -98,7 +98,10 @@ func readSchema(file string) (schemainfer.Schema, SchemaSource, bool) {
 // version of request t from rec, the record of a send, and returns what it
 // changed in schemas that already existed. A first sample creates the schema
 // silently. Bodies that are not JSON learn nothing. Schemas from a spec or
-// edited by hand are never rewritten.
+// edited by hand are never rewritten. An error response (outside 2xx) can
+// create its schema but never widens one that exists.
+//
+// Before: an odd error body widened the tracked schema of its status for good.
 func (w *Workspace) LearnSchemas(t RequestTarget, version string, rec engine.Record) ([]SchemaChange, error) {
 	_, r, err := w.requestFor(t)
 	if err != nil {
@@ -106,7 +109,7 @@ func (w *Workspace) LearnSchemas(t RequestTarget, version string, rec engine.Rec
 	}
 	var changes []SchemaChange
 	for _, s := range samplesOf(rec) {
-		got, err := learnOne(r.File, version, s.part, s.sample)
+		got, err := learnOne(r.File, version, s.part, s.sample, mayWiden(s.part))
 		if err != nil {
 			return changes, err
 		}
@@ -168,7 +171,13 @@ func requestJSON(rec engine.Record) any {
 	return v
 }
 
-func learnOne(requestFile, version string, part SchemaPart, sample any) ([]SchemaChange, error) {
+// mayWiden says whether a sample may change a schema that exists: every body
+// may, except that of an error response.
+func mayWiden(part SchemaPart) bool {
+	return part.Kind != "response" || (part.Status >= 200 && part.Status < 300)
+}
+
+func learnOne(requestFile, version string, part SchemaPart, sample any, widen bool) ([]SchemaChange, error) {
 	file, err := schemaFile(requestFile, version, part)
 	if err != nil {
 		return nil, err
@@ -179,6 +188,9 @@ func learnOne(requestFile, version string, part SchemaPart, sample any) ([]Schem
 			return nil, nil // there is a file we cannot read: leave it
 		}
 		return nil, writeSchema(file, schemainfer.Infer(sample))
+	}
+	if !widen {
+		return nil, nil
 	}
 	merged, found2 := schemainfer.Merge(existing, sample)
 	if len(found2) == 0 {

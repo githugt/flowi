@@ -154,17 +154,71 @@ func (m *Manager) DiscardOr(id model.ID, fail func(error)) {
 func (m *Manager) act(action func() error) { m.actOr(action, nil) }
 
 func (m *Manager) actOr(action func() error, fail func(error)) {
+	m.settle(action, func(err error) {
+		if err != nil && fail != nil {
+			fail(err)
+		}
+	})
+}
+
+// settle runs an action, reloads the manager and the workspace tree, and then tells done how it went (nil for
+// success). A screen that keeps what the person typed until the action worked needs the outcome.
+func (m *Manager) settle(action func() error, done func(error)) {
 	Run(m.w, action, func(err error) {
 		m.err = ""
 		if err != nil {
 			m.err = ErrorText(err)
-			if fail != nil {
-				fail(err)
-			}
 		}
 		m.changed()
 		m.Load()
 		m.ws.Load()
 		m.ws.Rewatch() // the mounted roots may have changed
+		if done != nil {
+			done(err)
+		}
 	})
+}
+
+// MountThen is Mount that tells done how it went.
+func (m *Manager) MountThen(dir string, done func(error)) {
+	m.settle(func() error { _, err := m.b.Mount(dir); return err }, done)
+}
+
+// OpenBundleThen is OpenBundle that tells done how it went.
+func (m *Manager) OpenBundleThen(path string, done func(error)) {
+	m.settle(func() error { return m.b.OpenBundle(path) }, done)
+}
+
+// OpenArazzoThen is OpenArazzo that tells done how it went.
+func (m *Manager) OpenArazzoThen(ref string, done func(error)) {
+	m.settle(func() error { return m.b.OpenArazzo(context.Background(), ref) }, done)
+}
+
+// OpenExampleThen opens the bundled example and its demo server, and tells done how it went.
+func (m *Manager) OpenExampleThen(done func(error)) {
+	m.settle(func() error { return m.b.OpenExample() }, done)
+}
+
+// AllowSecretHostThen lets secrets be sent to host (the person's own list) and tells done how it went.
+func (m *Manager) AllowSecretHostThen(host string, done func(error)) {
+	m.settle(func() error { return m.b.AllowSecretHost(host) }, done)
+}
+
+// RelocateThen is Relocate that tells done how it went.
+func (m *Manager) RelocateThen(id model.ID, dir string, done func(error)) {
+	m.settle(func() error { return m.b.Relocate(id, dir) }, done)
+}
+
+// SaveDraftThen is SaveDraft that tells done how it went.
+func (m *Manager) SaveDraftThen(id model.ID, dir string, done func(error)) {
+	m.settle(func() error { return m.b.SaveDraft(id, dir) }, done)
+}
+
+// NewCollectionThen is NewCollection that tells done how it went.
+func (m *Manager) NewCollectionThen(name, location string, done func(error)) {
+	if location == "" {
+		m.settle(func() error { _, err := m.b.NewDraft(name); return err }, done)
+		return
+	}
+	m.settle(func() error { _, err := m.b.InitCollection(location, name); return err }, done)
 }

@@ -17,43 +17,13 @@ import (
 // forward builds what the replayer does with a call no saved response can answer, from ServeOptions.Forward (and
 // the older PassThrough, which is Forward "pass" with ForwardTo).
 func (b *serveBuild) forward() (*replay.Forward, error) {
-	mode, to := b.o.Forward, b.o.ForwardTo
-	if b.o.PassThrough != "" {
-		if mode != "" || to != "" {
-			return nil, fmt.Errorf("%w: pass-through is the older way to say forward \"pass\" to one API; use one of them", ErrInvalidServeOptions)
-		}
-		mode, to = ForwardPass, b.o.PassThrough
-	}
-	if mode == "" {
-		if to != "" || len(b.o.ForwardOnly) > 0 {
-			return nil, fmt.Errorf("%w: an API to forward to is given but forwarding is off: choose pass or save", ErrInvalidServeOptions)
-		}
-		return nil, nil
-	}
-	if mode != ForwardPass && mode != ForwardSave {
-		return nil, fmt.Errorf("%w: forward is %q or %q, not %q", ErrInvalidServeOptions, ForwardPass, ForwardSave, mode)
-	}
-	if b.o.Record != "" {
-		return nil, fmt.Errorf("%w: record already forwards every call; forward and record cannot be used together", ErrInvalidServeOptions)
+	mode, to, err := b.forwardMode()
+	if err != nil || mode == "" {
+		return nil, err
 	}
 	f := &replay.Forward{Save: mode == ForwardSave, Self: b.s.replayAddr, BaseURL: b.w.forwardBaseURL(b.o.ForwardEnv)}
-	if to != "" {
-		up, err := parseForwardURL(to)
-		if err != nil {
-			return nil, err
-		}
-		if up.Host == b.s.replayAddr {
-			return nil, fmt.Errorf("%w: the API to forward to is the replayer itself; give the real API's URL", ErrInvalidServeOptions)
-		}
-		f.Upstream = up
-	} else {
-		for _, raw := range b.o.ForwardOnly {
-			up, err := parseForwardURL(raw)
-			if err != nil {
-				return nil, err
-			}
-			f.Only = append(f.Only, up)
-		}
+	if err := b.setUpstreams(f, to); err != nil {
+		return nil, err
 	}
 	if b.o.RecordHAR != "" {
 		f.Recorder.Tape = b.tape()
@@ -71,6 +41,54 @@ func (b *serveBuild) forward() (*replay.Forward, error) {
 	}
 	b.s.notes = append(b.s.notes, forwardNote(mode, to, b.o.ForwardOnly, b.o.RecordTo))
 	return f, nil
+}
+
+// forwardMode is the forwarding mode and the one API to forward to, with the older pass-through option folded in; the
+// mode is "" when forwarding is off.
+func (b *serveBuild) forwardMode() (mode, to string, err error) {
+	mode, to = b.o.Forward, b.o.ForwardTo
+	if b.o.PassThrough != "" {
+		if mode != "" || to != "" {
+			return "", "", fmt.Errorf("%w: pass-through is the older way to say forward \"pass\" to one API; use one of them", ErrInvalidServeOptions)
+		}
+		mode, to = ForwardPass, b.o.PassThrough
+	}
+	if mode == "" {
+		if to != "" || len(b.o.ForwardOnly) > 0 {
+			return "", "", fmt.Errorf("%w: an API to forward to is given but forwarding is off: choose pass or save", ErrInvalidServeOptions)
+		}
+		return "", "", nil
+	}
+	if mode != ForwardPass && mode != ForwardSave {
+		return "", "", fmt.Errorf("%w: forward is %q or %q, not %q", ErrInvalidServeOptions, ForwardPass, ForwardSave, mode)
+	}
+	if b.o.Record != "" {
+		return "", "", fmt.Errorf("%w: record already forwards every call; forward and record cannot be used together", ErrInvalidServeOptions)
+	}
+	return mode, to, nil
+}
+
+// setUpstreams sets the API f forwards to (to), or else the only APIs it may forward to.
+func (b *serveBuild) setUpstreams(f *replay.Forward, to string) error {
+	if to != "" {
+		up, err := parseForwardURL(to)
+		if err != nil {
+			return err
+		}
+		if replay.SameHost(up.Host, b.s.replayAddr) {
+			return fmt.Errorf("%w: the API to forward to is the replayer itself; give the real API's URL", ErrInvalidServeOptions)
+		}
+		f.Upstream = up
+		return nil
+	}
+	for _, raw := range b.o.ForwardOnly {
+		up, err := parseForwardURL(raw)
+		if err != nil {
+			return err
+		}
+		f.Only = append(f.Only, up)
+	}
+	return nil
 }
 
 func forwardNote(mode, to string, only []string, recordTo string) string {

@@ -33,6 +33,7 @@ func (s *Store) Format(c model.Collection) ([]FileChange, error) {
 			return fmt.Errorf("formatting %s: %w", file, err)
 		}
 		old, _ := s.source(file)
+		data = inLineEndingOf(old, data)
 		if !bytes.Equal(old, data) {
 			changes = append(changes, FileChange{File: file, Old: old, New: data, DropsComments: old != nil && s.codec.HasComments(old)})
 		}
@@ -91,4 +92,25 @@ func withoutDefaultName(e model.Environment) model.Environment {
 		e.Name = ""
 	}
 	return e
+}
+
+// inLineEndingOf returns data with the line ending of old: a file that was
+// written with CRLF (and has no byte-order mark, which the formatter removes
+// on purpose) stays CRLF, so formatting does not turn every line into a diff.
+//
+// Before: a CRLF file always "needed formatting", and the first save changed
+// every line ending.
+func inLineEndingOf(old, data []byte) []byte {
+	if bytes.HasPrefix(old, []byte{0xEF, 0xBB, 0xBF}) || !isCRLF(old) {
+		return data
+	}
+	lf := bytes.ReplaceAll(data, []byte("\r\n"), []byte("\n"))
+	return bytes.ReplaceAll(lf, []byte("\n"), []byte("\r\n"))
+}
+
+// isCRLF reports whether every line break in b is a CRLF, and there is at
+// least one.
+func isCRLF(b []byte) bool {
+	lf := bytes.Count(b, []byte("\n"))
+	return lf > 0 && lf == bytes.Count(b, []byte("\r\n"))
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { dockTabs, openAfterClick } from './card'
+import { dockTabs, firstDockTab, openAfterClick } from './card'
 
 describe('openAfterClick', () => {
   it('opens the clicked row', () => {
@@ -33,5 +33,19 @@ describe('dockTabs', () => {
   })
   it('adds Problems when the step reported some', () => {
     expect(dockTabs({ ...none, kind: 'step', output: [1], diags: ['x'] })).toEqual(['output', 'problems'])
+  })
+})
+
+describe('firstDockTab', () => {
+  it('opens a failed step on its problems, and a passed step on the first tab', () => {
+    expect(firstDockTab(['input', 'output', 'problems'], 'failed')).toBe('problems')
+    expect(firstDockTab(['input', 'output', 'problems'], 'passed')).toBe('input')
+  })
+  it('opens on the checks when a check failed and there are no problems', () => {
+    expect(firstDockTab(['input', 'output', 'checks'], 'failed', 1)).toBe('checks')
+    expect(firstDockTab(['input', 'output', 'checks'], 'failed', 0)).toBe('input')
+  })
+  it('gives nothing when there is no tab', () => {
+    expect(firstDockTab([], 'failed')).toBe('')
   })
 })

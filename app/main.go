@@ -64,8 +64,9 @@ func run() error {
 	// The vault asks for its passphrase only when a secret is first used,
 	// by which time app is set and the window shows.
 	ask := func() (string, error) { return app.Passphrase().Ask() }
+	askNew := func() (string, error) { return app.Passphrase().AskNew() }
 	tracer := tracing.NewHolder(slog.Default())
-	ws, openProblems, err := openWorkspace(os.Environ(), userHome(), ask, tracer)
+	ws, openProblems, err := openWorkspace(os.Environ(), userHome(), ask, askNew, tracer)
 	if err != nil {
 		return err
 	}
@@ -133,6 +134,9 @@ func run() error {
 		Title:  "Flowi",
 		Width:  1360,
 		Height: 860,
+		// Below this the tab bar, the sidebar and the editor panes cannot all keep their controls on screen.
+		MinWidth:  900,
+		MinHeight: 600,
 		// The page says where the window can be dragged from (--wails-draggable: the sidebar's
 		// head and the tab bar, but not its tabs). An InvisibleTitleBarHeight was dropped: AppKit
 		// dragged the window from anywhere in that strip, tabs included, before the page saw the
@@ -155,13 +159,26 @@ func run() error {
 	})
 	// Quitting keeps what a request's edit slot can hold and asks only about
 	// the rest; the window answers through System.Quit.
+	gate := bridge.NewQuitGate(3 * time.Second)
 	mayQuit = func() bool {
 		if quitting.Load() || !app.KeepEdits() {
 			return true
 		}
+		switch gate.Request() {
+		case bridge.QuitForce:
+			// The page never answered (it crashed or hangs): keep what can be kept and let the window close.
+			if err := app.KeepFlowEdits(); err != nil {
+				slog.Warn("the unsaved flows were not kept", "Event", "QuitKeepFailed", "Error", err)
+			}
+			quitting.Store(true)
+			return true
+		case bridge.QuitWait:
+			return false
+		}
 		emit("quit-requested", map[string]int{"environments": app.DirtyEnvironments()})
 		return false
 	}
+	wails.Event.On("quit-ack", func(*application.CustomEvent) { gate.Ack() })
 	window.RegisterHook(events.Common.WindowClosing, func(e *application.WindowEvent) {
 		if !mayQuit() {
 			e.Cancel()
@@ -186,14 +203,14 @@ func userHome() string {
 // another one. The problems it returns are what the files got wrong: the
 // window lists them in the Problems panel. passphrase asks for the vault's
 // passphrase where no OS keychain holds its key.
-func openWorkspace(environ []string, home string, passphrase func() (string, error), tracer *tracing.Holder) (*flowi.Workspace, diag.List, error) {
+func openWorkspace(environ []string, home string, passphrase, newPassphrase func() (string, error), tracer *tracing.Holder) (*flowi.Workspace, diag.List, error) {
 	paths, err := settings.DiscoverPaths(environ)
 	if err != nil {
 		return nil, nil, fmt.Errorf("finding the config folder: %w", err)
 	}
 	ws, problems, err := flowi.OpenWorkspace(context.Background(), flowi.WorkspaceOptions{
-		Paths: paths, Environ: environ, Home: home, Keys: vault.OSKeyStore(), Passphrase: passphrase,
-		UserAgent: "Flowi-UI/" + buildinfo.Version(),
+		Paths: paths, Environ: environ, Home: home, Keys: vault.OSKeyStore(), Passphrase: passphrase, NewPassphrase: newPassphrase,
+		UserAgent: "Flowi-UI/" + buildinfo.Version(), Version: buildinfo.Version(),
 		// The holder forwards to whichever exporter the Tracing page has switched on, if any.
 		Observe: tracer.Observe, Traceparent: tracer.Traceparent,
 	})

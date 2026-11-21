@@ -34,7 +34,7 @@ export function Empty() {
 }
 
 /**
- * Restore puts an item back into the Drafts and returns the path it got.
+ * Restore puts an item back (where a delete took it from, or into the Drafts) and returns the path it got.
  * @param {string} id
  * @returns {$CancellablePromise<string>}
  */
@@ -61,6 +61,15 @@ export function State() {
  */
 export function Sweep(open) {
     return $Call.ByID(1281838891, open);
+}
+
+/**
+ * Undo puts items that a delete sent to the trash back where they were. It returns a problem to show, or "".
+ * @param {string[]} ids
+ * @returns {$CancellablePromise<string>}
+ */
+export function Undo(ids) {
+    return $Call.ByID(3001533991, ids);
 }
 
 // Private type creation functions

@@ -3,6 +3,7 @@
 package bridge
 
 import (
+	"strings"
 	"time"
 
 	"github.com/githugt/flowi/lib/model"
@@ -20,6 +21,8 @@ type ScheduleView struct {
 	Inputs     string `json:"inputs"` // one name=value line each
 	TZ         string `json:"tz"`
 	Disabled   bool   `json:"disabled"`
+	OnFailure  string `json:"onFailure"` // where `flowi serve` tells when a run fails: an http(s) webhook or env:NAME; "" tells nobody
+	OnSuccess  string `json:"onSuccess"` // the same for a run that passes
 	FlowLabel  string `json:"flowLabel"` // the flow it runs, as "Collection › path", "" when none matches
 	When       string `json:"when"`      // the cron in words ("Every day at 03:00"), "" when it is not a common pattern
 	NextAt     string `json:"nextAt"`    // when it fires next, RFC 3339; "" when disabled or invalid
@@ -46,6 +49,19 @@ type RunnerView struct {
 	Notes       []string       `json:"notes"`
 	Upcoming    []UpcomingView `json:"upcoming"`
 	TriggerAddr string         `json:"triggerAddr"` // where triggers listen while it runs
+}
+
+// CronPreviewView is what the schedule editor shows under the cron line as it is typed.
+type CronPreviewView struct {
+	Words string   `json:"words"` // "Every day at 03:00"; "" when it is not a common pattern
+	Next  []string `json:"next"`  // the next firings, "Tue 09:00"
+	Error string   `json:"error"` // why the line or the zone cannot be used; "" when it can
+}
+
+// PreviewCron explains a cron line and time zone without saving anything.
+func (s *SchedulesService) PreviewCron(cron, tz string) CronPreviewView {
+	p := vm.PreviewCron(cron, tz, time.Now())
+	return CronPreviewView{Words: p.Words, Next: nonNil(p.Next), Error: p.Error}
 }
 
 // SchedulesView is the scheduler mode.
@@ -120,16 +136,25 @@ func (s *SchedulesService) Save(old string, sch ScheduleView) string {
 	if err != nil {
 		return err.Error()
 	}
-	return s.await(func(done func(error)) {
+	problem := s.await(func(done func(error)) {
 		s.vm.Save(old, model.Schedule{
 			Name: sch.Name, Flow: sch.Flow, Collection: sch.Collection, Cron: sch.Cron, Env: sch.Env, Inputs: inputs, TZ: sch.TZ, Disabled: sch.Disabled,
+			OnFailure: strings.TrimSpace(sch.OnFailure), OnSuccess: strings.TrimSpace(sch.OnSuccess),
 		}, done)
 	})
+	if problem == "" {
+		s.app.actor.Do(s.runner.Restart) // a running runner fires what it was started with until it is restarted
+	}
+	return problem
 }
 
 // Remove deletes a schedule.
 func (s *SchedulesService) Remove(name string) string {
-	return s.await(func(done func(error)) { s.vm.Remove(name, done) })
+	problem := s.await(func(done func(error)) { s.vm.Remove(name, done) })
+	if problem == "" {
+		s.app.actor.Do(s.runner.Restart)
+	}
+	return problem
 }
 
 // NewToken makes a fresh trigger token and returns it: the only time its
@@ -142,6 +167,9 @@ func (s *SchedulesService) NewToken() (string, error) {
 	ch := make(chan result, 1)
 	s.app.actor.Do(func() { s.vm.NewToken(func(token string, err error) { ch <- result{token, err} }) })
 	r := <-ch
+	if r.err == nil {
+		s.app.actor.Do(s.runner.Restart) // the old token keeps working in a running runner until it restarts
+	}
 	return r.token, r.err
 }
 
@@ -162,7 +190,7 @@ func (s *SchedulesService) view() SchedulesView {
 		v.Flows = append(v.Flows, FlowChoice{Label: f.Label(), Collection: string(f.CollectionID), Flow: string(f.ID)})
 	}
 	for _, x := range s.vm.List() {
-		sv := ScheduleView{Name: x.Name, Flow: x.Flow, Collection: x.Collection, Cron: x.Cron, Env: x.Env, Inputs: vm.FormatInputs(x.Inputs), TZ: x.TZ, Disabled: x.Disabled, When: vm.DescribeCron(x.Cron), Fires: []int{}}
+		sv := ScheduleView{Name: x.Name, Flow: x.Flow, Collection: x.Collection, Cron: x.Cron, Env: x.Env, Inputs: vm.FormatInputs(x.Inputs), TZ: x.TZ, Disabled: x.Disabled, OnFailure: x.OnFailure, OnSuccess: x.OnSuccess, When: vm.DescribeCron(x.Cron), Fires: []int{}}
 		if next, fires := vm.ScheduleOutlook(x, time.Now()); !next.IsZero() {
 			sv.NextAt, sv.Fires = next.Format(time.RFC3339), fires
 		}

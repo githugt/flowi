@@ -492,3 +492,26 @@ func TestCheck_Given_an_endpoint_nobody_answers_Then_fails_quickly(t *testing.T)
 		t.Fatal("expected an error")
 	}
 }
+
+func TestRedactURL_Given_credentials_in_the_url_Then_they_are_hidden(t *testing.T) {
+	// Before: a literal ?api_key=... in the URL left for the trace collector as typed.
+	tests := map[string]string{
+		"https://example.com/a?api_key=abc&page=2":       "https://example.com/a?api_key=REDACTED&page=2",
+		"https://example.com/a?Access%5FToken=abc&q=x+y": "https://example.com/a?Access%5FToken=REDACTED&q=x+y",
+		"https://user:pw@example.com/a":                  "https://REDACTED@example.com/a",
+		"https://example.com/a?page=2":                   "https://example.com/a?page=2",
+		"https://example.com/a?flag&sig=1&token":         "https://example.com/a?flag&sig=1&token",
+		"https://example.com/a?password=1":               "https://example.com/a?password=REDACTED",
+	}
+	for in, want := range tests {
+		if got := redactURL(in); got != want {
+			t.Errorf("redactURL(%q) = %q, want %q", in, got, want)
+		}
+	}
+}
+
+func TestRedactURL_Given_a_url_that_does_not_parse_Then_the_query_is_dropped(t *testing.T) {
+	if got := redactURL("http://a b/x?token=abc"); strings.Contains(got, "abc") {
+		t.Errorf("secret kept: %q", got)
+	}
+}

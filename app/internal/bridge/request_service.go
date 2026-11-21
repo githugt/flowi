@@ -12,8 +12,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/githugt/flowi/lib/bugreport"
 	"github.com/githugt/flowi/lib/engine"
 	"github.com/githugt/flowi/lib/model"
+	"github.com/githugt/flowi/lib/respdiff"
 	"github.com/githugt/flowi/lib/serve/replay"
 
 	"github.com/githugt/flowi/app/internal/vm"
@@ -21,22 +23,36 @@ import (
 
 // ResponseView is what a request screen shows of its latest send.
 type ResponseView struct {
-	Title    string        `json:"title"`
-	At       string        `json:"at"`
-	Took     string        `json:"took"` // how long the send took, "" when not measured
-	Size     string        `json:"size"` // the body's size, "" when unknown
-	Passed   bool          `json:"passed"`
-	Status   string        `json:"status"` // the engine's status: passed, failed, error…
-	Code     string        `json:"code"`   // what the Response tab shows after its name: the HTTP status, the gRPC code, or the engine's status
-	Sent     []PartView    `json:"sent"`
-	Received []PartView    `json:"received"`
-	Diags    []string      `json:"diags"`
-	Checks   []string      `json:"checks"`             // the checks (assert lines) this response judged; ones added or edited since are untried
-	BodyJSON any           `json:"bodyJson,omitempty"` // the parsed JSON body, for the tree; absent for other bodies and large ones
-	BodyXML  string        `json:"bodyXml,omitempty"`  // the body text of an XML response (not HTML), for the tree and the multi-status list; absent otherwise and when large
-	Phases   []PhaseView   `json:"phases"`
-	Messages []MessageView `json:"messages"`
-	Table    *TableView    `json:"table,omitempty"` // the rows of a dataset response
+	Title string `json:"title"`
+	At    string `json:"at"`
+	Took  string `json:"took"` // how long the send took, "" when not measured
+	Size  string `json:"size"` // the body's size, "" when unknown
+	// Facts is the line about how the response came ("HTTP/2 · gzip 12 KB → 340 KB · 2 redirects"), and Hops the redirects it
+	// passed through, one line each.
+	Facts        string          `json:"facts"`
+	Hops         []string        `json:"hops"`
+	Passed       bool            `json:"passed"`
+	Status       string          `json:"status"` // the engine's status: passed, failed, error…
+	Code         string          `json:"code"`   // what the Response tab shows after its name: the HTTP status, the gRPC code, or the engine's status
+	Sent         []PartView      `json:"sent"`
+	Received     []PartView      `json:"received"`
+	Diags        []string        `json:"diags"`
+	CheckResults []CheckEvalView `json:"checkResults"`       // what the send itself said about each check it ran, in order
+	Checks       []string        `json:"checks"`             // the checks (assert lines) this response judged; ones added or edited since are untried
+	Extracted    []ExtractedView `json:"extracted"`          // what each extraction the send tried took from the response; ones added or renamed since are absent
+	BodyJSON     any             `json:"bodyJson,omitempty"` // the parsed JSON body, for the tree; absent for other bodies and large ones
+	BodyXML      string          `json:"bodyXml,omitempty"`  // the body text of an XML response (not HTML), for the tree and the multi-status list; absent otherwise and when large
+	Phases       []PhaseView     `json:"phases"`
+	Messages     []MessageView   `json:"messages"`
+	Table        *TableView      `json:"table,omitempty"`    // the rows of a dataset response
+	BodyNote     string          `json:"bodyNote,omitempty"` // why no body shows: it was large and went to a file
+	// BodyKind says what the body is, for picking a viewer: none, json, xml, html, image, pdf, text or binary; ""
+	// for a response with no single body (messages, gRPC, a query). ContentType is the type it came as.
+	BodyKind    string `json:"bodyKind"`
+	ContentType string `json:"contentType,omitempty"`
+	BodyImage   string `json:"bodyImage,omitempty"` // a picture as a data address, when it is small enough to draw
+	BodyHTML    string `json:"bodyHtml,omitempty"`  // a page's source, for the sandboxed preview, when it is small enough
+	BodyHex     string `json:"bodyHex,omitempty"`   // the first bytes of a binary body as a hex dump
 }
 
 // RequestView is an open request as its screen shows it.
@@ -73,6 +89,7 @@ type RequestView struct {
 	Async          *AsyncInfo           `json:"async,omitempty"`
 	GRPC           *GRPCInfo            `json:"grpc,omitempty"`
 	Dataset        *DatasetInfo         `json:"dataset,omitempty"`
+	Connection     *ConnectionView      `json:"connection,omitempty"` // for a message or database request: the Test connection button and its last result
 
 	// Parts are the parts of a multipart form body, for its editor.
 	Parts []MultipartPartView `json:"parts"`
@@ -258,8 +275,8 @@ func (s *RequestService) view(node string, o *openRequest) RequestView {
 	v := RequestView{
 		Node: node, Name: d.Name, Path: d.Path, Kind: kind, Verb: vm.Verb(r.Current()), Versions: r.Labels(), VersionNames: versionNamesOf(d), Selected: r.SelectedLabel(), Default: d.Default,
 		BodyKind: string(r.BodyKind()), BodyFormat: string(r.BodyFormat()), Multipart: r.Multipart(), Auth: authViewOf(r, s.app.workspace.NamedAuths()),
-		Dirty: r.Dirty(), OnDisk: r.ChangedOnDisk(), NeedsDrop: r.NeedsDropConfirm(), Error: r.Err(), Current: r.Current(), FullURL: vm.URLWithQuery(r.Current().URL, r.Current().Query), HookChain: nonNil(r.HookChain()),
-		InScratch: s.app.workspace.InScratch(node), Snippet: snippetViewOf(o.snip), Pipeline: pipelineOf(r, s.app.send.TraceFor(t)), Live: liveOf(s.app.send.TraceFor(t)), Async: asyncInfoOf(r), GRPC: grpcInfoOf(r), Dataset: datasetInfoOf(r), Sending: s.app.send.RunningFor(t), SendError: s.app.send.ErrFor(t),
+		Dirty: r.Dirty(), OnDisk: r.ChangedOnDisk(), NeedsDrop: r.NeedsDropConfirm(), Error: r.Err(), Current: emptyCollections(r.Current()), FullURL: vm.URLWithQuery(r.Current().URL, r.Current().Query), HookChain: nonNil(r.HookChain()),
+		InScratch: s.app.workspace.InScratch(node), Snippet: snippetViewOf(o.snip), Pipeline: pipelineOf(r, s.app.send.TraceFor(t)), Live: liveOf(s.app.send.TraceFor(t)), Async: asyncInfoOf(r), GRPC: grpcInfoOf(r), Dataset: datasetInfoOf(r), Connection: connectionOf(r), Sending: s.app.send.RunningFor(t), SendError: s.app.send.ErrFor(t),
 	}
 	v.FlowiOverlay, v.FlowiOverlays, v.FlowiOverlayNotes = r.OverlayName(), flowiOverlaysOf(r), nonNil(r.OverlayNotes())
 	v.FlowiOverlayMarks = flowiOverlayMarksOf(r)
@@ -287,6 +304,13 @@ func (s *RequestService) view(node string, o *openRequest) RequestView {
 	return v
 }
 
+// ExtractedView is what one extraction took from the response a request got.
+type ExtractedView struct {
+	Name  string `json:"name"`
+	Value string `json:"value"` // cut for a chip; "" when nothing matched
+	Found bool   `json:"found"`
+}
+
 // maxTreeBody is the largest JSON body sent to the window as a tree: bigger ones are shown as text.
 const maxTreeBody = 1 << 20
 
@@ -303,9 +327,15 @@ func isXMLType(contentType string) bool {
 func responseOf(ex vm.Exchange, f vm.ViewFormat) *ResponseView {
 	rv := &ResponseView{
 		Title: ex.Title, At: ex.At.Local().Format(time.TimeOnly), Passed: ex.Result.Status == engine.StatusPassed,
-		Status: string(ex.Result.Status), Sent: []PartView{}, Received: []PartView{}, Diags: []string{}, Checks: append([]string{}, ex.Checks...), Phases: []PhaseView{}, Messages: []MessageView{},
+		Status: string(ex.Result.Status), Sent: []PartView{}, Received: []PartView{}, Diags: []string{}, Checks: append([]string{}, ex.Checks...), CheckResults: []CheckEvalView{}, Phases: []PhaseView{}, Messages: []MessageView{}, Hops: []string{}, Extracted: []ExtractedView{},
+	}
+	for _, e := range vm.ExtractedOf(ex) {
+		rv.Extracted = append(rv.Extracted, ExtractedView{Name: e.Name, Value: e.Value, Found: e.Found})
 	}
 	rv.Diags = append(rv.Diags, vm.DiagLines(ex.Result.Diags)...)
+	for _, c := range ex.Result.Checks {
+		rv.CheckResults = append(rv.CheckResults, CheckEvalView{Line: c.Line, Verdict: c.Verdict, Note: c.Note})
+	}
 	rv.Code = string(ex.Result.Status)
 	if rec := ex.Result.Record; rec != nil {
 		rv.Code = codeOf(rec, rv.Code)
@@ -319,6 +349,15 @@ func responseOf(ex vm.Exchange, f vm.ViewFormat) *ResponseView {
 		rv.Phases = phasesOf(rec.Timings)
 		rv.Took = vm.TookText(rec.Timings.Total)
 		rv.Size = sizeOf(rec)
+		rv.Facts, rv.Hops = vm.ResponseFacts(rec), vm.RedirectLines(rec)
+		rv.BodyNote = bodyNoteOf(rec)
+		if singleBody(rec) {
+			rv.BodyKind, rv.ContentType = string(vm.ResponseKindOf(rec.Body)), rec.Body.ContentType
+			rv.BodyImage, rv.BodyHTML = vm.BodyImage(rec.Body), vm.BodyHTML(rec.Body)
+			if rv.BodyKind == string(vm.RespBinary) || rv.BodyKind == string(vm.RespPDF) {
+				rv.BodyHex = vm.BodyHex(rec.Body)
+			}
+		}
 		rv.Messages = messagesOf(rec.Messages)
 		rv.Table = tableOf(rec)
 		rv.Sent = partsOf(vm.InputParts(model.Node{}, detail))
@@ -359,10 +398,153 @@ func (s *RequestService) PinExample(node, name string) (string, error) {
 			ch <- result{err: errors.New("send the request first")}
 			return
 		}
-		s.app.send.Pin(*ex.Result.Record, name, func(file string, err error) { ch <- result{file, err} })
+		rec := *ex.Result.Record
+		s.app.send.Pin(rec, name, func(file string, err error) {
+			if note := engine.PinWarning(rec); err == nil && note != "" {
+				s.app.emit("notice", Notice{Level: "warn", Text: note})
+			}
+			ch <- result{file, err}
+		})
 	})
 	r := <-ch
 	return r.file, r.err
+}
+
+// ChangeView is one difference between two responses: a JSON path, "line 12" or a header name.
+type ChangeView struct {
+	Path string `json:"path"`
+	Kind string `json:"kind"` // added, removed or changed
+	Old  string `json:"old"`
+	New  string `json:"new"`
+}
+
+// ResponseDiffView is how the response on screen differs from the one sent before it.
+type ResponseDiffView struct {
+	Older     string       `json:"older"` // when and what, "14:02:11 · 200"
+	Newer     string       `json:"newer"`
+	Same      bool         `json:"same"`
+	OldStatus int          `json:"oldStatus"`
+	NewStatus int          `json:"newStatus"`
+	Headers   []ChangeView `json:"headers"`
+	Body      []ChangeView `json:"body"`
+	BodyMode  string       `json:"bodyMode"` // json (by path), text (by line), binary or ""
+	Truncated int          `json:"truncated"`
+	Hidden    int          `json:"hidden"`   // credential-named values left out of the comparison
+	Volatile  int          `json:"volatile"` // headers that change on every send, skipped
+}
+
+func changeViews(cs []respdiff.Change) []ChangeView {
+	out := make([]ChangeView, len(cs))
+	for i, c := range cs {
+		out[i] = ChangeView{Path: c.Path, Kind: string(c.Kind), Old: c.Old, New: c.New}
+	}
+	return out
+}
+
+// ComparePrevious compares the response the request shows with the one sent before it (the same request and
+// version, from this session's history): the status, the headers, and the body by JSON path or by line.
+func (s *RequestService) ComparePrevious(node string) (ResponseDiffView, error) {
+	type result struct {
+		view ResponseDiffView
+		err  error
+	}
+	ch := make(chan result, 1)
+	s.with(node, func(o *openRequest) {
+		shown, ok := s.shownExchange(o)
+		if !ok || shown.Result.Record == nil {
+			ch <- result{err: errors.New("send the request first")}
+			return
+		}
+		var prev *vm.Exchange
+		for _, ex := range s.app.history.Items() {
+			if ex.Target != shown.Target || ex.Version != shown.Version || ex.Result.Record == nil || (shown.ID != 0 && ex.ID >= shown.ID) {
+				continue
+			}
+			if prev == nil || ex.ID > prev.ID {
+				p := ex
+				prev = &p
+			}
+		}
+		if prev == nil {
+			ch <- result{err: errors.New("there is no earlier response of this request to compare with")}
+			return
+		}
+		d := respdiff.Compare(*prev.Result.Record, *shown.Result.Record, respdiff.Options{})
+		label := func(ex vm.Exchange) string {
+			return ex.At.Format("15:04:05") + " · " + strconv.Itoa(ex.Result.Record.Status)
+		}
+		ch <- result{view: ResponseDiffView{
+			Older: label(*prev), Newer: label(shown), Same: d.Same(), OldStatus: d.OldStatus, NewStatus: d.NewStatus,
+			Headers: changeViews(d.Headers), Body: changeViews(d.Body), BodyMode: d.BodyMode, Truncated: d.Truncated, Hidden: d.Hidden, Volatile: d.Volatile,
+		}}
+	})
+	r := <-ch
+	return r.view, r.err
+}
+
+// BugReportView is the Markdown of the last send for a bug report, and what was masked in it.
+type BugReportView struct {
+	Text   string   `json:"text"`
+	Masked []string `json:"masked"`
+}
+
+// BugReport writes the request of the last send and its response as Markdown (a cURL line, the headers, and the
+// bodies cut to a few KB) with every credential-named header, query parameter and JSON field masked.
+func (s *RequestService) BugReport(node string) (BugReportView, error) {
+	type result struct {
+		view BugReportView
+		err  error
+	}
+	ch := make(chan result, 1)
+	s.with(node, func(o *openRequest) {
+		ex, ok := s.app.send.LastFor(o.req.Target())
+		if !ok || ex.Result.Record == nil {
+			ch <- result{err: errors.New("send the request first")}
+			return
+		}
+		rep := bugreport.Build(*ex.Result.Record, bugreport.Options{})
+		ch <- result{view: BugReportView{Text: rep.Markdown, Masked: append([]string{}, rep.Masked...)}}
+	})
+	r := <-ch
+	return r.view, r.err
+}
+
+// CheckEvalView is what one check says about the response on screen.
+type CheckEvalView struct {
+	Line    string `json:"line"`
+	Verdict string `json:"verdict"` // passed, failed or unknown (it needs a send: a variable, the environment)
+	Note    string `json:"note"`    // for a failed check what it saw; for an unknown one why it cannot be told
+}
+
+// CheckEvalsView is a list of checks tried on the response a request shows.
+type CheckEvalsView struct {
+	At     string          `json:"at"` // when that response was received, "14:02:11"; "" when there is none
+	Checks []CheckEvalView `json:"checks"`
+}
+
+// EvalChecks tries the given checks on the response the request shows, with no request sent: a check being
+// written is judged at once, and a POST that creates data does not create another record to try it.
+func (s *RequestService) EvalChecks(node string, lines []string) CheckEvalsView {
+	out := CheckEvalsView{Checks: []CheckEvalView{}}
+	s.with(node, func(o *openRequest) {
+		ex, ok := s.shownExchange(o)
+		if !ok || ex.Result.Record == nil {
+			return
+		}
+		out.At = ex.At.Local().Format(time.TimeOnly)
+		for _, c := range engine.EvalChecks(*ex.Result.Record, lines) {
+			out.Checks = append(out.Checks, CheckEvalView{Line: c.Line, Verdict: c.Verdict, Note: c.Note})
+		}
+	})
+	return out
+}
+
+// shownExchange is the exchange whose response the request shows: one opened from the history, else the latest.
+func (s *RequestService) shownExchange(o *openRequest) (vm.Exchange, bool) {
+	if o.shown != nil {
+		return *o.shown, true
+	}
+	return s.app.send.LastFor(o.req.Target())
 }
 
 // ShowExchange shows an exchange of the response history in the request
@@ -482,13 +664,27 @@ func untitledName(ws *vm.Workspace, node string, req *vm.Request) string {
 	return url
 }
 
+// bodyNoteOf says where a large body went. A body over the stream threshold is written to a file and not kept in the
+// record, so the Body tab has nothing to draw. Before, it was empty and nothing said why.
+func bodyNoteOf(rec *engine.Record) string {
+	if rec.Body.File == "" {
+		return ""
+	}
+	return vm.SizeText(rec.Body.Size) + " saved to " + rec.Body.File + ". It is not shown here, and checks and extracts do not see it."
+}
+
 // sizeOf is the size of the body a send got back. Messages, gRPC calls and queries have no single body, so they show
 // none: a query shows its rows.
 func sizeOf(rec *engine.Record) string {
-	if rec.HasMessages() || rec.Kind == engine.KindGRPC || rec.Kind == engine.KindDataset {
+	if !singleBody(rec) {
 		return ""
 	}
 	return vm.SizeText(rec.Body.Size)
+}
+
+// singleBody says whether the record has one response body: messages, gRPC calls and queries do not.
+func singleBody(rec *engine.Record) bool {
+	return !rec.HasMessages() && rec.Kind != engine.KindGRPC && rec.Kind != engine.KindDataset
 }
 
 // codeOf is the short status of a record: a gRPC code, an HTTP status, or the fallback (messages: the outcome).

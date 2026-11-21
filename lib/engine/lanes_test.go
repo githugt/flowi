@@ -110,3 +110,29 @@ func TestLanes_wait_any_and_first_success(t *testing.T) {
 		})
 	}
 }
+
+func TestLanes_batch_label_Then_the_steps_inside_are_paths_named_by_the_item(t *testing.T) {
+	// Before: a failing row showed as users[17]/work, and the run tree gave no hint which row it was.
+	f := newFixture(t)
+	p := newProbe()
+	batch := batchOf("users", []model.Field{
+		{Key: "over", Value: "{{['ada@x.test', 'bob@x.test']}}"},
+		{Key: "label", Value: "{{item}}"},
+	}, probeNode("work"))
+	fl := f.addFlow("labelled", batch)
+
+	_, res := runFlow(testCtx(t), t, p.deps(f.deps()), f.runInput(fl))
+
+	if res.Status != StatusPassed || !contains(p.order, "start:users[ada@x.test]/work") || !contains(p.order, "start:users[bob@x.test]/work") {
+		t.Fatalf("status %s order %v", res.Status, p.order)
+	}
+}
+
+func contains(list []string, want string) bool {
+	for _, s := range list {
+		if s == want {
+			return true
+		}
+	}
+	return false
+}

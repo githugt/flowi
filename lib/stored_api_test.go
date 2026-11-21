@@ -6,6 +6,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"strconv"
 	"testing"
 )
 
@@ -112,5 +113,33 @@ func TestStoredRecord_should_read_a_saved_response_back(t *testing.T) {
 	}
 	if _, err := w.StoredRecord(target, version, "missing"); err == nil {
 		t.Fatal("a missing response was read")
+	}
+}
+
+func TestExampleTaken_Given_a_pinned_example_When_asked_Then_only_that_name_is_taken(t *testing.T) {
+	// Before: pinning replaced an example of the same name without a word.
+	w := demoWorkspace(t)
+	target, _ := w.FindRequest("auth/login", "")
+	s, _ := w.SendRequest(context.Background(), target, SendOptions{Env: "local", With: map[string]string{"email": "a@example.com"}})
+	rec := *drain(s).Record
+	before, errBefore := w.ExampleTaken(rec, "ok")
+	if _, err := w.PinExample(rec, "ok"); err != nil {
+		t.Fatal(err)
+	}
+
+	same, errSame := w.ExampleTaken(rec, "ok")
+	other, errOther := w.ExampleTaken(rec, "second")
+	byStatus, errStatus := w.ExampleTaken(rec, "")
+	named, _ := w.ExampleTaken(rec, strconv.Itoa(rec.Status))
+	_, errBad := w.ExampleTaken(rec, "../x")
+
+	if errBefore != nil || errSame != nil || errOther != nil || errStatus != nil {
+		t.Fatalf("errors %v %v %v %v", errBefore, errSame, errOther, errStatus)
+	}
+	if before || !same || other || byStatus != named {
+		t.Errorf("before %t, same %t, other %t, by status %t (named %t)", before, same, other, byStatus, named)
+	}
+	if errBad == nil {
+		t.Error("a name that is not a plain file name was accepted")
 	}
 }

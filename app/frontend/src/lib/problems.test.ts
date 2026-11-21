@@ -40,3 +40,17 @@ describe('describeProblems', () => {
     expect(describeProblems('run cancelled')).toEqual([{ text: 'run cancelled', code: '' }])
   })
 })
+
+describe('secretHostsOf', () => {
+  it('should name the hosts of a blocked secret, one each, and nothing for other problems', async () => {
+    // Before: the message told the person to run a command, so the app offered no way to trust their own host.
+    const { describeProblem, secretHostsOf } = await import('./problems')
+    const one = describeProblem('FLW-SEC-005: auth/login would send a secret to "api.example.com", which is not trusted with secrets in environment "staging" (hint)')
+    const two = describeProblem('FLW-SEC-005: a would send a secret to "a.example, b.example:8443", which is not trusted with secrets in environment "x"')
+    const other = describeProblem('FLW-SEC-001: secret "x" is not set')
+
+    expect(secretHostsOf(one)).toEqual(['api.example.com'])
+    expect(secretHostsOf(two)).toEqual(['a.example', 'b.example:8443'])
+    expect(secretHostsOf(other)).toEqual([])
+  })
+})

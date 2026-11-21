@@ -5,6 +5,8 @@ package nodes
 import (
 	"errors"
 	"fmt"
+	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -348,5 +350,47 @@ func TestBatch_Given_times_out_of_range_at_run_time_Then_FLW_NODE_005(t *testing
 		if len(out.Diags) != 1 || out.Diags[0].Code != diag.CodeNodeParam || len(rt.lanes) != 0 {
 			t.Fatalf("times %d: %+v", times, out)
 		}
+	}
+}
+
+func TestBatch_label_Given_a_template_Then_each_lane_is_named_by_its_item(t *testing.T) {
+	// Before: a failure in a data-driven batch showed as users[17]/create, and nobody could tell which row that was.
+	s, _, rt := flowState()
+	s.Vars.Set("rows", []any{map[string]any{"email": "ada@x.test"}, map[string]any{"email": "bob@x.test"}})
+
+	out := runOutcome(t, batchNode("over", "{{vars.rows}}", "label", "{{item.email}}"), s)
+
+	if len(out.Diags) != 0 || rt.lanes[0][0].Label != "[ada@x.test]" || rt.lanes[0][1].Label != "[bob@x.test]" {
+		t.Fatalf("diags %v lanes %+v", out.Diags, rt.lanes)
+	}
+}
+
+func TestBatch_label_Given_awkward_repeated_or_empty_names_Then_they_are_cleaned_and_unique(t *testing.T) {
+	s, _, rt := flowState()
+	s.Vars.Set("names", []any{"a/b[1]", "same", "same", "", "  ", strings.Repeat("x", 60)})
+
+	out := runOutcome(t, batchNode("over", "{{vars.names}}", "label", "{{item}}"), s)
+
+	got := make([]string, len(rt.lanes[0]))
+	for i, l := range rt.lanes[0] {
+		got[i] = l.Label
+	}
+	want := []string{"[a_b_1_]", "[same]", "[same#2]", "[3]", "[4]", "[" + strings.Repeat("x", 40) + "]"}
+	if len(out.Diags) != 0 || !slices.Equal(got, want) {
+		t.Fatalf("labels %q\nwant   %q", got, want)
+	}
+}
+
+func TestBatch_label_Given_index_Then_it_is_in_scope_and_a_broken_template_is_a_diagnostic(t *testing.T) {
+	s, _, rt := flowState()
+
+	ok := runOutcome(t, batchNode("times", int64(2), "label", "row-{{index}}"), s)
+	bad := runOutcome(t, batchNode("times", int64(2), "label", "{{nope.missing}}"), s)
+
+	if len(ok.Diags) != 0 || rt.lanes[0][1].Label != "[row-1]" {
+		t.Fatalf("diags %v lanes %+v", ok.Diags, rt.lanes)
+	}
+	if len(bad.Diags) == 0 || len(rt.lanes) != 1 {
+		t.Fatalf("a broken label must fail before any lane starts: %v, %d runs", bad.Diags, len(rt.lanes))
 	}
 }

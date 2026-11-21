@@ -113,5 +113,5 @@
   .rail .homebtn { margin-bottom: 8px; padding: 5px; }
   .rail .homebtn.on { background: var(--tint-sel); }
   /* Floating, over the canvas: the layout does not move. */
-  .peek { position: absolute; z-index: 50; top: 0; bottom: 0; left: 40px; box-shadow: var(--shadow); display: flex; }
+  .peek { position: absolute; z-index: var(--z-menu); top: 0; bottom: 0; left: 40px; box-shadow: var(--shadow); display: flex; }
 </style>

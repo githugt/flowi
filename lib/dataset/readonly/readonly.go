@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+	"unicode"
 )
 
 // The reasons Check refuses a statement.
@@ -42,7 +43,11 @@ func Check(statement string) error {
 	if semicolons > 0 {
 		return ErrManyStatements
 	}
-	word, _, _ := strings.Cut(strings.ToUpper(code), " ")
+	// Before: the first word was cut at a space only, so "SELECT\n id" and "SELECT\tid" were refused as one odd word.
+	word := strings.ToUpper(code)
+	if end := strings.IndexFunc(word, unicode.IsSpace); end >= 0 {
+		word = word[:end]
+	}
 	if !readingStatements()[word] {
 		return fmt.Errorf("%w: it starts with %s, and only SELECT, WITH, VALUES, TABLE, SHOW, EXPLAIN and DESCRIBE are allowed", ErrNotReadOnly, word)
 	}

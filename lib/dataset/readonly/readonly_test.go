@@ -25,6 +25,11 @@ func TestCheck_should_accept_statements_that_only_read(t *testing.T) {
 		"SELECT 'it''s' AS quote",
 		`SELECT "a;b" FROM t`,
 		"SELECT 1 -- trailing; comment",
+		// Before: only a space ended the first word, so a newline, tab or CRLF after it was refused.
+		"SELECT\n id\nFROM t",
+		"SELECT\tid FROM t",
+		"SELECT\r\n id FROM t",
+		"WITH\n x AS (SELECT 1)\nSELECT * FROM x",
 	} {
 		t.Run(statement, func(t *testing.T) {
 			err := readonly.Check(statement)

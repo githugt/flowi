@@ -107,3 +107,16 @@ func ping(ctx context.Context, c *goredis.Client) error {
 	defer cancel()
 	return c.Ping(ctx).Err()
 }
+
+// Probe connects and sends PING; nothing is published or read.
+func (Transport) Probe(ctx context.Context, op transport.Operation) error {
+	client, addr, err := newClient(op)
+	if err != nil {
+		return err
+	}
+	defer client.Close() //nolint:errcheck // nothing useful to do if closing fails
+	if err := ping(ctx, client); err != nil {
+		return fmt.Errorf("connecting to %s: %w", addr, err)
+	}
+	return nil
+}

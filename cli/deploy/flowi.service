@@ -1,0 +1,28 @@
+# A systemd unit for `flowi serve`. Install as /etc/systemd/system/flowi.service, put the secrets in
+# /etc/flowi/flowi.env (mode 0600, owned by root), then: systemctl enable --now flowi
+[Unit]
+Description=Flowi serve (replayer, triggers, schedules)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=flowi
+Group=flowi
+# FLOWI_VAULT_KEY=... and any FLOWI_SECRET_* values.
+EnvironmentFile=/etc/flowi/flowi.env
+Environment=FLOWI_CONFIG_DIR=/var/lib/flowi
+ExecStart=/usr/local/bin/flowi serve --quiet --health-addr 127.0.0.1:8527 --metrics
+Restart=on-failure
+RestartSec=5
+# A few seconds more than serve.shutdown_timeout, so running flows can finish before systemd kills the process.
+TimeoutStopSec=45
+
+# What a service that only talks over the network and reads its own folder does not need.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/flowi
+
+[Install]
+WantedBy=multi-user.target

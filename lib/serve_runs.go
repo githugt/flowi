@@ -23,7 +23,7 @@ func (w *Workspace) startRun(ctx context.Context, r runs.Request) (runs.Handle, 
 	if err != nil {
 		return nil, asStartError(err)
 	}
-	run, err := w.RunFlow(ctx, target, RunOptions{Env: r.Env, PreferVersion: r.PreferVersion, Inputs: r.Inputs, Seed: r.Seed})
+	run, err := w.RunFlow(ctx, target, RunOptions{Env: r.Env, PreferVersion: r.PreferVersion, Inputs: r.Inputs, Seed: r.Seed, Trigger: "trigger"})
 	if err != nil {
 		return nil, asStartError(err)
 	}

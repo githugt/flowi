@@ -370,3 +370,25 @@ func (p *poller) stop() {
 	p.cancel()
 	p.wg.Wait()
 }
+
+// Probe connects to a broker, signs in and asks for the cluster's metadata; no topic is created, read or written.
+func (Transport) Probe(ctx context.Context, op transport.Operation) error {
+	brokers, useTLS, err := parseServer(op.Server)
+	if err != nil {
+		return err
+	}
+	cfg, err := parseBinding(op.Binding)
+	if err != nil {
+		return err
+	}
+	op.Send = nil // a probe must not ask the broker to create topics
+	cl, err := newClient(brokers, useTLS, op, cfg, nil)
+	if err != nil {
+		return fmt.Errorf("connecting to %s: %w", op.Server, err)
+	}
+	defer cl.Close()
+	if err := cl.Ping(ctx); err != nil {
+		return fmt.Errorf("connecting to %s: %w", op.Server, err)
+	}
+	return nil
+}

@@ -4,10 +4,13 @@ package bridge_test
 
 import (
 	"errors"
+	"os"
+	"path/filepath"
 	"slices"
 	"testing"
 
 	flowi "github.com/githugt/flowi/lib"
+	"github.com/githugt/flowi/lib/analysis"
 	"github.com/githugt/flowi/lib/model"
 
 	"github.com/githugt/flowi/app/internal/bridge"
@@ -119,7 +122,7 @@ func TestManagerService_PreviewSpecUpdate_should_leave_out_files_it_writes_back_
 	if err != nil || len(got.Changed) != 1 || len(got.Added) != 1 || len(got.Removed) != 1 {
 		t.Fatalf("view %+v err %v", got, err)
 	}
-	if err := mgr.ApplySpecUpdate("C1", "pets"); err != nil || len(specs.imported) != 1 {
+	if err := mgr.ApplySpecUpdate("C1", "pets", ""); err != nil || len(specs.imported) != 1 {
 		t.Fatalf("apply err %v imported %d", err, len(specs.imported))
 	}
 }
@@ -127,7 +130,7 @@ func TestManagerService_PreviewSpecUpdate_should_leave_out_files_it_writes_back_
 func TestManagerService_ApplySpecUpdate_Given_no_preview_Then_an_error(t *testing.T) {
 	_, _, _, app, _ := openLoginOptions(t, bridge.WithSpecOverlays(&fakeSpecs{}))
 
-	err := app.Manager().ApplySpecUpdate("C1", "pets")
+	err := app.Manager().ApplySpecUpdate("C1", "pets", "")
 
 	if err == nil || errors.Is(err, flowi.ErrNoKeptSpec) {
 		t.Fatalf("err %v, want: preview first", err)
@@ -141,5 +144,63 @@ func TestManagerService_KeptSpecs_should_name_the_overlays_relative_to_the_colle
 
 	if err != nil || len(got) != 1 || !slices.Equal(got[0].Overlays, []string{"descriptions/pets.overlay.yaml"}) {
 		t.Fatalf("specs %+v err %v (the edits overlay does not exist, so it is not listed)", got, err)
+	}
+}
+
+func newerSpec(t *testing.T) string {
+	t.Helper()
+	file := filepath.Join(t.TempDir(), "pets-v2.yaml")
+	if err := os.WriteFile(file, []byte("openapi: 3.0.3\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	return file
+}
+
+func TestManagerService_PreviewSpecUpdate_Given_a_newer_spec_Then_what_it_would_break_is_in_the_same_preview(t *testing.T) {
+	// Arrange
+	specs := &fakeSpecs{update: flowi.ImportPlan{Files: []flowi.PlannedFile{{Rel: "requests/pets/listPets.req.yaml", Exists: true}}}}
+	_, _, _, app, b := openLoginOptions(t, bridge.WithSpecOverlays(specs))
+	b.Check.Impact = flowi.SpecImpact{Spec: "pets", Breakages: []flowi.Breakage{{Request: "pets/getPet", Version: "1", Consumer: analysis.Consumer{Kind: analysis.KindRequest, Reason: "the field is gone"}}}}
+	file := newerSpec(t)
+
+	// Act
+	got, err := app.Manager().PreviewSpecUpdate("C1", "pets", file)
+
+	// Assert
+	// Before: "what files change" and "what breaks" were two previews, so an update could go ahead unseen.
+	if err != nil || !got.Checked || len(got.Breakages) != 1 || got.Breakages[0].Request != "pets/getPet" || got.Source != file {
+		t.Fatalf("view %+v err %v", got, err)
+	}
+}
+
+func TestManagerService_PreviewSpecUpdate_Given_the_kept_copy_Then_nothing_is_checked_and_nothing_breaks(t *testing.T) {
+	_, _, _, app, b := openLoginOptions(t, bridge.WithSpecOverlays(&fakeSpecs{}))
+
+	got, err := app.Manager().PreviewSpecUpdate("C1", "pets", "")
+
+	if err != nil || got.Checked || len(got.Breakages) != 0 || b.Called("ImpactAgainst") {
+		t.Fatalf("view %+v err %v", got, err)
+	}
+}
+
+func TestManagerService_ApplySpecUpdate_Given_a_source_other_than_the_previewed_one_Then_it_is_refused_and_nothing_is_written(t *testing.T) {
+	// Arrange
+	specs := &fakeSpecs{}
+	_, _, _, app, _ := openLoginOptions(t, bridge.WithSpecOverlays(specs))
+	file := newerSpec(t)
+	if _, err := app.Manager().PreviewSpecUpdate("C1", "pets", file); err != nil {
+		t.Fatal(err)
+	}
+
+	// Act
+	err := app.Manager().ApplySpecUpdate("C1", "pets", "https://example.test/other.yaml")
+
+	// Assert
+	// Before: Apply took only the spec's name, so the document written could differ from the one in the preview.
+	if err == nil || len(specs.imported) != 0 {
+		t.Fatalf("err %v imported %d", err, len(specs.imported))
+	}
+	if err := app.Manager().ApplySpecUpdate("C1", "pets", file); err != nil || len(specs.imported) != 1 {
+		t.Fatalf("the previewed source should still apply: err %v imported %d", err, len(specs.imported))
 	}
 }

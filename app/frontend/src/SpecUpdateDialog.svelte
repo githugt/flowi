@@ -1,4 +1,5 @@
 <script lang="ts">
+  import Modal from './Modal.svelte'
   import Button from './Button.svelte'
   // Update from spec: import a kept spec again with its overlays, from the kept copy or a newer
   // document. Requests it replaces keep your edits, checks, extractions and hooks; the preview says
@@ -6,12 +7,18 @@
   import { ManagerService } from '../bindings/github.com/githugt/flowi/app/internal/bridge'
   import { errorText } from './lib/errors'
   import { ui } from './lib/ui.svelte'
+  import { breakHeading, updateLabel } from './lib/specupdate'
   import type { KeptSpec, SpecUpdate } from './lib/types'
   import PathField from './PathField.svelte'
+  import RadioGroup from './RadioGroup.svelte'
 
   let { collection, spec, onclose }: { collection: string; spec: KeptSpec; onclose: () => void } = $props()
 
   let from = $state<'kept' | 'newer'>('kept')
+  const SOURCES = [
+    { value: 'kept', label: 'The kept copy' },
+    { value: 'newer', label: 'A newer version of the spec (it becomes the kept copy)' },
+  ] as const
   let source = $state('')
   let preview = $state<SpecUpdate | null>(null)
   let error = $state('')
@@ -33,7 +40,7 @@
   async function apply() {
     busy = true
     try {
-      await ManagerService.ApplySpecUpdate(collection, spec.name)
+      await ManagerService.ApplySpecUpdate(collection, spec.name, preview?.source ?? '')
       ui.toast(`Updated from ${spec.spec}`)
       onclose()
     } catch (e) {
@@ -52,16 +59,18 @@
   const nothing = $derived(preview && !preview.added.length && !preview.changed.length && !preview.removed.length)
 </script>
 
-<div class="scrim" role="presentation" onpointerdown={onclose}>
-  <div class="dialog" role="dialog" aria-label="Update from spec" tabindex="-1" onpointerdown={(e) => e.stopPropagation()}>
-    <h3>Update from spec</h3>
+<Modal title="Update from spec" width={520} maxHeight="82vh" scroll {onclose}>
     <p class="muted">
       Imports <code>{spec.spec}</code> again{spec.overlays.length ? `, with ${spec.overlays.join(', ')}` : ''}. Requests keep what you changed and what only Flowi has (checks, extractions, hooks, settings).
     </p>
-    <fieldset>
-      <label><input type="radio" bind:group={from} value="kept" onchange={() => (preview = null)} /> The kept copy</label>
-      <label><input type="radio" bind:group={from} value="newer" onchange={() => (preview = null)} /> A newer version of the spec (it becomes the kept copy)</label>
-    </fieldset>
+    <RadioGroup
+      label="Update from"
+      value={from}
+      options={SOURCES}
+      onchange={(v) => {
+        from = v as typeof from
+        preview = null
+      }} />
     {#if from === 'newer'}
       <PathField bind:value={source} kind="file" label="File, or an http(s) URL" title="Choose the newer spec" />
     {/if}
@@ -77,33 +86,36 @@
           {/if}
         {/each}
       {/if}
+      {#if breakHeading(preview)}
+        <h4 class:bad={preview.breakages.length > 0}>{breakHeading(preview)}</h4>
+        {#if preview.breakages.length}
+          <ul class="breaks">
+            {#each preview.breakages as b}<li><code>{b.request}</code> <span class="muted">({b.version}, {b.where})</span>: {b.reason}</li>{/each}
+          </ul>
+        {/if}
+      {/if}
       {#if preview.notes.length}
         <h4>Notes</h4>
         <ul class="notes">{#each preview.notes as n}<li>{n}</li>{/each}</ul>
       {/if}
     {/if}
-    <div class="actions">
+  {#snippet actions()}
       <Button type="button" onclick={onclose}>Cancel</Button>
       {#if preview && !nothing}
-        <Button variant="primary" disabled={busy} onclick={apply}>Update</Button>
+        <Button variant={preview.breakages.length ? 'danger' : 'primary'} disabled={busy} onclick={apply}>{updateLabel(preview)}</Button>
       {:else}
         <Button variant="primary" disabled={busy || (from === 'newer' && !source.trim())} onclick={look}>Preview</Button>
       {/if}
-    </div>
-  </div>
-</div>
+  {/snippet}
+</Modal>
 
 <style>
-  .scrim { position: fixed; inset: 0; background: rgb(0 0 0 / 0.4); display: grid; place-items: center; z-index: 60; }
-  .dialog { width: 520px; max-height: 82vh; overflow: auto; display: flex; flex-direction: column; gap: 10px; padding: 16px; background: var(--panel); border: 1px solid var(--line); border-radius: var(--r-lg); }
-  .dialog h3, .dialog h4, .dialog p { margin: 0; }
-  h4 { font-size: var(--fs-sm); color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; }
+  h4 { margin: 0; font-size: var(--fs-sm); color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; }
   ul { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 2px; }
+  h4.bad { color: var(--fail); }
+  .breaks li { font-size: var(--fs-sm); }
   .notes li { color: var(--muted); font-size: var(--fs-sm); }
-  fieldset { border: 0; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
-  label { display: flex; align-items: center; gap: 8px; }
   code { font-size: var(--fs-xs); }
   .muted { color: var(--muted); font-size: var(--fs-sm); }
   .err { color: var(--fail); }
-  .actions { display: flex; justify-content: flex-end; gap: 8px; }
 </style>

@@ -262,6 +262,18 @@ func (s *RequestService) SetAssert(node string, lines []string) {
 	s.with(node, func(o *openRequest) { o.req.Edit(func(v *model.RequestVersion) { v.Assert = lines }) })
 }
 
+// SetExpect sets the HTTP status the selected version is meant to answer with ("401", "400-499", "4xx", "200, 404";
+// "" for none, which keeps the usual rule that a 2xx passes). It returns what is wrong with the text, "" when it
+// was saved: a text that is not a status is not saved.
+func (s *RequestService) SetExpect(node, expect string) string {
+	expect = strings.TrimSpace(expect)
+	if _, err := model.ParseExpect(expect); err != nil {
+		return err.Error()
+	}
+	s.with(node, func(o *openRequest) { o.req.Edit(func(v *model.RequestVersion) { v.Expect = expect }) })
+	return ""
+}
+
 // SetVersionDetails sets the title and the description (Markdown, the version's
 // docs) of the selected version.
 func (s *RequestService) SetVersionDetails(node, name, docs string) {

@@ -143,3 +143,31 @@ func TestCardFacts_Given_a_step_with_its_own_outcomes_Then_they_win_over_the_req
 		t.Fatalf("got %+v, want %+v", got, want)
 	}
 }
+
+// Before: a request that expects a 401 looked like any other step, so a green step on a flow gave no hint that a
+// 401 was the right answer.
+func TestCardsOf_Given_a_version_that_expects_a_status_Then_its_card_says_so(t *testing.T) {
+	c := cardCollection()
+	c.Requests[0].Versions[0].Expect = "4xx, 401"
+	n := model.Node{ID: "n", Type: "request", Request: &model.RequestCall{Request: model.Ref{ID: "R1"}}}
+
+	got := vm.CardsOf(c, model.Flow{Nodes: []model.Node{n}})["n"]
+
+	var glyphs []string
+	for _, g := range got.Guards {
+		glyphs = append(glyphs, g.Glyph)
+	}
+	if !reflect.DeepEqual(glyphs, []string{"expects 400-499, 401"}) {
+		t.Fatalf("guards %v", glyphs)
+	}
+}
+
+func TestCardsOf_Given_a_version_with_no_expect_Then_there_is_no_mark(t *testing.T) {
+	n := model.Node{ID: "n", Type: "request", Request: &model.RequestCall{Request: model.Ref{ID: "R1"}}}
+
+	got := vm.CardsOf(cardCollection(), model.Flow{Nodes: []model.Node{n}})["n"]
+
+	if len(got.Guards) != 0 {
+		t.Fatalf("guards %+v", got.Guards)
+	}
+}

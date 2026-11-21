@@ -187,7 +187,9 @@ func literalQuery(rawQuery string, declared []model.KeyValue) []model.KeyValue {
 		add(unescape(k), unescape(v))
 	}
 	for _, kv := range declared {
-		add(kv.Key, kv.Value)
+		if !kv.Disabled {
+			add(kv.Key, kv.Value)
+		}
 	}
 	return out
 }

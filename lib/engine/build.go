@@ -30,6 +30,9 @@ type buildInput struct {
 	// secretVars are the environment's secret variable names, for the
 	// "use secret.x" hint.
 	secretVars map[string]bool
+	// envValues are the environment's other variables; with secretVars they
+	// give the names to suggest for a misspelt env.x.
+	envValues map[string]any
 	// missingSecret reports a declared secret that has no value; those are
 	// reported by the caller (FLW-SEC-001), all together.
 	missingSecret func(name string) bool
@@ -195,6 +198,9 @@ func (b *builder) url() (string, string) {
 	base, _ := b.text("URL", "url", b.in.version.URL)
 	var sendable, shown []string
 	for _, q := range b.in.version.Query {
+		if q.Disabled {
+			continue
+		}
 		key := "query:" + q.Key
 		v, ok := b.eval(b.queryDesc(q.Key), key, q.Value)
 		if !ok {
@@ -243,6 +249,9 @@ func (b *builder) headers() (http.Header, []Header) {
 	h := http.Header{}
 	var shown []Header
 	for _, kv := range b.in.version.Headers {
+		if kv.Disabled {
+			continue
+		}
 		desc, key := "header "+kv.Key, "header:"+kv.Key
 		v, ok := b.eval(desc, key, kv.Value)
 		if !ok {
@@ -265,7 +274,9 @@ func (b *builder) headers() (http.Header, []Header) {
 func (b *builder) addDefaultHeaders(h http.Header, shown []Header) []Header {
 	named := map[string]bool{}
 	for _, kv := range b.in.version.Headers {
-		named[http.CanonicalHeaderKey(kv.Key)] = true
+		if !kv.Disabled {
+			named[http.CanonicalHeaderKey(kv.Key)] = true
+		}
 	}
 	for _, d := range b.in.defaults {
 		if named[http.CanonicalHeaderKey(d.Key)] {
@@ -488,8 +499,16 @@ func (b *builder) undefined(field, name string) {
 		hint = " (no secret variable " + secret + " in this environment)"
 	}
 	if rest, ok := strings.CutPrefix(name, "env."); ok {
-		if v, _, _ := strings.Cut(rest, "."); b.in.secretVars[v] {
+		v, _, _ := strings.Cut(rest, ".")
+		if b.in.secretVars[v] {
 			hint = " (it is a secret: use secret." + v + ")"
+		} else {
+			// Before: the message gave no hint, so a typo or a missing row was slow to find.
+			hint = " (the selected environment does not set " + v + ": add it to the environment, check the spelling, or choose another environment)"
+			// Before: no hint named the variables the environment does set.
+			if near := nearest(v, b.envNames()); near != "" {
+				hint = " (the selected environment does not set " + v + ". Did you mean env." + near + "?)"
+			}
 		}
 	}
 	b.add(diag.CodeTemplateUndefined, map[string]string{"name": name, "field": field, "hint": hint})
@@ -497,4 +516,60 @@ func (b *builder) undefined(field, name string) {
 
 func (b *builder) add(c diag.Code, args map[string]string) {
 	b.diags = append(b.diags, diag.New(c, diag.Location{}, args))
+}
+
+// envNames lists the variables of the selected environment, secret ones too.
+func (b *builder) envNames() []string {
+	names := make([]string, 0, len(b.in.envValues)+len(b.in.secretVars))
+	for n := range b.in.envValues {
+		names = append(names, n)
+	}
+	for n := range b.in.secretVars {
+		names = append(names, n)
+	}
+	slices.Sort(names)
+	return names
+}
+
+// nearest returns the candidate closest to name when it is a likely typo (a
+// case difference, or at most two edits for a name of five or more letters,
+// one edit for a shorter one), or "" when none is.
+func nearest(name string, candidates []string) string {
+	limit := 1
+	if len(name) >= 5 {
+		limit = 2
+	}
+	best, bestDist := "", limit+1
+	for _, c := range candidates {
+		if c == name {
+			continue
+		}
+		d := editDistance(strings.ToLower(name), strings.ToLower(c))
+		if d < bestDist {
+			best, bestDist = c, d
+		}
+	}
+	return best
+}
+
+// editDistance is the Levenshtein distance between a and b.
+func editDistance(a, b string) int {
+	ra, rb := []rune(a), []rune(b)
+	prev := make([]int, len(rb)+1)
+	for j := range prev {
+		prev[j] = j
+	}
+	for i := 1; i <= len(ra); i++ {
+		cur := make([]int, len(rb)+1)
+		cur[0] = i
+		for j := 1; j <= len(rb); j++ {
+			cost := 1
+			if ra[i-1] == rb[j-1] {
+				cost = 0
+			}
+			cur[j] = min(prev[j]+1, cur[j-1]+1, prev[j-1]+cost)
+		}
+		prev = cur
+	}
+	return prev[len(rb)]
 }

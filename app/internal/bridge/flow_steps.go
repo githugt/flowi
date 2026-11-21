@@ -4,6 +4,7 @@ package bridge
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/githugt/flowi/lib/model"
 
@@ -95,4 +96,33 @@ func (s *FlowService) AddRouteByStatus(node, step string) (string, error) {
 		return nil
 	})
 	return id, err
+}
+
+// Wrap puts the selected steps, which must sit next to each other, inside a new loop, group or route (kind) and selects
+// it. Other steps that read the wrapped steps' results are named in a notice, since they may not find them any more.
+func (s *FlowService) Wrap(node, kind string) (string, error) {
+	var id string
+	err := s.edit(node, func(o *openFlow) error {
+		made, readBy, err := o.doc.Wrap(o.selection(), kind)
+		if err != nil {
+			return err
+		}
+		id = made
+		o.selected, o.also = made, nil
+		s.app.emit("flow", s.view(node, o))
+		if len(readBy) > 0 {
+			s.app.emit("notice", Notice{Level: "info", Text: wrapReadersText(readBy)})
+		}
+		return nil
+	})
+	return id, err
+}
+
+// wrapReadersText names the steps that read what the wrapped steps made.
+func wrapReadersText(readBy []string) string {
+	who := fmt.Sprintf("%d steps outside read", len(readBy))
+	if len(readBy) == 1 {
+		who = "1 step outside reads"
+	}
+	return "Wrapped. " + who + " what the wrapped steps made (" + strings.Join(readBy, ", ") + "): check they still find it."
 }

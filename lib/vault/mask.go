@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"cmp"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"net/url"
 	"slices"
@@ -78,12 +79,34 @@ func replacerFor(values []string) *strings.Replacer {
 	return strings.NewReplacer(pairs...)
 }
 
+// minEncodedLen is the shortest extra encoding worth masking. A 3-character
+// secret in hex is 6 characters that can turn up in a timestamp or an id, and
+// masking those would change text that is not secret.
+const minEncodedLen = 8
+
 // encodedForms lists how a value can appear: raw, inside a JSON string
 // (with and without HTML escaping), URL query and path escaped, and
 // base64 (Basic auth headers carry base64 of "user:password", which
-// taint tracking catches; this covers a bare base64 secret).
+// taint tracking catches; this covers a bare base64 secret). Base64 also
+// comes URL-safe and unpadded (JWT segments, signed URLs), and as hex
+// (digests, signatures); those longer-than-minEncodedLen forms are added too.
+//
+// Before: only raw, escaped and padded standard base64 were masked, so a
+// secret echoed back as base64url or hex was shown in the response.
 func encodedForms(v string) []string {
-	forms := []string{v, url.QueryEscape(v), url.PathEscape(v), base64.StdEncoding.EncodeToString([]byte(v))}
+	raw := []byte(v)
+	forms := []string{v, url.QueryEscape(v), url.PathEscape(v), base64.StdEncoding.EncodeToString(raw)}
+	for _, f := range []string{
+		base64.RawStdEncoding.EncodeToString(raw),
+		base64.URLEncoding.EncodeToString(raw),
+		base64.RawURLEncoding.EncodeToString(raw),
+		hex.EncodeToString(raw),
+		strings.ToUpper(hex.EncodeToString(raw)),
+	} {
+		if len(f) >= minEncodedLen {
+			forms = append(forms, f)
+		}
+	}
 	for _, escapeHTML := range []bool{false, true} {
 		forms = append(forms, jsonEscaped(v, escapeHTML))
 	}

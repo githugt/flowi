@@ -168,25 +168,7 @@ func crossSite(r *http.Request) bool {
 
 // ServeHTTP answers one call.
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	if !h.hostAllowed(r.Host) {
-		a := problem(r, http.StatusForbidden, MatchBad, "this host name is not allowed; use localhost or the address the replayer listens on")
-		h.deliver(w, r, a)
-		return
-	}
-	if strings.HasPrefix(r.URL.Path, controlPrefix) {
-		if crossSite(r) {
-			a := problem(r, http.StatusForbidden, MatchBad, "the control endpoints are not open to calls made by a web page from another origin")
-			h.deliver(w, r, a)
-			return
-		}
-		h.control(w, r)
-		return
-	}
-	if h.opts.CORS && h.preflight(w, r) {
-		return
-	}
-	if h.rec != nil {
-		h.serveRecording(w, r)
+	if h.answeredApart(w, r) {
 		return
 	}
 	start := time.Now()
@@ -231,6 +213,33 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		kept.Got = cw.message() // before record: the log hands entries to readers, so none is changed after Add
 	}
 	h.record(r, a, time.Since(start), kept)
+}
+
+// answeredApart answers the calls that are not saved-response lookups (a refused host or origin, the control
+// endpoints, a CORS preflight, a recording) and reports whether it did.
+func (h *Handler) answeredApart(w http.ResponseWriter, r *http.Request) bool {
+	if !h.hostAllowed(r.Host) {
+		a := problem(r, http.StatusForbidden, MatchBad, "this host name is not allowed; use localhost or the address the replayer listens on")
+		h.deliver(w, r, a)
+		return true
+	}
+	if strings.HasPrefix(r.URL.Path, controlPrefix) {
+		if crossSite(r) {
+			a := problem(r, http.StatusForbidden, MatchBad, "the control endpoints are not open to calls made by a web page from another origin")
+			h.deliver(w, r, a)
+			return true
+		}
+		h.control(w, r)
+		return true
+	}
+	if h.opts.CORS && h.preflight(w, r) {
+		return true
+	}
+	if h.rec != nil {
+		h.serveRecording(w, r)
+		return true
+	}
+	return false
 }
 
 // applyFaults adds the jitter and turns the answer into an injected error, or marks it to be dropped,

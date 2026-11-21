@@ -32,6 +32,7 @@ type RunOptions struct {
 	Inputs        map[string]string // values for the flow's declared inputs, as templates
 	Seed          uint64            // 0 picks a random seed (reported in the result)
 	Grace         time.Duration     // 0 uses the run.grace setting
+	Trigger       string            // what started the run, kept in its report ("app", "cli", "trigger")
 	// Only runs just these top-level nodes, with Prior as the outputs of
 	// the others (see engine.RunInput). nil runs the whole flow.
 	Only  []string
@@ -113,6 +114,27 @@ func (w *Workspace) FindFlowsTagged(tag, collection string) ([]FlowTarget, error
 	return found, nil
 }
 
+// FindAllFlows lists every saved flow, from every collection or only the one collection names, in file order. It
+// fails with FLW-FLOW-005 when there is none, so "run everything" never passes by running nothing.
+func (w *Workspace) FindAllFlows(collection string) ([]FlowTarget, error) {
+	w.mu.RLock()
+	defer w.mu.RUnlock()
+	candidates, err := w.collectionsNamed(collection)
+	if err != nil {
+		return nil, err
+	}
+	var found []FlowTarget
+	for _, c := range candidates {
+		for _, f := range c.Flows {
+			found = append(found, FlowTarget{Collection: c.Manifest.ID, Flow: f.ID})
+		}
+	}
+	if len(found) == 0 {
+		return nil, diagErr(diag.CodeFlowNone, nil)
+	}
+	return found, nil
+}
+
 // RunFlow starts running a flow. The flow's collection (and the
 // collections it depends on) must validate without errors, the
 // environment must exist and the inputs must match the flow's declared
@@ -144,7 +166,7 @@ func (w *Workspace) RunFlow(ctx context.Context, t FlowTarget, o RunOptions) (*e
 	if err := w.unlockWith(c, o.Env, environ); err != nil {
 		return nil, err
 	}
-	in := engine.RunInput{Collection: c, Flow: f, Env: o.Env, PreferVersion: o.PreferVersion, Inputs: o.Inputs, Seed: o.Seed, Grace: o.Grace, Only: o.Only, Prior: o.Prior, PriorVars: o.PriorVars, Skip: o.Skip, Overlay: o.Overlay}
+	in := engine.RunInput{Collection: c, Flow: f, Env: o.Env, PreferVersion: o.PreferVersion, Inputs: o.Inputs, Seed: o.Seed, Grace: o.Grace, Only: o.Only, Prior: o.Prior, PriorVars: o.PriorVars, Skip: o.Skip, Overlay: o.Overlay, Trigger: o.Trigger}
 	deps := w.engineDeps()
 	deps.Transport, deps.Environ = o.Transport, environ
 	if o.SkipSchemas {
