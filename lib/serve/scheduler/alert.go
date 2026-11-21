@@ -137,4 +137,4 @@ func httpPost(ctx context.Context, addr string, body []byte) error {
 	return nil
 }
 
-func defaultGetenv(k string) string { return os.Getenv(k) }
+func defaultGetenv(k string) string { return os.Getenv(k) } //nolint:forbidigo // the one place the scheduler reads the environment, replaced in tests

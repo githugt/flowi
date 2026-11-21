@@ -111,7 +111,7 @@ func (b *Backend) pace(flow model.ID) time.Duration {
 }
 
 // Send answers with the canned response of the request: 200 with a body, 404 for the order that does not exist.
-func (b *Backend) Send(_ context.Context, t flowi.RequestTarget, o flowi.SendOptions) (vm.Sending, error) {
+func (b *Backend) Send(_ context.Context, t flowi.RequestTarget, _ flowi.SendOptions) (vm.Sending, error) {
 	rec, status := responseOf(t.Request)
 	rec.Version = "1"
 	rec.At = time.Now()

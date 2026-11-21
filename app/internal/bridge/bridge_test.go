@@ -1392,7 +1392,9 @@ func TestFlowService_Drop_should_put_a_lifted_card_into_an_empty_lane_and_back_o
 func TestFlowService_Connect_Given_the_step_before_Then_says_so_and_stores_no_needs(t *testing.T) {
 	flows, v, pub := openTwoUnits(t)
 
-	flows.Connect(v.Node, "wait", "verify") // verify follows wait in the list
+	if err := flows.Connect(v.Node, "wait", "verify"); err != nil { // verify follows wait in the list
+		t.Fatal(err)
+	}
 	flows.Select(v.Node, "verify")
 	got := lastView(pub)
 
@@ -2396,7 +2398,9 @@ func TestFlowService_Connect_Given_a_step_whose_arrow_was_removed_Then_the_arrow
 	flows, v, pub := openTwoUnits(t) // login, wait, verify
 	_ = flows.SetArrow(v.Node, "wait", "verify", []string{})
 
-	flows.Connect(v.Node, "wait", "verify")
+	if err := flows.Connect(v.Node, "wait", "verify"); err != nil {
+		t.Fatal(err)
+	}
 
 	var edge bool
 	for _, e := range lastView(pub).Diagram.Edges {
@@ -2465,7 +2469,9 @@ func TestFlowService_Drop_Given_a_step_that_only_runs_on_an_outcome_dropped_over
 func TestFlowService_Connect_should_add_an_arrow_and_keep_the_one_the_step_already_had(t *testing.T) {
 	flows, v, pub := openTwoUnits(t) // login, wait, verify: verify follows wait
 
-	flows.Connect(v.Node, "login", "verify")
+	if err := flows.Connect(v.Node, "login", "verify"); err != nil {
+		t.Fatal(err)
+	}
 
 	var from []string
 	for _, e := range lastView(pub).Diagram.Edges {

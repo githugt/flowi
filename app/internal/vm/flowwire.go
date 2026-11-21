@@ -145,8 +145,8 @@ func pathSegments(path string) []string {
 	return out
 }
 
-// wireText is v as it would be written into a field: text as it is, anything else as JSON; cut to max runes.
-func wireText(v any, max int) string {
+// wireText is v as it would be written into a field: text as it is, anything else as JSON; cut to limit runes.
+func wireText(v any, limit int) string {
 	var text string
 	switch t := v.(type) {
 	case string:
@@ -161,10 +161,10 @@ func wireText(v any, max int) string {
 			text = string(b)
 		}
 	}
-	if utf8.RuneCountInString(text) <= max {
+	if utf8.RuneCountInString(text) <= limit {
 		return text
 	}
-	return string([]rune(text)[:max]) + "…"
+	return string([]rune(text)[:limit]) + "…"
 }
 
 // childrenOf lists what is inside v to click: a map's keys (sorted), a list's first items.

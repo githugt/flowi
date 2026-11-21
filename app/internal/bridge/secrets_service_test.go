@@ -5,11 +5,12 @@ package bridge_test
 import (
 	"bytes"
 	"errors"
-	flowi "github.com/githugt/flowi/lib"
 	"log/slog"
 	"strings"
 	"testing"
 	"time"
+
+	flowi "github.com/githugt/flowi/lib"
 
 	"github.com/githugt/flowi/app/internal/bridge"
 	"github.com/githugt/flowi/app/internal/vm/vmtest"

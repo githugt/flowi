@@ -62,13 +62,13 @@ func planWith(steps []Step, from, to int) ([]Step, error) {
 // CheckVersion tells whether the running release is new enough for a collection that names min in its flowi.yaml
 // (min_version). It returns the zero Diagnostic when it is, when min is empty, or when either is not a version
 // number (a development build has none: it reads everything).
-func CheckVersion(min, have string) diag.Diagnostic {
-	need, ok1 := parseVersion(min)
+func CheckVersion(minVersion, have string) diag.Diagnostic {
+	need, ok1 := parseVersion(minVersion)
 	got, ok2 := parseVersion(have)
 	if !ok1 || !ok2 || !need.after(got) {
 		return diag.Diagnostic{}
 	}
-	return diag.New(diag.CodeFormatNeedsNewer, diag.Location{Path: "$.min_version"}, map[string]string{"min": min, "have": have})
+	return diag.New(diag.CodeFormatNeedsNewer, diag.Location{Path: "$.min_version"}, map[string]string{"min": minVersion, "have": have})
 }
 
 type version struct {

@@ -4,10 +4,11 @@ package cli
 
 import (
 	"errors"
-	flowi "github.com/githugt/flowi/lib"
 	"os"
 	"path/filepath"
 	"testing"
+
+	flowi "github.com/githugt/flowi/lib"
 )
 
 const sampleRunReport = `{"id":"r1","kind":"flow","status":"passed","seed":1,"nodes":[{"path":"get","id":"get","type":"request","status":"passed","attempts":[{"n":1,"method":"GET","url":"http://x","status":200}]}],"duration_ms":4}`

@@ -11,8 +11,10 @@ import (
 	"github.com/githugt/flowi/lib/model"
 )
 
-// WrapKinds are the containers a run of steps can be wrapped in, with the node type each is.
-var WrapKinds = map[string]model.NodeType{"loop": "batch", "group": "parallel", "route": "condition"}
+// wrapKinds are the containers a run of steps can be wrapped in, with the node type each is.
+func wrapKinds() map[string]model.NodeType {
+	return map[string]model.NodeType{"loop": "batch", "group": "parallel", "route": "condition"}
+}
 
 // Wrap puts the steps ids, which must sit next to each other in one list, inside a new container of kind (loop, group
 // or route) that takes their place, and returns the container's id and the other steps that read the wrapped steps'
@@ -26,7 +28,7 @@ var WrapKinds = map[string]model.NodeType{"loop": "batch", "group": "parallel", 
 // Before: selecting several steps offered only Delete, so putting them in a loop meant adding the container, dragging
 // each step into it and mending the arrows by hand.
 func (d *FlowDoc) Wrap(ids []string, kind string) (string, []string, error) {
-	typ, ok := WrapKinds[kind]
+	typ, ok := wrapKinds()[kind]
 	if !ok {
 		return "", nil, fmt.Errorf("a step can be wrapped in a loop, a group or a route, not %q", kind)
 	}

@@ -45,7 +45,7 @@ func Label(f Format) string {
 	case Python:
 		return "Python – requests"
 	}
-	if l, ok := otherLabels[f]; ok {
+	if l, ok := otherLabels()[f]; ok {
 		return l
 	}
 	return string(f)

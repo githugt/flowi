@@ -212,7 +212,7 @@ func sensitiveHeaders() []string {
 func maskedHeaderRows(hs []engine.Header) []model.KeyValue {
 	rows := headerRows(hs)
 	for i, row := range rows {
-		if !(slices.Contains(sensitiveHeaders(), strings.ToLower(row.Key)) || engine.LooksLikeCredential(row.Key)) || strings.Contains(row.Value, "••") {
+		if (!slices.Contains(sensitiveHeaders(), strings.ToLower(row.Key)) && !engine.LooksLikeCredential(row.Key)) || strings.Contains(row.Value, "••") {
 			continue
 		}
 		scheme, rest, found := strings.Cut(strings.TrimSpace(row.Value), " ")

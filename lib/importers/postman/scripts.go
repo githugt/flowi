@@ -28,8 +28,9 @@ type scriptTranslator struct {
 	result scriptResult
 }
 
+const reString = `"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'`
+
 var (
-	reString    = `"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'`
 	reAlias     = regexp.MustCompile(`^(?:var|let|const)\s+(\w+)\s*=\s*(?:pm\.response\.json\(\)|JSON\.parse\((?:responseBody|pm\.response\.text\(\))\))$`)
 	reSet       = regexp.MustCompile(`^pm\.(?:environment|collectionVariables|globals|variables)\.set\(\s*(` + reString + `)\s*,\s*(.+)\)$`)
 	reStatus    = regexp.MustCompile(`^pm\.response\.to\.have\.status\(\s*(\d{3})\s*\)$`)
@@ -210,10 +211,10 @@ func (t *scriptTranslator) assert(check string) bool {
 
 // operand is the Flowi expression for a pm.expect subject.
 func (t *scriptTranslator) operand(subject string) (expr string, isTime, ok bool) {
-	switch {
-	case subject == "pm.response.code":
+	switch subject {
+	case "pm.response.code":
 		return "status", false, true
-	case subject == "pm.response.responseTime":
+	case "pm.response.responseTime":
 		return "response.time", true, true
 	}
 	if m := reHeaderGet.FindStringSubmatch(subject); m != nil {

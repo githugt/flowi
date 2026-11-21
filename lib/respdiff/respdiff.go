@@ -76,9 +76,14 @@ const (
 	lcsCells = 1_000_000
 )
 
-var volatileHeaders = map[string]bool{
-	"date": true, "age": true, "x-request-id": true, "x-correlation-id": true, "x-trace-id": true, "traceparent": true,
-	"server-timing": true, "cf-ray": true, "x-amzn-requestid": true, "x-amz-request-id": true, "x-runtime": true,
+// volatileHeader reports whether a (lower-case) header changes on every response, so a difference in it means nothing.
+func volatileHeader(k string) bool {
+	switch k {
+	case "date", "age", "x-request-id", "x-correlation-id", "x-trace-id", "traceparent",
+		"server-timing", "cf-ray", "x-amzn-requestid", "x-amz-request-id", "x-runtime":
+		return true
+	}
+	return false
 }
 
 // Compare compares older with newer.
@@ -97,7 +102,7 @@ func compareHeaders(a, b []engine.Header, d *Diff) []Change {
 		m, order := map[string]string{}, []string{}
 		for _, h := range hs {
 			k := strings.ToLower(h.Name)
-			if volatileHeaders[k] {
+			if volatileHeader(k) {
 				d.Volatile++
 				continue
 			}
@@ -244,7 +249,7 @@ func sortedKeys(m map[string]any) []string { return slices.Sorted(maps.Keys(m)) 
 // keyPath writes a key as .name, or as ["any key"] when it is not a plain name.
 func keyPath(k string) string {
 	if k != "" && strings.IndexFunc(k, func(r rune) bool {
-		return !(r == '_' || r == '-' || r >= '0' && r <= '9' || r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z')
+		return r != '_' && r != '-' && (r < '0' || r > '9') && (r < 'a' || r > 'z') && (r < 'A' || r > 'Z')
 	}) < 0 {
 		return "." + k
 	}
@@ -325,10 +330,10 @@ func lineChanges(a, b string, limit int) ([]Change, int) {
 	return c.out, c.over
 }
 
-// Values lists where two decoded JSON values differ, by path, at most max of them; more is how many further changes
+// Values lists where two decoded JSON values differ, by path, at most limit of them; more is how many further changes
 // were found and not listed. It is the comparison a body gets, for callers that compare something else.
-func Values(a, b any, max int) (changes []Change, more int) {
-	c := &collector{max: max}
+func Values(a, b any, limit int) (changes []Change, more int) {
+	c := &collector{max: limit}
 	walk(c, "$", a, b)
 	return c.out, c.over
 }

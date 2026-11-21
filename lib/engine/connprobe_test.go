@@ -47,7 +47,7 @@ func TestProbeSend_Given_a_message_request_Then_it_connects_with_the_credentials
 	if got.Status != ProbeOK || p.calls != 1 || got.Detail == "" {
 		t.Fatalf("probe %+v calls %d", got, p.calls)
 	}
-	if p.probed.Send != nil || p.probed.Receive != nil || p.scripted.got.Send != nil || p.probed.Binding["password"] != secretV {
+	if p.probed.Send != nil || p.probed.Receive != nil || p.got.Send != nil || p.probed.Binding["password"] != secretV {
 		t.Fatalf("the test must carry the real password and no message: %+v", p.probed)
 	}
 	if strings.Contains(got.Target, secretV) {

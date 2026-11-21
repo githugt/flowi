@@ -15,7 +15,7 @@ import (
 const hintValueMax = 80
 
 // secretMask stands for a secret's value wherever it is shown: the value never leaves the vault for a tooltip.
-const secretMask = "••••"
+const secretMask = "••••" //nolint:gosec // the placeholder shown instead of a secret, not a secret
 
 // VariableHint is what a {{variable}} chip says when hovered, and whether clicking it can set the variable.
 type VariableHint struct {

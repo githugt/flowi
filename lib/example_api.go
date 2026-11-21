@@ -126,7 +126,7 @@ func (w *Workspace) writeExample() (string, error) {
 		}
 		target := filepath.Join(dir, filepath.FromSlash(name))
 		if d.IsDir() {
-			return os.MkdirAll(target, 0o755)
+			return os.MkdirAll(target, 0o755) //nolint:gosec // the user's own workspace folder, readable like their other folders
 		}
 		data, err := fs.ReadFile(src, name)
 		if err != nil {
@@ -135,7 +135,7 @@ func (w *Workspace) writeExample() (string, error) {
 		if strings.HasPrefix(name, "environments/") {
 			return nil // the workspace's environments are global; the example's own two point at other servers
 		}
-		return os.WriteFile(target, []byte(strings.ReplaceAll(string(data), exampleSecretRef, examplePlainRef)), 0o644)
+		return os.WriteFile(target, []byte(strings.ReplaceAll(string(data), exampleSecretRef, examplePlainRef)), 0o644) //nolint:gosec // the user's own workspace file, readable like their other files
 	})
 	if err != nil {
 		_ = os.RemoveAll(dir)

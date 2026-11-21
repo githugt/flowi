@@ -11,11 +11,11 @@ import (
 type QuitStep int
 
 const (
-	// QuitAsk: cancel the close and ask the page what to do.
+	// QuitAsk cancels the close and asks the page what to do.
 	QuitAsk QuitStep = iota
-	// QuitWait: the page was asked a moment ago; cancel the close and do not ask again.
+	// QuitWait means the page was asked a moment ago: cancel the close and do not ask again.
 	QuitWait
-	// QuitForce: the page did not answer the earlier question. Keep what can be kept and quit.
+	// QuitForce means the page did not answer the earlier question: keep what can be kept and quit.
 	QuitForce
 )
 

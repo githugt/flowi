@@ -26,7 +26,7 @@ func RepoAdvice(collectionDir string) []string {
 	}
 	examples, layouts := 0, 0
 	seen := 0
-	_ = filepath.WalkDir(collectionDir, func(p string, d fs.DirEntry, err error) error {
+	_ = filepath.WalkDir(collectionDir, func(_ string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return nil
 		}

@@ -11,11 +11,12 @@ import (
 	"strings"
 	"testing"
 
+	"net/http/httptest"
+
 	"github.com/githugt/flowi/lib/diag"
 	"github.com/githugt/flowi/lib/engine"
 	"github.com/githugt/flowi/lib/examples/demoserver"
 	"github.com/githugt/flowi/lib/model"
-	"net/http/httptest"
 )
 
 // shippedWorkspace mounts a copy of the example collection and keeps its environments in the collection's own folder,

@@ -28,7 +28,7 @@ func GitLineMerger(ctx context.Context) LineMerger {
 			}
 		}
 		var out, stderr bytes.Buffer
-		cmd := exec.CommandContext(ctx, "git", "merge-file", "-p", "-L", "ours", "-L", "base", "-L", "theirs",
+		cmd := exec.CommandContext(ctx, "git", "merge-file", "-p", "-L", "ours", "-L", "base", "-L", "theirs", //nolint:gosec // a fixed command; the files are in a temporary folder made here
 			filepath.Join(dir, "ours"), filepath.Join(dir, "base"), filepath.Join(dir, "theirs"))
 		cmd.Stdout, cmd.Stderr = &out, &stderr
 		err = cmd.Run()

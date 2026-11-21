@@ -3,10 +3,11 @@
 package flowi
 
 import (
-	"github.com/githugt/flowi/lib/diag"
 	"slices"
 	"strings"
 	"testing"
+
+	"github.com/githugt/flowi/lib/diag"
 
 	"github.com/githugt/flowi/lib/model"
 )
@@ -88,7 +89,7 @@ func TestNeedDiagnostic_should_name_the_flow_the_thing_and_the_environment(t *te
 	d := needDiagnostic(f, "staging", Need{NeedSecretValue, "token"})
 
 	want := `flow "Signup" reads {{secret.token}}, but environment "staging" has no value for that secret`
-	if d.Code != diag.CodeRunEnvMissing || d.Location.File != f.File || !strings.HasPrefix(diag.Text(d), want) {
+	if d.Code != diag.CodeRunEnvMissing || d.File != f.File || !strings.HasPrefix(diag.Text(d), want) {
 		t.Fatalf("got %s %q", d.Code, diag.Text(d))
 	}
 }

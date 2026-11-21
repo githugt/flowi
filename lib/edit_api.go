@@ -23,7 +23,7 @@ func (w *Workspace) StoreEdit(t RequestTarget, base string, v model.RequestVersi
 // overlay laid over the base version: v already shows the overlay, and the
 // file remembers its name so that the overlay is chosen again with the edit
 // and the edit is not mistaken for a plain change of the version.
-func (w *Workspace) StoreEditUnder(t RequestTarget, base, overlay string, v model.RequestVersion, o SaveOptions) error {
+func (w *Workspace) StoreEditUnder(t RequestTarget, base, overlay string, v model.RequestVersion, _ SaveOptions) error {
 	_, r, err := w.requestFor(t)
 	if err != nil {
 		return err
@@ -54,7 +54,7 @@ func (w *Workspace) PromoteEdit(t RequestTarget, asLabel string, o SaveOptions) 
 }
 
 // DiscardEdit clears the edit slot. Having none is not an error.
-func (w *Workspace) DiscardEdit(t RequestTarget, o SaveOptions) error {
+func (w *Workspace) DiscardEdit(t RequestTarget, _ SaveOptions) error {
 	_, r, err := w.requestFor(t)
 	if err != nil || r.Edit == nil {
 		return err

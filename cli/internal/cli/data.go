@@ -27,9 +27,6 @@ type dataRow struct {
 	inputs map[string]string
 }
 
-// labelColumns are the columns that name a row, first match wins; otherwise the first column does.
-var labelColumns = []string{"label", "name", "id"}
-
 // readDataRows reads the rows of a data file: a CSV with a header line (each column is a flow input) or a JSON
 // array of objects (each key is a flow input). The file's extension says which. At most maxMatrixCells rows run from
 // one command.
@@ -153,7 +150,8 @@ func firstDuplicate(names []string) string {
 // first column, else its number; a repeated label gets #2, #3.
 func namedRows(records []map[string]string, order []string, firstColumn bool) []dataRow {
 	column := ""
-	for _, c := range labelColumns {
+	// The columns that name a row, first match wins; otherwise the first column does.
+	for _, c := range []string{"label", "name", "id"} {
 		if slices.Contains(order, c) {
 			column = c
 			break

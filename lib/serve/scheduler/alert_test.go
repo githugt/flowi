@@ -6,7 +6,6 @@ import (
 	"context"
 	"encoding/json"
 	"strings"
-	"sync"
 	"testing"
 	"time"
 
@@ -19,7 +18,6 @@ type posted struct{ addr, text string }
 
 // alerts is a receiver and a run manager the test controls: Await answers with the record the test chose.
 type alerts struct {
-	mu      sync.Mutex
 	rec     runs.Record
 	got     chan posted
 	postErr error

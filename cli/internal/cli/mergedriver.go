@@ -119,10 +119,10 @@ func newMergeDriverInstall(i do.Injector) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			if out, err := exec.CommandContext(cmd.Context(), "git", "-C", root, "config", "--local", "merge.flowi.name", "Flowi flow files").CombinedOutput(); err != nil {
+			if out, err := exec.CommandContext(cmd.Context(), "git", "-C", root, "config", "--local", "merge.flowi.name", "Flowi flow files").CombinedOutput(); err != nil { //nolint:gosec // fixed arguments; root is the collection folder the user named
 				return fmt.Errorf("git config: %w: %s (is %s in a git repository?)", err, bytes.TrimSpace(out), root)
 			}
-			if out, err := exec.CommandContext(cmd.Context(), "git", "-C", root, "config", "--local", "merge.flowi.driver", "flowi merge-driver run %O %A %B %P").CombinedOutput(); err != nil {
+			if out, err := exec.CommandContext(cmd.Context(), "git", "-C", root, "config", "--local", "merge.flowi.driver", "flowi merge-driver run %O %A %B %P").CombinedOutput(); err != nil { //nolint:gosec // as above
 				return fmt.Errorf("git config: %w: %s", err, bytes.TrimSpace(out))
 			}
 			if added {

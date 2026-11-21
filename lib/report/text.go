@@ -84,10 +84,10 @@ func handledSuffix(n Node) string {
 // checksSuffix tells how many of a request's checks passed ("3/4 checks"), when it ran any.
 func checksSuffix(n Node) string {
 	passed, total := n.ChecksPassed()
-	switch {
-	case total == 0:
+	switch total {
+	case 0:
 		return ""
-	case total == 1:
+	case 1:
 		return fmt.Sprintf("  (%d/1 check)", passed)
 	}
 	return fmt.Sprintf("  (%d/%d checks)", passed, total)

@@ -35,9 +35,11 @@ const (
 
 // imageTypes are the picture types a browser engine draws from a data address. SVG is among them: loaded as an image
 // it runs no script.
-var imageTypes = map[string]bool{
-	"image/png": true, "image/jpeg": true, "image/gif": true, "image/webp": true, "image/bmp": true,
-	"image/svg+xml": true, "image/x-icon": true, "image/vnd.microsoft.icon": true, "image/avif": true,
+func imageTypes() map[string]bool {
+	return map[string]bool{
+		"image/png": true, "image/jpeg": true, "image/gif": true, "image/webp": true, "image/bmp": true,
+		"image/svg+xml": true, "image/x-icon": true, "image/vnd.microsoft.icon": true, "image/avif": true,
+	}
 }
 
 // ResponseKindOf classifies a body by its content type and what the record kept of it.
@@ -78,7 +80,7 @@ func mediaType(contentType string) string {
 // is too big, or was not kept (a streamed download).
 func BodyImage(b engine.Body) string {
 	media := mediaType(b.ContentType)
-	if !imageTypes[media] || b.Size > MaxImageBytes {
+	if !imageTypes()[media] || b.Size > MaxImageBytes {
 		return ""
 	}
 	switch {

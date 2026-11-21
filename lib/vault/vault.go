@@ -28,7 +28,7 @@ const WorkspaceScope model.ID = "workspace"
 
 // TokenScope is the Entry.Collection of the OAuth tokens kept between runs. They share the vault's encryption but are
 // not secrets a user sets: Stored and Prune leave them alone, so the orphan sweep never takes them.
-const TokenScope model.ID = "oauth-tokens"
+const TokenScope model.ID = "oauth-tokens" //nolint:gosec // a name for a group of entries, not a credential
 
 // Options configures a vault.
 type Options struct {

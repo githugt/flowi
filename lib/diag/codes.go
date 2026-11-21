@@ -96,7 +96,7 @@ const (
 
 	CodeServeSchedule     Code = "FLW-SERVE-001"
 	CodeServeScheduleFlow Code = "FLW-SERVE-002"
-	CodeServeToken        Code = "FLW-SERVE-003"
+	CodeServeToken        Code = "FLW-SERVE-003" //nolint:gosec // an error code, not a credential
 
 	CodeBlueprintParamType   Code = "FLW-BP-001"
 	CodeBlueprintParamName   Code = "FLW-BP-002"
@@ -109,7 +109,7 @@ const (
 	CodeAuthInvalid  Code = "FLW-AUTH-001"
 	CodeAuthUnknown  Code = "FLW-AUTH-002"
 	CodeAuthNotFound Code = "FLW-AUTH-003"
-	CodeAuthToken    Code = "FLW-AUTH-004"
+	CodeAuthToken    Code = "FLW-AUTH-004" //nolint:gosec // an error code, not a credential
 
 	CodeOverlayInvalid    Code = "FLW-OVL-001"
 	CodeOverlayNotFound   Code = "FLW-OVL-002"

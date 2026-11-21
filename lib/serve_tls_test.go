@@ -114,10 +114,12 @@ func TestServe_Given_a_certificate_Then_the_trigger_endpoint_speaks_HTTPS_and_no
 	if err != nil {
 		t.Fatal(err)
 	}
-	req, _ := http.NewRequest(http.MethodPost, "https://"+s.TriggerAddr()+"/flows/no-such-flow/run", nil)
+	req, _ := http.NewRequestWithContext(context.Background(), http.MethodPost, "https://"+s.TriggerAddr()+"/flows/no-such-flow/run", nil)
 	req.Header.Set("Authorization", "Bearer "+token)
 	secure, secureErr := client.Do(req)
-	plain, plainErr := http.Post("http://"+s.TriggerAddr()+"/flows/no-such-flow/run", "text/plain", nil)
+	plainReq, _ := http.NewRequestWithContext(context.Background(), http.MethodPost, "http://"+s.TriggerAddr()+"/flows/no-such-flow/run", nil)
+	plainReq.Header.Set("Content-Type", "text/plain")
+	plain, plainErr := http.DefaultClient.Do(plainReq)
 
 	if secureErr != nil || !s.TriggerTLS() || secure.StatusCode != http.StatusNotFound {
 		t.Fatalf("secure %v %v tls %v", secure, secureErr, s.TriggerTLS())

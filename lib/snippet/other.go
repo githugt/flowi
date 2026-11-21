@@ -30,9 +30,11 @@ const (
 	SQLite    Format = "sqlite3"
 )
 
-var otherLabels = map[Format]string{
-	Grpcurl: "gRPC – grpcurl", Mosquitto: "MQTT – mosquitto_pub / mosquitto_sub", Kcat: "Kafka – kcat", NatsCLI: "NATS – nats",
-	RedisCLI: "Redis – redis-cli", Websocat: "WebSocket – websocat", Psql: "PostgreSQL – psql", MySQL: "MySQL – mysql", SQLite: "SQLite – sqlite3",
+func otherLabels() map[Format]string {
+	return map[Format]string{
+		Grpcurl: "gRPC – grpcurl", Mosquitto: "MQTT – mosquitto_pub / mosquitto_sub", Kcat: "Kafka – kcat", NatsCLI: "NATS – nats",
+		RedisCLI: "Redis – redis-cli", Websocat: "WebSocket – websocat", Psql: "PostgreSQL – psql", MySQL: "MySQL – mysql", SQLite: "SQLite – sqlite3",
+	}
 }
 
 // FormatsFor lists the formats that can say r, in display order: the HTTP ones for an HTTP request, the tool of its
@@ -48,15 +50,17 @@ func FormatsFor(r engine.PreviewRequest) []Format {
 			return []Format{f}
 		}
 	default:
-		if f, ok := messageTool[kind]; ok {
+		if f, ok := messageTool()[kind]; ok {
 			return []Format{f}
 		}
 	}
 	return nil
 }
 
-var messageTool = map[string]Format{
-	model.ProtocolMQTT: Mosquitto, model.ProtocolKafka: Kcat, model.ProtocolNATS: NatsCLI, model.ProtocolRedis: RedisCLI, model.ProtocolWS: Websocat,
+func messageTool() map[string]Format {
+	return map[string]Format{
+		model.ProtocolMQTT: Mosquitto, model.ProtocolKafka: Kcat, model.ProtocolNATS: NatsCLI, model.ProtocolRedis: RedisCLI, model.ProtocolWS: Websocat,
+	}
 }
 
 // kindOf is "" for HTTP, "grpc", "sql", or the protocol of a message request.
@@ -72,11 +76,11 @@ func kindOf(r engine.PreviewRequest) string {
 
 // generateOther renders r in a format of the other kinds; ok is false when f is not one of them.
 func generateOther(f Format, r engine.PreviewRequest) (text string, ok bool, err error) {
-	if _, known := otherLabels[f]; !known {
+	if _, known := otherLabels()[f]; !known {
 		return "", false, nil
 	}
 	if !contains(FormatsFor(r), f) {
-		return "", true, fmt.Errorf("%s cannot say this request: it is %s", otherLabels[f], describeKind(r))
+		return "", true, fmt.Errorf("%s cannot say this request: it is %s", otherLabels()[f], describeKind(r))
 	}
 	t := splitTarget(r.URL)
 	switch f {

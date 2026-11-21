@@ -45,7 +45,7 @@ func TestRunMergeDriver_Given_a_clean_flow_merge_Then_ours_holds_the_regenerated
 
 func TestRunMergeDriver_Given_a_flow_it_cannot_merge_Then_the_whole_files_are_merged_as_text(t *testing.T) {
 	base, ours, theirs := threeFiles(t)
-	lines := func(b, o, th []byte) ([]byte, bool, error) {
+	lines := func(_, o, th []byte) ([]byte, bool, error) {
 		return []byte("<<<<<<< ours\n" + string(o) + "=======\n" + string(th) + ">>>>>>> theirs\n"), false, nil
 	}
 

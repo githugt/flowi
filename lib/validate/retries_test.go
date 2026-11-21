@@ -14,10 +14,10 @@ import (
 // Before: retries could not be written, and a nonsense value would have been taken at run time.
 func TestCheckRetries(t *testing.T) {
 	tests := []struct {
-		name  string
-		type_ model.NodeType // "" is a request step
-		set   func(n *model.Node)
-		want  diag.Severity // 0 is no problem
+		name string
+		kind model.NodeType // "" is a request step
+		set  func(n *model.Node)
+		want diag.Severity // 0 is no problem
 	}{
 		{name: "none"},
 		{name: "a few", set: func(n *model.Node) { n.Retries = 3; n.RetryWait = time.Second }},
@@ -26,13 +26,13 @@ func TestCheckRetries(t *testing.T) {
 		{name: "negative", set: func(n *model.Node) { n.Retries = -1 }, want: diag.SeverityError},
 		{name: "negative wait", set: func(n *model.Node) { n.Retries = 1; n.RetryWait = -time.Second }, want: diag.SeverityError},
 		{name: "wait alone", set: func(n *model.Node) { n.RetryWait = time.Second }, want: diag.SeverityWarning},
-		{name: "on a note", type_: "note", set: func(n *model.Node) { n.Retries = 1 }, want: diag.SeverityError},
+		{name: "on a note", kind: "note", set: func(n *model.Node) { n.Retries = 1 }, want: diag.SeverityError},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := validateFlow(t, func(f *fixture, c *model.Collection, fl *model.Flow) {
+			got := validateFlow(t, func(f *fixture, c *model.Collection, _ *model.Flow) {
 				n := note("a")
-				if tt.type_ == "" {
+				if tt.kind == "" {
 					n = requestNode("a", f.request(c, "r", "1"))
 					n.Request.Version = "1"
 				}

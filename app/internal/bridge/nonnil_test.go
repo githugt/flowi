@@ -17,7 +17,7 @@ type outer struct {
 	Kept    []string          `json:"kept,omitempty"`
 	Inner   inner             `json:"inner"`
 	Items   []inner           `json:"items"`
-	private []string
+	private []string          //nolint:unused // an unexported field the walk must leave alone
 }
 
 // Before: a nil slice in a model value reached the page as null (13 fields of RequestView.Current did), and the page
