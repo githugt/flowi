@@ -85,13 +85,13 @@ func run(t *testing.T, app *bridge.App, f *feed, node string) bridge.RunView {
 	return bridge.RunView{}
 }
 
-func TestFixture_Should_show_requests_two_environments_and_two_flows_in_the_tree(t *testing.T) {
+func TestFixture_Should_show_requests_four_environments_and_two_flows_in_the_tree(t *testing.T) {
 	app, _ := start(t)
 
 	requests, flows := nodesOf(app, "request"), nodesOf(app, "flow")
 	envs := app.Workspace().Tree().Environments
 
-	if len(requests) != 5 || len(flows) != 2 || len(envs) != 2 {
+	if len(requests) != 5 || len(flows) != 2 || len(envs) != 4 {
 		t.Fatalf("%d requests, %d flows, environments %v", len(requests), len(flows), envs)
 	}
 }

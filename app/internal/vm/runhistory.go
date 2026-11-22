@@ -37,6 +37,41 @@ func (h *RunHistory) Load() {
 	})
 }
 
+// Steps reads the saved run id step by step, off the UI goroutine.
+func (h *RunHistory) Steps(id string, done func(flowi.RunSteps, error)) {
+	type result struct {
+		r   flowi.RunSteps
+		err error
+	}
+	Run(h.w, func() result {
+		r, err := h.b.FlowRunSteps(h.target, id)
+		return result{r, err}
+	}, func(r result) { done(r.r, r.err) })
+}
+
+// Delete deletes the saved run id, then reads the list again. done gets what went wrong, nil when the run is gone.
+func (h *RunHistory) Delete(id string, done func(error)) {
+	Run(h.w, func() error { return h.b.DeleteFlowRun(h.target, id) }, func(err error) {
+		h.Load()
+		done(err)
+	})
+}
+
+// Clear deletes every saved run, then reads the list again. done gets how many were deleted and what went wrong.
+func (h *RunHistory) Clear(done func(int, error)) {
+	type result struct {
+		n   int
+		err error
+	}
+	Run(h.w, func() result {
+		n, err := h.b.ClearFlowRuns(h.target)
+		return result{n, err}
+	}, func(r result) {
+		h.Load()
+		done(r.n, r.err)
+	})
+}
+
 // Runs are the saved runs, newest first.
 func (h *RunHistory) Runs() []flowi.RunSummary { return h.runs }
 

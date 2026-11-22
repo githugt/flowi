@@ -118,7 +118,6 @@ func TestImportService_PreviewPasted_should_preview_the_text_into_the_rows_colle
 		t.Run(tt.name, func(t *testing.T) {
 			_, v, _, app, b := openLoginWith(t)
 			importer := app.Import()
-			t.Cleanup(func() { _ = importer.Close() })
 
 			err := importer.PreviewPasted(string(tt.kind), tt.text, v.Node)
 
@@ -148,7 +147,6 @@ func TestImportService_PreparePasted_should_fill_the_wizard_with_the_text_and_no
 		t.Run(tt.name, func(t *testing.T) {
 			_, v, _, app, b := openLoginWith(t)
 			importer := app.Import()
-			t.Cleanup(func() { _ = importer.Close() })
 
 			err := importer.PreparePasted(string(tt.kind), tt.text, v.Node)
 
@@ -185,18 +183,22 @@ func TestImportService_PreviewPasted_should_refuse_kinds_that_make_no_requests(t
 	}
 }
 
-func TestImportService_Close_should_remove_the_pasted_text(t *testing.T) {
-	_, v, _, app, _ := openLoginWith(t)
+func TestImportService_PreviewPasted_Given_a_document_Then_the_text_is_not_written_to_the_temp_folder(t *testing.T) {
+	// Before: a pasted API description was written to a flowi-paste-* file in the temp folder and the wizard's
+	// source was that path, so its kept copy in the collection was named after it.
+	_, v, _, app, b := openLoginWith(t)
 	importer := app.Import()
-	if err := importer.PreviewPasted(string(flowi.ImportOpenAPI), "openapi: 3.1.0", v.Node); err != nil {
-		t.Fatal(err)
+
+	err := importer.PreviewPasted(string(flowi.ImportOpenAPI), "openapi: 3.1.0", v.Node)
+
+	if err != nil || len(b.PreviewedSources) != 1 {
+		t.Fatalf("got %v and %d previews", err, len(b.PreviewedSources))
 	}
-	file := importer.State().File
-
-	err := importer.Close()
-
-	if _, statErr := os.Stat(file); err != nil || !errors.Is(statErr, os.ErrNotExist) {
-		t.Fatalf("close %v, the file %s: %v; want it gone", err, file, statErr)
+	if src := b.PreviewedSources[0]; src.Name != flowi.PastedSourceName {
+		t.Fatalf("the source is named %q, want %q", src.Name, flowi.PastedSourceName)
+	}
+	if got := importer.State(); got.File != "" || !got.Pasted {
+		t.Fatalf("file %q pasted %v", got.File, got.Pasted)
 	}
 }
 
@@ -305,7 +307,6 @@ func TestImportService_SetFile_Given_a_file_Then_the_kind_is_set_to_what_it_is_a
 	// Arrange
 	_, _, _, app, _ := openLoginWith(t)
 	importer := app.Import()
-	t.Cleanup(func() { _ = importer.Close() })
 	file := filepath.Join(t.TempDir(), "capture.json")
 	if err := os.WriteFile(file, []byte(`{"log": {"version": "1.2", "entries": []}}`), 0o600); err != nil {
 		t.Fatal(err)
@@ -325,7 +326,6 @@ func TestImportService_SetFile_Given_a_file_Then_the_kind_is_set_to_what_it_is_a
 func TestImportService_SetFile_Given_a_bruno_folder_Then_it_is_recognised_by_bruno_json(t *testing.T) {
 	_, _, _, app, _ := openLoginWith(t)
 	importer := app.Import()
-	t.Cleanup(func() { _ = importer.Close() })
 	dir := t.TempDir()
 	if err := os.WriteFile(filepath.Join(dir, "bruno.json"), []byte(`{"name": "x", "version": "1"}`), 0o600); err != nil {
 		t.Fatal(err)
@@ -342,7 +342,6 @@ func TestImportService_SetFile_Given_a_file_that_is_not_recognised_or_a_url_Then
 	// Arrange
 	_, _, _, app, _ := openLoginWith(t)
 	importer := app.Import()
-	t.Cleanup(func() { _ = importer.Close() })
 	before := importer.State().Kind
 	file := filepath.Join(t.TempDir(), "notes.txt")
 	if err := os.WriteFile(file, []byte("buy milk"), 0o600); err != nil {
@@ -364,7 +363,6 @@ func TestImportService_SetFile_Given_a_file_that_is_not_recognised_or_a_url_Then
 func TestImportService_SetKind_Given_a_detected_source_Then_a_choice_by_hand_clears_the_note(t *testing.T) {
 	_, _, _, app, _ := openLoginWith(t)
 	importer := app.Import()
-	t.Cleanup(func() { _ = importer.Close() })
 	importer.SetPaste("curl https://example.test")
 	if importer.State().Detected == "" {
 		t.Fatal("the curl command was not recognised")

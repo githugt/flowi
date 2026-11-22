@@ -16,8 +16,6 @@ import (
 	"github.com/githugt/flowi/lib/importers/curl"
 	"github.com/githugt/flowi/lib/importers/httpfile"
 	"github.com/githugt/flowi/lib/model"
-
-	"github.com/githugt/flowi/app/internal/vm"
 )
 
 // Text pasted into a request's address (a curl command, a .http request, an
@@ -153,25 +151,20 @@ func defaultVersion(r model.Request) model.RequestVersion {
 
 // PreparePasted sets the import wizard to import text of the given kind into
 // the collection of the tree row node, without previewing: the import screen
-// opens with the text as its source. Kinds the wizard reads only from a file
-// are given one holding text, kept until the next paste or Close.
+// opens with the text as its source.
+//
+// Before: a kind the wizard reads from a file (an API description, a Postman export) got the text written to a temporary
+// file in the system's temp folder, kept until the window closed: the document sat on disk, and its kept copy in the
+// collection was named after the file ("flowi-paste-2749985858"). Every kind now takes the text as it is.
 func (s *ImportService) PreparePasted(kind, text, node string) error {
 	k := flowi.ImportKind(kind)
 	if !slices.Contains(pastedKinds(), k) {
 		return fmt.Errorf("importing %q: %w", kind, ErrPasteKind)
 	}
-	file := ""
-	if vm.SourceModeOf(k) != vm.SourceFileOrPaste {
-		var err error
-		if file, err = s.writePasted(text); err != nil {
-			return err
-		}
-		text = ""
-	}
 	s.app.actor.Do(func() {
 		s.vm.SetKind(k)
+		s.vm.SetFile("")
 		s.vm.SetPaste(text)
-		s.vm.SetFile(file)
 		if c := s.app.workspace.Node(node).Collection; c != "" {
 			s.vm.SetCollection(c)
 		}
@@ -189,55 +182,12 @@ func (s *ImportService) PreviewPasted(kind, text, node string) error {
 	return nil
 }
 
-// isPasted says whether the wizard's source is text the window handed it: the
-// paste box, or the file this service wrote the text to.
-func (s *ImportService) isPasted(file, paste string) bool {
-	s.pasteMu.Lock()
-	defer s.pasteMu.Unlock()
-	return paste != "" || (s.pasteFile != "" && file == s.pasteFile)
-}
-
-// writePasted writes text to the service's file for pasted documents.
-func (s *ImportService) writePasted(text string) (string, error) {
-	s.pasteMu.Lock()
-	defer s.pasteMu.Unlock()
-	if s.pasteFile == "" {
-		f, err := os.CreateTemp("", "flowi-paste-*")
-		if err != nil {
-			return "", fmt.Errorf("keeping the pasted text: %w", err)
-		}
-		s.pasteFile = f.Name()
-		if err := f.Close(); err != nil {
-			return "", fmt.Errorf("keeping the pasted text: %w", err)
-		}
-	}
-	if err := os.WriteFile(s.pasteFile, []byte(text), 0o600); err != nil {
-		return "", fmt.Errorf("keeping the pasted text: %w", err)
-	}
-	return s.pasteFile, nil
-}
-
-// Close removes the file of pasted text. The window calls it as it shuts down.
-func (s *ImportService) Close() error {
-	s.pasteMu.Lock()
-	defer s.pasteMu.Unlock()
-	if s.pasteFile == "" {
-		return nil
-	}
-	err := os.Remove(s.pasteFile)
-	s.pasteFile = ""
-	if err != nil && !errors.Is(err, os.ErrNotExist) {
-		return fmt.Errorf("removing the pasted text: %w", err)
-	}
-	return nil
-}
-
 // stalePasteAge is how old a pasted-text file must be before a launch removes it: a file of a window that is still
 // open is much younger.
 const stalePasteAge = 12 * time.Hour
 
-// sweepPasted removes the pasted-text files an earlier run left in dir (a crash or a kill skips Close), and
-// returns how many it removed. Only files this service names and that are older than olderThan go.
+// sweepPasted removes the pasted-text files an earlier version left in dir (it wrote pasted documents to the
+// temp folder), and returns how many it removed. Only files this service names and that are older than olderThan go.
 //
 // Before: a pasted collection or HAR stayed in the temp folder until the app quit cleanly, and after a crash
 // it stayed for good.

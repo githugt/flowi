@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { collectionRoot, firstOfKind } from './treewalk'
+import { collectionRoot, firstOfKind, nodeById } from './treewalk'
 import type { TreeNode } from './types'
 
 const tree: TreeNode[] = [
@@ -21,5 +21,14 @@ describe('firstOfKind', () => {
   it('finds the first request under a collection', () => {
     expect(firstOfKind('request', tree[0].children ?? [])?.id).toBe('r1')
     expect(firstOfKind('flow', tree)).toBeUndefined()
+  })
+})
+
+describe('nodeById', () => {
+  it('finds a row at any depth, so a folder the import went into can be opened', () => {
+    expect(nodeById(tree, 'r1')?.label).toBe('GET /pets')
+    expect(nodeById(tree, 'c:C2')?.label).toBe('Other')
+    expect(nodeById(tree, 'nope')).toBeUndefined()
+    expect(nodeById(undefined, 'r1')).toBeUndefined()
   })
 })

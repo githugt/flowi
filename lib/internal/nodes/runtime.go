@@ -90,6 +90,16 @@ type Runtime interface {
 	// started will (a stop node). Stopped reports it, for loops.
 	StopRun()
 	Stopped() bool
+	// EndIteration ends the current turn of the nearest enclosing loop (a loop_control next): steps already running
+	// finish, no step of the turn that has not started will, and the turn counts as passed. LeaveLoop does that and
+	// also ends the loop: the lanes that have not started never do, those running finish (LaneResult.Left says the
+	// lane left). Both report false outside a loop, and change nothing then. They are scoped to the turn, unlike
+	// StopRun, which ends the whole run.
+	EndIteration() bool
+	LeaveLoop() bool
+	// IterationEnded reports that the turn of the loop the calling node sits in has ended (or an outer turn
+	// has): a loop inside it starts no more turns.
+	IterationEnded() bool
 	Now() time.Time
 	RandomDuration(lo, hi time.Duration) time.Duration // seeded by the run
 	// Report is the report so far of the whole run ("run") or of a
@@ -148,6 +158,8 @@ type LaneOptions struct {
 	Concurrency int    // lanes in flight; capped by the run-wide limit
 	Wait        string // "all" (default), "any" or "first-success"
 	LaneJars    bool   // give lanes their own cookie jars per http.cookies
+	// Loop makes each lane one turn of a loop (batch, run_till): a loop_control inside ends its turn, or the loop.
+	Loop bool
 }
 
 // LaneResult is one lane's outcome. Vars and Nodes are the lane's own
@@ -159,6 +171,8 @@ type LaneResult struct {
 	Nodes  map[string]any
 	Diags  diag.List
 	First  bool
+	// Left: a loop_control inside the lane left the loop (LaneOptions.Loop).
+	Left bool
 }
 
 // RequestCall is a saved request to run from a request node.

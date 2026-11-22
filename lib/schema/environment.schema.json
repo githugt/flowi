@@ -30,6 +30,20 @@
         "gray"
       ]
     },
+    "groups": {
+      "type": "array",
+      "description": "The groups of environments this one belongs to, such as one set of environments for each set of services. Omit it for the default group alone; the entry \"default\" keeps the environment in the default group as well as in the named ones. The apps compare the environments of one group at a time.",
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 40,
+        "pattern": "^\\S(.*\\S)?$",
+        "not": {
+          "pattern": "^(D[Ee][Ff][Aa][Uu][Ll][Tt]|dE[Ff][Aa][Uu][Ll][Tt]|deF[Aa][Uu][Ll][Tt]|defA[Uu][Ll][Tt]|defaU[Ll][Tt]|defauL[Tt]|defaulT)$"
+        }
+      },
+      "uniqueItems": true
+    },
     "extends": {
       "type": "string",
       "description": "The environment this one builds on. Its plain variables apply unless this one sets the same name; secrets are not inherited."

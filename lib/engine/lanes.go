@@ -5,6 +5,7 @@ package engine
 import (
 	"context"
 	"sync"
+	"sync/atomic"
 
 	"golang.org/x/sync/errgroup"
 
@@ -26,6 +27,11 @@ func (rt *nodeRuntime) Lanes(ctx context.Context, lanes []nodes.Lane, o nodes.La
 	lctx, cancel := context.WithCancelCause(ctx)
 	defer cancel(nil)
 	set := &laneSet{wait: o.Wait, policy: rt.f.fs.onBranchError, cancel: cancel, results: make([]nodes.LaneResult, len(lanes))}
+	var left *atomic.Bool // a loop's turns share it: once set, no turn that has not started will
+	if o.Loop {
+		left = new(atomic.Bool)
+		set.halt = func() bool { return left.Load() || rt.f.loop.isOver() }
+	}
 	if set.wait == "" {
 		set.wait = waitAll
 	}
@@ -41,7 +47,7 @@ func (rt *nodeRuntime) Lanes(ctx context.Context, lanes []nodes.Lane, o nodes.La
 		started[i] = true
 		g.Go(func() error {
 			defer func() { <-slots }()
-			set.settle(i, rt.runLane(lctx, l, o.LaneJars))
+			set.settle(i, rt.runLane(lctx, l, o.LaneJars, left))
 			return nil
 		})
 	}
@@ -55,10 +61,16 @@ func (rt *nodeRuntime) Lanes(ctx context.Context, lanes []nodes.Lane, o nodes.La
 }
 
 // runLane runs one lane's nodes in a child frame.
-func (rt *nodeRuntime) runLane(ctx context.Context, l nodes.Lane, laneJars bool) nodes.LaneResult {
+// left is the shared flag of a loop's turns, nil for lanes that are not turns of a loop.
+func (rt *nodeRuntime) runLane(ctx context.Context, l nodes.Lane, laneJars bool, left *atomic.Bool) nodes.LaneResult {
 	child := rt.laneFrame(l, laneJars)
+	var turn *loopTurn
+	if left != nil {
+		turn = &loopTurn{parent: rt.f.loop, left: left}
+		child.loop = turn
+	}
 	res := rt.r.runList(ctx, child, l.Nodes)
-	out := nodes.LaneResult{Status: nodes.Status(res.status), Diags: res.diags}
+	out := nodes.LaneResult{Status: nodes.Status(res.status), Diags: res.diags, Left: turn != nil && turn.leftIn.Load()}
 	if l.OwnVars {
 		out.Vars = child.vars.Own()
 	}
@@ -78,6 +90,8 @@ type laneSet struct {
 	results []nodes.LaneResult
 	settled bool // a wait of any / first-success has its winner
 	stopped bool // start no more lanes
+	// halt, when set, ends the lanes that have not started: a loop was left, or the turn around it is over.
+	halt func() bool
 }
 
 // acquire takes a slot for the next lane, unless the lanes were cancelled
@@ -90,7 +104,7 @@ func (s *laneSet) acquire(ctx context.Context, slots chan struct{}) bool {
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if s.stopped || ctx.Err() != nil {
+	if s.stopped || ctx.Err() != nil || (s.halt != nil && s.halt()) {
 		<-slots
 		return false
 	}

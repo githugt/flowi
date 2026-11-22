@@ -139,6 +139,10 @@
         "type": "string",
         "minLength": 1
       }
+    },
+    "status": {
+      "$ref": "common.schema.json#/$defs/statusName",
+      "description": "The flow's development status. Without one, the nearest folder above it that has a status applies."
     }
   }
 }

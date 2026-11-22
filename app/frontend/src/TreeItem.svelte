@@ -8,6 +8,7 @@
   import { rowMenu } from './lib/menus'
   import { ui } from './lib/ui.svelte'
   import Verb from './Verb.svelte'
+  import StatusIcon from './StatusIcon.svelte'
   import { highlightParts } from './lib/treefilter'
   import { WorkspaceService } from '../bindings/github.com/githugt/flowi/app/internal/bridge'
   import { moved } from './lib/reorder'
@@ -145,6 +146,7 @@
     <span class="twist" class:open={shown} aria-hidden="true">{#if branch}<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6" /></svg>{/if}</span>
     {#if node.kind === 'request' && node.method}<span class="method"><Verb verb={node.method} short pill={false} /></span>{:else if node.kind === 'flow'}<span class="method"><Verb verb="FLOW" pill={false} /></span>{:else if node.kind === 'broken'}<span class="method"><span class="unmerged" role="img" aria-label="Cannot load">⚠ unmerged</span></span>{/if}
     <span class="label">{#if query}{#each highlightParts(node.label, query) as part}{#if part.hit}<mark>{part.text}</mark>{:else}{part.text}{/if}{/each}{:else}{node.label}{/if}</span>
+    {#if node.status}<StatusIcon mark={node.status} size={12} />{/if}
     {#if markable && app.isDirty(node.id)}<span class="dirtydot" title="Unsaved changes" role="img" aria-label="Unsaved changes"></span>{/if}
     {#if result}<span class="result {result}" title={result === 'passed' ? 'The last run passed' : 'The last run failed'} role="img" aria-label={result === 'passed' ? 'The last run passed' : 'The last run failed'}>{result === 'passed' ? '✓' : '✗'}</span>{/if}
   </button>

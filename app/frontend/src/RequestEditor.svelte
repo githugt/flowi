@@ -16,6 +16,8 @@
   import { COMMON_HEADERS, headerValues, implicitHeaders } from './lib/headernames'
   import { modeLoss } from './lib/modeloss'
   import { errorText } from './lib/errors'
+  import LabelsForm from './LabelsForm.svelte'
+  import { statusTitle } from './lib/devstatus'
   import { app } from './lib/app.svelte'
   import { ui } from './lib/ui.svelte'
   import { parseXml } from './lib/xml'
@@ -84,6 +86,7 @@
 
   let { view }: { view: RequestView } = $props()
   const node = $derived(view.node)
+  const statusMark = $derived(app.find(node)?.status)
   const v = $derived(view.current)
   const methods = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS', 'QUERY']
   // The registered WebDAV, CalDAV and other methods are not listed: they go through Custom…, which keeps their registered spelling.
@@ -633,6 +636,7 @@
       {#if menu === 'send'}<Menu at={menuAt} minWidth={150} label="Send options" items={sendItems} onclose={() => (menu = null)} />{/if}
     </div>
     </div>
+    {#if statusMark}{@const mark = statusMark}<IconButton icon={mark.icon} size={15} label="{statusTitle(mark)}. Change it in Docs." style="color: var(--st-{mark.color}); opacity: {mark.inherited ? 0.75 : 1}" onclick={() => (chosen = 'Docs')} />{/if}
     <VersionPicker {view} {node} onmanage={() => (overlaysOpen = true)} onnew={newVersion} />
     <!-- The pill and Discard keep their room while the version is clean, so the header does not shift when an edit begins. -->
     <span class="edited" class:clean={!view.dirty} aria-hidden={!view.dirty} inert={!view.dirty}>
@@ -868,6 +872,7 @@
           {:else if section === 'Cookies'}
             <RequestExtras {view} which="cookies" />
           {:else}
+            <div class="labelsbox"><LabelsForm {node} /></div>
             <div class="docsbar"><Segmented size="xs" label="Notes view" items={[{ id: 'write', label: 'Write' }, { id: 'preview', label: 'Preview', disabled: !v.Docs }]} value={docsPreview ? 'preview' : 'write'} onpick={(id) => (docsPreview = id === 'preview')} /></div>
             {#if docsPreview && v.Docs}
               <div class="docsview"><Markdown text={v.Docs} /></div>
@@ -946,6 +951,7 @@
   .tab.on, .tab.on:hover:not(:disabled) { color: var(--text); border-bottom-color: var(--accent); }
   .more-secs { flex: none; margin: 0 0 4px auto; padding-left: 6px; }
   .more-secs.on :global(.btn) { border-color: var(--accent); }
+  .labelsbox { flex: none; padding: 2px 2px var(--sp-3); margin-bottom: var(--sp-3); border-bottom: 1px solid var(--line); }
   .docsbar { flex: none; display: flex; gap: 2px; padding: 0 0 6px; }
   .docsview { flex: 1; min-height: 0; overflow: auto; padding: 4px 2px; }
   .typebar { flex: none; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; padding: 6px 10px; border-bottom: 1px solid var(--line); }

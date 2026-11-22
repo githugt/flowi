@@ -24,8 +24,9 @@
   import { blockedUnits, hintOf, type WireKind, type WireTarget } from './lib/wiretargets'
   import { paintOrder } from './lib/zorder'
   import { detailLevel, portRadius } from './lib/detail'
-  import { edgeTaken, running } from './lib/edgetaken'
-  import type { Card, DataEdge, Diagram, Edge, Face, Slot, Unit } from './lib/types'
+  import { edgeTaken, running, throughStatus } from './lib/edgetaken'
+  import type { Card, DataEdge, Diagram, Edge, Face, Lane, Slot, Unit } from './lib/types'
+  import { STACK, downPoints, roundedPath } from './lib/stackpath'
   import StepCard from './StepCard.svelte'
   import EdgeCard from './EdgeCard.svelte'
   import { edgeCards, keepStart } from './lib/edgecards'
@@ -246,12 +247,31 @@
     return u.card && id ? portLine(at(u).y, u.ports, id) : portY(u)
   }
 
+  /** The x the arrows that leave a unit start from: its right edge, or a loop's card's (the box under it is wider). */
+  const exitX = (u: Unit) => at(u).x + (u.boxed ? (u.headW ?? u.w) : u.w)
+
+  /** The corners of an arrow between two steps stacked in a loop's box. */
+  function downRoute(e: Edge): { x: number; y: number }[] | null {
+    const a = byId.get(e.from)
+    const b = byId.get(e.to)
+    if (!a || !b) return null
+    const port = Math.max(a.ports?.indexOf(e.fromPort ?? '') ?? 0, 0)
+    return downPoints({ x: exitX(a), y: portYOf(a, e.fromPort) }, { x: at(b).x, y: portY(b) }, at(a).y + a.h, at(b).y, port)
+  }
+
+  /** Where the middle of an arrow is: on its middle stretch for a stacked one, halfway along the way else. */
+  function routeMid(e: Edge, a: Unit, b: Unit): { x: number; y: number } {
+    const route = e.down ? downRoute(e) : null
+    if (route) return { x: (route[2].x + route[3].x) / 2, y: route[2].y }
+    return { x: (exitX(a) + at(b).x) / 2, y: (portY(a) + portY(b)) / 2 }
+  }
+
   // A container drawn as a card has an arrow to each of its lanes, labelled with what takes it.
   const branchArrows = $derived.by(() => {
     const out: { d: string; label: string; lx: number; ly: number }[] = []
     for (const l of diagram.lanes ?? []) {
       const c = byId.get(l.container)
-      if (!c?.headW) continue
+      if (!c?.headW || c.boxed) continue // a loop's steps are in a box under its card: no arrow beside it
       const x1 = at(c).x + c.headW
       const y1 = portYOf(c, l.port)
       const x2 = l.x
@@ -287,7 +307,8 @@
     const a = byId.get(e.from)
     const b = byId.get(e.to)
     if (!a || !b) return null
-    return { x: (at(a).x + a.w + at(b).x) / 2, y: (portY(a) + portY(b)) / 2 - 7 }
+    const m = routeMid(e, a, b)
+    return { x: m.x, y: m.y - 7 }
   }
 
   // Cards with a failure route show a port at the bottom edge; the route leaves from it, so it is not
@@ -312,7 +333,9 @@
     const b = byId.get(e.to)
     if (!a || !b) return ''
     if (e.fail && !a.card) return failPath(e)
-    const x1 = at(a).x + a.w
+    const route = e.down ? downRoute(e) : null
+    if (route) return roundedPath(route)
+    const x1 = exitX(a)
     const y1 = portYOf(a, e.fromPort)
     const x2 = at(b).x
     const y2 = portY(b)
@@ -553,8 +576,9 @@
     const a = byId.get(e.from)
     const b = byId.get(e.to)
     if (!a || !b) return null
+    if (e.down) return routeMid(e, a, b)
     const failFromStrip = e.fail && !a.card
-    const x1 = failFromStrip ? at(a).x + a.w / 2 : at(a).x + a.w
+    const x1 = failFromStrip ? at(a).x + a.w / 2 : exitX(a)
     const y1 = failFromStrip ? at(a).y + a.h : portYOf(a, e.fromPort)
     return { x: (x1 + at(b).x) / 2, y: (y1 + portY(b)) / 2 }
   }
@@ -754,9 +778,20 @@
   const live = (e: Edge) => {
     const a = byId.get(e.from)
     const b = byId.get(e.to)
-    return !!a && !!b && edgeTaken(e, statusOf(a), statusOf(b))
+    return !!a && !!b && edgeTaken(e, flowStatus(a), flowStatus(b))
   }
+  // What an arrow reads of a step: one skipped on purpose (its card is hatched) lets the run through, as passed.
+  const flowStatus = (u: Unit) => throughStatus(statusOf(u), !!cards[u.id]?.skipped)
   const going = $derived(running(statuses))
+  // The arrow out of Start is taken once the first step ran, the one into End once the last step got through.
+  const startTaken = $derived.by(() => {
+    const u = edge.first && byId.get(edge.first.id)
+    return !!u && edgeTaken({}, 'passed', flowStatus(u))
+  })
+  const endTaken = $derived.by(() => {
+    const u = edge.last && byId.get(edge.last.id)
+    return !!u && flowStatus(u) === 'passed'
+  })
 
   // The minimap: the flow's extent, and the part of it the canvas shows.
   const bounds = $derived.by(() => {
@@ -801,13 +836,15 @@
   // A + on each side of a card: on the selected one, else the right + after the last card (the one
   // reaching furthest right) and the left + before the first. There was only the right one, so a step
   // could not be added in front of another.
-  const picked = $derived(units.find((u) => selectedUnits.has(u.id) && !u.headW))
-  // Nothing starts after a Stop, so no step is added after it or on its outcome.
-  const endsRun = (u: Unit) => u.types.length > 0 && u.types.every((t) => t === 'stop')
+  // A loop's card counts as a step here (the flow goes on from its own port); a condition or a parallel does not.
+  const steps = (u: Unit) => !u.headW || !!u.boxed
+  const picked = $derived(units.find((u) => selectedUnits.has(u.id) && steps(u)))
+  // Nothing starts after a Stop or a Loop control (it ends the turn of its loop), so no step is added after it or on its outcome.
+  const endsRun = (u: Unit) => u.types.length > 0 && u.types.every((t) => t === 'stop' || t === 'loop_control')
   const addAfter = $derived.by(() => {
     if (picked) return endsRun(picked) ? null : picked
-    const cards = units.filter((u) => !u.headW && !endsRun(u))
-    return cards.reduce<Unit | null>((best, u) => (!best || at(u).x + u.w > at(best).x + best.w ? u : best), null)
+    const cards = units.filter((u) => !u.parent && steps(u) && !endsRun(u))
+    return cards.reduce<Unit | null>((best, u) => (!best || exitX(u) > exitX(best) ? u : best), null)
   })
   // Where a + goes: on the arrow joining the card to its neighbour, half-way along it, so it reads as
   // "a step here" and never covers an arrowhead. Without a neighbour it stands clear of the card, joined by a stub.
@@ -816,15 +853,23 @@
     const a = e && byId.get(e.from)
     const b = e && byId.get(e.to)
     if (!a || !b) return null
-    return { x: (at(a).x + a.w + at(b).x) / 2, y: (portY(a) + portY(b)) / 2 }
+    return routeMid(e, a, b)
   }
 
   const addBefore = $derived.by(() => {
     if (picked) return picked
-    const cards = units.filter((u) => !u.headW)
+    const cards = units.filter((u) => !u.parent && steps(u))
     return cards.reduce<Unit | null>((best, u) => (!best || at(u).x < at(best).x ? u : best), null)
   })
 </script>
+
+<!-- The "+ Add a step" chip of a lane, centred on (cx, cy): puts a step at the end of that lane. -->
+{#snippet laneAdd(l: Lane, cx: number, cy: number)}
+  <g class="addcase" role="button" tabindex="-1" aria-label={`Add a step to ${l.label || 'this lane'}`} onpointerdown={(e) => e.stopPropagation()} onclick={(e) => onaddinlane?.(l.container, l.index, e)} onkeydown={() => {}}>
+    <rect x={cx - 46} y={cy - 11} width="92" height="22" rx="11" />
+    <text x={cx} y={cy + 4} text-anchor="middle">+ Add a step</text>
+  </g>
+{/snippet}
 
 <!-- A + that adds a step; the dashed stub joins it to its card (from x1 to x2, none when equal). -->
 {#snippet plus(p: { x: number; y: number }, title: string, x1: number, x2: number, near: { step: string; before: boolean } | null)}
@@ -875,14 +920,30 @@
 
   <g transform={`translate(${view.x} ${view.y}) scale(${view.k})`}>
     {#each diagram.lanes as l}
-      <rect class="lane" x={l.x} y={l.y} width={l.w} height={l.h} rx="10" />
-      {#if l.label && !byId.get(l.container)?.headW}<text class="lanelabel" x={l.x + 10} y={l.y - 7}>{l.label.length > 40 ? l.label.slice(0, 39) + '…' : l.label}</text>{/if}
-      {#if editable && onaddinlane && !units.some((u) => u.parent === l.container && u.x >= l.x && u.x < l.x + l.w && u.y >= l.y && u.y < l.y + l.h)}
-        <!-- an empty lane is a target: the person clicks it to put the first step in -->
-        <g class="addcase" role="button" tabindex="-1" aria-label={`Add a step to ${l.label || 'this lane'}`} onpointerdown={(e) => e.stopPropagation()} onclick={(e) => onaddinlane(l.container, l.index, e)} onkeydown={() => {}}>
-          <rect x={l.x + l.w / 2 - 46} y={l.y + l.h / 2 - 11} width="92" height="22" rx="11" />
-          <text x={l.x + l.w / 2} y={l.y + l.h / 2 + 4} text-anchor="middle">+ Add a step</text>
-        </g>
+      {@const owner = byId.get(l.container)}
+      {@const inLane = units.filter((u) => u.parent === l.container && u.x >= l.x && u.x < l.x + l.w && u.y >= l.y && u.y < l.y + l.h)}
+      {@const first = inLane.reduce<Unit | null>((best, u) => (!best || u.y < best.y || (u.y === best.y && u.x < best.x) ? u : best), null)}
+      <rect class="lane" class:boxed={owner?.boxed} x={l.x} y={l.y} width={l.w} height={l.h} rx="10" />
+      {#if owner?.boxed}
+        <!-- a loop's box hangs from its card: a line from the card's foot into the box, onto the first step when they are stacked -->
+        {#if owner.down && first}
+          <path class="edge boxlink" d={`M${first.x + STACK.entryGutter},${owner.y + (owner.headH ?? 0)} V${first.y}`} marker-end="url(#arrow)" />
+        {:else}
+          <line class="boxlink" x1={l.x + 24} x2={l.x + 24} y1={owner.y + (owner.headH ?? 0)} y2={l.y} />
+        {/if}
+      {/if}
+      {#if l.label && !owner?.headW}<text class="lanelabel" x={l.x + 10} y={l.y - 7}>{l.label.length > 40 ? l.label.slice(0, 39) + '…' : l.label}</text>{/if}
+      {#if editable && onaddinlane}
+        {#if inLane.length === 0}
+          <!-- an empty lane is a target: the person clicks it to put the first step in -->
+          {@render laneAdd(l, l.x + l.w / 2, l.y + l.h / 2)}
+        {:else if owner?.boxed && owner.down}
+          <!-- under the last of the stacked steps: the next step of the loop goes here -->
+          {@render laneAdd(l, l.x + STACK.inset + (l.w - 2 * STACK.inset - STACK.portRoom) / 2, l.y + l.h - STACK.addH / 2)}
+        {:else if owner?.boxed}
+          <!-- the end of a loop's row: the next step of the loop goes here -->
+          {@render laneAdd(l, l.x + l.w - 62, l.portY)}
+        {/if}
       {/if}
     {/each}
 
@@ -910,10 +971,14 @@
     {/each}
 
     {#if start && edge.first}
-      <path class="edge" d={curve(edge.start.x + edge.start.w, edge.start.y + CARD.inPort, edge.first.x, edge.first.y + CARD.inPort)} marker-end="url(#arrow)" />
+      {@const d = curve(edge.start.x + edge.start.w, edge.start.y + CARD.inPort, edge.first.x, edge.first.y + CARD.inPort)}
+      <path class="edge" {d} marker-end="url(#arrow)" />
+      <path class="flow" class:live={startTaken} class:still={!going} {d} />
     {/if}
     {#if edge.end && !edge.end.ghost && edge.last}
-      <path class="edge" d={curve(edge.last.x + edge.last.w, edge.last.y + CARD.inPort, edge.end.x, edge.end.y + CARD.inPort)} marker-end="url(#arrow)" />
+      {@const d = curve(edge.last.x + edge.last.w, edge.last.y + CARD.inPort, edge.end.x, edge.end.y + CARD.inPort)}
+      <path class="edge" {d} marker-end="url(#arrow)" />
+      <path class="flow" class:live={endTaken} class:still={!going} {d} />
     {/if}
     {#if start}
       <EdgeCard role="start" face={start} place={edge.start} {editable} k={view.k} onrow={(key, e) => onedgerow?.('start', key, e)} onmove={onmoveinput} onadd={onaddinput} />
@@ -1065,7 +1130,7 @@
     {#if onadd && !moving && !link}
       {#if addAfter}
         {@const joined = plusOnEdge(addAfter, true)}
-        {@const after = joined ?? { x: at(addAfter).x + addAfter.w + ADD_GAP, y: portY(addAfter) }}
+        {@const after = joined ?? { x: exitX(addAfter) + ADD_GAP, y: portY(addAfter) }}
         {@render plus(after, 'Add a step after this one', joined ? 0 : after.x - ADD_GAP + 8, joined ? 0 : after.x - 13, { step: addAfter.nodes[addAfter.nodes.length - 1], before: false })}
       {/if}
       {#if addBefore}
@@ -1081,14 +1146,14 @@
     {#if link}
       {@const from = byId.get(link.from)}
       {#if from}
-        <path class="linking" class:wire={link.data} class:failing={link.port === 'fail'} class:named={!!link.port && link.port.startsWith('outcome-')} d={link.data ? `M${at(from).x + from.w / 2},${at(from).y + (from.headH || from.h)} L${link.x},${link.y}` : `M${at(from).x + from.w},${link.port && link.port !== 'done' ? portYOf(from, link.port) : portY(from)} L${link.x},${link.y}`} />
+        <path class="linking" class:wire={link.data} class:failing={link.port === 'fail'} class:named={!!link.port && link.port.startsWith('outcome-')} d={link.data ? `M${at(from).x + from.w / 2},${at(from).y + (from.headH || from.h)} L${link.x},${link.y}` : `M${exitX(from)},${link.port && link.port !== 'done' ? portYOf(from, link.port) : portY(from)} L${link.x},${link.y}`} />
         <text class="slotlabel" class:refused={!!linkHint} x={link.x + 10} y={link.y - 8}>{linkHint ? `Not here: ${linkHint}` : link.data ? `Release on a step to pass it a value from ${from.nodes[0]}` : link.port === 'fail' ? `Release on a step to run it when ${coreOf(from)} fails` : link.port?.startsWith('outcome-') ? `Release on a step to run it on ${outcomeOfPort(link.port)} of ${coreOf(from)}` : `Release on a step to make it wait for ${coreOf(from)}`}</text>
       {/if}
     {/if}
     {#if slot?.ok}
       {#if slot.horizontal}
         <rect class="slot" x={slot.x} y={slot.y - 2} width={slot.w ?? 0} height="4" rx="2" />
-        <text class="slotlabel" x={slot.x + (slot.w ?? 0) / 2} y={slot.y - 6} text-anchor="middle">{`Attach ${slot.side} ${slot.attach}`}</text>
+        <text class="slotlabel" x={slot.x + (slot.w ?? 0) / 2} y={slot.y - 6} text-anchor="middle">{slot.attach ? `Attach ${slot.side} ${slot.attach}` : 'Drop here'}</text>
       {:else}
         <rect class="slot" x={slot.x - 2} y={slot.y} width="4" height={slot.h} rx="2" />
         <text class="slotlabel" x={slot.x} y={slot.y - 6} text-anchor="middle">{slot.attach ? `Attach to ${slot.attach}` : 'Drop here'}</text>
@@ -1167,7 +1232,10 @@
   .edgelabel { fill: var(--muted); font-size: 10px; font-style: italic; pointer-events: none; }
   .branchlabel { fill: var(--accent); font-size: var(--cv-xs); font-weight: 600; pointer-events: none; }
   .edge.branch { stroke-dasharray: none; }
-  .lane { fill: none; stroke: var(--line); stroke-dasharray: 6 5; }
+  .lane { fill: none; stroke: var(--line); stroke-dasharray: 6 5; pointer-events: none; }
+  /* A loop's box: a solid, softly filled outline, so what is in it reads as grouped under the loop. */
+  .lane.boxed { fill: color-mix(in srgb, var(--panel) 55%, transparent); stroke: color-mix(in srgb, var(--muted) 55%, var(--bg)); stroke-dasharray: none; }
+  .boxlink { stroke: color-mix(in srgb, var(--muted) 55%, var(--bg)); stroke-width: 1.5; pointer-events: none; }
   .edge { fill: none; stroke: color-mix(in srgb, var(--muted) 80%, var(--bg)); stroke-width: 1.5; stroke-linecap: round; }
   .edge.fail, .flow.fail { stroke: var(--fail); }
   .edgehit { fill: none; stroke: transparent; stroke-width: 16; pointer-events: stroke; cursor: pointer; }

@@ -59,6 +59,13 @@ type Backend interface {
 	NewFolder(collection model.ID, tree, path string) error
 	// SetFolderOrder sets the order the entries of a folder are shown in (dir "" is the top of the tree).
 	SetFolderOrder(collection model.ID, tree, dir string, order []string, dropComments bool) error
+	// SetRequestLabels, SetFlowLabels and SetFolderLabels set the tags and the development status ("" for none of its
+	// own) of a request, a flow or a folder (dir under tree) in its file.
+	SetRequestLabels(t flowi.RequestTarget, tags []string, status string, dropComments bool) error
+	SetFlowLabels(t flowi.FlowTarget, tags []string, status string, dropComments bool) error
+	SetFolderLabels(collection model.ID, tree, dir string, tags []string, status string, dropComments bool) error
+	// SaveStatuses replaces the statuses a collection adds to the defaults.
+	SaveStatuses(collection model.ID, statuses []model.Status, dropComments bool) error
 	MoveFolder(collection model.ID, tree, from, to string) error
 	DeleteFolder(collection model.ID, tree, path string) error
 	SeedRequestHooks(t flowi.RequestTarget) error
@@ -91,6 +98,17 @@ type Backend interface {
 	KeepFlowEdits(t flowi.FlowTarget, f model.Flow) error
 	KeptFlowEdits(t flowi.FlowTarget) (string, bool, error)
 	SaveEnvironment(e model.Environment, dropComments bool) error
+	// SetEnvironmentGroups makes groups the groups of the workspace environments in files; none is the default group.
+	SetEnvironmentGroups(files []string, groups []string, dropComments bool) error
+	// SetEnvironmentColour marks the workspace environments in files with a colour; "" is the default colour.
+	SetEnvironmentColour(files []string, colour string, dropComments bool) error
+	// EnvironmentGroups lists the named groups, sorted: the ones made on their own and the ones an environment names.
+	EnvironmentGroups() []string
+	// AddEnvironmentGroup makes a group with no environment in it; RenameEnvironmentGroup and DeleteEnvironmentGroup
+	// change one together with its environments (deleting moves them to the default group).
+	AddEnvironmentGroup(name string) error
+	RenameEnvironmentGroup(from, to string, dropComments bool) error
+	DeleteEnvironmentGroup(name string, dropComments bool) error
 	// NewEnvironment creates an empty environment and returns its file.
 	NewEnvironment(name string) (string, error)
 
@@ -99,6 +117,11 @@ type Backend interface {
 	LastResponse(t flowi.RequestTarget, version string) (engine.Record, bool)
 	// FlowRuns lists the saved runs of a flow, newest first.
 	FlowRuns(t flowi.FlowTarget, limit int) []flowi.RunSummary
+	// FlowRunSteps reads a saved run step by step, for its list and timeline.
+	FlowRunSteps(t flowi.FlowTarget, id string) (flowi.RunSteps, error)
+	// DeleteFlowRun deletes one saved run of a flow; ClearFlowRuns deletes all of them and says how many files went.
+	DeleteFlowRun(t flowi.FlowTarget, id string) error
+	ClearFlowRuns(t flowi.FlowTarget) (int, error)
 	// FlowRunDetail reads what one saved run did at each node and the variables it ended with.
 	FlowRunDetail(t flowi.FlowTarget, id string) (flowi.RunDetail, error)
 	// FlowCompatibility lists the steps of a flow only Flowi can run (FLW-ARAZZO-002).
@@ -193,7 +216,8 @@ type Backend interface {
 	SaveDraft(id model.ID, dir string) error
 	DiscardDraft(id model.ID) error
 	PreviewImportSource(src flowi.ImportSource, collection model.ID) (flowi.ImportPlan, error)
-	ApplyImport(p flowi.ImportPlan, o flowi.ApplyOptions) error
+	// ApplyImportReport writes a plan and says what it did with each file (written, replaced, kept).
+	ApplyImportReport(p flowi.ImportPlan, o flowi.ApplyOptions) (flowi.ImportReport, error)
 
 	// SaveFlow writes f. expect is the FlowSum from when the flow was loaded: when the file has changed since, the
 	// save is refused with FLW-WRITE-005; "" saves over whatever is there.

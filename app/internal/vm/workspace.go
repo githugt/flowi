@@ -45,6 +45,15 @@ type TreeNode struct {
 	Method     string   // NodeRequest: the verb of its default version
 	Tree       string   // NodeFolder and the two groups: "requests" or "flows"
 	Detail     string   // NodeBroken: why it could not be read, with the line
+	// Status is the development status of a NodeRequest, NodeFlow or NodeFolder as it resolves (its own, else the nearest
+	// folder's); the zero value for none. A name the collection does not have is kept with the alert icon.
+	Status model.Status
+	// StatusFrom is the folder (as its Dir, "requests/auth") an inherited status comes from; "" for the item's own.
+	StatusFrom string
+	// StatusUnknown is set when Status names no status of the collection (FLW-STATUS-001).
+	StatusUnknown bool
+	// Tags are the tags that apply to a NodeRequest, NodeFlow or NodeFolder: its own and those of the folders above.
+	Tags []string
 }
 
 // snapshot is everything the workspace view-model shows, built off the UI
@@ -558,7 +567,9 @@ func addNested(add func(string, TreeNode), parent, tree string, c model.Collecti
 		for _, e := range entries {
 			if e.folder != "" {
 				id := parentID + "/" + path.Base(e.folder)
-				add(parentID, TreeNode{ID: id, Label: path.Base(e.folder), Kind: NodeFolder, Collection: c.Manifest.ID, Path: e.folder, Tree: tree})
+				folder := TreeNode{ID: id, Label: path.Base(e.folder), Kind: NodeFolder, Collection: c.Manifest.ID, Path: e.folder, Tree: tree}
+				withLabels(&folder, c, c.FolderStatus(tree+"/"+e.folder), c.FolderTags(tree+"/"+e.folder))
+				add(parentID, folder)
 				walk(e.folder, id)
 				continue
 			}
@@ -608,8 +619,10 @@ func requestLeaves(c model.Collection) []treeLeaf {
 		if label == "" {
 			label = path.Base(r.Path)
 		}
-		out[i] = treeLeaf{r.Path, TreeNode{ID: "r:" + string(c.Manifest.ID) + ":" + string(r.ID), Label: label, Kind: NodeRequest,
-			Collection: c.Manifest.ID, Request: r.ID, File: r.File, Path: r.Path, Method: verbOf(r)}}
+		node := TreeNode{ID: "r:" + string(c.Manifest.ID) + ":" + string(r.ID), Label: label, Kind: NodeRequest,
+			Collection: c.Manifest.ID, Request: r.ID, File: r.File, Path: r.Path, Method: verbOf(r)}
+		withLabels(&node, c, c.RequestStatus(r), c.RequestTags(r))
+		out[i] = treeLeaf{r.Path, node}
 	}
 	return out
 }
@@ -631,8 +644,10 @@ func brokenLeaves(c model.Collection, kind string) []treeLeaf {
 func flowLeaves(c model.Collection) []treeLeaf {
 	out := make([]treeLeaf, len(c.Flows))
 	for i, f := range c.Flows {
-		out[i] = treeLeaf{f.Path, TreeNode{ID: "f:" + string(c.Manifest.ID) + ":" + string(f.ID), Label: path.Base(f.Path), Kind: NodeFlow,
-			Collection: c.Manifest.ID, Flow: f.ID, File: f.File, Path: f.Path}}
+		node := TreeNode{ID: "f:" + string(c.Manifest.ID) + ":" + string(f.ID), Label: path.Base(f.Path), Kind: NodeFlow,
+			Collection: c.Manifest.ID, Flow: f.ID, File: f.File, Path: f.Path}
+		withLabels(&node, c, c.FlowStatus(f), c.FlowTags(f))
+		out[i] = treeLeaf{f.Path, node}
 	}
 	return out
 }

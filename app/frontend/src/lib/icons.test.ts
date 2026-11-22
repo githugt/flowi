@@ -34,7 +34,7 @@ describe('icons', () => {
   })
 
   it('only names icons that exist, in every step type and summary row', () => {
-    const types = ['request', 'subflow', 'fetch', 'webhook', 'set', 'assert', 'condition', 'batch', 'run_till', 'parallel', 'delay', 'log', 'save', 'digest', 'stop', 'note']
+    const types = ['request', 'subflow', 'fetch', 'webhook', 'set', 'assert', 'condition', 'batch', 'run_till', 'parallel', 'delay', 'log', 'save', 'digest', 'stop', 'loop_control', 'note']
     const rows = ['inputs', 'send', 'receive', 'connection', 'hooks', 'outcomes', 'settings', 'values', 'checks', 'steps', 'message']
 
     expect(types.filter((t) => !hasIcon(typeIcon(t)))).toEqual([])

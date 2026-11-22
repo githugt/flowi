@@ -5,6 +5,8 @@
 export interface NodeUi {
   /** The request section chosen ('' for the first). */
   section: string
+  /** The section of a flow step's settings chosen ('' for the first). */
+  stepSection: string
   /** The hook mode of the next send: all, none, skip-pre or skip-post. */
   hooks: string
   /** The replay bar is open. */
@@ -12,7 +14,7 @@ export interface NodeUi {
 }
 
 const state = new Map<string, NodeUi>()
-const fresh = (): NodeUi => ({ section: '', hooks: 'all', replay: false })
+const fresh = (): NodeUi => ({ section: '', stepSection: '', hooks: 'all', replay: false })
 
 /** The state of a node: a copy, so a caller changes it only through setNodeUi. */
 export function nodeUi(node: string): NodeUi {

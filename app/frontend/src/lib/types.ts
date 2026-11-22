@@ -13,7 +13,46 @@ export interface TreeNode {
   scratch?: boolean
   /** Folders and groups: the tree they belong to, requests or flows. Requests drop only into the first. */
   tree?: string
+  /** A request, flow or folder: its development status as it resolves (its own, else its folder's). */
+  status?: StatusMark
+  /** A request, flow or folder: the tags that apply to it, its own and its folders'. */
+  tags?: string[]
   children?: TreeNode[]
+}
+
+/** A development status as it is drawn: next to a tree row and in an editor. */
+export interface StatusMark {
+  name: string
+  /** One of the status colours, drawn from the theme token --st-<color>. */
+  color: string
+  icon: string
+  /** An inherited status: the folder it comes from, as its path in the collection ("requests/auth"). */
+  from?: string
+  inherited?: boolean
+  /** The collection has no status of this name (FLW-STATUS-001). */
+  unknown?: boolean
+}
+
+export interface TagChoice {
+  tag: string
+  count: number
+}
+
+/** What the Tags and status editor shows for one request, flow or folder. */
+export interface LabelsView {
+  node: string
+  kind: 'request' | 'flow' | 'folder'
+  /** Its own tags, as written in its file. */
+  tags: string[]
+  /** Its own status; "" when it sets none and inherits. */
+  status: string
+  inherited?: StatusMark
+  /** Tags the folders above add; shown, not removable here. */
+  folderTags: string[]
+  statuses: StatusMark[]
+  suggest: TagChoice[]
+  colors: string[]
+  icons: string[]
 }
 
 export interface Tree {
@@ -47,6 +86,8 @@ export interface Unit {
   above?: number // …and how far down its request sits (the stack above it)
   headW?: number // a container drawn as a card with its lanes to the right
   headH?: number // …and that card's own height (h covers its lanes too)
+  boxed?: boolean // a loop: its steps are in a box under the card (headH is the card's height, h covers the box too)
+  down?: boolean // …and they are stacked top to bottom, else in one row
   card?: boolean // drawn as a card: see Card.face and ports
   ports?: string[] // a card's control ports, top to bottom
 }
@@ -62,6 +103,7 @@ export interface Edge {
   fromStep?: string // the step an after_failure_of arrow names, when its card holds several
   goto?: boolean // a fail edge that is the step's on_error goto, not an arrow written on the step it leads to
   fromPort?: string // the card port it leaves from: done, fail, case-<n>, else
+  down?: boolean // between two steps stacked in a loop's box: out of the right port, down beside the card, into the left of the next
 }
 
 export interface Lane {
@@ -358,6 +400,13 @@ export interface RunView {
   statuses: Record<string, string>
   results: Record<string, string>
   /** The steps that ran, placed on the run's clock and ordered by start. */
+  timeline: TimelineBar[]
+}
+
+/** A saved run laid out like the live one: what the Steps list and the Timeline need. */
+export interface SavedRunView {
+  statuses: Record<string, string>
+  results: Record<string, string>
   timeline: TimelineBar[]
 }
 
@@ -798,9 +847,21 @@ export interface ImportView {
   pasted: boolean
   collections: Choice[]
   collection: string
+  /** The folder of the collection the import goes into ("demo/websocket"), "" for the top. */
+  folder: string
+  /** Where it goes in words: "Shop / demo / websocket". */
+  target: string
+  /** The row of the Import into dialog for the target. */
+  targetRow: string
+  /** A preview is being made now. */
+  previewing: boolean
+  /** There is a source to read. */
+  canPreview: boolean
+  /** What a preview still needs, "" when nothing: shown where the preview will be. */
+  waiting: string
   previewed: boolean
   summary: string
-  files: { rel: string; exists: boolean; remove: boolean }[]
+  files: { rel: string; exists: boolean; remove: boolean; kind: string; name: string; status: string }[]
   items: { name: string; skipped: boolean; problems: { severity: string; text: string; hint?: string; where?: string; excerpt?: string[] }[] }[]
   lossy: string[]
   skipped: number
@@ -808,6 +869,12 @@ export interface ImportView {
   canImport: boolean
   error?: string
   done?: string
+  /** What the last import did apart from writing: what it kept because it exists, what it replaced. */
+  notes: string[]
+  /** What it did as a matter of course, such as the copy of the document it kept. */
+  details: string[]
+  /** How many requests, flows and the like the last import wrote. */
+  wrote: number
 }
 
 export interface ScheduleView {
@@ -1260,11 +1327,53 @@ export interface CallPart {
   truncated: boolean
 }
 
-/** The environments side by side (EnvCompareView in the bridge). */
+/** One group of environments (EnvGroupView in the bridge); name "" is the default group. */
+export interface EnvGroup {
+  name: string
+  label: string
+  count: number
+}
+
+/** The environments of one group side by side (EnvCompareView in the bridge). */
 export interface EnvCompareView {
+  group: string
+  groups: EnvGroup[]
   envs: string[]
-  rows: { name: string; cells: { state: 'set' | 'inherited' | 'missing' | 'secret' | 'secret-unset'; value: string; kind: string; source: string }[]; differs: boolean; gaps: number }[]
+  rows: {
+    name: string
+    cells: { state: 'set' | 'inherited' | 'missing' | 'secret' | 'secret-unset'; value: string; kind: string; source: string }[]
+    differs: boolean
+    kindsDiffer: boolean
+    gaps: number
+  }[]
+  notes: string[]
   error?: string
+}
+
+/** One environment on the Manage environments screen (ManagedEnvView in the bridge). */
+export interface ManagedEnv {
+  name: string
+  file: string
+  /** As the file holds them: the named groups, sorted, and "default" when it is in the default group too; none means the default group alone. */
+  groups: string[]
+  colour: string
+  base: string
+  protected: boolean
+  vars: number
+  warning: string
+}
+
+/** The Manage environments screen (EnvManageView in the bridge). */
+export interface EnvManageView {
+  envs: ManagedEnv[]
+  groups: EnvGroup[]
+  /** The colours an environment can be marked with. */
+  colours: string[]
+}
+
+/** How a change to environment files ended (EnvMoveView in the bridge): a move between groups or a new colour): refused names an environment whose file has comments. */
+export interface EnvMoveView {
+  refused: string
 }
 
 /** What hovering a {{variable}} chip shows (bridge.VariableHintView). */

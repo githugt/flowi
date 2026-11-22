@@ -10,6 +10,8 @@ export const ICONS: Record<string, string> = {
   settings:
     'M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3h0a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5h0a1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8v0a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z',
   plus: 'M12 5v14 M5 12h14',
+  // Six dots: the handle a row is dragged by.
+  grip: 'M8 6a1 1 0 1 0 2 0a1 1 0 1 0-2 0 M14 6a1 1 0 1 0 2 0a1 1 0 1 0-2 0 M8 12a1 1 0 1 0 2 0a1 1 0 1 0-2 0 M14 12a1 1 0 1 0 2 0a1 1 0 1 0-2 0 M8 18a1 1 0 1 0 2 0a1 1 0 1 0-2 0 M14 18a1 1 0 1 0 2 0a1 1 0 1 0-2 0',
   chevd: 'M6 9l6 6 6-6',
   chevr: 'M9 6l6 6-6 6',
   up: 'M12 19V5 M6 11l6-6 6 6',
@@ -61,6 +63,7 @@ export const ICONS: Record<string, string> = {
   globe: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18z M3 12h18 M12 3c3 3 3 15 0 18 M12 3c-3 3-3 15 0 18',
   hook: 'M12 3v11a4 4 0 0 1-8 0v-1 M2 11l2 2 2-2 M9 5h6',
   repeat: 'M17 2l4 4-4 4 M3 11V9a3 3 0 0 1 3-3h15 M7 22l-4-4 4-4 M21 13v2a3 3 0 0 1-3 3H3',
+  'skip-next': 'M4 5l9 7-9 7z M15 5l8 7-8 7z',
   loop: 'M17 2l4 4-4 4 M3 11V9a3 3 0 0 1 3-3h15 M7 22l-4-4 4-4 M21 13v2a3 3 0 0 1-3 3H3 M11 10h1v4',
   note: 'M5 4h14v11l-5 5H5z M14 20v-5h5 M8 9h8',
   log: 'M6 3h12v18H6z M9 8h6 M9 12h6 M9 16h3',
@@ -68,6 +71,21 @@ export const ICONS: Record<string, string> = {
   info: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18z M12 11v5 M12 8h.01',
   undo: 'M9 14L4 9l5-5 M4 9h10a6 6 0 0 1 0 12h-3',
   redo: 'M15 14l5-5-5-5 M20 9H10a6 6 0 0 0 0 12h3',
+  // The development statuses (model.StatusIcons): each its own shape, so a status is never told by colour alone.
+  planning: 'M9 4h6v3H9z M7 5H6a1 1 0 0 0-1 1v14a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V6a1 1 0 0 0-1-1h-1 M9 12h6 M9 16h4',
+  eye: 'M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z M12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6z',
+  flask: 'M9 3h6 M10 3v6L5 19a1.5 1.5 0 0 0 1.3 2h11.4A1.5 1.5 0 0 0 19 19l-5-10V3 M7.5 15h9',
+  rocket: 'M12 3c3 2 5 5 5 9l-2 3H9l-2-3c0-4 2-7 5-9z M12 9.5h.01 M9 15l-2 4 3-1 M15 15l2 4-3-1',
+  flag: 'M5 21V4 M5 4h11l-2 4 2 4H5',
+  star: 'M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1L3.2 9.5l6.1-.9z',
+  bug: 'M9 7a3 3 0 0 1 6 0 M8 9h8v5a4 4 0 0 1-8 0z M12 9v9 M4 11l4 1 M20 11l-4 1 M4 19l4-2 M20 19l-4-2 M3 15h5 M16 15h5',
+  bolt: 'M13 2L4 14h7l-1 8 9-12h-7z',
+  lock: 'M6 11h12v9H6z M8 11V8a4 4 0 0 1 8 0v3 M12 15v2',
+  archive: 'M3 5h18v4H3z M5 9v10h14V9 M10 13h4',
+  bookmark: 'M7 3h10v18l-5-4-5 4z',
+  alert: 'M12 3l10 18H2z M12 10v5 M12 18h.01',
+  tag: 'M3 12V4h8l10 10-8 8z M7.5 8h.01',
+  filter: 'M3 5h18l-7 8v6l-4 2v-8z',
 }
 
 /** What an unknown name draws: a dot, so a typo shows up as a dot and not as nothing. */

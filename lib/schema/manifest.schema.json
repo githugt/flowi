@@ -60,6 +60,13 @@
       "additionalProperties": {
         "type": "string"
       }
+    },
+    "statuses": {
+      "type": "array",
+      "description": "Development statuses the collection adds to the defaults, each with a colour and an icon. A name that matches a default changes that default's colour and icon.",
+      "items": {
+        "$ref": "common.schema.json#/$defs/statusDef"
+      }
     }
   }
 }

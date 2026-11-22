@@ -26,6 +26,7 @@ func batchSpec() Spec {
 			{Name: "times", Kind: ParamInt, Min: 1, Max: maxBatchTimes, Doc: "Repeat a fixed number of times instead of over a list; `index` counts from 0 (and `item` is the same number)."},
 			{Name: "concurrency", Kind: ParamInt, Min: 1, Doc: "Iterations in flight (default 1); capped by the run-wide limit."},
 			{Name: "label", Kind: ParamText, Doc: "Names each iteration in the run tree, reports and failures instead of its number (item, index in scope): `{{item.email}}` gives users[ada@example.com]/create. Slashes and brackets become _, long names are cut, repeats get #2."},
+			loopLayoutParam(),
 		},
 		Typed: []string{"body"},
 		Run:   runBatch,
@@ -47,7 +48,7 @@ func runBatch(ctx context.Context, n model.Node, s *State) Outcome {
 	for i, item := range items {
 		lanes[i] = Lane{Label: labels[i], Nodes: n.Body, OwnVars: true, OwnNodes: true, Item: item, Index: i, HasItem: true}
 	}
-	results := s.Runtime.Lanes(ctx, lanes, LaneOptions{Concurrency: intParam(n, "concurrency", 1), LaneJars: true})
+	results := s.Runtime.Lanes(ctx, lanes, LaneOptions{Concurrency: intParam(n, "concurrency", 1), LaneJars: true, Loop: true})
 	return Outcome{Outputs: batchOutputs(items, results), Status: combine(results), Diags: diagsOf(results)}
 }
 
@@ -76,10 +77,13 @@ func batchItems(n model.Node, s *State) ([]any, Outcome) {
 	return list, Outcome{}
 }
 
+// batchOutputs are the results per item; left says a loop_control left the loop early, so the items after it
+// (status skipped) never started.
 func batchOutputs(items []any, results []LaneResult) map[string]any {
 	out := make([]any, len(results))
-	passed, failedCount := 0, 0
+	passed, failedCount, left := 0, 0, false
 	for i, r := range results {
+		left = left || r.Left
 		switch r.Status {
 		case StatusPassed:
 			passed++
@@ -88,7 +92,7 @@ func batchOutputs(items []any, results []LaneResult) map[string]any {
 		}
 		out[i] = map[string]any{"index": i, "item": items[i], "status": string(r.Status), "vars": r.Vars, "nodes": r.Nodes}
 	}
-	return map[string]any{"results": out, "count": len(results), "passed": passed, "failed": failedCount}
+	return map[string]any{"results": out, "count": len(results), "passed": passed, "failed": failedCount, "left": left}
 }
 
 // maxLabelRunes cuts a label that came from data, so a long cell cannot make a path nobody can read.

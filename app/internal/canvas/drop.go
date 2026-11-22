@@ -65,6 +65,9 @@ func UnitTarget(d Diagram, p Point, unit, node string, snap float64, at Locator)
 }
 
 func slotAt(d Diagram, list string, index int) Slot {
+	if x, y, w, ok := stackMarker(d, list, index); ok {
+		return Slot{List: list, Index: index, X: x, Y: y, W: w, OK: true, Horizontal: true}
+	}
 	x, y, h, ok := SlotMarker(d, list, index)
 	return Slot{List: list, Index: index, X: x, Y: y, H: h, OK: ok}
 }
@@ -116,6 +119,36 @@ func SlotMarker(d Diagram, list string, index int) (x, y, h int64, ok bool) {
 		}
 	}
 	return x, y, h, ok
+}
+
+// stackMarker is where to draw the slot of (list, index) when the list is the body of a loop drawn stacked: a bar
+// across the box in the gap above the unit that holds that index, or below the last one (the middle of an empty
+// box). ok is false for any other list.
+func stackMarker(d Diagram, list string, index int) (x, y, w int64, ok bool) {
+	var lane Lane
+	for _, l := range d.Lanes {
+		if parent, found := d.Unit(l.Container); found && parent.Down && l.Path == list {
+			lane, ok = l, true
+		}
+	}
+	if !ok {
+		return 0, 0, 0, false
+	}
+	x, w = lane.X+boxInsetV, lane.W-2*boxInsetV
+	y = lane.Y + lane.H/2 // an empty box: the middle of it
+	for _, u := range d.Units {
+		l, i, split := SplitPath(u.Path)
+		if !split || l != list || u.Parent != lane.Container {
+			continue
+		}
+		switch {
+		case index == i:
+			return x, u.Y - columnGap/2, w, true
+		case index == i+len(u.Nodes):
+			y = u.Y + u.H + columnGap/2 // after the last: kept unless a later unit takes it
+		}
+	}
+	return x, y, w, true
 }
 
 // laneEnd is the end of the lane p is in, unless the lane belongs to the unit

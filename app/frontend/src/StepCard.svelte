@@ -315,7 +315,8 @@
   .portadd path { fill: none; stroke-width: 1.6; stroke-linecap: round; pointer-events: none; }
   .portadd:hover circle { fill: var(--tint-hover); }
   .stepcard:hover .portadd, .selected .portadd, .portadd:hover { opacity: 1; }
-  .portlabel { font-size: var(--cv-sm); font-weight: 600; pointer-events: none; }
+  /* A halo in the canvas colour, so an arrow that runs down beside the card stays readable behind the label. */
+  .portlabel { font-size: var(--cv-sm); font-weight: 600; pointer-events: none; paint-order: stroke; stroke: var(--bg); stroke-width: 4px; stroke-linejoin: round; }
   .portlabel.edit { pointer-events: auto; cursor: text; }
   .portlabel.edit:hover { text-decoration: underline; }
   .result { fill: var(--muted); font-size: var(--cv-sm); pointer-events: none; }

@@ -5,10 +5,11 @@
   // What to do with text pasted into a request's address that is really something to import (a curl
   // command, an OpenAPI document …): fill the request from it, import it as new requests, or paste it
   // as typed. Importing shows the import screen's preview here, in short.
-  import { onDestroy } from 'svelte'
+  import { onDestroy, untrack } from 'svelte'
   import { ImportService, RequestService } from '../bindings/github.com/githugt/flowi/app/internal/bridge'
   import { app } from './lib/app.svelte'
   import { DEFAULT_EXISTING, EXISTING_CHOICES } from './lib/importkinds'
+  import { groupFiles, importLabel, type ExistingMode } from './lib/importpreview'
   import { fillNote } from './lib/fillnote'
   import { errorText } from './lib/errors'
   import { live } from './lib/live'
@@ -17,6 +18,7 @@
   import Code from './Code.svelte'
   import Select from './Select.svelte'
   import Icon from './Icon.svelte'
+  import Verb from './Verb.svelte'
   import type { CodeLang } from './lib/highlight'
 
   const offer = $derived(app.pasteOffer)
@@ -52,6 +54,19 @@
     })
   })
 
+  // An offer with nothing to choose between (a document can only be imported) previews by itself, so the first thing
+  // shown is what would be imported. A curl command or .http request can fill the open request too: that is asked.
+  // Before: the person had to press "Import as new…", and "More options…" opened a screen that read nothing until Preview.
+  let autoFor: typeof offer = null // plain variable: the guard must not rerun the effect
+  $effect(() => {
+    const o = offer
+    if (o && o !== autoFor && !canFill) {
+      autoFor = o
+      untrack(importNew)
+    }
+    if (!o) autoFor = null
+  })
+
   function close() {
     stop?.()
     stop = null
@@ -79,7 +94,8 @@
     error = ''
     stop = live<ImportView>('import', () => ImportService.State(), (v) => {
       preview = v
-      if (v.done) {
+      // A plain success is a toast; when something was kept or nothing was written the dialog stays and says so.
+      if (v.done && v.wrote > 0 && !v.notes.length) {
         ui.toast(v.done)
         close()
       }
@@ -114,22 +130,20 @@
     app.openScreen('screen:import', 'Import')
   }
 
-  // The chooser the new-request and Save dialogs use; an import fills a whole collection, so no folder.
-  function chooseCollection(current: string) {
+  // The chooser the new-request and Save dialogs use: a collection, or a folder in it at any depth. Go previews again
+  // by itself once the choice is made, in order: asking for the preview from here raced the choice.
+  function chooseTarget(current: string) {
     ui.place = {
       title: 'Import into',
       action: 'Choose',
       tree: 'requests',
-      collectionsOnly: true,
-      row: `c:${current}`,
-      done: (row) => setCollection(row.replace(/^c:/, '')),
+      note: 'A collection, or a folder in it. New folder makes one inside the place you chose.',
+      row: current || undefined,
+      done: (row) => ImportService.SetTarget(row),
     }
   }
 
-  function setCollection(id: string) {
-    ImportService.SetCollection(id)
-    ImportService.Preview()
-  }
+  const groups = $derived(groupFiles(preview?.files ?? [], existing as ExistingMode))
 </script>
 
 <svelte:window onkeydown={(e) => offer && e.key === 'Escape' && close()} />
@@ -150,12 +164,18 @@
         {/if}
         <div class="text"><Code text={excerpt} lang={excerptLang} /></div>
       {:else}
-        <div class="f"><span>Into collection</span>
-          <button type="button" class="choose" onclick={() => chooseCollection(preview!.collection)} title="Choose a collection, or make a new one">
-            {preview.collections.find((c) => c.id === preview!.collection)?.label ?? 'Choose a collection…'}<span class="chev"><Icon name="chevd" size={12} /></span>
+        <div class="f"><span>Into</span>
+          <button type="button" class="choose" onclick={() => chooseTarget(preview!.targetRow)} title="Choose a collection or a folder in it, or make a new one">
+            {preview.target || 'Choose a collection…'}<span class="chev"><Icon name="chevd" size={12} /></span>
           </button>
         </div>
-        {#if preview.previewed}
+        {#if preview.done}
+          <div class="result" class:warn={!preview.wrote} role="status" data-testid="import-result">
+            <strong>{preview.done}</strong>
+            {#if preview.notes.length}<ul>{#each preview.notes as n}<li>{n}</li>{/each}</ul>{/if}
+            {#if preview.details.length}<ul class="muted">{#each preview.details as d}<li>{d}</li>{/each}</ul>{/if}
+          </div>
+        {:else if preview.previewed}
           <p class="sum">{preview.summary}</p>
           {#if preview.lossy.length}<ul class="muted">{#each preview.lossy as l}<li>{l}</li>{/each}</ul>{/if}
           {#each preview.items.filter((it) => it.skipped || it.problems.length) as it}
@@ -164,7 +184,11 @@
               {#each it.problems as p}<div class="prob {p.severity}">{p.text}</div>{/each}
             </div>
           {/each}
-          <div class="files">{#each preview.files as f}<div class:exists={f.exists}>+ {f.rel}{f.exists ? ' (exists)' : ''}</div>{/each}</div>
+          {#each groups as g (g.kind)}
+            <div class="files" aria-label={g.title}>
+              {#each g.entries as e (e.path)}<div>{#if e.verb}<Verb verb={e.verb} /> {/if}<strong>{e.name}</strong> <span class="muted">{e.path}</span> <span class="note {e.tone}">{e.note}</span></div>{/each}
+            </div>
+          {/each}
           {#if preview.existing}
             <Field label={`${preview.existing} ${preview.existing === 1 ? 'file already exists' : 'files already exist'}`}>
               <Select bind:value={existing}>
@@ -173,7 +197,7 @@
             </Field>
           {/if}
         {:else if !preview.error}
-          <p class="muted">Reading it…</p>
+          <p class="muted" role="status">{preview.previewing || !preview.waiting ? 'Reading it…' : preview.waiting}</p>
         {/if}
         {#if preview.error}<p class="err">{preview.error}</p>{/if}
       {/if}
@@ -185,9 +209,11 @@
         {#if !preview}
           {#if !isRequestFile || !offer.node}<Button type="button" variant={canFill ? 'secondary' : 'primary'} onclick={importNew}>Import as new…</Button>{/if}
           {#if canFill}<Button type="button" variant="primary" onclick={fill}>Fill this request</Button>{/if}
+        {:else if preview.done}
+          <Button type="button" variant="primary" onclick={close}>Close</Button>
         {:else}
           <Button type="button" variant="primary" disabled={!preview.canImport} onclick={() => ImportService.Import(existing, preview!.skipped > 0)}>
-            {preview.skipped > 0 ? 'Import the rest' : 'Import'}
+            {importLabel(preview.files, existing as ExistingMode, preview.skipped)}
           </Button>
         {/if}
       </div>
@@ -210,7 +236,12 @@
   .tag { margin-left: 8px; color: var(--fail); font-size: var(--fs-xs); }
   .prob.error { color: var(--fail); }
   .prob.warning { color: var(--warn); }
-  .exists { color: var(--warn); }
+  .note.ok { color: var(--ok); }
+  .note.warn { color: var(--warn); }
+  .note.muted { color: var(--muted); }
+  .result { padding: 8px 12px; border-radius: var(--r-md); border: 1px solid var(--ok); background: var(--ok-t); font-size: var(--fs-sm); }
+  .result.warn { border-color: var(--warn); background: var(--warn-t); }
+  .result ul { margin: 4px 0 0; padding-left: 18px; }
   .err { color: var(--fail); font-size: var(--fs-sm); }
   .actions { display: flex; align-items: center; gap: 8px; }
   .grow { flex: 1; }

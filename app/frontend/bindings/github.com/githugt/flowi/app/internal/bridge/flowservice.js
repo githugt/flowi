@@ -277,6 +277,15 @@ export function ClearResults(node) {
 }
 
 /**
+ * ClearRuns deletes every saved run of the flow and says how many there were. The Runs tab gets the empty list.
+ * @param {string} node
+ * @returns {$CancellablePromise<number>}
+ */
+export function ClearRuns(node) {
+    return $Call.ByID(26020130, node);
+}
+
+/**
  * Close forgets the open flow of a tree node, discarding unsaved edits. A run that is still going stops first: it
  * sends real requests, and with the tab gone the user could no longer cancel it.
  * @param {string} node
@@ -475,6 +484,16 @@ export function DeleteImpact(node, ids) {
     return $Call.ByID(2431998222, node, ids).then(/** @type {($result: any) => any} */(($result) => {
         return $$createType10($result);
     }));
+}
+
+/**
+ * DeleteRun deletes the saved run id of the flow. The Runs tab gets the new list.
+ * @param {string} node
+ * @param {string} id
+ * @returns {$CancellablePromise<void>}
+ */
+export function DeleteRun(node, id) {
+    return $Call.ByID(3943295865, node, id);
 }
 
 /**
@@ -831,6 +850,18 @@ export function RunPart(node, scope, inputs) {
 }
 
 /**
+ * RunSteps reads the saved run id of the flow step by step.
+ * @param {string} node
+ * @param {string} id
+ * @returns {$CancellablePromise<$models.SavedRunView>}
+ */
+export function RunSteps(node, id) {
+    return $Call.ByID(3958383595, node, id).then(/** @type {($result: any) => any} */(($result) => {
+        return $$createType17($result);
+    }));
+}
+
+/**
  * Running lists the nodes whose flow is running, so the window can ask before it closes them.
  * @returns {$CancellablePromise<string[]>}
  */
@@ -920,7 +951,7 @@ export function SelectAll(node) {
  */
 export function Sequence(node, others) {
     return $Call.ByID(1938749126, node, others).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType17($result);
+        return $$createType18($result);
     }));
 }
 
@@ -1195,7 +1226,7 @@ export function SetValues(node, rows) {
  */
 export function Source(node) {
     return $Call.ByID(1216649946, node).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType18($result);
+        return $$createType19($result);
     }));
 }
 
@@ -1206,7 +1237,7 @@ export function Source(node) {
  */
 export function StandaloneArazzo(node) {
     return $Call.ByID(387293967, node).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType19($result);
+        return $$createType20($result);
     }));
 }
 
@@ -1260,8 +1291,7 @@ export function ToggleSelect(node, step) {
 }
 
 /**
- * ToggleSkip skips step in the next runs, or stops skipping it. The list is
- * kept with the open flow, not in the file.
+ * ToggleSkip skips step, or stops skipping it. The mark is saved with the flow, so it is an edit: one undo step.
  * @param {string} node
  * @param {string} step
  * @returns {$CancellablePromise<void>}
@@ -1288,7 +1318,7 @@ export function Undo(node) {
  */
 export function WireChoices(node, $from, to) {
     return $Call.ByID(252791798, node, $from, to).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType20($result);
+        return $$createType21($result);
     }));
 }
 
@@ -1302,7 +1332,7 @@ export function WireChoices(node, $from, to) {
  */
 export function WirePreview(node, $from, path) {
     return $Call.ByID(2928313070, node, $from, path).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType21($result);
+        return $$createType22($result);
     }));
 }
 
@@ -1317,7 +1347,7 @@ export function WirePreview(node, $from, path) {
  */
 export function WireTargets(node, $from, kind) {
     return $Call.ByID(421071552, node, $from, kind).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType23($result);
+        return $$createType24($result);
     }));
 }
 
@@ -1362,10 +1392,11 @@ const $$createType13 = $models.NodeData.createFrom;
 const $$createType14 = $models.FlowView.createFrom;
 const $$createType15 = canvas$0.Slot.createFrom;
 const $$createType16 = $models.MatrixView.createFrom;
-const $$createType17 = $models.SequenceView.createFrom;
-const $$createType18 = $models.FlowSourceView.createFrom;
-const $$createType19 = $models.StandaloneView.createFrom;
-const $$createType20 = $models.WireChoices.createFrom;
-const $$createType21 = $models.WirePreviewView.createFrom;
-const $$createType22 = $models.WireTargetView.createFrom;
-const $$createType23 = $Create.Array($$createType22);
+const $$createType17 = $models.SavedRunView.createFrom;
+const $$createType18 = $models.SequenceView.createFrom;
+const $$createType19 = $models.FlowSourceView.createFrom;
+const $$createType20 = $models.StandaloneView.createFrom;
+const $$createType21 = $models.WireChoices.createFrom;
+const $$createType22 = $models.WirePreviewView.createFrom;
+const $$createType23 = $models.WireTargetView.createFrom;
+const $$createType24 = $Create.Array($$createType23);

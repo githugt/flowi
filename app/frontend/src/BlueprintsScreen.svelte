@@ -85,7 +85,7 @@
   // A step type's pill colour: what calls out is the accent, what checks is green, what branches is amber.
   const stepTone = (type: string) =>
     ({ request: '--accent', subflow: '--accent', fetch: '--accent', webhook: '--accent', assert: '--ok', log: '--info', set: '--data', save: '--data', digest: '--data',
-      condition: '--warn', batch: '--warn', run_till: '--warn', parallel: '--warn', delay: '--pending', stop: '--fail' })[type] ?? '--muted'
+      condition: '--warn', batch: '--warn', run_till: '--warn', parallel: '--warn', delay: '--pending', stop: '--fail', loop_control: '--warn' })[type] ?? '--muted'
   // A built-in steps aside for the chosen collection's own version of it, so each default is listed once.
   const replaced = (b: Blueprint) => b.builtIn && view.blueprints.some((o) => o.replacesDefault && o.collection === collection && o.group === b.group && o.kind === b.kind)
   const of = (group: Blueprint['group']) => view.blueprints.filter((b) => b.group === group && !replaced(b))

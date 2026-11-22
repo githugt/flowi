@@ -3,7 +3,8 @@
 import { screens } from './screens'
 import { fold } from './fold'
 import { SIDEBAR_MODES } from './sidebar'
-import type { TreeNode } from './types'
+import { hasLabelTerms, labelText, labelsMatch, parseQuery } from './devstatus'
+import type { StatusMark, TreeNode } from './types'
 
 export interface Command {
   id: string
@@ -14,15 +15,22 @@ export interface Command {
   run: () => void
   /** Where an item lives ("Petstore › Pets"), matched by the query but shown quietly beside the title. */
   detail?: string
+  /** A request or flow: its development status and tags (its folders' included), which a search reads too. */
+  status?: StatusMark
+  tags?: string[]
 }
 
-/** The words of the query must all appear in the title; titles that start with the query come first. */
+/**
+ * The words of the query must all appear in the title, where it lives, or the item's status and tags; titles that start
+ * with the query come first. `tag:smoke` (or `#smoke`) and `status:review` ask for those, so only items can answer them.
+ */
 export function filterCommands(commands: Command[], query: string): Command[] {
-  const words = fold(query).split(/\s+/).filter(Boolean)
-  if (!words.length) return commands
-  const matching = commands.filter((c) => words.every((w) => fold(`${c.title} ${c.detail ?? ''}`).includes(w)))
-  const first = words[0]
-  const starts = (c: Command) => fold(c.title).startsWith(first)
+  const q = parseQuery(query)
+  const words = q.words
+  if (!words.length && !hasLabelTerms(q)) return commands
+  const matching = commands.filter((c) => (!hasLabelTerms(q) || labelsMatch(c, q)) && words.every((w) => fold(`${c.title} ${c.detail ?? ''} ${labelText(c)}`).includes(w)))
+  const first = words[0] ?? ''
+  const starts = (c: Command) => !!first && fold(c.title).startsWith(first)
   return [...matching.filter(starts), ...matching.filter((c) => !starts(c))]
 }
 
@@ -113,6 +121,8 @@ export function itemCommands(roots: TreeNode[], openTabs: string[], open: (n: Tr
       keys: '',
       icon: ITEM_ICON[node.kind],
       detail: where,
+      status: node.status,
+      tags: node.tags,
       run: () => open(node),
     }))
 }

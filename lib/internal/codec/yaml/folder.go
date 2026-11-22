@@ -24,6 +24,7 @@ func (c *Codec) DecodeFolder(file, dir string, data []byte) (model.Folder, diag.
 	f.Hooks = m.hooks()
 	f.Order = m.stringList("order")
 	f.Tags = m.stringList("tags")
+	f.Status = m.str("status")
 	m.closeStrict()
 	return f, d.diags
 }
@@ -35,5 +36,6 @@ func (c *Codec) EncodeFolder(f model.Folder) ([]byte, error) {
 	o.put("hooks", encodeHooks(f.Hooks))
 	o.put("order", f.Order)
 	o.put("tags", f.Tags)
+	o.put("status", f.Status)
 	return marshal(o.items)
 }

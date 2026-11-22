@@ -156,7 +156,7 @@ paths:
 	iw.Import(vm.ImportRefuseExisting, false)
 	w.Wait()
 
-	if iw.Err() != "" || iw.Done() != "Imported 3 files into User creation" {
+	if iw.Err() != "" || iw.Done() != "Imported 1 request into User creation" {
 		t.Fatalf("err %q done %q rows %+v", iw.Err(), iw.Done(), iw.Rows())
 	}
 	found := false

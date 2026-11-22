@@ -23,6 +23,7 @@
   import CommandPalette from './CommandPalette.svelte'
   import BlueprintDialog from './BlueprintDialog.svelte'
   import MoveDialog from './MoveDialog.svelte'
+  import LabelsDialog from './LabelsDialog.svelte'
   import PlaceDialog from './PlaceDialog.svelte'
   import SignInDialog from './SignInDialog.svelte'
   import Dropdown from './Dropdown.svelte'
@@ -104,6 +105,7 @@
 
 <BlueprintDialog />
 <MoveDialog />
+<LabelsDialog />
 <PlaceDialog />
 <SignInDialog />
 

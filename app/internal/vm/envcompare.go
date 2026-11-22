@@ -3,6 +3,7 @@
 package vm
 
 import (
+	"fmt"
 	"slices"
 	"strings"
 
@@ -31,8 +32,13 @@ type EnvCell struct {
 type EnvCompareRow struct {
 	Name  string
 	Cells []EnvCell // in the order of EnvMatrix.Envs
-	// Differs: at least two environments have a plain value and the values, or the types they are read as, are not all the same.
+	// Differs: at least two environments define it (a plain value or a secret) and what they define is not all the same.
+	// A plain value is the same as another only if its text and the type it is read as both match, so 3 as a number and
+	// "3" as text differ. A secret differs from any plain value, and two secrets do not differ: a value in the vault is
+	// never read here, so whether they hold the same text is not known.
 	Differs bool
+	// KindsDiffer: the plain values are not all read as the same type, so each cell should say its type.
+	KindsDiffer bool
 	// Gaps counts the environments where it is missing or a secret has no value.
 	Gaps int
 }
@@ -41,6 +47,8 @@ type EnvCompareRow struct {
 type EnvMatrix struct {
 	Envs []string
 	Rows []EnvCompareRow
+	// Notes say what the comparison cannot show on its own, such as an environment that builds on a base outside the group.
+	Notes []string
 }
 
 // CompareEnvironments lays the variables of envs side by side: a row for each name any of them has, a cell for each
@@ -49,48 +57,117 @@ type EnvMatrix struct {
 //
 // Before: finding why staging behaved unlike local meant opening each environment in turn and comparing by eye.
 func CompareEnvironments(envs []model.Environment, infos []flowi.SecretInfo) EnvMatrix {
+	return compareColumns(envs, envs, infos)
+}
+
+// CompareGroup is CompareEnvironments for the environments of one group of all ("" is the default group). A base
+// outside the group still supplies the values its environments inherit, so the cells tell the truth, and a note says
+// that the base is not a column.
+//
+// Before: every environment of the workspace was one table, which with several sets of services was too wide to read.
+func CompareGroup(all []model.Environment, group string, infos []flowi.SecretInfo) EnvMatrix {
+	columns := model.EnvironmentsInGroup(all, group)
+	m := compareColumns(columns, all, infos)
+	m.Notes = baseNotes(columns, all)
+	return m
+}
+
+// baseNotes names the environments of columns that build on one outside their group.
+func baseNotes(columns, all []model.Environment) []string {
+	var notes []string
+	for _, e := range columns {
+		i := slices.IndexFunc(all, func(x model.Environment) bool { return x.Name == strings.TrimSpace(e.Extends) })
+		if e.Extends == "" || i < 0 {
+			continue
+		}
+		if _, missing := missingGroup(e, all[i]); !missing {
+			continue
+		}
+		notes = append(notes, fmt.Sprintf("%s builds on %s, which is in %s: the values it inherits are shown, but %s is not a column here.", e.Name, all[i].Name, groupsLabel(all[i].Memberships()), all[i].Name))
+	}
+	return notes
+}
+
+// GroupLabel is how a screen names a group: the default group has no name of its own.
+func GroupLabel(group string) string {
+	if group == "" {
+		return "the default group"
+	}
+	return "the group " + group
+}
+
+// groupsLabel names the groups of one environment for a screen, as Environment.Memberships lists them ("" is the
+// default group).
+func groupsLabel(groups []string) string {
+	if len(groups) == 1 {
+		return GroupLabel(groups[0])
+	}
+	names := make([]string, len(groups))
+	for i, g := range groups {
+		names[i] = g
+		if g == "" {
+			names[i] = "default"
+		}
+	}
+	return "the groups " + strings.Join(names, ", ")
+}
+
+// compareColumns builds the matrix for columns; all supplies the bases they inherit from.
+func compareColumns(columns, all []model.Environment, infos []flowi.SecretInfo) EnvMatrix {
 	byName := map[string]model.Environment{}
-	for _, e := range envs {
+	for _, e := range all {
 		byName[e.Name] = e
 	}
-	m := EnvMatrix{Envs: make([]string, 0, len(envs))}
-	for _, e := range envs {
+	m := EnvMatrix{Envs: make([]string, 0, len(columns))}
+	for _, e := range columns {
 		m.Envs = append(m.Envs, e.Name)
 	}
-	var names []string
-	seen := map[string]bool{}
-	for _, e := range envs {
-		for _, v := range e.Vars {
-			if !seen[v.Name] {
-				seen[v.Name] = true
-				names = append(names, v.Name)
-			}
-		}
-		for _, v := range inheritedVars(e, byName) {
-			if !seen[v.Name] {
-				seen[v.Name] = true
-				names = append(names, v.Name)
-			}
-		}
-	}
-	slices.Sort(names)
+	names := variableNames(columns, byName)
 	for _, name := range names {
 		row := EnvCompareRow{Name: name}
-		var plain []string // the value and its type, so "1" as a number and "1" as text differ
-		for _, e := range envs {
+		shapes := map[string]bool{} // what each environment that defines the variable defines, so a repeat counts once
+		kinds := map[string]bool{}
+		for _, e := range columns {
 			cell := cellOf(e, name, byName, infos)
 			row.Cells = append(row.Cells, cell)
 			switch cell.State {
 			case CellSet, CellInherited:
-				plain = append(plain, cell.Kind+"\x00"+cell.Value)
-			case CellMissing, CellSecretUnset:
+				shapes[cell.Kind+"\x00"+cell.Value] = true
+				kinds[cell.Kind] = true
+			case CellSecret, CellSecretUnset:
+				shapes["secret"] = true
+			}
+			if cell.State == CellMissing || cell.State == CellSecretUnset {
 				row.Gaps++
 			}
 		}
-		row.Differs = len(plain) > 1 && slices.ContainsFunc(plain, func(v string) bool { return v != plain[0] })
+		row.Differs = len(shapes) > 1
+		row.KindsDiffer = len(kinds) > 1
 		m.Rows = append(m.Rows, row)
 	}
 	return m
+}
+
+// variableNames lists, sorted, every name one of the columns sets or inherits.
+func variableNames(columns []model.Environment, byName map[string]model.Environment) []string {
+	var names []string
+	seen := map[string]bool{}
+	add := func(name string) {
+		if !seen[name] {
+			seen[name] = true
+			names = append(names, name)
+		}
+	}
+	for _, e := range columns {
+		for _, v := range e.Vars {
+			add(v.Name)
+		}
+		for _, v := range inheritedVars(e, byName) {
+			add(v.Name)
+		}
+	}
+	slices.Sort(names)
+	return names
 }
 
 func cellOf(e model.Environment, name string, byName map[string]model.Environment, infos []flowi.SecretInfo) EnvCell {

@@ -69,3 +69,14 @@ func TestSkipReaders_Given_a_skipped_container_Then_what_is_inside_counts_as_ski
 		t.Fatalf("got %+v, want %+v", got, want)
 	}
 }
+
+func TestSkipReaders_Given_a_step_the_flow_marks_skipped_Then_its_readers_are_listed_with_no_skip_list(t *testing.T) {
+	f := skipFlow("{{nodes.login.status}}")
+	f.Nodes[0].Skipped = true
+
+	got := SkipReaders(f, nil)
+
+	if len(got) != 2 || got[0].Skipped != "login" {
+		t.Fatalf("got %+v", got)
+	}
+}

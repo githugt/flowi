@@ -22,6 +22,16 @@ func (d *FlowDoc) SetColor(id, color string) error {
 	return nil
 }
 
+// SetSkipped marks step id as skipped, or takes the mark off. A skipped step does not run in any run of the flow,
+// and the mark is saved with the flow. One undo step.
+func (d *FlowDoc) SetSkipped(id string, skipped bool) error {
+	if _, ok := d.Node(id); !ok {
+		return fmt.Errorf("no step %s", id)
+	}
+	d.EditNode(id, func(n *model.Node) { n.Skipped = skipped })
+	return nil
+}
+
 // Duplicate puts a copy of step id, with the steps inside it, right after it
 // and returns the copy's id. The copy and everything inside it get free ids;
 // what points between the copied steps follows the new ids.

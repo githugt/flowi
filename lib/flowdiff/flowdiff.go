@@ -268,6 +268,7 @@ func stepChanges(a, b entry, move string) []Change {
 	c.text("attach", x.Attach, y.Attach)
 	c.text("attach_at", x.AttachAt, y.AttachAt)
 	c.text("colour", x.Color, y.Color)
+	c.text("skipped", fmt.Sprint(x.Skipped), fmt.Sprint(y.Skipped), "false")
 	requestChanges(&c, x.Request, y.Request)
 	subflowChanges(&c, x.Subflow, y.Subflow)
 	c.keyed("value", valueMap(x.Values), valueMap(y.Values))

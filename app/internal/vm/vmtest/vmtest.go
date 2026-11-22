@@ -65,6 +65,7 @@ type Backend struct {
 	TakenExamples     map[string]bool   // example names ExampleTaken says are taken
 	SharedEnvs        map[model.ID]bool // collections whose environments folder already holds the shared environment
 	ShareNotes        []string          // what ShareEnvironment says to tell the person
+	EnvGroups         []string          // the groups made on their own, as workspace.yaml lists them; the environments' own come on top
 	// SendFor, when set, answers each Send from its options (a request matrix needs a different outcome per cell).
 	SendFor      func(flowi.SendOptions) (*Sending, error)
 	SendErr      error
@@ -80,6 +81,7 @@ type Backend struct {
 	trashedFlows map[string]model.Flow      // flows deleted into Trash, by item id
 	RunList      []flowi.RunSummary         // what FlowRuns returns
 	RunDetails   map[string]flowi.RunDetail // what FlowRunDetail returns, by run id
+	RunStepList  map[string]flowi.RunSteps  // what FlowRunSteps returns, by run id
 	Compat       diag.List                  // what FlowCompatibility returns
 	SchemaStore  Schemas                    // what the schema calls work on
 	SavedEnvs    []model.Environment
@@ -605,6 +607,106 @@ func (f *Backend) SetFolderOrder(collection model.ID, tree, dir string, order []
 	return nil
 }
 
+// labelError is the error a status the fake's collection does not have gets, as the library gives it.
+func labelError(c model.Collection, status string) error {
+	if status == "" {
+		return nil
+	}
+	if _, ok := c.StatusNamed(status); ok {
+		return nil
+	}
+	return diag.List{diag.New(diag.CodeStatusUnknown, diag.Location{}, map[string]string{"status": status, "where": "an item", "known": "planning, in-development, review, testing, production"})}.Err()
+}
+
+// SetRequestLabels records the call and keeps the tags and status in the fake's request.
+func (f *Backend) SetRequestLabels(t flowi.RequestTarget, tags []string, status string, _ bool) error {
+	f.record("SetRequestLabels " + string(t.Request) + " " + strings.Join(tags, ",") + " " + status)
+	f.Mu.Lock()
+	defer f.Mu.Unlock()
+	for ci := range f.Cols {
+		if f.Cols[ci].Manifest.ID != t.Collection {
+			continue
+		}
+		if err := labelError(f.Cols[ci], status); err != nil {
+			return err
+		}
+		for ri := range f.Cols[ci].Requests {
+			if f.Cols[ci].Requests[ri].ID == t.Request {
+				f.Cols[ci].Requests[ri].Tags, f.Cols[ci].Requests[ri].Status = model.CleanTags(tags), status
+			}
+		}
+	}
+	return nil
+}
+
+// SetFlowLabels records the call and keeps the tags and status in the fake's flow.
+func (f *Backend) SetFlowLabels(t flowi.FlowTarget, tags []string, status string, _ bool) error {
+	f.record("SetFlowLabels " + string(t.Flow) + " " + strings.Join(tags, ",") + " " + status)
+	f.Mu.Lock()
+	defer f.Mu.Unlock()
+	for ci := range f.Cols {
+		if f.Cols[ci].Manifest.ID != t.Collection {
+			continue
+		}
+		if err := labelError(f.Cols[ci], status); err != nil {
+			return err
+		}
+		for fi := range f.Cols[ci].Flows {
+			if f.Cols[ci].Flows[fi].ID == t.Flow {
+				f.Cols[ci].Flows[fi].Tags, f.Cols[ci].Flows[fi].Status = model.CleanTags(tags), status
+			}
+		}
+	}
+	return nil
+}
+
+// SetFolderLabels records the call and keeps the tags and status in the fake's folder, adding it when it is not there.
+func (f *Backend) SetFolderLabels(collection model.ID, tree, dir string, tags []string, status string, _ bool) error {
+	f.record("SetFolderLabels " + tree + "/" + dir + " " + strings.Join(tags, ",") + " " + status)
+	f.Mu.Lock()
+	defer f.Mu.Unlock()
+	rel := tree + "/" + dir
+	for i := range f.Cols {
+		if f.Cols[i].Manifest.ID != collection {
+			continue
+		}
+		if err := labelError(f.Cols[i], status); err != nil {
+			return err
+		}
+		at := slices.IndexFunc(f.Cols[i].Folders, func(fo model.Folder) bool { return fo.Dir == rel })
+		if at < 0 {
+			f.Cols[i].Folders = append(f.Cols[i].Folders, model.Folder{Dir: rel})
+			at = len(f.Cols[i].Folders) - 1
+		}
+		f.Cols[i].Folders[at].Tags, f.Cols[i].Folders[at].Status = model.CleanTags(tags), status
+	}
+	return nil
+}
+
+// SaveStatuses records the call and keeps the statuses in the fake's manifest, refusing what the library refuses.
+func (f *Backend) SaveStatuses(collection model.ID, statuses []model.Status, _ bool) error {
+	f.record("SaveStatuses " + strconv.Itoa(len(statuses)))
+	f.Mu.Lock()
+	defer f.Mu.Unlock()
+	seen := map[string]bool{}
+	for _, s := range statuses {
+		err := model.CheckStatus(s)
+		if err == nil && seen[s.Name] {
+			err = fmt.Errorf("it is defined twice")
+		}
+		if err != nil {
+			return diag.List{diag.New(diag.CodeStatusInvalid, diag.Location{}, map[string]string{"name": s.Name, "detail": err.Error()})}.Err()
+		}
+		seen[s.Name] = true
+	}
+	for i := range f.Cols {
+		if f.Cols[i].Manifest.ID == collection {
+			f.Cols[i].Manifest.Statuses = slices.Clone(statuses)
+		}
+	}
+	return nil
+}
+
 // MoveFolder records the call.
 func (f *Backend) MoveFolder(_ model.ID, tree, from, to string) error {
 	f.record("MoveFolder " + tree + "/" + from + " -> " + to)
@@ -674,6 +776,37 @@ func (f *Backend) FlowRunDetail(_ flowi.FlowTarget, id string) (flowi.RunDetail,
 		return flowi.RunDetail{}, errors.New("no run " + id)
 	}
 	return d, nil
+}
+
+// FlowRunSteps returns the entry of RunStepList for the run id.
+func (f *Backend) FlowRunSteps(_ flowi.FlowTarget, id string) (flowi.RunSteps, error) {
+	f.record("FlowRunSteps " + id)
+	f.Mu.Lock()
+	defer f.Mu.Unlock()
+	s, ok := f.RunStepList[id]
+	if !ok {
+		return flowi.RunSteps{}, errors.New("no run " + id)
+	}
+	return s, nil
+}
+
+// DeleteFlowRun takes the run id out of RunList.
+func (f *Backend) DeleteFlowRun(_ flowi.FlowTarget, id string) error {
+	f.record("DeleteFlowRun " + id)
+	f.Mu.Lock()
+	defer f.Mu.Unlock()
+	f.RunList = slices.DeleteFunc(f.RunList, func(r flowi.RunSummary) bool { return r.ID == id })
+	return f.NewErr
+}
+
+// ClearFlowRuns empties RunList and says how many it held.
+func (f *Backend) ClearFlowRuns(flowi.FlowTarget) (int, error) {
+	f.record("ClearFlowRuns")
+	f.Mu.Lock()
+	defer f.Mu.Unlock()
+	n := len(f.RunList)
+	f.RunList = nil
+	return n, f.NewErr
 }
 
 // FlowRuns returns RunList.
@@ -942,6 +1075,138 @@ func (f *Backend) SaveEnvironment(e model.Environment, _ bool) error {
 	defer f.Mu.Unlock()
 	f.SavedEnvs = append(f.SavedEnvs, e)
 	return f.SaveErr
+}
+
+// SetEnvironmentGroups makes groups the groups of the environments of the fake's collections that files name, as the
+// real workspace does: a file the fake does not hold is an error and nothing changes. SaveErr is returned in its place
+// when set.
+func (f *Backend) SetEnvironmentGroups(files []string, groups []string, _ bool) error {
+	f.record("SetEnvironmentGroups " + strings.Join(groups, "+"))
+	return f.editEnvironments(files, func(e *model.Environment) { e.Groups = model.NormaliseGroups(groups) })
+}
+
+// SetEnvironmentColour marks the environments that files name with colour, as SetEnvironmentGroups does for groups.
+func (f *Backend) SetEnvironmentColour(files []string, colour string, _ bool) error {
+	f.record("SetEnvironmentColour " + colour)
+	return f.editEnvironments(files, func(e *model.Environment) { e.Colour = colour })
+}
+
+// editEnvironments applies edit to the environments in files, all or none.
+func (f *Backend) editEnvironments(files []string, edit func(*model.Environment)) error {
+	f.Mu.Lock()
+	defer f.Mu.Unlock()
+	if f.SaveErr != nil {
+		return f.SaveErr
+	}
+	for _, file := range files {
+		if !slices.ContainsFunc(f.Cols, func(c model.Collection) bool {
+			return slices.ContainsFunc(c.Environments, func(e model.Environment) bool { return e.File == file })
+		}) {
+			return fmt.Errorf("environment file %s not found", file)
+		}
+	}
+	for ci := range f.Cols {
+		f.Cols[ci].Environments = slices.Clone(f.Cols[ci].Environments)
+		for ei := range f.Cols[ci].Environments {
+			if slices.Contains(files, f.Cols[ci].Environments[ei].File) {
+				edit(&f.Cols[ci].Environments[ei])
+			}
+		}
+	}
+	return nil
+}
+
+// environmentGroups is EnvironmentGroups for a caller that holds Mu.
+func (f *Backend) environmentGroups() []string {
+	var envs []model.Environment
+	for _, c := range f.Cols {
+		envs = append(envs, c.Environments...)
+	}
+	all := model.EnvironmentGroups(envs)
+	for _, g := range f.EnvGroups {
+		if !slices.Contains(all, g) {
+			all = append(all, g)
+		}
+	}
+	slices.Sort(all)
+	return all
+}
+
+// EnvironmentGroups are the groups made on their own and the ones the fake's environments name.
+func (f *Backend) EnvironmentGroups() []string {
+	f.Mu.Lock()
+	defer f.Mu.Unlock()
+	return f.environmentGroups()
+}
+
+// AddEnvironmentGroup makes an empty group, refusing a name that cannot be one or that is taken.
+func (f *Backend) AddEnvironmentGroup(name string) error {
+	f.record("AddEnvironmentGroup " + name)
+	f.Mu.Lock()
+	defer f.Mu.Unlock()
+	if err := f.checkNewGroup(name); err != nil {
+		return err
+	}
+	f.EnvGroups = append(f.EnvGroups, name)
+	return nil
+}
+
+func (f *Backend) checkNewGroup(name string) error {
+	switch {
+	case name == "":
+		return errors.New("give the group a name")
+	case model.CheckGroup(name) != nil:
+		return model.CheckGroup(name)
+	case slices.Contains(f.environmentGroups(), name):
+		return errors.New("there is already a group with this name")
+	}
+	return nil
+}
+
+// RenameEnvironmentGroup renames a group and moves its environments, as the real workspace does.
+func (f *Backend) RenameEnvironmentGroup(from, to string, _ bool) error {
+	f.record("RenameEnvironmentGroup " + from + " " + to)
+	f.Mu.Lock()
+	defer f.Mu.Unlock()
+	if from == "" || !slices.Contains(f.environmentGroups(), from) {
+		return errors.New("there is no such group")
+	}
+	if err := f.checkNewGroup(to); err != nil {
+		return err
+	}
+	f.regroup(from, func(groups []string) []string {
+		return append(slices.DeleteFunc(groups, func(g string) bool { return g == from }), to)
+	})
+	f.EnvGroups = append(slices.DeleteFunc(f.EnvGroups, func(g string) bool { return g == from }), to)
+	return nil
+}
+
+// DeleteEnvironmentGroup removes a group and puts its environments in the default group.
+func (f *Backend) DeleteEnvironmentGroup(name string, _ bool) error {
+	f.record("DeleteEnvironmentGroup " + name)
+	f.Mu.Lock()
+	defer f.Mu.Unlock()
+	if name == "" || !slices.Contains(f.environmentGroups(), name) {
+		return errors.New("there is no such group")
+	}
+	f.regroup(name, func(groups []string) []string {
+		return slices.DeleteFunc(groups, func(g string) bool { return g == name })
+	})
+	f.EnvGroups = slices.DeleteFunc(f.EnvGroups, func(g string) bool { return g == name })
+	return nil
+}
+
+// regroup changes the groups of the environments that are in group from, as change says. The caller holds Mu.
+func (f *Backend) regroup(from string, change func([]string) []string) {
+	for ci := range f.Cols {
+		f.Cols[ci].Environments = slices.Clone(f.Cols[ci].Environments)
+		for ei := range f.Cols[ci].Environments {
+			e := &f.Cols[ci].Environments[ei]
+			if slices.Contains(e.Groups, from) {
+				e.Groups = model.NormaliseGroups(change(slices.Clone(e.Groups)))
+			}
+		}
+	}
 }
 
 func (f *Backend) CollectionEnvironments(collection model.ID) ([]model.Environment, diag.List, error) {
@@ -1357,12 +1622,30 @@ func (f *Backend) PreviewImportSource(src flowi.ImportSource, collection model.I
 	return f.Plan, f.PreviewErr
 }
 
-func (f *Backend) ApplyImport(p flowi.ImportPlan, o flowi.ApplyOptions) error {
+func (f *Backend) ApplyImportReport(p flowi.ImportPlan, o flowi.ApplyOptions) (flowi.ImportReport, error) {
 	f.record("ApplyImport " + string(p.Collection))
 	f.Mu.Lock()
 	defer f.Mu.Unlock()
 	f.ApplyOpts = append(f.ApplyOpts, o)
-	return f.ApplyErr
+	if f.ApplyErr != nil {
+		return flowi.ImportReport{}, f.ApplyErr
+	}
+	// What the real one does with the plan's files: new ones are written, existing ones replaced, kept or
+	// found the same, by the options.
+	var r flowi.ImportReport
+	for _, file := range p.Files {
+		switch {
+		case !file.Exists:
+			r.Written = append(r.Written, file)
+		case o.SkipExisting && !o.Overwrite:
+			r.Kept = append(r.Kept, file)
+		case file.Same:
+			r.Unchanged = append(r.Unchanged, file)
+		default:
+			r.Replaced = append(r.Replaced, file)
+		}
+	}
+	return r, nil
 }
 
 func (f *Backend) Watch(ctx context.Context) (<-chan flowi.Change, error) {

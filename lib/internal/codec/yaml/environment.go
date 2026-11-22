@@ -30,6 +30,7 @@ func (c *Codec) DecodeEnvironment(file string, data []byte) (model.Environment, 
 	}
 	env.Meta = m.meta()
 	env.Colour = m.str("colour")
+	env.Groups = m.stringList("groups")
 	env.Extends = m.str("extends")
 	env.Protected = m.boolean("protected")
 	env.Vars = m.envVars()
@@ -104,6 +105,7 @@ func (c *Codec) EncodeEnvironment(env model.Environment) ([]byte, error) {
 	var o omap
 	putMeta(&o, env.Meta)
 	o.put("colour", env.Colour)
+	o.put("groups", stringsToYAML(env.Groups))
 	o.put("extends", env.Extends)
 	o.put("protected", env.Protected)
 	var vars yaml.MapSlice

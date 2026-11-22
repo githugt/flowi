@@ -17,16 +17,22 @@ import (
 // CardsOf is the card of every step of f, nested ones included, by node id.
 func CardsOf(c model.Collection, f model.Flow) map[string]card.Card {
 	out := map[string]card.Card{}
-	var walk func(list []model.Node)
-	walk = func(list []model.Node) {
+	var walk func(list []model.Node, loop string)
+	walk = func(list []model.Node, loop string) {
 		for _, n := range list {
-			out[n.ID] = card.Summarize(n, CardFacts(c, n))
+			facts := CardFacts(c, n)
+			facts.Loop = loop
+			out[n.ID] = card.Summarize(n, facts)
+			inner := loop
+			if n.Type == "batch" || n.Type == "run_till" {
+				inner = string(n.Type)
+			}
 			for _, child := range n.Children() {
-				walk(child)
+				walk(child, inner)
 			}
 		}
 	}
-	walk(f.Nodes)
+	walk(f.Nodes, "")
 	return out
 }
 

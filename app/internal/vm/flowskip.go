@@ -3,7 +3,7 @@
 package vm
 
 import (
-	"slices"
+	"fmt"
 	"strings"
 
 	flowi "github.com/githugt/flowi/lib"
@@ -22,26 +22,29 @@ type SkipProblem struct {
 	Text     string // the library's sentence for it, with a hint
 }
 
-// The skip list belongs to the open flow, not to the file: it is how a person
-// runs "everything but the notification" without editing the flow. A run takes
-// it as RunOptions.Skip.
+// A skip is part of the flow: the step carries the mark in the file, so it is still skipped when the flow is opened
+// again, and in scheduled runs and the CLI. It is an edit like any other (undoable, saved with the flow). A run takes
+// the list as RunOptions.Skip as well, so the steps that read a skipped step can keep its last values.
+// Before: the list was kept only in the open flow, and closing the flow dropped it.
 
-// ToggleSkip skips step in the next runs, or stops skipping it.
-func (r *FlowRun) ToggleSkip(step string) {
-	if i := slices.Index(r.skip, step); i >= 0 {
-		r.skip = slices.Delete(r.skip, i, i+1)
-	} else {
-		r.skip = append(r.skip, step)
+// ToggleSkip skips step in the flow, or stops skipping it.
+func (r *FlowRun) ToggleSkip(step string) error {
+	n, ok := r.doc.Node(step)
+	if !ok {
+		return fmt.Errorf("no step %s", step)
+	}
+	if err := r.doc.SetSkipped(step, !n.Skipped); err != nil {
+		return err
 	}
 	r.changed()
+	return nil
 }
 
-// Skipped lists the steps skipped, in flow order. A step deleted since is not
-// listed.
+// Skipped lists the steps the flow skips, in flow order.
 func (r *FlowRun) Skipped() []string {
 	out := []string{}
 	for _, id := range r.doc.NodeIDs() {
-		if slices.Contains(r.skip, id) {
+		if n, ok := r.doc.Node(id); ok && n.Skipped {
 			out = append(out, id)
 		}
 	}

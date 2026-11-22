@@ -2,7 +2,7 @@
   import Checkbox from './Checkbox.svelte'
   import { anchorAt, type MenuAt } from './lib/menuanchor'
   import IconButton from './IconButton.svelte'
-  import { radiogroup } from './lib/radiogroup'
+  import ColourPicker from './ColourPicker.svelte'
   import { isLetter } from './lib/keymatch'
   import Button from './Button.svelte'
   import HiddenChars from './HiddenChars.svelte'
@@ -19,6 +19,8 @@
   import { ui } from './lib/ui.svelte'
   import { errorText } from './lib/errors'
   import { replaceShareText, sharedNotice } from './lib/envshare'
+  import { moved } from './lib/reorder'
+  import { tick } from 'svelte'
 
   let { view }: { view: EnvView } = $props()
   const node = $derived(view.node)
@@ -84,6 +86,40 @@
     push()
   }
 
+  // Reordering. The order of the rows is the order of the file, so it is also the order Compare environments lists the
+  // variables in. Dragging the grip moves the row live under the pointer and the order is written when it is let go
+  // (pointer events rather than HTML5 drag and drop, which the window's web view does not do reliably); the up and down
+  // arrows on a focused grip move it by one. With a filter on, the rows shown are not neighbours, so the grips are off.
+  let body = $state<HTMLElement>()
+  let dragging = $state<number | null>(null)
+  function grab(e: PointerEvent, i: number) {
+    if (e.button !== 0) return
+    ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
+    dragging = i
+  }
+  function drag(e: PointerEvent) {
+    if (dragging === null || !body) return
+    const els = [...body.querySelectorAll<HTMLElement>('.row')]
+    const over = els.findIndex((r) => e.clientY >= r.getBoundingClientRect().top && e.clientY <= r.getBoundingClientRect().bottom)
+    if (over < 0 || over === dragging) return
+    rows = moved(rows, dragging, over)
+    dragging = over
+  }
+  function drop() {
+    if (dragging === null) return
+    dragging = null
+    push()
+  }
+  function gripKeys(e: KeyboardEvent, i: number) {
+    if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return
+    e.preventDefault()
+    const to = i + (e.key === 'ArrowUp' ? -1 : 1)
+    if (to < 0 || to >= rows.length) return
+    rows = moved(rows, i, to)
+    push()
+    void tick().then(() => body?.querySelectorAll<HTMLElement>('.row > .iconbtn:first-child')[to]?.focus())
+  }
+
   function onkeydown(e: KeyboardEvent) {
     if ((e.metaKey || e.ctrlKey) && isLetter(e, 's')) {
       e.preventDefault()
@@ -106,12 +142,7 @@
         {#each view.bases as b}<option value={b}>{b}</option>{/each}
       </Select>
     </label>
-    <div class="swatches" role="radiogroup" use:radiogroup aria-label="Colour">
-      <button class="sw none" class:on={!view.colour} role="radio" aria-checked={!view.colour} title="Default colour" aria-label="Default colour" onclick={() => EnvironmentService.SetColour(node, '')}></button>
-      {#each view.colours as c}
-        <button class="sw" class:on={view.colour === c} role="radio" aria-checked={view.colour === c} title={c} aria-label={c} style:background={envSwatch(c)} onclick={() => EnvironmentService.SetColour(node, c)}></button>
-      {/each}
-    </div>
+    <span class="colours"><ColourPicker colours={view.colours} value={view.colour} onpick={(c) => EnvironmentService.SetColour(node, c)} /></span>
     <span class="base"><Checkbox checked={view.protected} onchange={(v) => EnvironmentService.SetProtected(node, v)} title="Ask before a request that changes data (anything but GET, HEAD or OPTIONS) is sent with this environment, and before a flow runs in it.">Ask before writes</Checkbox></span>
     <span class="share">
       <Button aria-haspopup="menu" aria-expanded={shareOpen} title={view.dirty ? 'Save first: sharing writes what is saved' : "Write this environment into a collection's own environments folder, so it travels with the collection"} disabled={view.dirty || !view.onDisk} onclick={openShare}>Share with…</Button>
@@ -128,7 +159,7 @@
     declineDrop={() => EnvironmentService.DeclineDrop(node)}
   />
   {#if view.error}<p class="err">{view.error}</p>{/if}
-  <div class="body" onfocusin={() => (within = true)} onfocusout={leave}>
+  <div class="body" bind:this={body} onfocusin={() => (within = true)} onfocusout={leave}>
     {#if unset.length}
       <div class="unset">
         <span>Used by your requests and flows but not set here:</span>
@@ -138,10 +169,22 @@
     {/if}
     <p class="muted">Secrets (🔒) are kept in the encrypted workspace vault, never in the file, and are not shown again once saved. To change one, type a new value; leave the box blank to keep the saved one.<Hint>To see a stored secret again, open <b>Workspace → Secrets…</b> and choose <b>Show</b> on that secret, or run <code>flowi secret get &lt;env&gt; &lt;name&gt; --reveal</code> in a terminal. It shows one secret for a few seconds.</Hint></p>
     {#if rows.length >= FILTER_FROM}<div class="find"><SearchField bind:value={filter} placeholder="Filter variables…" label="Filter variables" small /></div>{/if}
-    <div class="head"><span>Name</span><span>Value</span><span>Type</span><span>Secret</span><span></span></div>
+    <div class="head"><span></span><span>Name</span><span>Value</span><span>Type</span><span>Secret</span><span></span></div>
     {#each rows as r, i}
       {#if envRowMatches(r, filter)}
-      <div class="row">
+      <div class="row" class:lifted={dragging === i}>
+        <IconButton
+          icon="grip"
+          size={14}
+          label="Move {r.name || 'variable'}"
+          hint={filter ? 'Clear the filter to reorder' : 'Drag to reorder (or use the up and down arrows)'}
+          disabled={!!filter}
+          onpointerdown={(e) => grab(e, i)}
+          onpointermove={drag}
+          onpointerup={drop}
+          onpointercancel={drop}
+          onkeydown={(e) => gripKeys(e, i)}
+        />
         <input placeholder="name" bind:value={r.name} oninput={push} spellcheck="false" />
         <span class="cell sensitive">
           <input
@@ -177,18 +220,18 @@
 <style>
   .env { position: absolute; inset: 0; display: flex; flex-direction: column; }
   .base { display: flex; align-items: center; gap: 6px; margin-right: 12px; font-size: var(--fs-sm); color: var(--muted); }
-  .swatches { display: flex; align-items: center; gap: 6px; margin-right: 8px; }
-  .sw { width: 16px; height: 16px; padding: 0; border-radius: 50%; border: 2px solid transparent; box-sizing: border-box; background: var(--bg); }
-  .sw.none { border: 1px dashed var(--muted); }
-  .sw.on { outline: 2px solid var(--text); outline-offset: 1px; }
+  .colours { margin-right: 8px; }
   header { height: var(--head-h); flex: none; display: flex; align-items: center; gap: 8px; padding: 0 12px; border-bottom: 1px solid var(--line); }
   .dirty { color: var(--accent); font-size: var(--fs-xs); }
   .spacer { flex: 1; }
   .body { padding: 12px 16px; overflow: auto; display: flex; flex-direction: column; gap: 6px; max-width: 900px; }
   .muted { color: var(--muted); font-size: var(--fs-sm); margin: 0 0 6px; }
   .err { margin: 0; padding: 6px 12px; color: var(--fail); }
-  .head, .row { display: grid; grid-template-columns: 1fr 1.6fr 96px 70px 24px; gap: 6px; align-items: center; }
+  .head, .row { display: grid; grid-template-columns: 24px 1fr 1.6fr 96px 70px 24px; gap: 6px; align-items: center; }
   .find { max-width: 280px; }
+  .row > :global(.iconbtn:first-child) { cursor: grab; touch-action: none; }
+  .row.lifted > :global(.iconbtn:first-child) { cursor: grabbing; color: var(--text); }
+  .row.lifted { background: var(--tint-hover); border-radius: var(--r-md); }
   .head { color: var(--muted); font-size: var(--fs-xs); }
   input[type='text'], input[type='password'], input:not([type]) {
     min-width: 0; background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: var(--r-md); padding: 5px 8px;

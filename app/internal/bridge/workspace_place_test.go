@@ -143,3 +143,39 @@ func TestAuthSchemeChoices_should_label_every_scheme_the_library_has(t *testing.
 		}
 	}
 }
+
+func TestImportService_SetTarget_Given_a_folder_row_Then_the_import_goes_into_that_folder_and_the_view_says_so(t *testing.T) {
+	app, _, _ := twoCollections(t)
+	row := placeRow(t, app, "Shop / auth")
+
+	app.Import().SetTarget(row)
+	got := app.Import().State()
+
+	// Before: the Import into dialog offered collections only, so every import landed at the top of one.
+	if got.Folder != "auth" || got.Target != "Shop / auth" || got.TargetRow != row {
+		t.Fatalf("folder %q target %q row %q (want %q)", got.Folder, got.Target, got.TargetRow, row)
+	}
+}
+
+func TestImportService_SetTarget_Given_a_collection_row_Then_the_folder_is_cleared(t *testing.T) {
+	app, _, _ := twoCollections(t)
+	app.Import().SetTarget(placeRow(t, app, "Shop / auth"))
+	app.Import().SetTarget(rowOf(t, app, "collection", "Billing"))
+
+	got := app.Import().State()
+
+	if got.Folder != "" || got.Target != "Billing" {
+		t.Fatalf("folder %q target %q", got.Folder, got.Target)
+	}
+}
+
+func TestImportService_SetTarget_Given_a_row_that_is_not_a_place_Then_it_is_ignored(t *testing.T) {
+	app, _, _ := twoCollections(t)
+	app.Import().SetTarget(placeRow(t, app, "Shop / auth"))
+
+	app.Import().SetTarget("no-such-row")
+
+	if got := app.Import().State(); got.Folder != "auth" {
+		t.Fatalf("folder %q", got.Folder)
+	}
+}

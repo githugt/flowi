@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -453,5 +454,53 @@ func TestDecodeWorkspace_should_read_and_round_trip_a_schedules_alert_addresses(
 	}
 	if s := ws.Schedules[0]; s.OnFailure != "env:SLACK_HOOK" || s.OnSuccess != "https://hooks.example/ok" {
 		t.Fatalf("schedule %+v", s)
+	}
+}
+
+// Before: an environment had no group, so a `groups:` line was an unknown key.
+func TestDecodeEnvironment_should_read_and_write_the_groups_in_canonical_order(t *testing.T) {
+	data := []byte("id: 01J9ZE3M4N5P6Q7R8S9T0VWXYZ\nname: checkout-staging\ncolour: blue\ngroups:\n  - checkout services\n  - data jobs\nextends: base\nvars:\n  retries: 3\n")
+	c := newCodec()
+
+	env, diags := c.DecodeEnvironment("checkout-staging.yaml", data)
+	requireNoDiagnostics(t, diags)
+	out, err := c.EncodeEnvironment(env)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Equal(env.Groups, []string{"checkout services", "data jobs"}) {
+		t.Fatalf("groups %q", env.Groups)
+	}
+	if !bytes.Equal(out, data) {
+		t.Fatalf("round trip differs:\n%s", out)
+	}
+}
+
+func TestEncodeEnvironment_Given_no_group_Then_no_group_line_is_written(t *testing.T) {
+	data := readFixture(t, "valid/staging.yaml")
+	env, _ := newCodec().DecodeEnvironment("staging.yaml", data)
+
+	out, err := newCodec().EncodeEnvironment(env)
+
+	if err != nil || bytes.Contains(out, []byte("groups")) {
+		t.Fatalf("err %v, output:\n%s", err, out)
+	}
+}
+
+// Before: workspace.yaml had no place for a group with no environment in it.
+func TestDecodeWorkspace_should_read_and_round_trip_environment_groups(t *testing.T) {
+	data := []byte("id: 01J9ZE3M4N5P6Q7R8S9T0VWXYZ\ncollections: []\nenvironment_groups:\n  - checkout\n  - data jobs\n")
+	c := newCodec()
+
+	ws, diags := c.DecodeWorkspace("workspace.yaml", data)
+	requireNoDiagnostics(t, diags)
+	out, err := c.EncodeWorkspace(ws)
+
+	if err != nil || len(ws.EnvironmentGroups) != 2 || ws.EnvironmentGroups[1] != "data jobs" {
+		t.Fatalf("groups %v err %v", ws.EnvironmentGroups, err)
+	}
+	if !bytes.Contains(out, []byte("environment_groups:\n- checkout\n- data jobs\n")) && !bytes.Contains(out, []byte("environment_groups:\n  - checkout\n  - data jobs\n")) {
+		t.Fatalf("not written back:\n%s", out)
 	}
 }

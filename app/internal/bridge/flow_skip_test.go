@@ -14,7 +14,9 @@ func TestToggleSkip_Given_a_step_read_later_Then_the_view_lists_the_skip_and_nam
 	_ = flows.ConnectData(v.Node, "login", "status", "verify", "with.code")
 
 	// Act
-	flows.ToggleSkip(v.Node, "login")
+	if err := flows.ToggleSkip(v.Node, "login"); err != nil {
+		t.Fatal(err)
+	}
 	got := lastView(pub).Skips
 
 	// Assert
@@ -31,8 +33,12 @@ func TestToggleSkip_Given_the_step_toggled_again_Then_nothing_is_skipped(t *test
 	flows, v, pub := openTwoUnits(t)
 
 	// Act
-	flows.ToggleSkip(v.Node, "wait")
-	flows.ToggleSkip(v.Node, "wait")
+	if err := flows.ToggleSkip(v.Node, "wait"); err != nil {
+		t.Fatal(err)
+	}
+	if err := flows.ToggleSkip(v.Node, "wait"); err != nil {
+		t.Fatal(err)
+	}
 	got := lastView(pub).Skips
 
 	// Assert
@@ -47,7 +53,9 @@ func TestToggleSkip_Given_a_skipped_step_Then_its_card_says_so(t *testing.T) {
 	_ = flows.ConnectData(v.Node, "login", "status", "verify", "with.code")
 
 	// Act
-	flows.ToggleSkip(v.Node, "login")
+	if err := flows.ToggleSkip(v.Node, "login"); err != nil {
+		t.Fatal(err)
+	}
 	cards := lastView(pub).Cards
 
 	// Assert

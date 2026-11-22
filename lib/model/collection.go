@@ -22,9 +22,12 @@ type Manifest struct {
 	// the same name, so the value that differs per API (a base URL) can still
 	// differ per environment.
 	Variables []KeyValue
-	Settings  Settings
-	Hooks     Hooks
-	File      string
+	// Statuses are the development statuses the collection adds to the defaults (DefaultStatuses), or whose colour and
+	// icon it changes by using a default's name. Manifest.StatusList is the whole list.
+	Statuses []Status
+	Settings Settings
+	Hooks    Hooks
+	File     string
 }
 
 // Folder holds the settings and hooks of one _folder.yaml. Dir is relative
@@ -39,7 +42,9 @@ type Folder struct {
 	Order []string
 	// Tags apply to every flow and request under the folder.
 	Tags []string
-	File string
+	// Status is the default development status of everything under the folder that does not set its own.
+	Status string
+	File   string
 }
 
 // Collection is everything loaded from one collection directory.

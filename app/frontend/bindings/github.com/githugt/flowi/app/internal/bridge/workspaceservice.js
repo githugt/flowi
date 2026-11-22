@@ -16,6 +16,20 @@ import { Call as $Call, CancellablePromise as $CancellablePromise, Create as $Cr
 import * as $models from "./models.js";
 
 /**
+ * AddStatus adds a status to the collection of the row node, or changes the colour and icon of the one of that name.
+ * It returns true, with nothing written, when the collection file has comments that writing would drop.
+ * @param {string} node
+ * @param {string} name
+ * @param {string} color
+ * @param {string} icon
+ * @param {boolean} dropComments
+ * @returns {$CancellablePromise<boolean>}
+ */
+export function AddStatus(node, name, color, icon, dropComments) {
+    return $Call.ByID(1136261055, node, name, color, icon, dropComments);
+}
+
+/**
  * Do runs a menu action on rows. text is what its prompt asked (a path or
  * name) and protocol the async protocol. Results come back as events:
  * "open" with a row to open, "notice" with a problem, "clipboard" with text
@@ -68,6 +82,17 @@ export function Inside(id) {
 }
 
 /**
+ * Labels is the tags and status of a request, flow or folder row, with the choices to pick from.
+ * @param {string} node
+ * @returns {$CancellablePromise<$models.LabelsView>}
+ */
+export function Labels(node) {
+    return $Call.ByID(2880758765, node).then(/** @type {($result: any) => any} */(($result) => {
+        return $$createType3($result);
+    }));
+}
+
+/**
  * Location is where the collection holding tree node `node` lives; the zero
  * value when the node belongs to no collection.
  * @param {string} node
@@ -75,7 +100,7 @@ export function Inside(id) {
  */
 export function Location(node) {
     return $Call.ByID(3823764941, node).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType3($result);
+        return $$createType4($result);
     }));
 }
 
@@ -86,7 +111,7 @@ export function Location(node) {
  */
 export function Menu(ids) {
     return $Call.ByID(347913881, ids).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType5($result);
+        return $$createType6($result);
     }));
 }
 
@@ -110,7 +135,7 @@ export function MoveInto(ids, row) {
  */
 export function MoveTargets() {
     return $Call.ByID(3646977023).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType7($result);
+        return $$createType8($result);
     }));
 }
 
@@ -191,7 +216,7 @@ export function NewScratchRequest() {
  */
 export function PlaceTargets(tree) {
     return $Call.ByID(2138337117, tree).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType7($result);
+        return $$createType8($result);
     }));
 }
 
@@ -246,12 +271,26 @@ export function SelectEnvironment(name) {
 }
 
 /**
+ * SetLabels sets the tags and the status ("" for none of its own) of a request, flow or folder row, in its file. It
+ * returns true, with nothing written, when the file has comments that writing would drop: the window asks, then calls
+ * again with dropComments.
+ * @param {string} node
+ * @param {string[]} tags
+ * @param {string} status
+ * @param {boolean} dropComments
+ * @returns {$CancellablePromise<boolean>}
+ */
+export function SetLabels(node, tags, status, dropComments) {
+    return $Call.ByID(3596789605, node, tags, status, dropComments);
+}
+
+/**
  * Tree is the workspace now.
  * @returns {$CancellablePromise<$models.Tree>}
  */
 export function Tree() {
     return $Call.ByID(1035379242).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType8($result);
+        return $$createType9($result);
     }));
 }
 
@@ -259,9 +298,10 @@ export function Tree() {
 const $$createType0 = $models.EnvOffer.createFrom;
 const $$createType1 = $Create.Array($$createType0);
 const $$createType2 = $Create.Array($Create.Any);
-const $$createType3 = $models.LocationView.createFrom;
-const $$createType4 = $models.MenuEntry.createFrom;
-const $$createType5 = $Create.Array($$createType4);
-const $$createType6 = $models.MoveTargetView.createFrom;
-const $$createType7 = $Create.Array($$createType6);
-const $$createType8 = $models.Tree.createFrom;
+const $$createType3 = $models.LabelsView.createFrom;
+const $$createType4 = $models.LocationView.createFrom;
+const $$createType5 = $models.MenuEntry.createFrom;
+const $$createType6 = $Create.Array($$createType5);
+const $$createType7 = $models.MoveTargetView.createFrom;
+const $$createType8 = $Create.Array($$createType7);
+const $$createType9 = $models.Tree.createFrom;

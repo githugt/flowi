@@ -72,3 +72,50 @@ describe('highlightParts', () => {
     expect(highlightParts('Ping', '  ')).toEqual([{ text: 'Ping', hit: false }])
   })
 })
+
+describe('filterTree by status and tag', () => {
+  const mark = (name: string) => ({ name, color: 'blue', icon: 'code' })
+  const item = (id: string, label: string, status = '', tags: string[] = []): TreeNode => ({ id, label, kind: 'request', status: status ? mark(status) : undefined, tags })
+  const tree: TreeNode[] = [
+    group('c1', 'Shop', [
+      group('c1/auth', 'auth', [item('a1', 'Login', 'review', ['smoke', 'auth']), item('a2', 'Logout', 'testing', ['auth'])]),
+      item('p1', 'Ping', 'review', ['smoke']),
+      item('p2', 'Health'),
+    ]),
+  ]
+
+  it('finds rows by their status name and their tags as plain words', () => {
+    expect(ids(filterTree(tree, 'testing'))).toEqual(['c1', 'c1/auth', 'a2'])
+    expect(ids(filterTree(tree, 'smoke'))).toEqual(['c1', 'c1/auth', 'a1', 'p1'])
+  })
+
+  it('narrows to a status with status:', () => {
+    expect(ids(filterTree(tree, 'status:review'))).toEqual(['c1', 'c1/auth', 'a1', 'p1'])
+  })
+
+  it('narrows to a tag with tag: or #, and needs every tag', () => {
+    expect(ids(filterTree(tree, 'tag:auth'))).toEqual(['c1', 'c1/auth', 'a1', 'a2'])
+    expect(ids(filterTree(tree, '#smoke'))).toEqual(['c1', 'c1/auth', 'a1', 'p1'])
+    expect(ids(filterTree(tree, '#smoke #auth'))).toEqual(['c1', 'c1/auth', 'a1'])
+  })
+
+  it('combines a status, a tag and a word', () => {
+    expect(ids(filterTree(tree, 'status:review tag:smoke ping'))).toEqual(['c1', 'p1'])
+    expect(filterTree(tree, 'status:testing tag:smoke')).toEqual([])
+  })
+
+  it('does not show a whole group because its name matches a word, when a tag or status is asked for', () => {
+    // Before: a group named like the word showed everything under it, which would ignore the tag.
+    expect(ids(filterTree(tree, 'auth status:review'))).toEqual(['c1', 'c1/auth', 'a1'])
+  })
+
+  it('does not empty the tree while a term is being typed', () => {
+    expect(filterTree(tree, 'tag:')).toBe(tree)
+    expect(filterTree(tree, '#')).toBe(tree)
+    expect(filterTree(tree, 'status:')).toBe(tree)
+  })
+
+  it('does not highlight a term in a label', () => {
+    expect(highlightParts('Login', 'tag:auth')).toEqual([{ text: 'Login', hit: false }])
+  })
+})

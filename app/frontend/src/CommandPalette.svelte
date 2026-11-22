@@ -6,6 +6,7 @@
   // the arrows move, Escape or a click outside closes it. It also opens requests, flows and environments by name.
   import { tick } from 'svelte'
   import { app } from './lib/app.svelte'
+  import StatusIcon from './StatusIcon.svelte'
   import { commandList, filterCommands, itemCommands } from './lib/commands'
   import SearchField from './SearchField.svelte'
   import Icon from './Icon.svelte'
@@ -62,11 +63,11 @@
 
 {#if app.paletteOpen}
   <Modal title="Command palette" bare placement="top" guard={false} width="min(520px, calc(100vw - 32px))" maxHeight="none" onclose={close}>
-    <SearchField bind:value={query} bind:el={field} placeholder="Type a command, request, flow or environment… (> for commands only)" label="Command or item" onkeydown={keys} />
+    <SearchField bind:value={query} bind:el={field} placeholder="Type a command, request, flow or environment… (> for commands only; tag:x or status:y to filter)" label="Command or item" onkeydown={keys} />
     <div class="list" role="listbox" bind:this={list}>
       {#each shown as c, i (c.id)}
         <button class="row" class:on={i === index} role="option" aria-selected={i === index} onpointermove={() => (index = i)} onclick={() => runAt(i)}>
-          <Icon name={c.icon} size={14} /><span class="title">{c.title}</span>{#if c.detail}<span class="detail">{c.detail}</span>{/if}{#if c.keys}<kbd>{c.keys}</kbd>{/if}
+          <Icon name={c.icon} size={14} /><span class="title">{c.title}</span>{#if c.status}<StatusIcon mark={c.status} size={12} />{/if}{#if c.detail}<span class="detail">{c.detail}</span>{/if}{#if c.keys}<kbd>{c.keys}</kbd>{/if}
         </button>
       {:else}
         <p class="none">Nothing matches.</p>

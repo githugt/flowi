@@ -52,6 +52,98 @@ func (w *Workspace) SaveEnvironment(e model.Environment, o SaveOptions) error {
 	return w.writeEnvironment(e.File, data, o)
 }
 
+// SetEnvironmentGroups makes groups the groups of the workspace environments in files; none is the default group. A
+// group is only the `groups:` line of each environment file, so this touches nothing else: the vault keeps its values
+// (it finds them by the environment's id, which does not change) and an environment that builds on another keeps its
+// base. The names are sorted and repeats dropped before they are written.
+//
+// Every file is checked before any is written: an unknown file is FLW-REQ-004, a name that cannot be a group is
+// FLW-REQ-012, and a file with comments is refused unless o.DropComments is set (as for SaveEnvironment).
+// An environment that already has exactly these groups is left alone.
+//
+// Before: an environment had at most one group (`group:`), so a service shared by two sets of environments could be
+// compared with only one of them.
+func (w *Workspace) SetEnvironmentGroups(files []string, groups []string, o SaveOptions) error {
+	groups = model.NormaliseGroups(groups)
+	return w.changeGroups(files, func([]string) []string { return groups }, o)
+}
+
+// changeGroups rewrites the groups of each environment in files as change says, given its present groups. It is the
+// writer behind SetEnvironmentGroups, renaming a group and deleting one.
+func (w *Workspace) changeGroups(files []string, change func([]string) []string, o SaveOptions) error {
+	return w.editEnvironments(files, o, func(e *model.Environment) error {
+		groups := model.NormaliseGroups(change(slices.Clone(e.Groups)))
+		if err := model.CheckGroups(groups); err != nil {
+			return diagErr(diag.CodeRequestEnvGroup, map[string]string{"env": e.Name, "detail": err.Error()})
+		}
+		e.Groups = groups
+		return nil
+	}, func(a, b model.Environment) bool { return slices.Equal(a.Groups, b.Groups) })
+}
+
+// SetEnvironmentColour marks the workspace environments in files with colour, one of model.EnvColours(); "" is the
+// default colour. Like SetEnvironmentGroups it changes only that line of each file, with the same refusals: an unknown
+// file is FLW-REQ-004, a file with comments is FLW-WRITE-001 unless o.DropComments is set, and a colour that is not
+// one of EnvColours is FLW-REQ-015.
+//
+// Before: the colour could be set only while editing the environment's variables, one environment at a time.
+func (w *Workspace) SetEnvironmentColour(files []string, colour string, o SaveOptions) error {
+	return w.editEnvironments(files, o, func(e *model.Environment) error {
+		if colour != "" && !slices.Contains(model.EnvColours(), colour) {
+			return diagErr(diag.CodeRequestEnvColour, map[string]string{"env": e.Name, "colour": colour})
+		}
+		e.Colour = colour
+		return nil
+	}, func(a, b model.Environment) bool { return a.Colour == b.Colour })
+}
+
+// editEnvironments applies edit to each workspace environment in files and writes the files that came out different
+// (same says when two versions are). Every file is checked before any is written.
+func (w *Workspace) editEnvironments(files []string, o SaveOptions, edit func(*model.Environment) error, same func(a, b model.Environment) bool) error {
+	w.mu.RLock()
+	envs := slices.Clone(w.globalEnvs)
+	w.mu.RUnlock()
+	changes, err := w.environmentChanges(envs, files, o, edit, same)
+	if err != nil || len(changes) == 0 {
+		return err
+	}
+	if err := store.Apply(changes); err != nil {
+		return err
+	}
+	return w.reloadEnvironments()
+}
+
+// environmentChanges builds the file changes that edit makes to the environments in files.
+func (w *Workspace) environmentChanges(envs []model.Environment, files []string, o SaveOptions, edit func(*model.Environment) error, same func(a, b model.Environment) bool) ([]store.FileChange, error) {
+	var changes []store.FileChange
+	for _, file := range files {
+		i := slices.IndexFunc(envs, func(x model.Environment) bool { return x.File == file })
+		if i < 0 {
+			return nil, diagErr(diag.CodeRequestEnvUnknown, map[string]string{"env": filepath.Base(file)})
+		}
+		e := envs[i]
+		if err := edit(&e); err != nil {
+			return nil, err
+		}
+		if same(envs[i], e) {
+			continue
+		}
+		data, err := w.store.EncodeEnvironment(e)
+		if err != nil {
+			return nil, fmt.Errorf("encoding %s: %w", e.File, err)
+		}
+		old, err := os.ReadFile(file)
+		if err != nil {
+			return nil, fmt.Errorf("reading %s: %w", file, err)
+		}
+		if !o.DropComments && w.store.HasComments(old) {
+			return nil, diag.List{diag.New(diag.CodeWriteDropsComments, diag.Location{File: file}, map[string]string{"file": filepath.Base(file)})}.Err()
+		}
+		changes = append(changes, store.FileChange{File: file, Old: old, New: data})
+	}
+	return changes, nil
+}
+
 // NewEnvironment creates <environments dir>/<name>.yaml with a fresh id and
 // no variables, and loads it; it returns the file. The name must be a plain
 // name; a bad name or an existing file is FLW-WRITE-002.

@@ -14,3 +14,24 @@ export function firstOfKind(kind: string, nodes: TreeNode[]): TreeNode | undefin
     if (inner) return inner
   }
 }
+
+/** The row of the environment called name, wherever the tree puts it. */
+export function environmentNode(roots: TreeNode[] | undefined, name: string): TreeNode | undefined {
+  const find = (nodes: TreeNode[]): TreeNode | undefined => {
+    for (const n of nodes) {
+      if (n.kind === 'environment' && n.label === name) return n
+      const inner = find(n.children ?? [])
+      if (inner) return inner
+    }
+  }
+  return find(roots ?? [])
+}
+
+/** The row with this id, wherever the tree puts it. */
+export function nodeById(nodes: TreeNode[] | undefined, id: string): TreeNode | undefined {
+  for (const n of nodes ?? []) {
+    if (n.id === id) return n
+    const inner = nodeById(n.children, id)
+    if (inner) return inner
+  }
+}

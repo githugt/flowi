@@ -136,7 +136,7 @@ func dependencies(list []model.Node) [][]arrowDep {
 
 // advance starts or skips one pending node and reports whether it did.
 func (lr *listRun) advance(g *errgroup.Group) bool {
-	if lr.stopped || lr.ctx.Err() != nil || lr.r.stop.Load() {
+	if lr.stopped || lr.ctx.Err() != nil || lr.r.stop.Load() || lr.f.loop.isOver() {
 		return false
 	}
 	for i := range lr.list {
@@ -302,7 +302,7 @@ func (lr *listRun) skip(i int, blocked bool) {
 // other (a needs on a later node): that is a failure of the run, not a pass
 // with steps left out.
 func (lr *listRun) skipRest() {
-	if stuck := lr.pendingIDs(); len(stuck) > 0 && !lr.stopped && !lr.interrupted && !lr.r.stop.Load() && lr.ctx.Err() == nil && len(lr.failed) == 0 {
+	if stuck := lr.pendingIDs(); len(stuck) > 0 && !lr.stopped && !lr.interrupted && !lr.r.stop.Load() && !lr.f.loop.isOver() && lr.ctx.Err() == nil && len(lr.failed) == 0 {
 		lr.failed = append(lr.failed, nodeResult{status: StatusError, diags: diag.List{
 			diag.New(diag.CodeCycleNeeds, diag.Location{}, map[string]string{"cycle": strings.Join(stuck, " → ")}),
 		}})

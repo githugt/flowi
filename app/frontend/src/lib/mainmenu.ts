@@ -24,6 +24,7 @@ export const mainItems: MainItem[] = [
   { label: 'Collections…', action: 'collections' },
   { label: 'Import…', action: 'import', shortcut: 'Ctrl+I' },
   { label: 'Secrets…', action: 'secrets', separated: true },
+  { label: 'Manage environments…', action: 'envmanage' },
   { label: 'Compare environments…', action: 'envcompare' },
   { label: 'Schedules…', action: 'schedules' },
   { label: 'Replayer…', action: 'replayer' },

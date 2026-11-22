@@ -49,7 +49,9 @@ type RunTill struct {
 type Flow struct {
 	Meta
 	// Tags label the flow for `flowi run --tag`; the tags of its folders apply as well.
-	Tags          []string
+	Tags []string
+	// Status is the development status of the flow; "" for none of its own, as for a Request.
+	Status        string
 	Path          string
 	PreferVersion string
 	Inputs        []Input

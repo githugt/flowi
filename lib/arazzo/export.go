@@ -104,6 +104,7 @@ type step struct {
 	afterFailureOf              []string
 	afterOutcome                []string
 	unlinked                    bool
+	skipped                     bool
 	timeoutMS                   int64
 	customNode                  string // the node a custom step stands for
 	action                      string // send or receive (AsyncAPI steps)
@@ -330,7 +331,7 @@ func (ex *exporter) flowOutputs(f model.Flow, vars map[string]string) yaml.MapSl
 }
 
 func newStep(n model.Node) *step {
-	return &step{id: n.ID, values: map[string]string{}, needs: n.Needs, afterFailureOf: n.AfterFailureOf, afterOutcome: n.AfterOutcome, unlinked: n.Unlinked, timeoutMS: n.Timeout.Milliseconds()}
+	return &step{id: n.ID, values: map[string]string{}, needs: n.Needs, afterFailureOf: n.AfterFailureOf, afterOutcome: n.AfterOutcome, unlinked: n.Unlinked, skipped: n.Skipped, timeoutMS: n.Timeout.Milliseconds()}
 }
 
 func (s *step) yaml() yaml.MapSlice {
@@ -375,6 +376,9 @@ func (s *step) yaml() yaml.MapSlice {
 	}
 	if s.unlinked {
 		out = append(out, yaml.MapItem{Key: "x-flowi-unlinked", Value: true})
+	}
+	if s.skipped {
+		out = append(out, yaml.MapItem{Key: "x-flowi-skip", Value: true})
 	}
 	if len(s.afterOutcome) > 0 {
 		out = append(out, yaml.MapItem{Key: "x-flowi-after-outcome", Value: s.afterOutcome})

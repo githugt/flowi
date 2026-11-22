@@ -137,6 +137,157 @@ func (w *Workspace) FlowRunDetail(t FlowTarget, id string) (RunDetail, error) {
 	return out, nil
 }
 
+// RunStep is one step of a saved run, with every instance of it folded in (a step inside a batch ran once for each
+// round): the worst status, how many times it ran, and when it ran on the run's clock.
+type RunStep struct {
+	ID        string
+	Status    string
+	Instances int
+	// Start and End bracket every instance: the first start and the last finish, counted from the start of the run.
+	Start, End time.Duration
+	// Code is the HTTP status of the last attempt of the last instance, 0 for a step that sent nothing.
+	Code int
+}
+
+// RunSteps is what a saved run did at each step, in the order the steps first ran.
+type RunSteps struct {
+	ID     string
+	Status string
+	Steps  []RunStep
+}
+
+// FlowRunSteps reads the saved run id of flow t step by step, steps inside batches, branches and conditions included,
+// for showing the run as a list or a timeline. The id is checked as FlowRunDetail checks it.
+func (w *Workspace) FlowRunSteps(t FlowTarget, id string) (RunSteps, error) {
+	if id == "" || strings.IndexFunc(id, func(r rune) bool { return !isIDRune(r) }) >= 0 {
+		return RunSteps{}, fmt.Errorf("%q is not a run id", id)
+	}
+	file := filepath.Join(w.DataDir(t.Collection), "runs", string(t.Flow), id+".json")
+	data, err := os.ReadFile(file)
+	if err != nil {
+		return RunSteps{}, fmt.Errorf("reading run %s: %w", id, err)
+	}
+	var raw savedRun
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return RunSteps{}, fmt.Errorf("reading run %s: %w", id, err)
+	}
+	out := RunSteps{ID: raw.ID, Status: raw.Status}
+	at := map[string]int{}
+	var walk func(nodes []savedNode)
+	walk = func(nodes []savedNode) {
+		for _, n := range nodes {
+			i, seen := at[n.ID]
+			if !seen {
+				i = len(out.Steps)
+				at[n.ID] = i
+				out.Steps = append(out.Steps, RunStep{ID: n.ID})
+			}
+			out.Steps[i].fold(n, raw.Started)
+			for _, lane := range n.Lanes {
+				walk(lane.Nodes)
+			}
+		}
+	}
+	walk(raw.Nodes)
+	return out, nil
+}
+
+// savedRun and savedNode are the parts of a report FlowRunSteps reads; report.Run has no decoder of its own, since
+// a report is written by the engine and read only here and by the tools that compare runs.
+type savedRun struct {
+	ID      string      `json:"id"`
+	Status  string      `json:"status"`
+	Started time.Time   `json:"started"`
+	Nodes   []savedNode `json:"nodes"`
+}
+
+type savedNode struct {
+	ID         string    `json:"id"`
+	Status     string    `json:"status"`
+	Started    time.Time `json:"started"`
+	DurationMS int64     `json:"duration_ms"`
+	Attempts   []struct {
+		Status int `json:"status"`
+	} `json:"attempts"`
+	Lanes []struct {
+		Nodes []savedNode `json:"nodes"`
+	} `json:"lanes"`
+}
+
+// fold adds one instance of the step to s.
+func (s *RunStep) fold(n savedNode, runStart time.Time) {
+	s.Instances++
+	if rank(n.Status) > rank(s.Status) {
+		s.Status = n.Status
+	}
+	if k := len(n.Attempts); k > 0 {
+		s.Code = n.Attempts[k-1].Status
+	}
+	if n.Started.IsZero() || runStart.IsZero() {
+		return
+	}
+	start := max(n.Started.Sub(runStart), 0)
+	end := start + time.Duration(n.DurationMS)*time.Millisecond
+	if s.Instances == 1 || start < s.Start {
+		s.Start = start
+	}
+	s.End = max(s.End, end)
+}
+
+// rank orders statuses by how much a person needs to see them: the worst instance names the step.
+func rank(status string) int {
+	switch status {
+	case "failed", "error":
+		return 5
+	case "aborted":
+		return 4
+	case "cancelled":
+		return 3
+	case "passed":
+		return 2
+	case "":
+		return 0
+	}
+	return 1
+}
+
+// DeleteFlowRun deletes the saved run id of flow t. The id is checked as FlowRunDetail checks it. A run that is
+// already gone is not an error: the list the person clicked in may be a moment old.
+func (w *Workspace) DeleteFlowRun(t FlowTarget, id string) error {
+	if id == "" || strings.IndexFunc(id, func(r rune) bool { return !isIDRune(r) }) >= 0 {
+		return fmt.Errorf("%q is not a run id", id)
+	}
+	file := filepath.Join(w.DataDir(t.Collection), "runs", string(t.Flow), id+".json")
+	if err := os.Remove(file); err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("deleting run %s: %w", id, err)
+	}
+	return nil
+}
+
+// ClearFlowRuns deletes every saved run of flow t, the ones FlowRuns leaves out as unreadable too, and says how many
+// files it removed. Other files in the folder are left alone.
+func (w *Workspace) ClearFlowRuns(t FlowTarget) (int, error) {
+	dir := filepath.Join(w.DataDir(t.Collection), "runs", string(t.Flow))
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return 0, nil
+		}
+		return 0, fmt.Errorf("reading the runs of %s: %w", t.Flow, err)
+	}
+	removed := 0
+	for _, e := range entries {
+		if e.IsDir() || !strings.HasSuffix(e.Name(), ".json") {
+			continue
+		}
+		if err := os.Remove(filepath.Join(dir, e.Name())); err != nil && !os.IsNotExist(err) {
+			return removed, fmt.Errorf("deleting run %s: %w", strings.TrimSuffix(e.Name(), ".json"), err)
+		}
+		removed++
+	}
+	return removed, nil
+}
+
 func isIDRune(r rune) bool {
 	return r >= '0' && r <= '9' || r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z'
 }

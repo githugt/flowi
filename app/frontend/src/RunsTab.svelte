@@ -10,6 +10,9 @@
   import type { DiffView, FlowView, RunComparison } from './lib/types'
   import { statusMark } from './lib/statusmark'
   import { lastGreenIndex } from './lib/lastgreen'
+  import { plural } from './lib/plural'
+  import { ui } from './lib/ui.svelte'
+  import { runPanelsOf, toggleRunPanel } from './lib/runpanels.svelte'
 
   let { view }: { view: FlowView } = $props()
   const runs = $derived(app.history[view.node] ?? [])
@@ -21,6 +24,9 @@
   let depth = $state<RunComparison | null>(null)
   let open = $state<string | null>(null)
   let problem = $state('')
+  // The run the last click chose: its buttons (steps, timeline, trace) show under it.
+  let picked = $state('')
+  const panels = $derived(runPanelsOf(view.node))
 
   // Where each run's trace is in the person's tracing tool (the otel.trace_url setting), when one is set.
   let traces = $state<Record<string, string>>({})
@@ -54,6 +60,38 @@
   }
   const changedBody = (step: string) => !!depth?.steps?.[step]
 
+  // The list changes under a comparison when runs go, so the picked runs and what was shown for them are let go.
+  function forgetPicks() {
+    from = -1
+    to = 0
+    diff = []
+    depth = null
+    open = null
+    problem = ''
+  }
+  // Runs are a record the engine wrote, not something the person made, so one goes at once; all of them ask first.
+  function clearOne(id: string) {
+    forgetPicks()
+    FlowService.DeleteRun(view.node, id).catch(ui.fail)
+  }
+  function clearAll() {
+    ui.confirm('Clear all runs?', `The ${plural(runs.length, 'saved run')} of this flow will be deleted. This cannot be undone.`, () => {
+      forgetPicks()
+      return FlowService.ClearRuns(view.node).then(() => undefined)
+    }, 'Clear all')
+  }
+  function runMenu(e: MouseEvent, id: string) {
+    e.preventDefault()
+    picked = id
+    ui.openMenu(e.clientX, e.clientY, [
+      { label: 'Steps', checked: panels.steps === id, run: () => toggleRunPanel(view.node, 'steps', id) },
+      { label: 'Timeline', checked: panels.timeline === id, run: () => toggleRunPanel(view.node, 'timeline', id) },
+      { label: '', separator: true, run: () => {} },
+      { label: 'Clear this run', run: () => clearOne(id) },
+      { label: 'Clear all runs…', run: clearAll },
+    ])
+  }
+
   // When the latest run went wrong, the run to blame is the last one that worked: it is compared at once, and the card
   // says so. It is done once for each latest run, so a comparison the person picks is not replaced.
   const green = $derived(lastGreenIndex(runs.map((r) => r.status)))
@@ -84,13 +122,25 @@
   {#if !runs.length}
     <EmptyState icon="clock" title="No saved runs yet" hint="Each run of this flow is kept here, so two runs can be compared." compact />
   {/if}
+  {#if runs.length}
+    <div class="listhead">
+      <span>{plural(runs.length, 'saved run')}</span>
+      <Button small variant="ghost" danger title="Delete every saved run of this flow" onclick={clearAll}>Clear all</Button>
+    </div>
+  {/if}
   {#each runs as r, i}
-    <div class="runrow">
-      <button class="run" class:active={i === from || i === to} onclick={() => compare(i, 0)}>
+    <div class="runrow" role="presentation" oncontextmenu={(e) => runMenu(e, r.id)}>
+      <button class="run" class:active={i === from || i === to} onclick={() => { picked = r.id; void compare(i, 0) }}>
         <span class="dot {r.status}" role="img" aria-label={r.status} title={r.status}>{statusMark(r.status)}</span>{r.label}{i === 0 ? ' (latest)' : ''}
       </button>
-      {#if traces[r.id]}<Button small variant="ghost" title="Open this run's trace in your tracing tool" onclick={() => openExternal(traces[r.id])}>Open trace</Button>{/if}
     </div>
+    {#if picked === r.id || panels.steps === r.id || panels.timeline === r.id}
+      <div class="acts">
+        <Button small variant="ghost" pressed={panels.steps === r.id} title="List this run's steps: status, result and duration" onclick={() => toggleRunPanel(view.node, 'steps', r.id)}>Steps</Button>
+        <Button small variant="ghost" pressed={panels.timeline === r.id} title="Show this run as a timeline: when each step started and how long it took" onclick={() => toggleRunPanel(view.node, 'timeline', r.id)}>Timeline</Button>
+        {#if traces[r.id]}<Button small variant="ghost" title="Open this run's trace in your tracing tool" onclick={() => openExternal(traces[r.id])}>Open trace</Button>{/if}
+      </div>
+    {/if}
   {/each}
   {#if from >= 0 && from !== to}
     <h5>Compare</h5>
@@ -146,8 +196,10 @@
   .err { color: var(--fail); }
   .since { margin: 0 0 var(--sp-2); font-size: var(--fs-sm); padding: 4px 8px; border-radius: var(--r-md); background: var(--fail-t); }
   .trend { margin: 0 0 var(--sp-2); font-family: var(--mono); font-size: var(--fs-sm); }
+  .listhead { display: flex; align-items: center; justify-content: space-between; margin: 0 0 var(--sp-1); color: var(--muted); font-size: var(--fs-xs); }
   .runrow { display: flex; align-items: center; gap: var(--sp-2); }
   .runrow .run { flex: 1; min-width: 0; }
+  .acts { display: flex; flex-wrap: wrap; gap: var(--sp-1); margin: 0 0 var(--sp-1) 28px; }
   .run {
     display: flex;
     align-items: center;

@@ -2,7 +2,7 @@
 
 Generated from the node registry (`go test ./internal/nodes/ -run Reference -update`). Do not edit.
 
-Every node also takes the common fields `id`, `name`, `description`, `needs` (steps this one waits for, taken when they succeed), `after_failure_of` (steps whose failure starts this one; a step in both lists runs either way), `after_outcome` (`step:outcome` entries: the step starts this one when its request ends with that outcome, one of the `outcomes` its version names; a step with no arrows follows the one before it), `when`, `concurrent`, `on_error` (`fail`, `continue`, `goto:<id>`), `timeout` and `attach` (the id of a request or subflow node right next to it that the canvas shows it with; a view only, the run order is the list order) and `attach_at` (`above` or `below`: draw it in a stack above or below that request, not beside it).
+Every node also takes the common fields `id`, `name`, `description`, `needs` (steps this one waits for, taken when they succeed), `after_failure_of` (steps whose failure starts this one; a step in both lists runs either way), `after_outcome` (`step:outcome` entries: the step starts this one when its request ends with that outcome, one of the `outcomes` its version names; a step with no arrows follows the one before it), `when`, `concurrent`, `on_error` (`fail`, `continue`, `goto:<id>`), `timeout`, `skip` (`true`: the step, and what is inside it, does not run in any run of the flow, and is reported as skipped) and `attach` (the id of a request or subflow node right next to it that the canvas shows it with; a view only, the run order is the list order) and `attach_at` (`above` or `below`: draw it in a stack above or below that request, not beside it).
 
 ## Call
 
@@ -114,6 +114,7 @@ Fields: `body`.
 | `times` | integer 1–100000 |  | Repeat a fixed number of times instead of over a list; `index` counts from 0 (and `item` is the same number). |
 | `concurrency` | integer ≥ 1 |  | Iterations in flight (default 1); capped by the run-wide limit. |
 | `label` | template |  | Names each iteration in the run tree, reports and failures instead of its number (item, index in scope): `{{item.email}}` gives users[ada@example.com]/create. Slashes and brackets become _, long names are cut, repeats get #2. |
+| `layout` | one of `vertical`, `horizontal` |  | How the canvas draws the steps in the body: vertical (default) stacks them top to bottom in a box under the loop, horizontal puts them in one row. It changes only the picture, not the run. |
 
 ### `run_till`
 
@@ -127,6 +128,7 @@ Fields: `body`.
 | `max` | integer 1–10000 |  | Most iterations (default 10). |
 | `interval` | duration |  | Wait between iterations. |
 | `max_duration` | duration |  | Stop once this much time has passed. |
+| `layout` | one of `vertical`, `horizontal` |  | How the canvas draws the steps in the body: vertical (default) stacks them top to bottom in a box under the loop, horizontal puts them in one row. It changes only the picture, not the run. |
 
 ### `parallel`
 
@@ -147,6 +149,15 @@ End the run here: nothing after it starts. Useful in a branch of a condition.
 |---|---|---|---|
 | `status` | one of `passed`, `failed` |  | How the run ends: passed (default) is a normal end that skips the rest, failed ends it as a failure. |
 | `message` | template |  | Why it stops; written to the run log, or into the failure. |
+
+### `loop_control`
+
+Inside a loop: end this item or round here and go on with the next, or leave the loop. Useful in a branch of a condition.
+
+| Parameter | Kind | Required | Notes |
+|---|---|---|---|
+| `action` | one of `next`, `leave` |  | What it does: next (default) ends the current item (batch) or round (run_till) here, counts it as passed and goes on with the next one; leave ends the loop: a run_till counts as met, a batch starts no more items and lets the ones already running finish. It acts on the nearest loop around it, and only works inside a batch or run_till body. |
+| `message` | template |  | Why; written to the run log. |
 
 ## Output
 

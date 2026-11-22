@@ -53,7 +53,6 @@ type FlowRun struct {
 	result   engine.RunResult
 	vars     map[string]any // the flow's variables when the last run ended (masked)
 	err      string
-	skip     []string // steps this open flow skips; not saved in the file
 	hold     bool     // skipped steps keep what the last run gave them
 	breaks   []string // steps to pause before when debugging; not saved in the file
 	dbg      *debugSession

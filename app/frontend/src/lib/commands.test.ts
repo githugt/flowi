@@ -25,6 +25,34 @@ describe('filterCommands', () => {
   })
 })
 
+describe('filterCommands with a status and tags', () => {
+  const mark = (name: string) => ({ name, color: 'blue', icon: 'code' })
+  const item = (id: string, title: string, status?: string, tags: string[] = []): Command => ({ id, title, keys: '', icon: '', run, status: status ? mark(status) : undefined, tags })
+  const items = [item('a', 'Login', 'production', ['smoke', 'auth']), item('b', 'Pay', 'review', ['payments']), item('c', 'Health', undefined, ['smoke'])]
+
+  it('Given a tag term When filtering Then only the items with that tag stay, and commands never match', () => {
+    // Before: the palette read the title and where an item lives, so a tag or a status could not be searched.
+    expect(filterCommands([...items, cmd('x', 'New request')], 'tag:smoke').map((c) => c.id)).toEqual(['a', 'c'])
+    expect(filterCommands(items, '#pay').map((c) => c.id)).toEqual(['b'])
+  })
+
+  it('Given a status term When filtering Then the item with that status stays', () => {
+    expect(filterCommands(items, 'status:rev').map((c) => c.id)).toEqual(['b'])
+  })
+
+  it('Given a word that is a status or a tag When filtering Then it matches the item as it does its title', () => {
+    expect(filterCommands(items, 'production').map((c) => c.id)).toEqual(['a'])
+    expect(filterCommands(items, 'login tag:smoke').map((c) => c.id)).toEqual(['a'])
+  })
+
+  it('Given itemCommands When built Then the status and tags of the row come along', () => {
+    const roots = [{ id: 'r', kind: 'request', label: 'Login', status: mark('review'), tags: ['smoke'] }] as never
+    const [c] = itemCommands(roots, [], () => {})
+    expect(c.status?.name).toBe('review')
+    expect(c.tags).toEqual(['smoke'])
+  })
+})
+
 describe('commandList', () => {
   const ran: string[] = []
   const ctx = (over: Partial<PaletteContext> = {}): PaletteContext => ({

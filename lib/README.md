@@ -76,6 +76,8 @@ flowi impact auth/login                                # who uses this request, 
 ## More
 
 - [Node reference](docs/reference/nodes.md): every node type and its parameters.
+- [Environment reference](docs/reference/environments.md): the environment file, variable types and groups.
+- [Status and tags reference](docs/reference/status-and-tags.md): development status, tags, and how a folder's apply.
 - [Development guide](docs/development.md): layout, rules, how to work on all three repositories.
 - [Design decisions](docs/adr): one short record per decision.
 - [Changelog](CHANGELOG.md).

@@ -228,6 +228,11 @@ func (e *Environment) SetRows(rows []EnvVarRow) {
 // no longer secret.
 func (e *Environment) Save(dropComments bool) {
 	env := e.disk
+	// The groups are not edited here: they follow the file, so a move made on the Manage environments screen while this
+	// editor holds unsaved edits is not undone by saving them.
+	if i := slices.IndexFunc(e.envs, func(x model.Environment) bool { return x.File == e.file }); i >= 0 {
+		env.Groups = e.envs[i].Groups
+	}
 	env.Colour = e.colour
 	env.Extends = e.extends
 	env.Protected = e.protect

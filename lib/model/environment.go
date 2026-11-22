@@ -7,8 +7,11 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"slices"
 	"strconv"
 	"strings"
+	"unicode"
+	"unicode/utf8"
 )
 
 // EnvVar is one environment variable. When Secret is set, Value is empty:
@@ -75,6 +78,12 @@ type Environment struct {
 	// Protected asks the apps to confirm before a request that changes data is sent with this environment.
 	// The CLI does not ask; it runs unattended.
 	Protected bool
+	// Groups names the sets of environments this one belongs to ("the checkout services", "the data jobs"): one
+	// environment can serve several sets. Sorted, without repeats. None means the default group alone; the entry
+	// DefaultGroupToken keeps the environment in the default group as well as in the named ones. The apps compare the
+	// environments of one group at a time. The `groups:` line goes wherever the environment file goes (git, when it is
+	// shared); a group can also exist with no environment in it (see Workspace.EnvironmentGroups).
+	Groups []string
 	// Extends names the environment this one builds on: its plain variables apply unless this one sets the same name.
 	// Secrets are not inherited, because a secret's value lives in the vault under the environment that declares it.
 	Extends string
@@ -99,6 +108,116 @@ func DefaultEnvColour(name string) string {
 		return "red"
 	}
 	return ""
+}
+
+// MaxGroupRunes bounds the length of a group name.
+const MaxGroupRunes = 40
+
+// DefaultGroupToken is the entry of Environment.Groups that keeps an environment in the default group while it is in
+// named groups too. An environment with no entries at all is in the default group alone, so the token only ever stands
+// beside a named group. It is the one spelling of "default" a group list accepts; a group may not be named so.
+const DefaultGroupToken = "default"
+
+// DefaultGroupLabel is what the apps call the group of an environment that names none. A named group may not use it
+// (in any case), so the two can never be mistaken for each other.
+const DefaultGroupLabel = "Default"
+
+// CheckGroup says why name cannot be the name of an environment group, or returns nil. The empty name is the
+// default group and is valid. A group name is text for people: any letters, digits, spaces and punctuation, but no control
+// characters, no space at either end, at most MaxGroupRunes characters, and not "default".
+func CheckGroup(name string) error {
+	switch {
+	case name == "":
+		return nil
+	case strings.TrimSpace(name) != name:
+		return errors.New("a group name cannot start or end with a space")
+	case utf8.RuneCountInString(name) > MaxGroupRunes:
+		return fmt.Errorf("a group name has at most %d characters", MaxGroupRunes)
+	case strings.EqualFold(name, DefaultGroupLabel):
+		return fmt.Errorf("%q is the name of the group of environments that have none: choose another name", DefaultGroupLabel)
+	case strings.ContainsFunc(name, func(r rune) bool { return unicode.IsControl(r) || unicode.Is(unicode.Cf, r) }):
+		return errors.New("a group name cannot hold control characters")
+	}
+	return nil
+}
+
+// CheckGroups says why groups cannot be the groups of one environment: a name CheckGroup refuses, an empty name
+// or a repeat. DefaultGroupToken is allowed (once): it is how an environment is in the default group and in others.
+func CheckGroups(groups []string) error {
+	for i, g := range groups {
+		if g == "" {
+			return errors.New("a group name cannot be empty")
+		}
+		if g != DefaultGroupToken {
+			if err := CheckGroup(g); err != nil {
+				return err
+			}
+		}
+		if slices.Contains(groups[:i], g) {
+			return fmt.Errorf("the group %q is named twice", g)
+		}
+	}
+	return nil
+}
+
+// NormaliseGroups returns groups sorted and without repeats or empty names: how an environment file holds them. The
+// token alone is the same as no entry (the default group alone), so it is dropped.
+func NormaliseGroups(groups []string) []string {
+	out := slices.DeleteFunc(slices.Clone(groups), func(g string) bool { return g == "" })
+	slices.Sort(out)
+	out = slices.Compact(out)
+	if len(out) == 1 && out[0] == DefaultGroupToken {
+		return nil
+	}
+	return out
+}
+
+// InGroup says whether e belongs to group; "" is the default group: the environments with no group, and those that
+// hold DefaultGroupToken.
+func (e Environment) InGroup(group string) bool {
+	if group == "" {
+		return len(e.Groups) == 0 || slices.Contains(e.Groups, DefaultGroupToken)
+	}
+	return group != DefaultGroupToken && slices.Contains(e.Groups, group)
+}
+
+// Memberships lists the groups e is in, the default group (as "") first when it is one, then the named groups sorted.
+func (e Environment) Memberships() []string {
+	var out []string
+	if e.InGroup("") {
+		out = append(out, "")
+	}
+	for _, g := range e.Groups {
+		if g != DefaultGroupToken {
+			out = append(out, g)
+		}
+	}
+	return out
+}
+
+// EnvironmentGroups lists the named groups the environments belong to, sorted. The default group is not in the list.
+func EnvironmentGroups(envs []Environment) []string {
+	var out []string
+	for _, e := range envs {
+		for _, g := range e.Groups {
+			if g != "" && g != DefaultGroupToken && !slices.Contains(out, g) {
+				out = append(out, g)
+			}
+		}
+	}
+	slices.Sort(out)
+	return out
+}
+
+// EnvironmentsInGroup returns the environments of one group, in their order; "" is the default group.
+func EnvironmentsInGroup(envs []Environment, group string) []Environment {
+	var out []Environment
+	for _, e := range envs {
+		if e.InGroup(group) {
+			out = append(out, e)
+		}
+	}
+	return out
 }
 
 // Errors EnvironmentChain wraps, so a caller can tell a missing base from a loop.

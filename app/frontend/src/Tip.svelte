@@ -1,9 +1,10 @@
 <script lang="ts">
   import type { Snippet } from 'svelte'
+  import { portal } from './lib/portal'
 
   // An explanation that shows when the pointer rests on something or the keyboard reaches it, and goes on Escape.
-  // The words come as text, or as a snippet when they need markup. The panel is fixed to the window, so a scrolling
-  // or clipping panel around the trigger cannot cut it off; it opens below and is kept inside the window's edges.
+  // The words come as text, or as a snippet when they need markup. The panel is moved to the page itself (lib/portal) and
+  // fixed to the window, so a scrolling or clipping panel around the trigger cannot cut it off; it opens below and is kept inside the window's edges.
   // The trigger must be reachable by keyboard (a button, or tabindex="0"); a tip is never the only way to learn
   // something a person needs to act.
   // Before: Hint had the only good one, the native title attribute is slow and cannot be reached by keyboard, and a
@@ -61,7 +62,7 @@
 >
   {@render children()}
   {#if shown}
-    <span class="pop" {id} role="tooltip" style="left:{left}px;top:{top}px;width:{width}px">{#if content}{@render content()}{:else}{text}{/if}</span>
+    <span class="pop" use:portal {id} role="tooltip" style="left:{left}px;top:{top}px;width:{width}px">{#if content}{@render content()}{:else}{text}{/if}</span>
   {/if}
 </span>
 

@@ -50,3 +50,19 @@ func TestDecodeFlow_should_give_back_an_unlinked_step(t *testing.T) {
 		t.Fatalf("diags %v, unlinked %v:\n%s", diags, back.Nodes[1].Unlinked, got)
 	}
 }
+
+func TestDecodeFlow_should_give_back_a_skipped_step(t *testing.T) {
+	o := datasetFlowOptions()
+	fl := datasetFlow()
+	fl.Nodes[1].Skipped = true
+
+	got, _, err := EncodeFlow(fl, o)
+	if err != nil {
+		t.Fatal(err)
+	}
+	back, diags := DecodeFlow(fl.File, fl.Path, got, o)
+
+	if len(diags) > 0 || !back.Nodes[1].Skipped || back.Nodes[0].Skipped {
+		t.Fatalf("diags %v, skipped %v %v:\n%s", diags, back.Nodes[0].Skipped, back.Nodes[1].Skipped, got)
+	}
+}

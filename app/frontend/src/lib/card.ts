@@ -36,6 +36,7 @@ export function categoryToken(type: string): string {
   if (['request', 'subflow', 'fetch', 'webhook'].includes(type)) return '--request'
   if (['condition', 'batch', 'run_till', 'parallel'].includes(type)) return '--container'
   if (['stop'].includes(type)) return '--fail'
+  if (type === 'loop_control') return '--container'
   return '--action'
 }
 
@@ -47,7 +48,7 @@ export function typeLabel(type: string): string {
   const labels: Record<string, string> = {
     request: 'Request', fetch: 'Request', webhook: 'Request', subflow: 'Flow', set: 'Set value', assert: 'Check',
     condition: 'Route', batch: 'Loop', run_till: 'Loop', parallel: 'Group', delay: 'Wait',
-    log: 'Output', save: 'Output', digest: 'Output', stop: 'Stop', note: 'Note',
+    log: 'Output', save: 'Output', digest: 'Output', stop: 'Stop', loop_control: 'Loop control', note: 'Note',
   }
   return labels[type] ?? type
 }
@@ -57,7 +58,7 @@ export function typeIcon(type: string): string {
   const icons: Record<string, string> = {
     request: 'send', subflow: 'flow', fetch: 'globe', webhook: 'hook', set: 'variables', assert: 'assert',
     condition: 'usedby', batch: 'repeat', run_till: 'loop', parallel: 'list', delay: 'clock',
-    log: 'log', save: 'save', digest: 'chart', stop: 'stop', note: 'note',
+    log: 'log', save: 'save', digest: 'chart', stop: 'stop', loop_control: 'skip-next', note: 'note',
   }
   return icons[type] ?? 'list'
 }

@@ -101,6 +101,32 @@ func (rt *nodeRuntime) StopRun() { rt.r.stop.Store(true) }
 // Stopped reports that a stop node ended the run.
 func (rt *nodeRuntime) Stopped() bool { return rt.r.stop.Load() }
 
+// EndIteration ends the loop turn the step sits in (a loop_control next). It reports false outside a loop.
+func (rt *nodeRuntime) EndIteration() bool {
+	turn := rt.f.loop
+	if turn == nil {
+		return false
+	}
+	turn.ended.Store(true)
+	return true
+}
+
+// LeaveLoop ends the turn and the loop: turns that have not started never will, running ones finish. It reports
+// false outside a loop.
+func (rt *nodeRuntime) LeaveLoop() bool {
+	turn := rt.f.loop
+	if turn == nil {
+		return false
+	}
+	turn.leftIn.Store(true)
+	turn.left.Store(true)
+	turn.ended.Store(true)
+	return true
+}
+
+// IterationEnded reports that the turn the node sits in, or one around it, is over.
+func (rt *nodeRuntime) IterationEnded() bool { return rt.f.loop.isOver() }
+
 // Sleep waits d on the run's clock, or until ctx is done.
 func (rt *nodeRuntime) Sleep(ctx context.Context, d time.Duration) error {
 	if d <= 0 {

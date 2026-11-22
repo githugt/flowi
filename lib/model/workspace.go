@@ -32,6 +32,9 @@ type Workspace struct {
 	Meta
 	Collections []Mount
 	Schedules   []Schedule
-	Settings    Settings
-	File        string
+	// EnvironmentGroups are the environment groups the person made, so that a group can exist with no environment in
+	// it. A group an environment names exists as well, whether it is listed here or not (see Workspace.EnvironmentGroups).
+	EnvironmentGroups []string
+	Settings          Settings
+	File              string
 }

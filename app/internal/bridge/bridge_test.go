@@ -478,11 +478,11 @@ func TestWorkspaceService_Menu_should_offer_what_applies_to_the_row(t *testing.T
 	// "Rename / move", yet could not move to another collection. It now asks
 	// for the name, and Move to… does the moving.
 	// Delete asks nothing: the request goes to the trash and a toast offers Undo.
-	if strings.Join(actions, ",") != "open,duplicate,rename,move,delete" {
+	if strings.Join(actions, ",") != "open,duplicate,rename,move,labels,delete" {
 		t.Fatalf("menu %v", actions)
 	}
-	if menu[2].Prompt == nil || menu[2].Prompt.Initial != "login" || menu[3].Dialog != "move" || menu[4].Confirm != "" {
-		t.Fatalf("prompt %+v, move %+v, confirm %q", menu[2].Prompt, menu[3], menu[4].Confirm)
+	if menu[2].Prompt == nil || menu[2].Prompt.Initial != "login" || menu[3].Dialog != "move" || menu[4].Dialog != "labels" || menu[5].Confirm != "" {
+		t.Fatalf("prompt %+v, move %+v, labels %+v, confirm %q", menu[2].Prompt, menu[3], menu[4], menu[5].Confirm)
 	}
 }
 
@@ -641,7 +641,7 @@ func TestManagerService_State_should_list_the_mounted_collections(t *testing.T) 
 func TestImportService_Preview_should_show_the_planned_files(t *testing.T) {
 	c := vmtest.SampleCollection()
 	b := &vmtest.Backend{Cols: []model.Collection{c}}
-	b.Plan = flowi.ImportPlan{Collection: c.Manifest.ID, Files: []flowi.PlannedFile{{Rel: "requests/health.req.yaml"}}}
+	b.Plan = flowi.ImportPlan{Collection: c.Manifest.ID, Files: []flowi.PlannedFile{{Rel: "requests/health.req.yaml", Kind: flowi.PlannedRequest, Name: "health"}}}
 	pub := &published{}
 	svc := bridge.NewApp(b, bridge.NewInlineActor(), pub.emit).Import()
 	v := svc.State()

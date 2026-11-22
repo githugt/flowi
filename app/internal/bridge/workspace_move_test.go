@@ -85,7 +85,7 @@ func TestWorkspaceService_Menu_should_offer_Move_to_for_requests_only(t *testing
 		want  []string // the actions, in order
 		other bool     // Move to… must not be there
 	}{
-		{name: "one request", ids: []string{login}, want: []string{"open", "duplicate", "rename", "move", "delete"}},
+		{name: "one request", ids: []string{login}, want: []string{"open", "duplicate", "rename", "move", "labels", "delete"}},
 		{name: "two requests", ids: []string{login, verify}, want: []string{"flowFromRequests", "move", "delete"}},
 		{name: "a request and a flow", ids: []string{login, flow}, other: true},
 	}

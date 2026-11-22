@@ -50,6 +50,8 @@ async function run(e: MenuEntry, ids: string[]) {
   const ask = () => {
     if (e.dialog === 'move') {
       ui.moving = ids
+    } else if (e.dialog === 'labels') {
+      ui.labelling = ids[0]
     } else if (e.prompt) {
       ui.prompt({
         title: e.prompt.title,

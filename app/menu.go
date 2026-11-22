@@ -52,6 +52,7 @@ func buildMenu(wails *application.App, emit func(name string, data any)) *applic
 		menuAction{"Import…", "CmdOrCtrl+I", "import"},
 		menuAction{"", "", ""},
 		menuAction{"Secrets…", "", "secrets"},
+		menuAction{"Manage environments…", "", "envmanage"},
 		menuAction{"Compare environments…", "", "envcompare"},
 		menuAction{"Schedules…", "", "schedules"},
 		menuAction{"Replayer…", "", "replayer"},

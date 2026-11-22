@@ -222,6 +222,36 @@ func (b *Workspace) SaveEnvironment(e model.Environment, dropComments bool) erro
 	return b.ws.SaveEnvironment(e, flowi.SaveOptions{DropComments: dropComments})
 }
 
+func (b *Workspace) SetEnvironmentGroups(files []string, groups []string, dropComments bool) error {
+	b.guard.Check("SetEnvironmentGroups")
+	return b.ws.SetEnvironmentGroups(files, groups, flowi.SaveOptions{DropComments: dropComments})
+}
+
+func (b *Workspace) SetEnvironmentColour(files []string, colour string, dropComments bool) error {
+	b.guard.Check("SetEnvironmentColour")
+	return b.ws.SetEnvironmentColour(files, colour, flowi.SaveOptions{DropComments: dropComments})
+}
+
+func (b *Workspace) EnvironmentGroups() []string {
+	b.guard.Check("EnvironmentGroups")
+	return b.ws.EnvironmentGroups()
+}
+
+func (b *Workspace) AddEnvironmentGroup(name string) error {
+	b.guard.Check("AddEnvironmentGroup")
+	return b.ws.AddEnvironmentGroup(name)
+}
+
+func (b *Workspace) RenameEnvironmentGroup(from, to string, dropComments bool) error {
+	b.guard.Check("RenameEnvironmentGroup")
+	return b.ws.RenameEnvironmentGroup(from, to, flowi.SaveOptions{DropComments: dropComments})
+}
+
+func (b *Workspace) DeleteEnvironmentGroup(name string, dropComments bool) error {
+	b.guard.Check("DeleteEnvironmentGroup")
+	return b.ws.DeleteEnvironmentGroup(name, flowi.SaveOptions{DropComments: dropComments})
+}
+
 func (b *Workspace) ShareEnvironment(collection model.ID, name string, overwrite bool) (string, bool, []string, error) {
 	b.guard.Check("ShareEnvironment")
 	return b.ws.ShareEnvironment(collection, name, overwrite)
@@ -603,6 +633,11 @@ func (b *Workspace) ApplyImport(p flowi.ImportPlan, o flowi.ApplyOptions) error 
 	return b.ws.ApplyImport(p, o)
 }
 
+func (b *Workspace) ApplyImportReport(p flowi.ImportPlan, o flowi.ApplyOptions) (flowi.ImportReport, error) {
+	b.guard.Check("ApplyImportReport")
+	return b.ws.ApplyImportReport(p, o)
+}
+
 // FlowSum fingerprints the flow's file as it is on disk now.
 func (b *Workspace) FlowSum(t flowi.FlowTarget) (string, error) {
 	b.guard.Check("FlowSum")
@@ -654,6 +689,21 @@ func (b *Workspace) FlowRunDetail(t flowi.FlowTarget, id string) (flowi.RunDetai
 	return b.ws.FlowRunDetail(t, id)
 }
 
+func (b *Workspace) FlowRunSteps(t flowi.FlowTarget, id string) (flowi.RunSteps, error) {
+	b.guard.Check("FlowRunSteps")
+	return b.ws.FlowRunSteps(t, id)
+}
+
+func (b *Workspace) DeleteFlowRun(t flowi.FlowTarget, id string) error {
+	b.guard.Check("DeleteFlowRun")
+	return b.ws.DeleteFlowRun(t, id)
+}
+
+func (b *Workspace) ClearFlowRuns(t flowi.FlowTarget) (int, error) {
+	b.guard.Check("ClearFlowRuns")
+	return b.ws.ClearFlowRuns(t)
+}
+
 func (b *Workspace) FlowRuns(t flowi.FlowTarget, limit int) []flowi.RunSummary {
 	b.guard.Check("FlowRuns")
 	return b.ws.FlowRuns(t, limit)
@@ -702,6 +752,30 @@ func (b *Workspace) StoredRecord(t flowi.RequestTarget, version, name string) (e
 func (b *Workspace) LastResponse(t flowi.RequestTarget, version string) (engine.Record, bool) {
 	b.guard.Check("LastResponse")
 	return b.ws.LastResponse(t, version)
+}
+
+// SetRequestLabels sets the tags and status of a request.
+func (b *Workspace) SetRequestLabels(t flowi.RequestTarget, tags []string, status string, dropComments bool) error {
+	b.guard.Check("SetRequestLabels")
+	return b.ws.SetRequestLabels(t, tags, status, flowi.SaveOptions{DropComments: dropComments})
+}
+
+// SetFlowLabels sets the tags and status of a flow.
+func (b *Workspace) SetFlowLabels(t flowi.FlowTarget, tags []string, status string, dropComments bool) error {
+	b.guard.Check("SetFlowLabels")
+	return b.ws.SetFlowLabels(t, tags, status, flowi.SaveOptions{DropComments: dropComments})
+}
+
+// SetFolderLabels sets the tags and status of a folder.
+func (b *Workspace) SetFolderLabels(collection model.ID, tree, dir string, tags []string, status string, dropComments bool) error {
+	b.guard.Check("SetFolderLabels")
+	return b.ws.SetFolderLabels(collection, tree, dir, tags, status, flowi.SaveOptions{DropComments: dropComments})
+}
+
+// SaveStatuses replaces the statuses a collection adds to the defaults.
+func (b *Workspace) SaveStatuses(collection model.ID, statuses []model.Status, dropComments bool) error {
+	b.guard.Check("SaveStatuses")
+	return b.ws.SaveStatuses(collection, statuses, flowi.SaveOptions{DropComments: dropComments})
 }
 
 func (b *Workspace) SetFolderOrder(collection model.ID, tree, dir string, order []string, dropComments bool) error {

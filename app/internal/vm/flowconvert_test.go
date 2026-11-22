@@ -10,7 +10,7 @@ import (
 	"github.com/githugt/flowi/lib/model"
 )
 
-func TestStepCatalog_Then_it_lists_eleven_entries_in_five_groups(t *testing.T) {
+func TestStepCatalog_Then_it_lists_twelve_entries_in_five_groups(t *testing.T) {
 	// Act
 	entries := StepCatalog()
 
@@ -22,7 +22,7 @@ func TestStepCatalog_Then_it_lists_eleven_entries_in_five_groups(t *testing.T) {
 			t.Errorf("entry %+v is missing its name, description or type", e)
 		}
 	}
-	if len(entries) != 11 || len(groups) != 5 {
+	if len(entries) != 12 || len(groups) != 5 {
 		t.Fatalf("%d entries in %d groups: %+v", len(entries), len(groups), entries)
 	}
 }
@@ -62,7 +62,7 @@ func TestSearchSteps_Given_a_word_from_a_description_Then_the_entry_is_found(t *
 	if len(none) != 0 {
 		t.Errorf("no match should find nothing: %+v", none)
 	}
-	if len(SearchSteps("  ")) != 11 {
+	if len(SearchSteps("  ")) != 12 {
 		t.Errorf("a blank search should list every entry")
 	}
 }

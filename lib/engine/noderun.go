@@ -39,6 +39,9 @@ type nodeResult struct {
 // skippedByYou is the reason of a node the person chose not to run.
 const skippedByYou = "skipped by you"
 
+// skippedInFlow is the reason of a node the flow itself marks as skipped.
+const skippedInFlow = "skipped in the flow"
+
 // skipSet is the set of node ids and paths in a RunInput's Skip.
 func skipSet(ids []string) map[string]bool {
 	set := make(map[string]bool, len(ids))
@@ -84,6 +87,9 @@ func (r *runner) shownChecks(list []CheckEval) []CheckEval {
 func (r *runner) execNode(ctx context.Context, f *frame, n model.Node, path string) nodeResult {
 	if r.skip[n.ID] || r.skip[path] {
 		return nodeResult{status: StatusSkipped, reason: skippedByYou, outputs: r.prior[n.ID]}
+	}
+	if n.Skipped {
+		return nodeResult{status: StatusSkipped, reason: skippedInFlow, outputs: r.prior[n.ID]}
 	}
 	run, diags := shouldRun(n, f.scope(r))
 	if diags.HasErrors() {

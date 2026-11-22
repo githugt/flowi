@@ -34,6 +34,7 @@ import (
 	"github.com/githugt/flowi/lib/importers/thunderclient"
 	"github.com/githugt/flowi/lib/internal/names"
 	"github.com/githugt/flowi/lib/internal/textenc"
+	"github.com/githugt/flowi/lib/internal/yamldoc"
 	"github.com/githugt/flowi/lib/mermaid"
 	"github.com/githugt/flowi/lib/model"
 	"github.com/githugt/flowi/lib/openapi"
@@ -87,14 +88,21 @@ type ImportSource struct {
 	// or AsyncAPI document before it is imported. The document itself is kept
 	// as it was, with the overlays beside it in descriptions/.
 	Overlays [][]byte
+	// Into is the folder of the collection the requests and flows are put in
+	// ("demo/websocket", nested as deep as you like; made when it is not there). Empty
+	// means where the importer puts them: its own folders, or the top. Kept
+	// documents, environments and authentications are not moved.
+	Into string
 }
 
 // ImportPlan is what an import would write. Files are in path order;
 // Diags are the import's lossy reports (FLW-IMPORT-001).
 type ImportPlan struct {
 	Collection model.ID
-	Files      []PlannedFile
-	Diags      diag.List
+	// Into is the folder the requests and flows were put in, as cleaned (see ImportSource.Into).
+	Into  string
+	Files []PlannedFile
+	Diags diag.List
 	// Items is the per-item report of importers other than OpenAPI and
 	// Arazzo; skipped items contribute no files.
 	Items []importers.Item
@@ -116,7 +124,35 @@ type PlannedFile struct {
 	// Workspace marks an environment, which belongs to the workspace and is
 	// written to its environments directory, not to the collection.
 	Workspace bool
+	// Kind says what the file is (a PlannedKind) and Name what people call it:
+	// the title of a request or flow, the name of an environment. Both are set by the
+	// preview functions, for a screen to list what an import makes instead of paths.
+	Kind PlannedKind
+	Name string
+	// Verb is what a request shows where an HTTP request shows its method (GET, MQTT, SQS, GRPC …), for a preview to
+	// show the same pill as the request tree. "" for a file that is not a request, or whose protocol has no verb.
+	Verb string
+	// ExistingName is the title of the request or flow that is already at this path and differs from what the import
+	// would write, so a preview can say which one is in the way: two operations can share a file name and still be
+	// different requests. "" when nothing is there, or it is the same, or it has no title.
+	ExistingName string
 }
+
+// PlannedKind is what a planned file is.
+type PlannedKind string
+
+// Kinds of planned files.
+const (
+	PlannedRequest     PlannedKind = "request"
+	PlannedFlow        PlannedKind = "flow"
+	PlannedEnvironment PlannedKind = "environment"
+	PlannedAuth        PlannedKind = "auth"
+	PlannedExample     PlannedKind = "example"  // a pinned response of a request
+	PlannedSchema      PlannedKind = "schema"   // a response schema a request checks against
+	PlannedDocument    PlannedKind = "document" // the imported description, kept in descriptions/ (not a request)
+	PlannedProto       PlannedKind = "proto"
+	PlannedOther       PlannedKind = "other"
+)
 
 // ApplyOptions decide what happens to files that already exist. Without
 // either, ApplyImport refuses (FLW-IMPORT-003) and writes nothing.
@@ -172,6 +208,21 @@ func (w *Workspace) PreviewImportSourceNew(src ImportSource, dir string) (Import
 }
 
 func (w *Workspace) previewIn(c model.Collection, src ImportSource) (ImportPlan, error) {
+	into, err := cleanInto(src.Into)
+	if err != nil {
+		return ImportPlan{}, err
+	}
+	src.Into = into
+	plan, err := w.planSource(c, src)
+	if err != nil {
+		return ImportPlan{}, err
+	}
+	plan.Into = into
+	w.annotate(&plan)
+	return plan, nil
+}
+
+func (w *Workspace) planSource(c model.Collection, src ImportSource) (ImportPlan, error) {
 	// Some Windows tools put a byte order mark at the start of a file, or save
 	// it as UTF-16; no JSON parser accepts either, so every source is plain UTF-8 from here.
 	src.Data = textenc.ToUTF8(src.Data)
@@ -180,7 +231,7 @@ func (w *Workspace) previewIn(c model.Collection, src ImportSource) (ImportPlan,
 		if fatal.HasErrors() {
 			return ImportPlan{}, fatal.Err()
 		}
-		return w.planResult(c, r)
+		return w.planResult(c, intoResult(r, src.Into, src.Kind))
 	}
 	var (
 		files map[string][]byte
@@ -242,41 +293,50 @@ func planOf(c model.Collection, files map[string][]byte, diags diag.List, envDir
 // ApplyImport writes a previewed plan and reloads the collection.
 // Existing files are checked again at apply time; see ApplyOptions.
 func (w *Workspace) ApplyImport(p ImportPlan, o ApplyOptions) error {
+	_, err := w.ApplyImportReport(p, o)
+	return err
+}
+
+// ApplyImportReport is ApplyImport that says what it did with each file: written,
+// replaced, left as it was, or removed (see ImportReport). The report is what to tell
+// the person, so "2 files imported" cannot hide that one of them was kept.
+func (w *Workspace) ApplyImportReport(p ImportPlan, o ApplyOptions) (ImportReport, error) {
 	w.mu.RLock()
 	c, ok := w.collection(p.Collection)
 	w.mu.RUnlock()
 	if !ok {
-		return diagErr(diag.CodeWSUnknownCollection, map[string]string{"name": string(p.Collection)})
+		return ImportReport{}, diagErr(diag.CodeWSUnknownCollection, map[string]string{"name": string(p.Collection)})
 	}
 	changes, existing, err := importChanges(p)
 	if err != nil {
-		return err
+		return ImportReport{}, err
 	}
 	if len(existing) > 0 && !o.Overwrite && !o.SkipExisting {
-		return diagErr(diag.CodeImportExists, map[string]string{"count": strconv.Itoa(len(existing)), "files": strings.Join(existing, ", ")})
+		return ImportReport{}, diagErr(diag.CodeImportExists, map[string]string{"count": strconv.Itoa(len(existing)), "files": strings.Join(existing, ", ")})
 	}
+	report := reportOf(p, changes, o)
 	if o.SkipExisting && !o.Overwrite {
 		changes = slices.DeleteFunc(changes, func(ch store.FileChange) bool { return ch.Old != nil })
 	}
 	writes, removals := splitRemovals(changes)
 	if err := store.Apply(writes); err != nil {
-		return err
+		return ImportReport{}, err
 	}
 	for _, file := range removals {
 		if err := os.Remove(file); err != nil && !errors.Is(err, fs.ErrNotExist) {
-			return fmt.Errorf("removing %s: %w", file, err)
+			return ImportReport{}, fmt.Errorf("removing %s: %w", file, err)
 		}
 	}
 	if slices.ContainsFunc(p.Files, func(f PlannedFile) bool { return f.Workspace }) {
 		if err := w.reloadEnvironments(); err != nil {
-			return err
+			return ImportReport{}, err
 		}
 	}
 	if _, err = w.Reload(Change{Root: c.Root, File: c.Root, Op: store.ChangeRescan}); err != nil {
-		return err
+		return ImportReport{}, err
 	}
 	w.noteImported(p, changes)
-	return nil
+	return report, nil
 }
 
 // noteImported records, for each request and flow an import wrote as a new file, that it came from an import. One
@@ -357,7 +417,8 @@ func (w *Workspace) planOpenAPI(c model.Collection, src ImportSource) (map[strin
 		return nil, nil, diags.Err()
 	}
 	diags = append(overlayDiags, diags...)
-	base := previousImport(kept, hasKept)
+	intoOpenAPI(&r, src.Into)
+	base := intoBase(previousImport(kept, hasKept), src.Into)
 	ids := map[model.ID]model.ID{} // imported id → existing id it keeps
 	files := map[string][]byte{}
 	for _, req := range r.Requests {
@@ -409,6 +470,7 @@ func (w *Workspace) planAsyncAPI(c model.Collection, src ImportSource) (map[stri
 		return nil, nil, diags.Err()
 	}
 	diags = append(overlayDiags, diags...)
+	intoRequests(r.Requests, src.Into)
 	ids := map[model.ID]model.ID{}
 	files := map[string][]byte{}
 	for _, req := range r.Requests {
@@ -450,7 +512,7 @@ func (w *Workspace) planProto(c model.Collection, src ImportSource) (map[string]
 		if m.ClientStream {
 			g.Body = model.Body{JSON: "[" + m.Example + "]"}
 		}
-		req := model.Request{Meta: model.Meta{ID: w.newID(), Name: service + "." + m.Name}, Path: service + "/" + m.Name,
+		req := model.Request{Meta: model.Meta{ID: w.newID(), Name: service + "." + m.Name}, Path: joinInto(src.Into, service+"/"+m.Name),
 			Versions: []model.RequestVersion{{Label: "1", GRPC: &g}}}
 		if _, err := w.planRequestFile(c, req, ids, files); err != nil {
 			return nil, nil, err
@@ -480,11 +542,23 @@ func planSpecCopy(c model.Collection, src ImportSource, kind string, files map[s
 	}
 }
 
+var dashes = regexp.MustCompile(`-{2,}`)
+
+// PastedSourceName is the name of a document whose text was pasted, not read from a file.
+const PastedSourceName = "pasted text"
+
 // specBaseName is the name a source is kept under in descriptions/: the
-// source file's, else "imported".
+// source file's, the document's own title for pasted text, else "imported".
+//
+// Before: a pasted document was written to a temporary file and kept as
+// descriptions/flowi-paste-2749985858.asyncapi.yaml, a name that meant nothing to the person and that every
+// later paste reused, so a second pasted document was not kept beside the first.
 func specBaseName(src ImportSource) string {
 	base := ""
-	if src.Name != "" {
+	switch {
+	case src.Name == PastedSourceName:
+		base = dashes.ReplaceAllString(importers.FileName(titleOf(src.Data)), "-")
+	case src.Name != "":
 		base = strings.TrimSuffix(filepath.Base(src.Name), filepath.Ext(src.Name))
 		base = importers.FileName(strings.TrimSuffix(strings.TrimSuffix(strings.TrimSuffix(base, ".openapi"), ".asyncapi"), ".arazzo"))
 	}
@@ -492,6 +566,17 @@ func specBaseName(src ImportSource) string {
 		base = "imported"
 	}
 	return base
+}
+
+// titleOf is the info.title of an OpenAPI or AsyncAPI document, "" when it has none.
+func titleOf(data []byte) string {
+	root, err := yamldoc.Decode(data)
+	if err != nil {
+		return ""
+	}
+	info, _ := root["info"].(map[string]any)
+	title, _ := info["title"].(string)
+	return title
 }
 
 func (w *Workspace) planRequest(c model.Collection, req model.Request, schemas map[string]map[string]any, ids map[model.ID]model.ID, files map[string][]byte) error {
@@ -617,6 +702,7 @@ func (w *Workspace) planArazzo(c model.Collection, src ImportSource) (map[string
 		return nil, nil, diags.Err()
 	}
 	diags = append(overlayDiags, diags...)
+	intoFlows(r.Flows, src.Into, false) // its requests are the collection's own: they stay where they are
 	files := map[string][]byte{}
 	if err := w.planFlows(c, r.Flows, map[model.ID]model.ID{}, files); err != nil {
 		return nil, nil, err

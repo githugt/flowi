@@ -74,6 +74,7 @@ type operation struct {
 	server             server
 	message            map[string]any // the message this operation sends or receives
 	bindings           bindingSources
+	flowiBinding       map[string]any // x-flowi-binding of the operation: Flowi binding names the protocol bindings cannot carry
 }
 
 type channel struct {
@@ -82,6 +83,7 @@ type channel struct {
 
 type server struct {
 	protocol, host, pathname, extension string
+	scheme                              string // x-flowi-scheme: the URL scheme to write, where the protocol's usual one is not wanted
 }
 
 // ref follows a local "#/a/b" reference; anything else comes back as given.
@@ -122,6 +124,7 @@ func operationsV3(root map[string]any) []operation {
 		op.server = firstServerV3(root, ch, servers)
 		op.message = firstMessage(root, od["messages"], ch["messages"], channels)
 		op.bindings = bindingSources{server: bindingsMap(root, firstServerRawV3(root, ch, servers)), channel: bindingsMap(root, ch), operation: bindingsMap(root, od), message: bindingsMap(root, op.message)}
+		op.flowiBinding, _ = od["x-flowi-binding"].(map[string]any)
 		if od["reply"] != nil {
 			op.send, op.receive = true, true
 		}
@@ -154,7 +157,7 @@ func firstServerRawV3(root, ch, servers map[string]any) map[string]any {
 func firstServerV3(root, ch, servers map[string]any) server {
 	pick := func(v any) server {
 		s := ref(root, v)
-		return server{protocol: str(s, "protocol"), host: str(s, "host"), pathname: str(s, "pathname"), extension: str(s, "x-flowi-protocol")}
+		return server{protocol: str(s, "protocol"), host: str(s, "host"), pathname: str(s, "pathname"), extension: str(s, "x-flowi-protocol"), scheme: str(s, "x-flowi-scheme")}
 	}
 	if list, _ := ch["servers"].([]any); len(list) > 0 {
 		return pick(list[0])
@@ -194,7 +197,7 @@ func operationsV2(root map[string]any) []operation {
 		s := ref(root, servers[names[0]])
 		firstRaw = s
 		host, path, _ := strings.Cut(strings.TrimPrefix(strings.TrimPrefix(str(s, "url"), str(s, "protocol")+"://"), "//"), "/")
-		first = server{protocol: str(s, "protocol"), host: host, extension: str(s, "x-flowi-protocol")}
+		first = server{protocol: str(s, "protocol"), host: host, extension: str(s, "x-flowi-protocol"), scheme: str(s, "x-flowi-scheme")}
 		if path != "" {
 			first.pathname = "/" + path
 		}
@@ -214,6 +217,7 @@ func operationsV2(root map[string]any) []operation {
 			op := operation{id: id, title: str(od, "summary"), summary: str(od, "description"), send: kind == "publish", receive: kind == "subscribe",
 				channel: channel{address: address}, server: first}
 			op.bindings = bindingSources{server: bindingsMap(root, firstRaw), channel: bindingsMap(root, ch), operation: bindingsMap(root, od)}
+			op.flowiBinding, _ = od["x-flowi-binding"].(map[string]any)
 			if m := ref(root, od["message"]); m != nil {
 				op.message = m
 				if one, _ := m["oneOf"].([]any); len(one) > 0 {
@@ -281,13 +285,23 @@ func requestOf(op operation, id model.ID) (*model.Request, diag.List) {
 		detail := fmt.Sprintf("its server protocol is %q, which Flowi has no client for", op.server.protocol)
 		return nil, diag.List{diag.New(diag.CodeImportUnmapped, diag.Location{}, map[string]string{"what": what, "how": "skipped", "detail": detail})}
 	}
+	var diags diag.List
+	if want := op.server.scheme; want != "" {
+		if slices.Contains(model.AsyncSchemes(protocol), want) {
+			scheme = want
+		} else {
+			diags = append(diags, unmappedExtension(op.id, "x-flowi-scheme "+want, protocol+" has no such URL scheme"))
+		}
+	}
 	server := ""
 	if op.server.host != "" {
 		server = scheme + "://" + templated(op.server.host, "env.") + op.server.pathname
 	}
 	a := model.Async{Protocol: protocol, Server: server, Channel: templated(op.channel.address, "")}
 	binding, topic, left := bindingsOf(protocol, op.bindings)
+	binding, extDiags := flowiBindings(op, protocol, binding)
 	a.Binding = binding
+	diags = append(diags, extDiags...)
 	if topic != "" {
 		a.Channel = templated(topic, "")
 	}
@@ -303,7 +317,39 @@ func requestOf(op operation, id model.ID) (*model.Request, diag.List) {
 	}
 	r := model.Request{Meta: model.Meta{ID: id, Name: name, Description: op.summary}, Path: importers.FileName(op.id), Operation: op.id,
 		Versions: []model.RequestVersion{{Label: "1", Async: &a}}}
-	return &r, unmappedBindings(op.id, left)
+	return &r, append(diags, unmappedBindings(op.id, left)...)
+}
+
+// flowiBindings applies x-flowi-binding of the operation: Flowi binding names (model.AsyncBindings) the AsyncAPI
+// protocol bindings have no field for, such as the mode of a Redis request or the endpoint of a Pub/Sub emulator.
+// A name the protocol does not have is reported. A credential is reported and never imported: the extension is
+// for options, and credentials stay out of files.
+func flowiBindings(op operation, protocol string, binding []model.KeyValue) ([]model.KeyValue, diag.List) {
+	var diags diag.List
+	for _, name := range slices.Sorted(maps.Keys(op.flowiBinding)) {
+		value := scalar(op.flowiBinding[name])
+		switch {
+		case slices.Contains(model.AsyncCredentials(protocol), name):
+			diags = append(diags, unmappedExtension(op.id, "x-flowi-binding "+name, "credentials are never imported: set it in the request's Authentication"))
+			continue
+		case !slices.Contains(model.AsyncBindings(protocol), name):
+			diags = append(diags, unmappedExtension(op.id, "x-flowi-binding "+name, protocol+" has no such binding"))
+			continue
+		case value == "":
+			continue
+		}
+		if i := slices.IndexFunc(binding, func(kv model.KeyValue) bool { return kv.Key == name }); i >= 0 {
+			binding[i].Value = value
+		} else {
+			binding = append(binding, model.KeyValue{Key: name, Value: value})
+		}
+	}
+	return binding, diags
+}
+
+func unmappedExtension(operation, what, detail string) diag.Diagnostic {
+	return diag.New(diag.CodeImportUnmapped, diag.Location{}, map[string]string{
+		"what": what + " of operation " + operation, "how": "left out", "detail": detail})
 }
 
 // exampleOf is the first example payload of a message, else a skeleton of its

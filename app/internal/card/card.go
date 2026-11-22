@@ -128,6 +128,10 @@ type Facts struct {
 	// Outcomes are the outcomes the request's version writes; none when it writes none, which is success
 	// and failure (the Done and Fail ports).
 	Outcomes []OutcomeFact
+
+	// Loop is the type of the nearest loop a step sits in (batch or run_till), "" outside one: a loop control
+	// card says "Next round" in a run_till and "Next item" in a batch.
+	Loop string
 }
 
 // OutcomeFact is one outcome of a request, as the card needs it.

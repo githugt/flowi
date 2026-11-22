@@ -14,8 +14,16 @@ export function edgeTaken(edge: { fail?: boolean }, from: string, to: string): b
   const toRan = RAN.includes(to)
   if (edge.fail) return FAILED.includes(from) && toRan
   if (from === 'running') return true
-  return from === 'passed' && toRan
+  // A skipped step does not hold up the ones after it: it takes its success arrows (lib/engine arrowTaken). One
+  // that never started because something before it failed has a target that did not run either.
+  return (from === 'passed' || from === 'skipped') && toRan
 }
+
+/**
+ * The status an arrow reads of a step. A step skipped on purpose (the flow marks it, or the person did: its card is
+ * hatched) lets the run through, so for its arrows it counts as passed: the arrow into it is taken like the one out of it.
+ */
+export const throughStatus = (status: string, skippedOnPurpose: boolean): string => (status === 'skipped' && skippedOnPurpose ? 'passed' : status)
 
 /** Whether a run is going, so only then do the taken arrows move. */
 export const running = (statuses: Record<string, string>): boolean => Object.values(statuses).includes('running')

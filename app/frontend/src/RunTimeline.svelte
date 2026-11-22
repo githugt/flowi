@@ -5,7 +5,7 @@
 
   // The last run as a waterfall: one bar per step on a shared time axis, so steps that ran side by side line up and the
   // slow one stands out. A step's name selects it on the canvas.
-  let { bars, onselect }: { bars: TimelineBar[]; onselect: (step: string) => void } = $props()
+  let { bars, label = '', onselect }: { bars: TimelineBar[]; label?: string; onselect: (step: string) => void } = $props()
 
   const rows = $derived(timelineRows(bars))
   const total = $derived(runLength(bars))
@@ -16,12 +16,13 @@
 <section class="timeline" aria-label="Run timeline">
   <p class="head">
     <strong>Timeline</strong>
-    <span class="muted">{formatSpan(total)} in all{slow ? ` · ${slow.step} took ${slow.share}% of it` : ''}</span>
+    <span class="muted">{label ? `${label} · ` : ''}{formatSpan(total)} in all{slow ? ` · ${slow.step} took ${slow.share}% of it` : ''}</span>
   </p>
   <div class="axis" aria-hidden="true">
     <span></span>
     <div class="ticks">{#each ticks as t (t.at)}<span class="tick" style:left="{t.at}%">{t.label}</span>{/each}</div>
   </div>
+  {#if rows.length === 0}<p class="muted">No step times were saved for this run.</p>{/if}
   <ul>
     {#each rows as r (r.step)}
       <li class:overlaps={r.overlaps}>

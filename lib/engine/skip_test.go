@@ -86,3 +86,22 @@ func TestRun_Given_a_trigger_Then_the_report_says_what_started_the_run(t *testin
 		t.Fatalf("trigger %q", res.Report.Trigger)
 	}
 }
+
+func TestRun_Given_a_step_the_flow_marks_skipped_Then_it_does_not_execute_in_any_run(t *testing.T) {
+	// Before: only a run's own skip list could skip a step, so a skip could not be kept in the flow.
+	f := newFixture(t)
+	skipped := setValues("b", model.SetValue{Name: "b", Value: "{{2}}"})
+	skipped.Skipped = true
+	fl := f.addFlow("skip-flow",
+		setValues("a", model.SetValue{Name: "a", Value: "{{1}}"}),
+		skipped,
+		flowNode("c", "note", "text", "b={{vars.b ?? 'none'}}"))
+
+	events, res := runFlow(testCtx(t), t, f.deps(), f.runInput(fl))
+
+	b, _ := finishedNode(events, "b")
+	c, _ := finishedNode(events, "c")
+	if res.Status != StatusPassed || b.Status != StatusSkipped || b.Reason != "skipped in the flow" || c.Outputs["text"] != "b=none" {
+		t.Fatalf("result %+v b %+v c %+v", res, b, c)
+	}
+}

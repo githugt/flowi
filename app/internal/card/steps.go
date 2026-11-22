@@ -17,22 +17,23 @@ type stepBuilder func(model.Node, Facts) Card
 // stepBuilders are the cards of every step that is not a request, by type.
 func stepBuilders() map[model.NodeType]stepBuilder {
 	return map[model.NodeType]stepBuilder{
-		"subflow":   flowCard,
-		"set":       setCard,
-		"assert":    checkCard,
-		"fuzz":      fuzzCard,
-		"condition": routeCard,
-		"batch":     loopCard,
-		"run_till":  loopCard,
-		"parallel":  groupCard,
-		"delay":     waitCard,
-		"log":       outputCard,
-		"save":      outputCard,
-		"digest":    outputCard,
-		"stop":      stopCard,
-		"note":      noteCard,
-		"fetch":     legacyCallCard,
-		"webhook":   legacyCallCard,
+		"subflow":      flowCard,
+		"set":          setCard,
+		"assert":       checkCard,
+		"fuzz":         fuzzCard,
+		"condition":    routeCard,
+		"batch":        loopCard,
+		"run_till":     loopCard,
+		"parallel":     groupCard,
+		"delay":        waitCard,
+		"log":          outputCard,
+		"save":         outputCard,
+		"digest":       outputCard,
+		"stop":         stopCard,
+		"loop_control": loopControlCard,
+		"note":         noteCard,
+		"fetch":        legacyCallCard,
+		"webhook":      legacyCallCard,
 	}
 }
 
@@ -309,6 +310,23 @@ func stopCard(n model.Node, _ Facts) Card {
 	} else {
 		c.Ports = []Port{{ID: "done", Label: "Done", Tone: "done"}}
 	}
+	if msg := param(n, "message"); msg != "" {
+		c.Rows = []Row{row("message", "message", msg)}
+	}
+	return c
+}
+
+// loopControlCard says what the step does to the loop around it. Like a Stop it ends the flow it sits in (nothing
+// after it in the body runs), so it has the one Done port and the canvas adds no step after it.
+func loopControlCard(n model.Node, f Facts) Card {
+	subline := "Next item"
+	switch {
+	case param(n, "action") == "leave":
+		subline = "Leave the loop"
+	case f.Loop == "run_till":
+		subline = "Next round"
+	}
+	c := Card{Subline: subline, Ports: []Port{{ID: "done", Label: "Done", Tone: "done"}}}
 	if msg := param(n, "message"); msg != "" {
 		c.Rows = []Row{row("message", "message", msg)}
 	}
