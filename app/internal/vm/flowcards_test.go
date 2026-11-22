@@ -171,3 +171,23 @@ func TestCardsOf_Given_a_version_with_no_expect_Then_there_is_no_mark(t *testing
 		t.Fatalf("guards %+v", got.Guards)
 	}
 }
+
+// Before: loop_control had no card; its wording has to follow the nearest loop, however deep in conditions.
+func TestCardsOf_Given_a_loop_control_in_a_condition_Then_it_says_round_in_a_run_till_and_item_in_a_batch(t *testing.T) {
+	// Arrange
+	route := func(id, inner string) model.Node {
+		return model.Node{ID: id, Type: "condition", Params: []model.Field{{Key: "check", Value: "true"}}, Then: []model.Node{{ID: inner, Type: "loop_control"}}}
+	}
+	till := model.Node{ID: "till", Type: "run_till", Body: []model.Node{route("r1", "in-till")}}
+	each := model.Node{ID: "each", Type: "batch", Body: []model.Node{route("r2", "in-batch")}}
+	nested := model.Node{ID: "outer", Type: "run_till", Body: []model.Node{{ID: "mid", Type: "batch", Body: []model.Node{{ID: "in-nested", Type: "loop_control"}}}}}
+
+	// Act
+	cards := vm.CardsOf(cardCollection(), model.Flow{Nodes: []model.Node{till, each, nested}})
+
+	// Assert
+	got := []string{cards["in-till"].Subline, cards["in-batch"].Subline, cards["in-nested"].Subline}
+	if !reflect.DeepEqual(got, []string{"Next round", "Next item", "Next item"}) {
+		t.Fatalf("sublines %q: the nearest loop decides the wording", got)
+	}
+}

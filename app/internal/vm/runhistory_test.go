@@ -3,6 +3,7 @@
 package vm_test
 
 import (
+	"errors"
 	"testing"
 	"time"
 
@@ -132,5 +133,69 @@ func TestRunLabel_Given_a_run_with_a_trigger_Then_the_label_says_who_started_it(
 
 	if got := vm.RunLabel(s); got != "passed · 1s · by trigger" {
 		t.Fatalf("%q", got)
+	}
+}
+
+func historyOf(t *testing.T, ids ...string) (*vm.RunHistory, *vmtest.Backend) {
+	t.Helper()
+	b, f := flowFixture()
+	b.Cols[0].Flows = []model.Flow{f}
+	for _, id := range ids {
+		b.RunList = append(b.RunList, flowi.RunSummary{ID: id, Status: "passed"})
+	}
+	w := vmtest.SyncWorker()
+	h := vm.NewRunHistory(b, w, vm.NewFlowDoc(b, w, b.Cols[0], f))
+	h.Load()
+	return h, b
+}
+
+func TestRunHistory_Given_saved_runs_When_one_is_deleted_Then_the_list_loses_only_it(t *testing.T) {
+	// Before: the Runs tab could only show saved runs, never remove one.
+	h, _ := historyOf(t, "c", "b", "a")
+	var gotErr error
+
+	h.Delete("b", func(err error) { gotErr = err })
+
+	runs := h.Runs()
+	if gotErr != nil || len(runs) != 2 || runs[0].ID != "c" || runs[1].ID != "a" {
+		t.Fatalf("err %v runs %+v", gotErr, runs)
+	}
+}
+
+func TestRunHistory_Given_saved_runs_When_cleared_Then_the_list_is_empty_and_the_count_is_reported(t *testing.T) {
+	h, _ := historyOf(t, "c", "b", "a")
+	var count int
+	var gotErr error
+
+	h.Clear(func(n int, err error) { count, gotErr = n, err })
+
+	if gotErr != nil || count != 3 || len(h.Runs()) != 0 {
+		t.Fatalf("count %d err %v runs %+v", count, gotErr, h.Runs())
+	}
+}
+
+func TestRunHistory_Given_the_backend_fails_When_cleared_Then_the_error_is_reported(t *testing.T) {
+	h, b := historyOf(t, "a")
+	b.NewErr = errors.New("disk is read-only")
+	var gotErr error
+
+	h.Clear(func(_ int, err error) { gotErr = err })
+
+	if gotErr == nil {
+		t.Fatal("a failed clear must say so")
+	}
+}
+
+func TestRunHistory_Given_a_saved_run_When_its_steps_are_read_Then_they_come_back_and_an_unknown_run_says_so(t *testing.T) {
+	h, b := historyOf(t, "a")
+	b.RunStepList = map[string]flowi.RunSteps{"a": {ID: "a", Steps: []flowi.RunStep{{ID: "login", Status: "passed"}}}}
+	var got flowi.RunSteps
+	var gotErr, missErr error
+
+	h.Steps("a", func(r flowi.RunSteps, err error) { got, gotErr = r, err })
+	h.Steps("zzz", func(_ flowi.RunSteps, err error) { missErr = err })
+
+	if gotErr != nil || len(got.Steps) != 1 || got.Steps[0].ID != "login" || missErr == nil {
+		t.Fatalf("got %+v err %v miss %v", got, gotErr, missErr)
 	}
 }

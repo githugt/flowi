@@ -40,7 +40,7 @@ func SkipReaders(f model.Flow, skip []string) []SkipReader {
 // skippedIDs marks the ids in skip and everything nested inside them.
 func skippedIDs(list []model.Node, skip []string, inside bool, into map[string]bool) map[string]bool {
 	for _, n := range list {
-		hit := inside || contains(skip, n.ID)
+		hit := inside || n.Skipped || contains(skip, n.ID)
 		if hit {
 			into[n.ID] = true
 		}

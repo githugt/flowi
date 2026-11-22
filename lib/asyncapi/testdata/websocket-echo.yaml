@@ -1,0 +1,57 @@
+asyncapi: 3.0.0
+info:
+  title: Flowi manual test - WebSocket
+  version: 1.0.0
+  description: Two requests against the demo server of this folder (compose.yaml).
+
+servers:
+  local:
+    host: localhost:8080
+    protocol: ws
+
+channels:
+  echo:
+    address: /ws
+    messages:
+      hello:
+        $ref: "#/components/messages/hello"
+  ticks:
+    address: /ws/ticks
+    messages:
+      tick:
+        $ref: "#/components/messages/tick"
+
+operations:
+  echo:
+    action: send
+    title: Echo (send a message, get it back)
+    summary: Sends one message and waits for the server to echo it.
+    channel:
+      $ref: "#/channels/echo"
+    reply:
+      channel:
+        $ref: "#/channels/echo"
+  receiveTicks:
+    action: receive
+    title: Receive ticks
+    summary: Listens; the server pushes a tick every second.
+    channel:
+      $ref: "#/channels/ticks"
+
+components:
+  messages:
+    hello:
+      payload:
+        type: object
+        properties:
+          hello: {type: string}
+      examples:
+        - payload: {hello: flowi}
+    tick:
+      payload:
+        type: object
+        properties:
+          n: {type: integer}
+          at: {type: string}
+      examples:
+        - payload: {n: 1, at: "2026-01-01T00:00:00.000Z"}

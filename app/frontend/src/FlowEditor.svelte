@@ -10,11 +10,12 @@
   import { openStepTarget } from './lib/opentarget'
   import Button from './Button.svelte'
   import Toggle from './Toggle.svelte'
-  import { tick } from 'svelte'
+  import { tick, untrack } from 'svelte'
   import { confirmDeleteSteps } from './lib/flowDelete'
   import { FlowService } from '../bindings/github.com/githugt/flowi/app/internal/bridge'
   import type { DiskDiff } from './lib/diskdiff'
-  import type { FlowView, Slot, StepChoice, WireChoices } from './lib/types'
+  import type { FlowView, SavedRunView, Slot, StepChoice, WireChoices } from './lib/types'
+  import { LIVE, closeRunPanel, runPanelsOf, toggleRunPanel } from './lib/runpanels.svelte'
   import Canvas, { type DragInfo } from './Canvas.svelte'
   import { copy, paste } from './lib/clip'
   import { clipAction } from './lib/flowkeys'
@@ -33,6 +34,7 @@
   import Problem from './Problem.svelte'
   import { ui, type MenuItem } from './lib/ui.svelte'
   import { app } from './lib/app.svelte'
+  import StatusIcon from './StatusIcon.svelte'
   import VarsBar from './VarsBar.svelte'
   import StepPopup from './StepPopup.svelte'
   import IOEditor from './IOEditor.svelte'
@@ -83,10 +85,35 @@
   )
   let failIndex = 0
   // The run's waterfall: offered when a finished run has at least two steps to compare.
-  let timelineOpen = $state(false)
   // The steps as a list: for a long flow whose canvas is thousands of pixels wide.
-  let stepsOpen = $state(false)
+  // Each is opened from the More menu (the run just made) or from the Runs tab (any saved run), and shows that run.
+  const panels = $derived(runPanelsOf(node))
   const canShowTimeline = $derived(!view.run.running && (view.run.timeline?.length ?? 0) > 1)
+  let savedRuns = $state<Record<string, SavedRunView>>({})
+  const asked = new Set<string>()
+  $effect(() => {
+    for (const id of [panels.steps, panels.timeline]) {
+      if (!id || id === LIVE || asked.has(id)) continue
+      asked.add(id)
+      FlowService.RunSteps(node, id)
+        .then((r) => (savedRuns[id] = r as unknown as SavedRunView))
+        .catch((e) => {
+          asked.delete(id)
+          for (const p of ['steps', 'timeline'] as const) if (panels[p] === id) closeRunPanel(node, p)
+          ui.fail(e)
+        })
+    }
+  })
+  // A run that is cleared takes its panels with it.
+  $effect(() => {
+    const list = app.history[node]
+    if (!list) return
+    for (const p of ['steps', 'timeline'] as const) {
+      const id = untrack(() => runPanelsOf(node)[p])
+      if (id && id !== LIVE && !list.some((r) => r.id === id)) closeRunPanel(node, p)
+    }
+  })
+  const runLabel = (id: string | null) => (id && id !== LIVE ? (app.history[node] ?? []).find((r) => r.id === id)?.label ?? '' : '')
   function showStep(id: string) {
     FlowService.Select(node, id)
     mode = 'canvas'
@@ -115,6 +142,10 @@
   function moreMenu(e: MouseEvent) {
     const r = (e.currentTarget as HTMLElement).getBoundingClientRect()
     ui.openMenu(r.left - 160, r.bottom + 4, [
+      // The run just made: the steps as a list, and when each step ran. Any saved run is opened from the Runs tab.
+      { label: 'Steps of the last run', checked: panels.steps === LIVE, run: () => toggleRunPanel(node, 'steps', LIVE) },
+      { label: 'Timeline of the last run', checked: panels.timeline === LIVE, disabled: !canShowTimeline && panels.timeline !== LIVE, run: () => toggleRunPanel(node, 'timeline', LIVE) },
+      { separator: true, label: '', run: () => {} },
       { label: 'Fit to window', run: () => canvas?.fit() },
       {
         label: relayoutLabel(view.selection.length),
@@ -312,13 +343,17 @@
   // The selected card's toolbar: add opens the popup after the step; the rest act on it at once.
   function onTool(tool: 'add' | 'skip' | 'break' | 'duplicate' | 'delete', step: string, e: MouseEvent) {
     if (tool === 'add') openPopup(e.clientX, e.clientY, { step, before: false })
-    else if (tool === 'skip') FlowService.ToggleSkip(node, step)
+    else if (tool === 'skip') toggleSkip(step)
     else if (tool === 'break') FlowService.ToggleBreak(node, step)
     else if (tool === 'duplicate') FlowService.Duplicate(node, step)
     else confirmDeleteSteps(node, [step])
   }
-  // Right-click on a card: what the toolbar and the side panel offer for it, in one place. Skipping and opening the request
-  // work on a flow that is not being edited, since neither changes the flow.
+  // A skip is saved with the flow, so it is an edit: it is offered only in Edit.
+  function toggleSkip(step: string) {
+    FlowService.ToggleSkip(node, step).catch(ui.fail)
+  }
+  // Right-click on a card: what the toolbar and the side panel offer for it, in one place. Opening the request works on a
+  // flow that is not being edited, since it does not change the flow; the rest are edits.
   function stepMenu(step: string, e: MouseEvent) {
     const u = view.diagram.units.find((x) => x.nodes.includes(step))
     const type = u?.types[u.nodes.indexOf(step)]
@@ -326,15 +361,15 @@
     const skipped = view.skips.steps.includes(step)
     const items: MenuItem[] = []
     if (calls) items.push({ label: type === 'request' ? 'Open request' : 'Open flow', run: () => void openStepTarget(node, step) })
-    items.push({ label: 'Skip in the next runs', checked: skipped, run: () => void FlowService.ToggleSkip(node, step) })
     if (editing) {
+      items.push({ label: 'Skip this step', checked: skipped, run: () => toggleSkip(step) })
       items.push({ label: 'Pause before this step', checked: view.debug.breaks.includes(step), run: () => void FlowService.ToggleBreak(node, step) })
       items.push({ label: '', separator: true, run: () => {} })
       items.push({ label: 'Add a step after', run: () => openPopup(e.clientX, e.clientY, { step, before: false }) })
       items.push({ label: 'Duplicate', run: () => void FlowService.Duplicate(node, step) })
       items.push({ label: 'Delete…', run: () => confirmDeleteSteps(node, view.selection.includes(step) && view.selection.length > 1 ? view.selection : [step]) })
     }
-    ui.openMenu(e.clientX, e.clientY, items)
+    if (items.length) ui.openMenu(e.clientX, e.clientY, items)
   }
   const onColour = (step: string, colour: string) => FlowService.SetColor(node, step, colour).catch(ui.fail)
   // The step a new one would follow, when it gives a status to route by: a request, a URL call or a webhook.
@@ -373,8 +408,9 @@
 
 <div class="editor" bind:this={root}>
   <header>
+    {#if app.find(node)?.status}<StatusIcon mark={app.find(node)!.status!} size={15} />{/if}
     <strong>{view.name}</strong>
-    {#if !embedded}<Chips {view} /><SkipChip {view} />{/if}
+    {#if !embedded}<Chips {view} /><SkipChip {view} {editing} />{/if}
     {#if failedSteps.length && !view.run.running}
       <button class="failed" title="Show the step the run failed at" onclick={showFailure}>Failed: {failedSteps[0]}{failedSteps.length > 1 ? ` +${failedSteps.length - 1}` : ''}</button>
     {/if}
@@ -385,8 +421,6 @@
     {#if !embedded}
       <span class="live" role="status" aria-live="polite">{#if view.run.running}<span class="status">Running…</span>
       {:else if view.run.summary && !view.run.error}<span class="status">{view.run.summary}</span>{/if}</span>
-      <Button small pressed={stepsOpen} title="List the steps: status, result and duration, click one to show it on the canvas" onclick={() => (stepsOpen = !stepsOpen)}>Steps</Button>
-      {#if canShowTimeline}<Button small pressed={timelineOpen} title="Show the run as a timeline: when each step started and how long it took" onclick={() => (timelineOpen = !timelineOpen)}>Timeline</Button>{/if}
       <RunMenu {view} />
       <FlowTools {view} />
     {/if}
@@ -402,8 +436,10 @@
     {#if !embedded}<IconButton icon="more" label="More" onpointerdown={(e) => e.stopPropagation()} onclick={moreMenu} />{/if}
   </header>
   <DebugBar {view} />
-  {#if !embedded && stepsOpen}<StepsPanel {view} onselect={showStep} />{/if}
-  {#if !embedded && timelineOpen && canShowTimeline}<RunTimeline bars={view.run.timeline} onselect={showStep} />{/if}
+  {#if !embedded && panels.steps === LIVE}<StepsPanel {view} onselect={showStep} />{/if}
+  {#if !embedded && panels.steps && panels.steps !== LIVE && savedRuns[panels.steps]}<StepsPanel {view} run={savedRuns[panels.steps]} label={runLabel(panels.steps)} onselect={showStep} />{/if}
+  {#if !embedded && panels.timeline === LIVE && canShowTimeline}<RunTimeline bars={view.run.timeline} onselect={showStep} />{/if}
+  {#if !embedded && panels.timeline && panels.timeline !== LIVE && savedRuns[panels.timeline]}<RunTimeline bars={savedRuns[panels.timeline].timeline} label={runLabel(panels.timeline)} onselect={showStep} />{/if}
   <!-- A run's error gets its own line: in the header it was cut to a few words. -->
   {#if !embedded && view.run.error && !view.run.running && dismissedError !== view.run.error}
     <Banner tone="fail">

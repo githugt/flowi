@@ -269,6 +269,33 @@ func TestLs_Given_a_tag_Then_only_requests_and_flows_that_carry_it_are_listed_wi
 	}
 }
 
+// Before: a request and a flow could not say where the work stood, so `ls` had nothing to filter or show.
+func TestLs_Given_a_status_Then_only_what_has_it_is_listed_its_own_or_from_the_folder_and_shown(t *testing.T) {
+	// Arrange
+	e := newSendEnv(t)
+	writeFile(t, filepath.Join(e.dir, "tools", "requests", "slow.req.yaml"), "id: 01JA00000000000000000000T3\nname: Slow\nstatus: review\nversions:\n  \"1\":\n    method: GET\n    url: \"{{env.base_url}}/slow\"\n")
+	writeFile(t, filepath.Join(e.dir, "tools", "requests", "late", "_folder.yaml"), "status: testing\n")
+	writeFile(t, filepath.Join(e.dir, "tools", "requests", "late", "inherits.req.yaml"), "id: 01JA00000000000000000000T5\nname: Inherits\nversions:\n  \"1\":\n    method: GET\n    url: \"{{env.base_url}}/o\"\n")
+	writeFile(t, filepath.Join(e.dir, "tools", "requests", "other.req.yaml"), "id: 01JA00000000000000000000T9\nname: Other\nversions:\n  \"1\":\n    method: GET\n    url: \"{{env.base_url}}/o\"\n")
+
+	// Act
+	_, review, _ := e.run(context.Background(), "ls", "requests", "--status", "review")
+	_, inTesting, _ := e.run(context.Background(), "ls", "requests", "--status", "testing")
+	_, all, _ := e.run(context.Background(), "ls", "requests")
+
+	// Assert
+	if !strings.Contains(review, "Slow") || strings.Contains(review, "Other") || strings.Contains(review, "Inherits") || !strings.Contains(review, "status:review") {
+		t.Errorf("review:\n%s", review)
+	}
+	if !strings.Contains(inTesting, "Inherits") || strings.Contains(inTesting, "Slow") || !strings.Contains(inTesting, "status:testing") {
+		t.Errorf("testing:\n%s", inTesting)
+	}
+	at := strings.Index(all, "Other")
+	if at < 0 || strings.Contains(strings.SplitN(all[at:], "\n", 2)[0], "status:") {
+		t.Errorf("a request with no status should show none:\n%s", all)
+	}
+}
+
 func TestRun_Given_bundle_Then_the_run_is_written_and_plays_back_offline_in_another_workspace(t *testing.T) {
 	// Arrange
 	e := newSendEnv(t)

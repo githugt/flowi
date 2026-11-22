@@ -339,3 +339,49 @@ func TestEnvVM_Given_bad_variable_names_When_saved_Then_nothing_is_written_and_t
 		})
 	}
 }
+
+// Before: an editor with unsaved edits saved the group it had loaded, so a move made on the Manage environments screen
+// in the meantime was undone by the next Save.
+func TestEnvVM_Given_the_group_changed_while_edits_are_open_When_saved_Then_the_new_group_is_kept(t *testing.T) {
+	env, b, w := newEnvVM(t)
+	rows := env.Rows()
+	rows[0].Value = "https://edited"
+	env.SetRows(rows)
+	moved := slices.Clone(b.Cols[0].Environments)
+	for i := range moved {
+		if moved[i].File == "/c/environments/staging.yaml" {
+			moved[i].Groups = []string{"checkout"}
+		}
+	}
+
+	env.Reloaded(moved) // the workspace reloaded; the edits stay, the editor is flagged
+	env.Save(false)
+	w.Wait()
+
+	if got := b.SavedEnvs[0].Groups; !slices.Equal(got, []string{"checkout"}) {
+		t.Fatalf("saved groups %q, want the one the file has now", got)
+	}
+}
+
+// Before: the editor had no way to reorder variables, so nothing showed that the order of the rows is the order
+// of the file. A secret's row moves with the others and stays a secret.
+func TestEnvVM_Given_the_rows_were_reordered_When_saved_Then_the_file_keeps_that_order(t *testing.T) {
+	env, b, w := newEnvVM(t)
+	rows := env.Rows() // base_url, then the secret password
+	rows = append(rows, vm.EnvVarRow{Name: "region", Value: "eu"})
+
+	env.SetRows([]vm.EnvVarRow{rows[2], rows[1], rows[0]})
+	env.Save(false)
+	w.Wait()
+
+	var got []string
+	for _, v := range b.SavedEnvs[0].Vars {
+		got = append(got, v.Name)
+	}
+	if !slices.Equal(got, []string{"region", "password", "base_url"}) {
+		t.Fatalf("saved order %v", got)
+	}
+	if v := b.SavedEnvs[0].Vars[1]; !v.Secret || v.Value != "" {
+		t.Fatalf("the secret lost its flag or leaked its value: %+v", v)
+	}
+}

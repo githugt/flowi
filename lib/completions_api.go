@@ -179,8 +179,8 @@ func nodeOutputs() map[model.NodeType][]string {
 	return map[model.NodeType][]string{
 		"request":  {"status", "headers", "body", "time", "vars"},
 		"fetch":    {"status", "headers", "body", "time"},
-		"batch":    {"results", "passed", "failed"},
-		"run_till": {"met", "iterations"},
+		"batch":    {"results", "passed", "failed", "left"},
+		"run_till": {"met", "iterations", "left"},
 	}
 }
 

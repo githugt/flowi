@@ -16,6 +16,15 @@ import { Call as $Call, CancellablePromise as $CancellablePromise, Create as $Cr
 import * as $models from "./models.js";
 
 /**
+ * AddGroup makes a group with no environment in it, to move environments into afterwards.
+ * @param {string} name
+ * @returns {$CancellablePromise<void>}
+ */
+export function AddGroup(name) {
+    return $Call.ByID(769169336, name);
+}
+
+/**
  * Close forgets the open environment.
  * @param {string} node
  * @returns {$CancellablePromise<void>}
@@ -25,13 +34,27 @@ export function Close(node) {
 }
 
 /**
- * Compare lays the variables of all the workspace's environments side by side. A secret shows only whether it holds
- * a value, never the value.
+ * ColourEnvironments marks the environments in files with a colour; "" is the default colour.
+ * @param {string[]} files
+ * @param {string} colour
+ * @param {boolean} dropComments
+ * @returns {$CancellablePromise<$models.EnvMoveView>}
+ */
+export function ColourEnvironments(files, colour, dropComments) {
+    return $Call.ByID(4175162456, files, colour, dropComments).then(/** @type {($result: any) => any} */(($result) => {
+        return $$createType0($result);
+    }));
+}
+
+/**
+ * Compare lays the variables of the workspace's environments in one group side by side ("" is the default group). A
+ * secret shows only whether it holds a value, never the value.
+ * @param {string} group
  * @returns {$CancellablePromise<$models.EnvCompareView>}
  */
-export function Compare() {
-    return $Call.ByID(1138852001).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType0($result);
+export function Compare(group) {
+    return $Call.ByID(1138852001, group).then(/** @type {($result: any) => any} */(($result) => {
+        return $$createType1($result);
     }));
 }
 
@@ -45,6 +68,43 @@ export function DeclineDrop(node) {
 }
 
 /**
+ * DeleteGroup takes the environments out of a group; one left in no group is in the default group. No environment
+ * is deleted.
+ * @param {string} group
+ * @param {boolean} dropComments
+ * @returns {$CancellablePromise<$models.EnvMoveView>}
+ */
+export function DeleteGroup(group, dropComments) {
+    return $Call.ByID(872713644, group, dropComments).then(/** @type {($result: any) => any} */(($result) => {
+        return $$createType0($result);
+    }));
+}
+
+/**
+ * Manage lists every environment of the workspace with its group, colour and base, and the groups.
+ * @returns {$CancellablePromise<$models.EnvManageView>}
+ */
+export function Manage() {
+    return $Call.ByID(4087517225).then(/** @type {($result: any) => any} */(($result) => {
+        return $$createType2($result);
+    }));
+}
+
+/**
+ * MoveToGroups makes groups the groups of the environments in files; none is the default group. A name that is new
+ * makes the group first, so it stays when its environments leave.
+ * @param {string[]} files
+ * @param {string[]} groups
+ * @param {boolean} dropComments
+ * @returns {$CancellablePromise<$models.EnvMoveView>}
+ */
+export function MoveToGroups(files, groups, dropComments) {
+    return $Call.ByID(467029714, files, groups, dropComments).then(/** @type {($result: any) => any} */(($result) => {
+        return $$createType0($result);
+    }));
+}
+
+/**
  * Open opens the environment of a tree node, or returns the one already
  * open. Every change publishes the "environment" event.
  * @param {string} node
@@ -52,7 +112,20 @@ export function DeclineDrop(node) {
  */
 export function Open(node) {
     return $Call.ByID(1934938562, node).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType1($result);
+        return $$createType3($result);
+    }));
+}
+
+/**
+ * RenameGroup renames a group in each of its environments, which keep their other groups.
+ * @param {string} $from
+ * @param {string} to
+ * @param {boolean} dropComments
+ * @returns {$CancellablePromise<$models.EnvMoveView>}
+ */
+export function RenameGroup($from, to, dropComments) {
+    return $Call.ByID(4178667127, $from, to, dropComments).then(/** @type {($result: any) => any} */(($result) => {
+        return $$createType0($result);
     }));
 }
 
@@ -136,7 +209,7 @@ export function SetRows(node, rows) {
  */
 export function Share(node, collection, overwrite) {
     return $Call.ByID(1091050289, node, collection, overwrite).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType2($result);
+        return $$createType4($result);
     }));
 }
 
@@ -147,7 +220,7 @@ export function Share(node, collection, overwrite) {
  */
 export function ShareTargets() {
     return $Call.ByID(3262955797).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType4($result);
+        return $$createType6($result);
     }));
 }
 
@@ -160,15 +233,17 @@ export function ShareTargets() {
  */
 export function Unset(node) {
     return $Call.ByID(2264062559, node).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType6($result);
+        return $$createType8($result);
     }));
 }
 
 // Private type creation functions
-const $$createType0 = $models.EnvCompareView.createFrom;
-const $$createType1 = $models.EnvView.createFrom;
-const $$createType2 = $models.EnvShareView.createFrom;
-const $$createType3 = $models.Choice.createFrom;
-const $$createType4 = $Create.Array($$createType3);
-const $$createType5 = $models.MissingVar.createFrom;
+const $$createType0 = $models.EnvMoveView.createFrom;
+const $$createType1 = $models.EnvCompareView.createFrom;
+const $$createType2 = $models.EnvManageView.createFrom;
+const $$createType3 = $models.EnvView.createFrom;
+const $$createType4 = $models.EnvShareView.createFrom;
+const $$createType5 = $models.Choice.createFrom;
 const $$createType6 = $Create.Array($$createType5);
+const $$createType7 = $models.MissingVar.createFrom;
+const $$createType8 = $Create.Array($$createType7);

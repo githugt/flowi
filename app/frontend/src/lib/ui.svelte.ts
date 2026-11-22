@@ -90,6 +90,8 @@ class UIState {
   place = $state<PlaceDialog | null>(null)
   /** The Move dialog: the request rows to move. */
   moving = $state<string[] | null>(null)
+  /** The Tags and status dialog: the tree row of the request, flow or folder. */
+  labelling = $state<string | null>(null)
   toasts = $state<Toast[]>([])
   /** A request is waiting for the person to sign in (an OAuth 2.0 grant that needs a browser or a device code). */
   signIn = $state<{ kind: 'open' | 'device'; url: string; code?: string; expires?: string } | null>(null)

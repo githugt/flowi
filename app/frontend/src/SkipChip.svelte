@@ -2,13 +2,14 @@
   import Button from './Button.svelte'
   import Popover from './Popover.svelte'
   import Toggle from './Toggle.svelte'
-  // "2 skipped" in the flow's header: the steps this open flow leaves out of its runs, what that would break, and the
-  // choice to keep their last values instead. Nothing here is saved in the flow file.
+  // "2 skipped" in the flow's header: the steps the flow leaves out of its runs, what that would break, and the choice to
+  // keep their last values instead. A skip is saved with the flow, so taking it off is an edit: only in Edit.
   import { FlowService } from '../bindings/github.com/githugt/flowi/app/internal/bridge'
   import type { FlowView } from './lib/types'
   import { plural } from './lib/plural'
+  import { ui } from './lib/ui.svelte'
 
-  let { view }: { view: FlowView } = $props()
+  let { view, editing = true }: { view: FlowView; editing?: boolean } = $props()
   const node = $derived(view.node)
   const skips = $derived(view.skips)
   const errors = $derived(skips.problems.filter((p) => p.required).length)
@@ -18,13 +19,13 @@
 
 {#if skips.steps.length}
   <span>
-    <button class="chip" class:bad={errors > 0} aria-haspopup="dialog" aria-expanded={open} title="Steps left out of the next runs" onclick={(e) => { const r = e.currentTarget.getBoundingClientRect(); at = { x: r.left, y: r.bottom }; open = !open }}>
+    <button class="chip" class:bad={errors > 0} aria-haspopup="dialog" aria-expanded={open} title="Steps the flow leaves out of its runs" onclick={(e) => { const r = e.currentTarget.getBoundingClientRect(); at = { x: r.left, y: r.bottom }; open = !open }}>
       {skips.steps.length} skipped{errors ? ` · ${plural(errors, 'problem')}` : ''}
     </button>
     {#if open}
       <Popover x={at.x} y={at.y} width={340} height={220} label="Skipped steps" onclose={() => (open = false)}>
         {#each skips.steps as id (id)}
-          <div class="row"><code>{id}</code><Button small onclick={() => FlowService.ToggleSkip(node, id)}>Run it</Button></div>
+          <div class="row"><code>{id}</code>{#if editing}<Button small onclick={() => FlowService.ToggleSkip(node, id).catch(ui.fail)}>Run it</Button>{/if}</div>
         {/each}
         <Toggle checked={skips.hold} onchange={(on) => FlowService.SetHold(node, on)} title="The steps that read a skipped step get the value it had in the last run">Keep their last values</Toggle>
         {#each skips.problems as p (p.reader + p.skipped + p.text)}

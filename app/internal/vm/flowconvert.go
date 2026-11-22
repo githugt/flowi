@@ -22,7 +22,7 @@ type StepEntry struct {
 	Mode        string
 }
 
-// StepCatalog lists the eleven things a person can add, in five groups. The
+// StepCatalog lists the twelve things a person can add, in five groups. The
 // file format still has more node types (fetch, webhook, run_till, save and
 // digest); the popup offers them as modes of these.
 //
@@ -36,6 +36,7 @@ func StepCatalog() []StepEntry {
 		{Group: "Data", Name: "Check", Description: "Fail the run unless every expression is true", Type: "assert"},
 		{Group: "Branch", Name: "Route", Description: "Take a different path by status or by value", Type: "condition"},
 		{Group: "Branch", Name: "Loop", Description: "Repeat steps over a list, a number of times, or until something holds", Type: "batch"},
+		{Group: "Branch", Name: "Loop control", Description: "Inside a loop: go on with the next item, or leave the loop", Type: "loop_control"},
 		{Group: "Order", Name: "Group", Description: "Run steps together and wait for all of them", Type: "parallel"},
 		{Group: "Order", Name: "Wait", Description: "Pause for a fixed or random time", Type: "delay"},
 		{Group: "Finish", Name: "Output", Description: "Write a value to the run log, a file or a webhook", Type: "log"},

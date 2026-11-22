@@ -45,14 +45,12 @@ func skipMark(v SkipView, steps []string) (skipped bool, note string) {
 	return skipped, note
 }
 
-// ToggleSkip skips step in the next runs, or stops skipping it. The list is
-// kept with the open flow, not in the file.
-func (s *FlowService) ToggleSkip(node, step string) {
-	_ = s.edit(node, func(o *openFlow) error {
-		if _, ok := o.doc.Node(step); !ok {
-			return fmt.Errorf("no step %s", step)
+// ToggleSkip skips step, or stops skipping it. The mark is saved with the flow, so it is an edit: one undo step.
+func (s *FlowService) ToggleSkip(node, step string) error {
+	return s.edit(node, func(o *openFlow) error {
+		if err := o.run.ToggleSkip(step); err != nil {
+			return err
 		}
-		o.run.ToggleSkip(step)
 		s.app.emit("flow", s.view(node, o))
 		return nil
 	})

@@ -280,6 +280,13 @@ body {
 @media (prefers-color-scheme: light) { :root:not([data-theme]) { --v-GET: #147d57; --v-POST: #8a5700; --v-PUT: #245ddb; --v-PATCH: #7042b8; --v-DELETE: #c43142; --v-QUERY: #8e3fb8; --v-WS: #0f766e; --v-SSE: #0369a1; --v-MQTT: #b4441a; --v-KAFKA: #a21caf; --v-AMQP: #4d7c0f; --v-NATS: #4338ca; --v-GRPC: #0f766e; --v-SQL: #966800; --v-REDIS: #b91c1c; --v-SQS: #b45309; --v-SNS: #be123c; --v-BUS: #0b5cad; --v-PUBSUB: #0e7490; --v-OTHER: #536178; --v-POSTGRES: #2f5fb8; --v-MYSQL: #9a5a00; --v-MARIADB: #a8485a; --v-SQLITE: #0f766e; --v-CSV: #2f7d3c; --v-XLSX: #12784a; --v-PARQUET: #6d3fc4; } }
 :root[data-mode='light'] { --v-GET: #147d57; --v-POST: #8a5700; --v-PUT: #245ddb; --v-PATCH: #7042b8; --v-DELETE: #c43142; --v-QUERY: #8e3fb8; --v-WS: #0f766e; --v-SSE: #0369a1; --v-MQTT: #b4441a; --v-KAFKA: #a21caf; --v-AMQP: #4d7c0f; --v-NATS: #4338ca; --v-GRPC: #0f766e; --v-SQL: #966800; --v-REDIS: #b91c1c; --v-SQS: #b45309; --v-SNS: #be123c; --v-BUS: #0b5cad; --v-PUBSUB: #0e7490; --v-OTHER: #536178; --v-POSTGRES: #2f5fb8; --v-MYSQL: #9a5a00; --v-MARIADB: #a8485a; --v-SQLITE: #0f766e; --v-CSV: #2f7d3c; --v-XLSX: #12784a; --v-PARQUET: #6d3fc4; }
 
+/* Development statuses (model.StatusColors): a status is drawn in one of these, never in a colour of its own, so every
+   one can be held to 4.5:1 on every theme's frame, pane and panel (lib/devstatus.test.ts). The dark set is the default;
+   the light set reads on the light themes. */
+:root { --st-gray: #aab2c0; --st-blue: #90b4ff; --st-sky: #5fc3ee; --st-teal: #3fc7b5; --st-green: #4fc58a; --st-amber: #e6b04a; --st-red: #ff9d93; --st-pink: #f693bb; --st-purple: #c3a9ff; }
+@media (prefers-color-scheme: light) { :root:not([data-theme]) { --st-gray: #5b6472; --st-blue: #2459c7; --st-sky: #0a6b8f; --st-teal: #0a7165; --st-green: #17703f; --st-amber: #8a5a00; --st-red: #b42318; --st-pink: #b3306a; --st-purple: #6a3fc0; } }
+:root[data-mode='light'] { --st-gray: #5b6472; --st-blue: #2459c7; --st-sky: #0a6b8f; --st-teal: #0a7165; --st-green: #17703f; --st-amber: #8a5a00; --st-red: #b42318; --st-pink: #b3306a; --st-purple: #6a3fc0; }
+
 /* Flows have a pill too. */
 :root { --v-FLOW: #e0b0ff; }
 @media (prefers-color-scheme: light) { :root:not([data-theme]) { --v-FLOW: #7e22ce; } }

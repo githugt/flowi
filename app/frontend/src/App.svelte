@@ -95,6 +95,7 @@
   import AuthsScreen from './AuthsScreen.svelte'
   import TrashScreen from './TrashScreen.svelte'
   import EnvCompareScreen from './EnvCompareScreen.svelte'
+  import EnvManageScreen from './EnvManageScreen.svelte'
   import ChecksScreen from './ChecksScreen.svelte'
   import IconButton from './IconButton.svelte'
   import { bandColour, envSwatch } from './lib/envcolours'
@@ -216,7 +217,7 @@
     const selected = app.tree?.selected ?? ''
     const choices = ['', ...(app.tree?.environments ?? [])]
     const items: MenuItem[] = choices.map((name) => ({ label: name || 'No environment', checked: name === selected, run: () => app.selectEnvironment(name) }))
-    return [...items, { label: '', separator: true, run: () => {} }, { label: 'New environment…', run: promptNewEnvironment }, { label: 'Compare environments…', run: () => app.openScreen('screen:envcompare', 'Compare environments') }]
+    return [...items, { label: '', separator: true, run: () => {} }, { label: 'New environment…', run: promptNewEnvironment }, { label: 'Manage environments…', run: () => app.openScreen('screen:envmanage', 'Manage environments') }, { label: 'Compare environments…', run: () => app.openScreen('screen:envcompare', 'Compare environments') }]
   }
 
   // Tabs are reordered by dragging with the pointer (the browser's own drag and drop
@@ -402,6 +403,8 @@
         <BlueprintsScreen />
       {:else if tab && tab.node === 'screen:trash'}
         <TrashScreen />
+      {:else if tab && tab.node === 'screen:envmanage'}
+        <EnvManageScreen />
       {:else if tab && tab.node === 'screen:envcompare'}
         <EnvCompareScreen />
       {:else if tab && tab.node === 'screen:checks'}

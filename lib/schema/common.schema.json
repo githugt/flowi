@@ -58,7 +58,8 @@
             "note",
             "digest",
             "save",
-            "stop"
+            "stop",
+            "loop_control"
           ]
         },
         "name": {
@@ -95,6 +96,10 @@
         "retry_wait": {
           "type": "string",
           "description": "The pause before each retry, such as 2s."
+        },
+        "skip": {
+          "type": "boolean",
+          "description": "The step, and everything inside it, does not run in any run of the flow until this is taken off. It is reported as skipped, and a step that reads what it would have made gets no value."
         },
         "attach": {
           "type": "string",
@@ -253,7 +258,7 @@
         },
         "message": {
           "type": "string",
-          "description": "assert: shown when the check fails; stop: why the run stops"
+          "description": "assert: shown when the check fails; stop and loop_control: why the run stops or leaves"
         },
         "status": {
           "enum": [
@@ -432,6 +437,29 @@
           "if": {
             "properties": {
               "type": {
+                "const": "loop_control"
+              }
+            },
+            "required": [
+              "type"
+            ]
+          },
+          "then": {
+            "properties": {
+              "action": {
+                "enum": [
+                  "next",
+                  "leave"
+                ],
+                "description": "loop_control: next (the default) ends the current item or round and goes on with the next; leave ends the loop. Only valid inside the body of a batch or run_till"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
                 "const": "log"
               }
             },
@@ -494,7 +522,15 @@
             "required": [
               "until",
               "body"
-            ]
+            ],
+            "properties": {
+              "layout": {
+                "enum": [
+                  "vertical",
+                  "horizontal"
+                ]
+              }
+            }
           }
         },
         {
@@ -511,7 +547,15 @@
           "then": {
             "required": [
               "body"
-            ]
+            ],
+            "properties": {
+              "layout": {
+                "enum": [
+                  "vertical",
+                  "horizontal"
+                ]
+              }
+            }
           }
         },
         {
@@ -803,6 +847,58 @@
           "boolean",
           "null"
         ]
+      }
+    },
+    "statusName": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9_-]*$",
+      "maxLength": 40,
+      "description": "A development status: one of the defaults (planning, in-development, review, testing, production) or one the collection adds under `statuses:` in flowi.yaml."
+    },
+    "statusDef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name"
+      ],
+      "properties": {
+        "name": {
+          "$ref": "#/$defs/statusName"
+        },
+        "color": {
+          "enum": [
+            "gray",
+            "blue",
+            "sky",
+            "teal",
+            "green",
+            "amber",
+            "red",
+            "pink",
+            "purple"
+          ],
+          "description": "Drawn from the theme, so it reads on every theme. Default gray."
+        },
+        "icon": {
+          "enum": [
+            "planning",
+            "code",
+            "eye",
+            "flask",
+            "rocket",
+            "flag",
+            "star",
+            "bug",
+            "bolt",
+            "lock",
+            "archive",
+            "bookmark",
+            "pause",
+            "clock",
+            "alert"
+          ],
+          "description": "Default flag."
+        }
       }
     }
   }

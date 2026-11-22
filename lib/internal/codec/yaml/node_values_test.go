@@ -130,3 +130,17 @@ func TestNode_Given_an_unlinked_step_When_saved_and_loaded_Then_it_round_trips(t
 		t.Fatalf("err %v unlinked %v, output:\n%s", err, f.Nodes[1].Unlinked, out)
 	}
 }
+
+func TestNode_Given_a_skipped_step_When_saved_and_loaded_Then_it_round_trips(t *testing.T) {
+	// Before: a skip lived only in the open editor, so the flow file could not say a step is skipped.
+	const src = "id: 01J9ZB3M4N5P6Q7R8S9T0VWXYZ\nnodes:\n  - id: a\n    type: delay\n    duration: 1s\n  - id: b\n    type: delay\n    skip: true\n    duration: 1s\n"
+	c := newCodec()
+
+	f, diags := c.DecodeFlow("f.flow.yaml", "f", []byte(src))
+	requireNoDiagnostics(t, diags)
+	out, err := c.EncodeFlow(f)
+
+	if err != nil || f.Nodes[0].Skipped || !f.Nodes[1].Skipped || !bytes.Equal(out, []byte(src)) {
+		t.Fatalf("err %v skipped %v %v, output:\n%s", err, f.Nodes[0].Skipped, f.Nodes[1].Skipped, out)
+	}
+}

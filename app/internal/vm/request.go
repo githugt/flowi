@@ -770,6 +770,11 @@ func (r *Request) Reloaded(c model.Collection, disk model.Request, found bool) {
 		// Renamed or moved, nothing else: the edits still fit, so there is no conflict to ask about.
 		r.disk.Name, r.disk.Path, r.disk.File = disk.Name, disk.Path, disk.File
 		r.draft.Name, r.draft.Path, r.draft.File = disk.Name, disk.Path, disk.File
+	case r.dirty && sameSaved(withLabelsOf(disk, r.disk), r.disk):
+		// Only the tags or the status changed, set from the sidebar or the Docs section, which write at once. Before: that
+		// counted as a change on disk, and an open request with edits asked which to keep.
+		r.disk.Tags, r.disk.Status = disk.Tags, disk.Status
+		r.draft.Tags, r.draft.Status = disk.Tags, disk.Status
 	case r.dirty:
 		disk.Edit, disk.EditBase = nil, ""
 		r.disk, r.onDisk = disk, true
@@ -791,6 +796,12 @@ const removedText = "this request was removed or its file no longer loads (see P
 // inPlaceOf is a with the name and place of b, to compare everything else.
 func inPlaceOf(a, b model.Request) model.Request {
 	a.Name, a.Path, a.File = b.Name, b.Path, b.File
+	return a
+}
+
+// withLabelsOf is a with the tags and status of b, to compare everything else.
+func withLabelsOf(a, b model.Request) model.Request {
+	a.Tags, a.Status = b.Tags, b.Status
 	return a
 }
 

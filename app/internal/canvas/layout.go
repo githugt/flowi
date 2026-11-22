@@ -50,6 +50,15 @@ const (
 	branchGapX         = 70                               // between that card and its lanes: room for the labelled arrows
 	minLaneW           = actionW + stripPad + 2*laneInset // an empty lane is still a target big enough to drop a step on
 	baseline           = portRequest                      // every row's port line sits this far below its top
+	boxGap             = 16                               // between a loop's card and the box holding its steps
+	boxAddW            = 176                              // room at the end of a loop's row for its "+ Add a step": the last step's port labels hang out about 70 past its edge
+	columnGap          = 44                               // between steps stacked in a loop's box: room for the arrow between them to turn
+	boxInsetV          = 24                               // between a stacked box's edge and its steps, left and top
+	boxPortRoom        = 56                               // …and to the right of them: the labels of a step's ports hang out
+	boxAddH            = 44                               // …and below the last of them: the "+ Add a step"
+	exitGutter         = 10                               // how far right of a stacked step the arrow leaving it runs down
+	gutterStep         = 8                                // each further port of that step runs this much further out, so two arrows do not overlap
+	entryGutter        = 12                               // how far left of a stacked step the arrow into it runs down
 )
 
 // Strip geometry: an action strip is StripPad wide plus ActionW per
@@ -84,6 +93,21 @@ type Unit struct {
 	Card       bool     `json:"card,omitempty"`  // drawn as a card (see WithCards): its ports are in Ports
 	HeadH      int64    `json:"headH,omitempty"` // a container drawn as a card: the card's own height (H covers its lanes too)
 	Ports      []string `json:"ports,omitempty"` // a card's control ports, top to bottom
+	// Boxed marks a container card whose body is one box under the card: a loop groups the steps it runs, where a
+	// condition or a parallel offers alternatives to its right. The flow goes on from the card's own port.
+	Boxed bool `json:"boxed,omitempty"`
+	// Down marks a boxed container whose steps are stacked top to bottom (else they are in one row): the arrows
+	// between them run down, see Edge.Down.
+	Down bool `json:"down,omitempty"`
+}
+
+// OutX is the x the arrows that leave the unit start from: its right edge, or for a boxed container its card's (the
+// box under the card is wider, and the flow goes on from the loop itself, not from the box).
+func (u Unit) OutX() int64 {
+	if u.Boxed {
+		return u.X + u.HeadW
+	}
+	return u.X + u.W
 }
 
 // Cell is where one node of a request block is drawn, relative to the block.
@@ -128,6 +152,23 @@ type Edge struct {
 	// FromPort is the card port the edge leaves from (done, fail, case-i, else);
 	// "" for units that are not cards.
 	FromPort string `json:"fromPort,omitempty"`
+	// Down marks an edge between two steps stacked in a loop's box: it leaves the right edge of the first, runs down
+	// beside it and into the left edge of the next from below, see EdgePath.
+	Down bool `json:"down,omitempty"`
+}
+
+// markDown sets Down on the edges between two steps of the same stacked lane.
+func markDown(d *Diagram) {
+	for i, e := range d.Edges {
+		from, _ := d.Unit(e.From)
+		to, _ := d.Unit(e.To)
+		if e.Into || from.Parent == "" || from.Parent != to.Parent || from.Lane != to.Lane {
+			continue
+		}
+		if parent, ok := d.Unit(from.Parent); ok && parent.Down {
+			d.Edges[i].Down = true
+		}
+	}
 }
 
 // Lane is one list inside a container (a branch, then/else/case, a
@@ -188,6 +229,7 @@ func Layout(f model.Flow, manual map[string]Point, collapsed map[string]bool, op
 	// Lists, never null: the window reads them with .filter and .find, and Go writes a nil slice as null.
 	d := Diagram{Units: orEmpty(l.units), Edges: orEmpty(l.edges), Lanes: orEmpty(l.lanes)}
 	portEdges(&d)
+	markDown(&d)
 	applyManual(&d, manual)
 	markCurves(&d)
 	return d
@@ -374,6 +416,9 @@ func (l *layouter) place(u Unit, n model.Node, x, y int64) (Unit, []string) {
 // container lays out each lane under the header, inside the box.
 func (l *layouter) container(u Unit, n model.Node, x, y int64) (Unit, []string) {
 	if l.branches {
+		if l.cards != nil && groupsSteps(n) {
+			return l.boxContainer(u, n, x, y)
+		}
 		return l.branchContainer(u, n, x, y)
 	}
 	u.Y = y + baseline - portContainer
@@ -452,6 +497,89 @@ func (l *layouter) branchContainer(u Unit, n model.Node, x, y int64) (Unit, []st
 		lasts = []string{u.ID}
 	}
 	return u, lasts
+}
+
+// groupsSteps says whether a container is a group of steps that run one after another inside it (a loop),
+// not a choice between lists (a condition, a parallel).
+func groupsSteps(n model.Node) bool { return n.Type == "batch" || n.Type == "run_till" }
+
+// stacked says whether the steps of a loop are drawn top to bottom in its box: the default, unless its layout field
+// says horizontal (then they are in one row).
+func stacked(n model.Node) bool {
+	for _, f := range n.Params {
+		if f.Key == "layout" {
+			text, _ := f.Value.(string)
+			return text != "horizontal"
+		}
+	}
+	return true
+}
+
+// boxContainer lays a loop out as its card with the steps it runs in a box right under it, so the steps read as
+// inside the loop and not as the next ones in the flow. The steps are stacked top to bottom, or go left to right
+// when the loop's layout says so, with room at the end for the "+ Add a step". The flow goes on from the loop's own
+// "done" port: the next step runs once every iteration has finished, not after the last step of the body.
+func (l *layouter) boxContainer(u Unit, n model.Node, x, y int64) (Unit, []string) {
+	own := l.cards[n.ID]
+	head := cardHeight(own)
+	down := stacked(n)
+	u.Y, u.HeadW, u.HeadH = y+baseline-cardInPort, cardW, head
+	u.Card, u.Ports, u.Boxed, u.Down = true, cardPorts(own), true, down
+	idx := len(l.units)
+	l.units = append(l.units, u) // placeholder; size is known after the body
+	lane := lanes(n, u.Path, true)[0]
+	laneY := u.Y + head + boxGap
+	var res listResult
+	if down {
+		res = l.column(lane.nodes, lane.path, x+boxInsetV, laneY+boxInsetV, u.ID, 0)
+	} else {
+		res = l.list(lane.nodes, lane.path, x+laneInset, laneY, u.ID, 0)
+	}
+	emptyH := int64(baseline-cardInPort) + cardHeight(card.Card{}) + laneInset // an empty box is as tall as one with a step in it
+	w, h := int64(cardW), emptyH                                               // an empty box is as wide as the card
+	if res.first != "" {
+		l.edges = append(l.edges, Edge{From: u.ID, To: res.first, Into: true})
+		if down {
+			w, h = max(w, res.w+2*boxInsetV+boxPortRoom), boxInsetV+res.h+boxAddH
+		} else {
+			w, h = max(w, res.w+2*laneInset+boxAddW), max(res.h+laneInset, emptyH)
+		}
+	}
+	l.lanes = append(l.lanes, Lane{Container: u.ID, Path: lane.path, X: x, Y: laneY, W: w, H: h, PortY: laneY + baseline, Label: lane.label})
+	u.W, u.H = w, head+boxGap+h
+	l.units[idx] = u
+	return u, []string{u.ID}
+}
+
+// column lays nodes out top to bottom, from the top of the first card at (x, y): the way the steps of a loop are
+// stacked. Each card is one unit; the arrows between them run down (see markDown). Steps that hang from an outcome
+// are in line like the others. w is the widest unit and h how far the last one reaches below y.
+func (l *layouter) column(nodes []model.Node, path string, x, y int64, parent string, lane int) listResult {
+	nodes = withoutRedundantNeeds(nodes)
+	res := listResult{}
+	unitOf := map[string]string{} // node id → unit id, for needs edges
+	var prevLasts []string
+	cursor := y
+	for i, n := range nodes {
+		needs := groupNeeds(nodes[i:i+1], n)
+		u := Unit{ID: n.ID, Kind: KindCard, Path: index(path, i), Parent: parent, Lane: lane, Concurrent: n.Concurrent, Nodes: []string{n.ID}, Types: []string{string(n.Type)}}
+		if unitKind(n) == KindContainer {
+			u.Kind = KindContainer
+		}
+		unitOf[n.ID] = u.ID
+		var lasts []string
+		u, lasts = l.place(u, n, x, cursor-(baseline-cardInPort)) // place puts a card's top at row+baseline-cardInPort
+		l.connect(u, needs, prevLasts, unitOf)
+		if res.first == "" {
+			res.first = u.ID
+		}
+		prevLasts = lasts
+		res.w = max(res.w, u.W)
+		res.h = u.Y + u.H - y
+		cursor = u.Y + u.H + columnGap
+	}
+	res.lasts = prevLasts
+	return res
 }
 
 type laneSpec struct {

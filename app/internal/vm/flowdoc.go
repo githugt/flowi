@@ -1157,6 +1157,17 @@ func (d *FlowDoc) Reloaded(c model.Collection, f model.Flow, found bool) {
 	switch {
 	case !found:
 		d.err = "this flow was removed or its file no longer loads (see Problems)"
+	case d.dirty && sameFlowBesidesLabels(f, d.disk):
+		// Only the tags or the status changed, set from the sidebar or the flow panel, which write at once. Before: that
+		// counted as a change on disk, so a flow with edits was refused its next save.
+		d.disk.Tags, d.disk.Status = f.Tags, f.Status
+		d.draft.Tags, d.draft.Status = f.Tags, f.Status
+		for _, history := range [][]model.Flow{d.undo, d.redo} {
+			for i := range history { // an undo restores a whole copy of the flow: it must not bring the old labels back
+				history[i].Tags, history[i].Status = f.Tags, f.Status
+			}
+		}
+		d.loadSum()
 	case d.dirty:
 		d.disk, d.onDisk = f, true
 	default:
@@ -1164,6 +1175,12 @@ func (d *FlowDoc) Reloaded(c model.Collection, f model.Flow, found bool) {
 		d.loadSum()
 	}
 	d.changed()
+}
+
+// sameFlowBesidesLabels reports whether two loads of a flow differ in nothing but their tags and status.
+func sameFlowBesidesLabels(a, b model.Flow) bool {
+	a.Tags, a.Status, b.Tags, b.Status = nil, "", nil, ""
+	return reflect.DeepEqual(a, b)
 }
 
 // Revert drops the edits and shows the flow as on disk.

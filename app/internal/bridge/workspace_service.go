@@ -11,16 +11,18 @@ import (
 
 // TreeNode is one row of the workspace tree.
 type TreeNode struct {
-	ID       string     `json:"id"`
-	Label    string     `json:"label"`
-	Kind     string     `json:"kind"` // collection, missing, requests, folder, request, environments, environment, flows, flow, broken
-	Method   string     `json:"method,omitempty"`
-	Name     string     `json:"name,omitempty"` // what a folder's order calls it: the file or folder name
-	Draft    bool       `json:"draft,omitempty"`
-	Scratch  bool       `json:"scratch,omitempty"` // the Drafts try-out space
-	Tree     string     `json:"tree,omitempty"`    // folders and groups: requests or flows; requests can be dropped only on the first
-	Detail   string     `json:"detail,omitempty"`  // a broken file: why it could not be read, with the line
-	Children []TreeNode `json:"children,omitempty"`
+	ID       string      `json:"id"`
+	Label    string      `json:"label"`
+	Kind     string      `json:"kind"` // collection, missing, requests, folder, request, environments, environment, flows, flow, broken
+	Method   string      `json:"method,omitempty"`
+	Name     string      `json:"name,omitempty"` // what a folder's order calls it: the file or folder name
+	Draft    bool        `json:"draft,omitempty"`
+	Scratch  bool        `json:"scratch,omitempty"` // the Drafts try-out space
+	Tree     string      `json:"tree,omitempty"`    // folders and groups: requests or flows; requests can be dropped only on the first
+	Detail   string      `json:"detail,omitempty"`  // a broken file: why it could not be read, with the line
+	Status   *StatusMark `json:"status,omitempty"`  // a request, flow or folder: its development status as it resolves
+	Tags     []string    `json:"tags,omitempty"`    // a request, flow or folder: the tags that apply to it
+	Children []TreeNode  `json:"children,omitempty"`
 }
 
 // Tree is the workspace as the sidebar shows it.
@@ -172,7 +174,7 @@ func (s *WorkspaceService) nodes(ids []string) []TreeNode {
 		n := s.app.workspace.Node(id)
 		out = append(out, TreeNode{
 			ID: id, Label: s.app.workspace.Display(id), Kind: kindNames()[n.Kind],
-			Method: n.Method, Name: entryName(n), Draft: n.Draft, Scratch: n.Scratch, Tree: n.Tree, Detail: n.Detail, Children: s.nodes(s.app.workspace.Children(id)),
+			Method: n.Method, Name: entryName(n), Draft: n.Draft, Scratch: n.Scratch, Tree: n.Tree, Detail: n.Detail, Status: markOf(n), Tags: n.Tags, Children: s.nodes(s.app.workspace.Children(id)),
 		})
 	}
 	return out

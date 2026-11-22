@@ -24,6 +24,7 @@ func (c *Codec) DecodeFlow(file, path string, data []byte) (model.Flow, diag.Lis
 	}
 	f.Meta = m.meta()
 	f.Tags = m.stringList("tags")
+	f.Status = m.str("status")
 	m.flowBody(&f)
 	m.closeStrict()
 	return f, d.diags
@@ -152,6 +153,7 @@ func (c *Codec) EncodeFlow(f model.Flow) ([]byte, error) {
 	var o omap
 	putMeta(&o, f.Meta)
 	o.put("tags", f.Tags)
+	o.put("status", f.Status)
 	putFlowBody(&o, f)
 	return marshal(o.items)
 }

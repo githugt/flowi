@@ -36,6 +36,20 @@
         }
       }
     },
+    "environment_groups": {
+      "type": "array",
+      "description": "The environment groups the person made, so a group can exist with no environment in it. A group an environment file names exists as well.",
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 40,
+        "pattern": "^\\S(.*\\S)?$",
+        "not": {
+          "pattern": "^[Dd][Ee][Ff][Aa][Uu][Ll][Tt]$"
+        }
+      },
+      "uniqueItems": true
+    },
     "schedules": {
       "type": "array",
       "items": {

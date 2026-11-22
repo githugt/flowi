@@ -6,6 +6,7 @@ import (
 	"maps"
 	"strings"
 	"sync"
+	"sync/atomic"
 
 	"github.com/githugt/flowi/lib/internal/httpx"
 	"github.com/githugt/flowi/lib/internal/nodes"
@@ -43,9 +44,31 @@ type frame struct {
 	// and lane say where the frame sits for NodeStarted events.
 	prefix, parentPath, lane string
 	depth                    int
+	// loop is the turn of the nearest enclosing batch or run_till this frame sits in, for loop_control; nil
+	// outside a loop. Frames of conditions and parallels inside the body share it.
+	loop *loopTurn
 	// activeHooks are the hook steps running above this frame (see hookKey): a request they send does not run them
 	// again.
 	activeHooks []string
+}
+
+// loopTurn is one turn (item or round) of a loop, as a loop_control step sees it. The step sets flags; the list
+// schedulers and the lane scheduler read them, so nothing here needs a lock.
+type loopTurn struct {
+	parent *loopTurn    // the turn this loop sits in, nil for a loop at the top
+	left   *atomic.Bool // shared by every turn of one loop: the loop was left, start no more turns
+	ended  atomic.Bool  // this turn is over: start no more steps in it
+	leftIn atomic.Bool  // this turn is the one that left the loop
+}
+
+// isOver says this turn, or one around it, is over. Safe on nil.
+func (t *loopTurn) isOver() bool {
+	for ; t != nil; t = t.parent {
+		if t.ended.Load() {
+			return true
+		}
+	}
+	return false
 }
 
 // newRootFrame is the top frame of a flow scope.

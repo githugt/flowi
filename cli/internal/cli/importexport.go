@@ -19,6 +19,7 @@ import (
 
 type importFlags struct {
 	collection, init             string
+	into                         string // a folder of the collection to put the requests and flows in
 	dryRun, force, skip, partial bool
 	overlays                     []string // OpenAPI Overlay documents, applied in order
 }
@@ -102,6 +103,7 @@ func newImportKindCommand(i do.Injector, k importKind) *cobra.Command {
 	fl := cmd.Flags()
 	fl.StringVar(&f.collection, "collection", "", "collection (name or id) to import into (default: the only one mounted)")
 	fl.StringVar(&f.init, "init", "", "create a new collection in this directory and import into it")
+	fl.StringVar(&f.into, "into", "", "put the requests and flows in this folder of the collection (\"demo/websocket\"; made when it is not there)")
 	fl.BoolVar(&f.dryRun, "dry-run", false, "list the files without writing them")
 	fl.BoolVar(&f.force, "force", false, "overwrite files that already exist")
 	fl.BoolVar(&f.skip, "skip-existing", false, "write only files that do not exist yet")
@@ -134,6 +136,7 @@ func runImport(cmd *cobra.Command, i do.Injector, kind flowi.ImportKind, arg str
 	if src.Overlays, err = readOverlays(cmd, f.overlays, env.Cwd); err != nil {
 		return err
 	}
+	src.Into = f.into
 	s, err := session(cmd, i)
 	if err != nil {
 		return err
@@ -239,10 +242,17 @@ func finishImport(cmd *cobra.Command, w *flowi.Workspace, plan flowi.ImportPlan,
 		cmd.PrintErrf("%s skipped; nothing was written (use --partial to import the rest)\n", plural(skipped, "item"))
 		return Exit(ExitFailed)
 	}
-	if err := w.ApplyImport(plan, flowi.ApplyOptions{Overwrite: f.force, SkipExisting: f.skip}); err != nil {
+	report, err := w.ApplyImportReport(plan, flowi.ApplyOptions{Overwrite: f.force, SkipExisting: f.skip})
+	if err != nil {
 		return err
 	}
-	cmd.Printf("Imported %s into %s\n", plural(written(plan, f), "file"), importedInto(w, plan.Collection))
+	cmd.Printf("Imported %s into %s\n", plural(len(report.Written)+len(report.Replaced)+len(report.Unchanged), "file"), importedInto(w, plan.Collection))
+	if len(report.Kept) > 0 {
+		cmd.Printf("Left %s as they are, because they already exist (--force overwrites them):\n", plural(len(report.Kept), "file"))
+		for _, k := range report.Kept {
+			cmd.Printf("  = %s\n", k.Rel)
+		}
+	}
 	return exitIfSkipped(skipped)
 }
 
@@ -274,20 +284,6 @@ func previewImport(cmd *cobra.Command, w *flowi.Workspace, src flowi.ImportSourc
 	}
 	cmd.Printf("Created collection %s (%s) at %s\n", m.Name, m.ID, displayPath(cwd, f.init))
 	return w.PreviewImportSource(src, m.ID)
-}
-
-// written is how many files ApplyImport wrote.
-func written(p flowi.ImportPlan, f importFlags) int {
-	if f.force || !f.skip {
-		return len(p.Files)
-	}
-	n := 0
-	for _, file := range p.Files {
-		if !file.Exists {
-			n++
-		}
-	}
-	return n
 }
 
 func writePlan(out io.Writer, output string, p flowi.ImportPlan) error {

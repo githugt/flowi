@@ -5,7 +5,7 @@ import buttonSource from '../Button.svelte?raw'
 import overlays from '../Overlays.svelte?raw'
 
 // The dialogs that moved to Modal; each had its own scrim, box, heading and button row.
-const dialogs = import.meta.glob('../{MoveDialog,PlaceDialog,SignInDialog,SpecUpdateDialog,FlowiOverlayWarning,OverlayDialog,FlowiOverlayDialog,BlueprintDialog,VersionDetails,RequestMatrix,FlowiOverlayEditor,RunMenu,PasteOffer,FlowTools,Overlays,CommandPalette}.svelte', { query: '?raw', import: 'default', eager: true }) as Record<string, string>
+const dialogs = import.meta.glob('../{MoveDialog,LabelsDialog,PlaceDialog,SignInDialog,SpecUpdateDialog,FlowiOverlayWarning,OverlayDialog,FlowiOverlayDialog,BlueprintDialog,VersionDetails,RequestMatrix,FlowiOverlayEditor,RunMenu,PasteOffer,FlowTools,Overlays,CommandPalette}.svelte', { query: '?raw', import: 'default', eager: true }) as Record<string, string>
 
 describe('Modal', () => {
   it('names itself, traps focus and closes on Escape or a press outside, from one place', () => {
@@ -23,9 +23,9 @@ describe('Modal', () => {
     expect(modalSource).toContain("onsubmit ? 'form' : 'div'")
   })
 
-  it('is what the sixteen dialogs use, with no scrim, box or button row of their own', () => {
+  it('is what the seventeen dialogs use, with no scrim, box or button row of their own', () => {
     // Before: each of them wrote `.scrim`, `.dialog` and `.actions` rules and the three attributes of a dialog.
-    expect(Object.keys(dialogs)).toHaveLength(16)
+    expect(Object.keys(dialogs)).toHaveLength(17)
     for (const [path, text] of Object.entries(dialogs)) {
       expect(text, path).toContain('<Modal')
       expect(text, path).not.toMatch(/\.scrim\s*\{/)

@@ -27,6 +27,7 @@ func runTillSpec() Spec {
 			{Name: "max", Kind: ParamInt, Min: 1, Max: maxRunTillMax, Doc: "Most iterations (default 10)."},
 			{Name: "interval", Kind: ParamDuration, Doc: "Wait between iterations."},
 			{Name: "max_duration", Kind: ParamDuration, Doc: "Stop once this much time has passed."},
+			loopLayoutParam(),
 		},
 		Typed: []string{"body"},
 		Run:   runRunTill,
@@ -34,19 +35,24 @@ func runTillSpec() Spec {
 }
 
 // runRunTill repeats the body in a fresh nodes scope each time; variables
-// carry over, so counters work.
+// carry over, so counters work. A loop_control next ends the round (it still
+// counts, and until is asked); leave ends the loop as met.
 func runRunTill(ctx context.Context, n model.Node, s *State) Outcome {
 	limit, maxDuration, interval := intParam(n, "max", defaultRunTillMax), durationParam(n, "max_duration"), durationParam(n, "interval")
 	start := s.Runtime.Now()
 	for i := 0; ; i++ {
 		lane := Lane{Label: "[" + strconv.Itoa(i) + "]", Nodes: n.Body, OwnNodes: true}
-		r := s.Runtime.Lanes(ctx, []Lane{lane}, LaneOptions{Concurrency: 1})[0]
-		outputs := map[string]any{"iterations": i + 1, "met": false, "last": r.Nodes}
+		r := s.Runtime.Lanes(ctx, []Lane{lane}, LaneOptions{Concurrency: 1, Loop: true})[0]
+		outputs := map[string]any{"iterations": i + 1, "met": false, "left": false, "last": r.Nodes}
 		if r.Status != StatusPassed {
 			return Outcome{Outputs: outputs, Status: r.Status, Diags: r.Diags}
 		}
-		if s.Runtime.Stopped() {
-			return Outcome{Outputs: outputs} // a stop node ended the run: the condition is not asked
+		if r.Left { // a loop_control left: the loop ends as met, and the condition is not asked
+			outputs["met"], outputs["left"] = true, true
+			return Outcome{Outputs: outputs}
+		}
+		if s.Runtime.Stopped() || s.Runtime.IterationEnded() {
+			return Outcome{Outputs: outputs} // a stop node ended the run, or the turn this loop sits in: the condition is not asked
 		}
 		met, err := untilHolds(n, s, r.Nodes)
 		if err != nil {

@@ -29,6 +29,7 @@ func (c *Codec) DecodeRequest(file, path string, data []byte) (model.Request, di
 	}
 	r.Meta = m.meta()
 	r.Tags = m.stringList("tags")
+	r.Status = m.str("status")
 	r.Operation = m.str("operation")
 	r.Default = m.versionLabel("default")
 	r.Versions = c.versions(d, m)
@@ -325,6 +326,7 @@ func (c *Codec) EncodeRequest(r model.Request) ([]byte, error) {
 	var o omap
 	putMeta(&o, r.Meta)
 	o.put("tags", r.Tags)
+	o.put("status", r.Status)
 	o.put("operation", r.Operation)
 	o.put("default", r.Default)
 	var versions yaml.MapSlice

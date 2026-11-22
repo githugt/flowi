@@ -2,21 +2,22 @@
   import EmptyState from './EmptyState.svelte'
   import Button from './Button.svelte'
   import { filterRows, stepRows } from './lib/steplist'
-  import type { FlowView } from './lib/types'
+  import type { FlowView, RunView } from './lib/types'
 
   // The flow as a list: every step in canvas order with its status, result and a bar for how long it took. A long flow is
   // thousands of pixels wide on the canvas; here step 19 is one click away. A step's name selects it on the canvas.
-  let { view, onselect }: { view: FlowView; onselect: (step: string) => void } = $props()
+  // `run` is what to show, the live run's by default, or a saved run's; `label` says which run it is.
+  let { view, run = view.run, label = '', onselect }: { view: FlowView; run?: Pick<RunView, 'statuses' | 'results' | 'timeline'>; label?: string; onselect: (step: string) => void } = $props()
 
   let text = $state('')
-  const all = $derived(stepRows(view.diagram.units, view.run.statuses, view.run.results, view.run.timeline ?? []))
+  const all = $derived(stepRows(view.diagram.units, run.statuses, run.results, run.timeline ?? []))
   const rows = $derived(filterRows(all, text))
 </script>
 
 <section class="steps" aria-label="Steps">
   <p class="head">
     <strong>Steps</strong>
-    <span class="muted">{all.length}</span>
+    <span class="muted">{all.length}{label ? ` · ${label}` : ''}</span>
     <input type="search" placeholder="Filter by name or type" aria-label="Filter the steps" bind:value={text} />
   </p>
   {#if rows.length === 0}

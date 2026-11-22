@@ -28,12 +28,19 @@ func skipFixture(t *testing.T, events []engine.Event) (*vm.FlowRun, *vmtest.Back
 	return vm.NewFlowRun(b, w, d), b, w
 }
 
+func toggleSkip(t *testing.T, r *vm.FlowRun, step string) {
+	t.Helper()
+	if err := r.ToggleSkip(step); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestToggleSkip_Given_a_step_read_later_Then_the_problem_list_names_the_reader(t *testing.T) {
 	// Arrange
 	r, _, _ := skipFixture(t, nil)
 
 	// Act
-	r.ToggleSkip("a")
+	toggleSkip(t, r, "a")
 	problems := r.SkipProblems()
 
 	// Assert
@@ -53,10 +60,10 @@ func TestToggleSkip_Given_a_step_nothing_reads_Then_there_is_no_problem_and_a_se
 	r, _, _ := skipFixture(t, nil)
 
 	// Act
-	r.ToggleSkip("b")
+	toggleSkip(t, r, "b")
 	problems := r.SkipProblems()
 	skippedOnce := r.Skipped()
-	r.ToggleSkip("b")
+	toggleSkip(t, r, "b")
 
 	// Assert
 	if len(problems) != 0 || len(skippedOnce) != 1 || len(r.Skipped()) != 0 {
@@ -67,7 +74,7 @@ func TestToggleSkip_Given_a_step_nothing_reads_Then_there_is_no_problem_and_a_se
 func TestRun_Given_a_skip_Then_the_run_input_carries_it(t *testing.T) {
 	// Arrange
 	r, b, w := skipFixture(t, nil)
-	r.ToggleSkip("b")
+	toggleSkip(t, r, "b")
 
 	// Act
 	r.Run("staging", nil)
@@ -85,7 +92,7 @@ func TestSetHold_Given_a_last_run_with_the_skipped_steps_values_Then_the_problem
 	r, b, w := skipFixture(t, events)
 	r.Run("staging", nil)
 	w.Wait()
-	r.ToggleSkip("a")
+	toggleSkip(t, r, "a")
 	before := len(r.SkipProblems())
 
 	// Act
@@ -106,7 +113,7 @@ func TestSetHold_Given_a_last_run_with_the_skipped_steps_values_Then_the_problem
 func TestSetHold_Given_no_last_run_Then_the_problem_stays(t *testing.T) {
 	// Arrange
 	r, _, _ := skipFixture(t, nil)
-	r.ToggleSkip("a")
+	toggleSkip(t, r, "a")
 
 	// Act
 	r.SetHold(true)
@@ -114,5 +121,37 @@ func TestSetHold_Given_no_last_run_Then_the_problem_stays(t *testing.T) {
 	// Assert
 	if len(r.SkipProblems()) != 1 {
 		t.Fatalf("a hold with nothing to hold should not hide the problem: %+v", r.SkipProblems())
+	}
+}
+
+func TestToggleSkip_Given_a_skip_When_the_flow_is_saved_Then_the_saved_flow_marks_the_step(t *testing.T) {
+	// Before: the skip list lived only in the open flow, so it was gone when the flow was opened again.
+	// Arrange
+	r, b, w := skipFixture(t, nil)
+
+	// Act
+	if err := r.ToggleSkip("b"); err != nil {
+		t.Fatal(err)
+	}
+	r.Doc().Save(false)
+	w.Wait()
+
+	// Assert
+	saved := b.SavedFlows[len(b.SavedFlows)-1]
+	if saved.Nodes[0].Skipped || !saved.Nodes[1].Skipped {
+		t.Fatalf("saved skipped marks: %v %v", saved.Nodes[0].Skipped, saved.Nodes[1].Skipped)
+	}
+}
+
+func TestToggleSkip_Given_a_step_that_is_not_in_the_flow_Then_it_says_so(t *testing.T) {
+	// Arrange
+	r, _, _ := skipFixture(t, nil)
+
+	// Act
+	err := r.ToggleSkip("nope")
+
+	// Assert
+	if err == nil || len(r.Skipped()) != 0 {
+		t.Fatalf("err %v skipped %v", err, r.Skipped())
 	}
 }

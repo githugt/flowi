@@ -40,12 +40,36 @@ type Backend struct {
 	// Pace is the pause before each event of a run or a send; 0 means 120 ms for the checkout flow and 8 ms for the
 	// long one. Tests set it to a nanosecond.
 	Pace time.Duration
+
+	sandbox importSandbox // the real importers' collection, see import.go
 }
 
 // New returns a backend over the fixture workspace.
 func New() *Backend {
 	b := &vmtest.Backend{Cols: []model.Collection{Collection()}, Name: "UI development"}
 	b.Values = map[string]any{"defaults.environment": "staging"}
+	b.EnvGroups = []string{"data jobs"} // a group made on its own, with no environment in it yet
+	// Saved runs, newest first, so the Runs tab has a list to compare, step through and clear.
+	started := time.Date(2026, 1, 15, 9, 0, 0, 0, time.UTC)
+	b.RunDetails = map[string]flowi.RunDetail{}
+	b.RunStepList = map[string]flowi.RunSteps{}
+	for i, status := range []string{"passed", "passed", "failed"} {
+		id := fmt.Sprintf("RUN%d", i+1)
+		payCode := 200
+		if status == "failed" {
+			payCode = 500
+		}
+		ms := time.Millisecond
+		b.RunStepList[id] = flowi.RunSteps{ID: id, Status: status, Steps: []flowi.RunStep{
+			{ID: "login", Status: "passed", Instances: 1, Code: 200, Start: 0, End: 220 * ms},
+			{ID: "create", Status: "passed", Instances: 1, Code: 201, Start: 230 * ms, End: 610 * ms},
+			{ID: "wait", Status: "passed", Instances: 1, Start: 620 * ms, End: 1620 * ms},
+			{ID: FailingStep, Status: status, Instances: 1, Code: payCode, Start: 1630 * ms, End: 1900 * ms},
+		}}
+		b.RunDetails[id] = flowi.RunDetail{ID: id, Outputs: map[string]map[string]any{"login": {"status": 200}}, Vars: map[string]any{}}
+		b.RunList = append([]flowi.RunSummary{{ID: id, Env: "staging", Status: status, Started: started.Add(time.Duration(i) * time.Hour), Duration: 1500 * time.Millisecond,
+			Nodes: []flowi.RunNodeSummary{{ID: "login", Type: "request", Status: "passed", Duration: 200 * time.Millisecond}, {ID: FailingStep, Type: "request", Status: status, Duration: 300 * time.Millisecond}}}}, b.RunList...)
+	}
 	return &Backend{Backend: b}
 }
 
@@ -67,6 +91,15 @@ func Collection() model.Collection {
 	pay := get("R-pay", "orders/pay", "Pay for an order", "POST", "{{env.base_url}}/orders/{{order_id}}/pay", &model.Body{JSON: `{"card": "tok_visa"}`})
 	health := get("R-health", "health", "Health", "GET", "{{env.base_url}}/health", nil)
 
+	// Development status and tags, so the sidebar, the editors and the search have something to show: a status of its
+	// own, one a folder gives (orders/ is in development, Pay overrides it), a status of the collection's own
+	// ("needs-design") and a status the collection does not have, which is a diagnostic.
+	login.Status, login.Tags = "production", []string{"smoke", "auth"}
+	create.Tags = []string{"smoke"}
+	orders.Status = "blocked" // not one of the collection's statuses
+	pay.Status, pay.Tags = "review", []string{"payments"}
+	health.Status, health.Tags = "needs-design", []string{"smoke", "ops"}
+
 	call := func(id, path string) *model.RequestCall {
 		return &model.RequestCall{Request: model.Ref{ID: model.ID(id), Path: path}}
 	}
@@ -77,6 +110,7 @@ func Collection() model.Collection {
 		{ID: FailingStep, Type: "request", Request: call("R-pay", "orders/pay")},
 		{ID: "done", Type: "log", Params: []model.Field{{Key: "value", Value: "order paid"}}},
 	}}
+	checkout.Status, checkout.Tags = "testing", []string{"smoke", "payments"}
 	soak := model.Flow{Meta: model.Meta{ID: FlowSoak, Name: "Soak: 300 steps"}, Path: "soak", File: "/demo/flows/soak.arazzo.yaml"}
 	for i := 0; i < SoakSteps; i++ {
 		id := fmt.Sprintf("step%03d", i+1)
@@ -89,10 +123,14 @@ func Collection() model.Collection {
 
 	return model.Collection{
 		Root:     "/demo",
-		Manifest: model.Manifest{Meta: model.Meta{ID: "C-demo", Name: "Demo shop"}, File: "/demo/flowi.yaml"},
+		Manifest: model.Manifest{Meta: model.Meta{ID: "C-demo", Name: "Demo shop"}, File: "/demo/flowi.yaml", Statuses: []model.Status{{Name: "needs-design", Color: "purple", Icon: "bookmark"}}},
+		Folders:  []model.Folder{{Dir: "requests/orders", Status: "in-development", Tags: []string{"orders"}, File: "/demo/requests/orders/_folder.yaml"}},
 		Environments: []model.Environment{
-			{Meta: model.Meta{Name: "staging"}, File: "/demo/environments/staging.yaml", Vars: []model.EnvVar{{Name: "base_url", Value: "https://staging.shop.example"}, {Name: "password", Secret: true}}},
-			{Meta: model.Meta{Name: "local"}, File: "/demo/environments/local.yaml", Vars: []model.EnvVar{{Name: "base_url", Value: "http://localhost:8080"}}},
+			{Meta: model.Meta{Name: "staging"}, File: "/demo/environments/staging.yaml", Vars: []model.EnvVar{{Name: "base_url", Value: "https://staging.shop.example"}, {Name: "password", Secret: true}, {Name: "retries", Value: "3"}, {Name: "region", Value: "eu"}}},
+			{Meta: model.Meta{Name: "local"}, File: "/demo/environments/local.yaml", Vars: []model.EnvVar{{Name: "base_url", Value: "http://localhost:8080"}, {Name: "retries", Value: "3", Kind: model.VarNumber}, {Name: "region", Value: "eu"}}},
+			// A second set of environments, for the services that take payments: the group Compare and Manage environments sort by.
+			{Meta: model.Meta{Name: "payments-staging"}, File: "/demo/environments/payments-staging.yaml", Groups: []string{"checkout", "payments"}, Colour: "blue", Vars: []model.EnvVar{{Name: "timeout", Value: "30", Kind: model.VarNumber}, {Name: "mode", Value: "fast"}, {Name: "api_key", Secret: true}}},
+			{Meta: model.Meta{Name: "payments-prod"}, File: "/demo/environments/payments-prod.yaml", Groups: []string{"payments"}, Colour: "red", Protected: true, Extends: "payments-staging", Vars: []model.EnvVar{{Name: "timeout", Value: "30"}, {Name: "api_key", Secret: true}}},
 		},
 		Requests: []model.Request{login, orders, create, pay, health},
 		Flows:    []model.Flow{checkout, soak},

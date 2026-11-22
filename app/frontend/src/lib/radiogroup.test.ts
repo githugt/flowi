@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { radioKeyTarget, tabStop } from './radiogroup'
 
-const screens = import.meta.glob(['../OutcomesEditor.svelte', '../EnvEditor.svelte', '../SettingsScreen.svelte', '../Segmented.svelte'], { query: '?raw', import: 'default', eager: true }) as Record<string, string>
+const screens = import.meta.glob(['../OutcomesEditor.svelte', '../ColourPicker.svelte', '../SettingsScreen.svelte', '../Segmented.svelte'], { query: '?raw', import: 'default', eager: true }) as Record<string, string>
 
 describe('radio groups', () => {
   it('moves with the arrows, wrapping round, and Home and End jump', () => {

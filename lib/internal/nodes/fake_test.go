@@ -15,9 +15,13 @@ import (
 type fakeRuntime struct {
 	mu sync.Mutex
 
-	stopped  bool
-	now      time.Time
-	laneStep time.Duration // Now advances by this per lane run
+	stopped bool
+	// loop control: what was asked, whether the step sits outside any loop, and whether the enclosing turn ended
+	ended       []string
+	outsideLoop bool
+	turnEnded   bool
+	now         time.Time
+	laneStep    time.Duration // Now advances by this per lane run
 
 	lanes     [][]Lane
 	laneOpts  []LaneOptions
@@ -110,6 +114,26 @@ func (f *fakeRuntime) Stopped() bool {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	return f.stopped
+}
+
+func (f *fakeRuntime) EndIteration() bool {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.ended = append(f.ended, "next")
+	return !f.outsideLoop
+}
+
+func (f *fakeRuntime) LeaveLoop() bool {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.ended = append(f.ended, "leave")
+	return !f.outsideLoop
+}
+
+func (f *fakeRuntime) IterationEnded() bool {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.turnEnded
 }
 
 func (f *fakeRuntime) Now() time.Time {

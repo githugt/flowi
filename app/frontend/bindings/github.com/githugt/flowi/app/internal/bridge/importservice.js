@@ -16,14 +16,6 @@ import { Call as $Call, CancellablePromise as $CancellablePromise, Create as $Cr
 import * as $models from "./models.js";
 
 /**
- * Close removes the file of pasted text. The window calls it as it shuts down.
- * @returns {$CancellablePromise<void>}
- */
-export function Close() {
-    return $Call.ByID(3065458658);
-}
-
-/**
  * Import writes the previewed files. existing is refuse, overwrite or skip;
  * partial imports the rest when some items cannot be imported.
  * @param {string} existing
@@ -37,8 +29,11 @@ export function Import(existing, partial) {
 /**
  * PreparePasted sets the import wizard to import text of the given kind into
  * the collection of the tree row node, without previewing: the import screen
- * opens with the text as its source. Kinds the wizard reads only from a file
- * are given one holding text, kept until the next paste or Close.
+ * opens with the text as its source.
+ * 
+ * Before: a kind the wizard reads from a file (an API description, a Postman export) got the text written to a temporary
+ * file in the system's temp folder, kept until the window closed: the document sat on disk, and its kept copy in the
+ * collection was named after the file ("flowi-paste-2749985858"). Every kind now takes the text as it is.
  * @param {string} kind
  * @param {string} text
  * @param {string} node
@@ -49,7 +44,8 @@ export function PreparePasted(kind, text, node) {
 }
 
 /**
- * Preview reads the source and plans the import.
+ * Preview reads the source and plans the import. The wizard also does it by itself shortly after a choice changes;
+ * this is for refreshing it, for a source that changed on disk.
  * @returns {$CancellablePromise<void>}
  */
 export function Preview() {
@@ -69,7 +65,7 @@ export function PreviewPasted(kind, text, node) {
 }
 
 /**
- * SetCollection chooses where the import goes.
+ * SetCollection chooses the collection the import goes into, at its top.
  * @param {string} id
  * @returns {$CancellablePromise<void>}
  */
@@ -112,6 +108,24 @@ export function SetOverlay(refs) {
  */
 export function SetPaste(text) {
     return $Call.ByID(3748734985, text);
+}
+
+/**
+ * SetTarget chooses where the import goes from a row of the Import into dialog: a collection (its top) or one of
+ * the folders in it, at any depth. A row that is neither is ignored.
+ * @param {string} row
+ * @returns {$CancellablePromise<void>}
+ */
+export function SetTarget(row) {
+    return $Call.ByID(4099854191, row);
+}
+
+/**
+ * StartOver clears the source and the result of the last import, to import something else into the same place.
+ * @returns {$CancellablePromise<void>}
+ */
+export function StartOver() {
+    return $Call.ByID(777707740);
 }
 
 /**

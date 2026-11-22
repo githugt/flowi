@@ -204,6 +204,15 @@ export class Edge {
              */
             this["fromPort"] = undefined;
         }
+        if (/** @type {any} */(false)) {
+            /**
+             * Down marks an edge between two steps stacked in a loop's box: it leaves the right edge of the first, runs down
+             * beside it and into the left edge of the next from below, see EdgePath.
+             * @member
+             * @type {boolean | undefined}
+             */
+            this["down"] = undefined;
+        }
 
         Object.assign(this, $$source);
     }
@@ -580,6 +589,24 @@ export class Unit {
              * @type {string[] | undefined}
              */
             this["ports"] = undefined;
+        }
+        if (/** @type {any} */(false)) {
+            /**
+             * Boxed marks a container card whose body is one box under the card: a loop groups the steps it runs, where a
+             * condition or a parallel offers alternatives to its right. The flow goes on from the card's own port.
+             * @member
+             * @type {boolean | undefined}
+             */
+            this["boxed"] = undefined;
+        }
+        if (/** @type {any} */(false)) {
+            /**
+             * Down marks a boxed container whose steps are stacked top to bottom (else they are in one row): the arrows
+             * between them run down, see Edge.Down.
+             * @member
+             * @type {boolean | undefined}
+             */
+            this["down"] = undefined;
         }
 
         Object.assign(this, $$source);

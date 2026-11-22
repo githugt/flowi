@@ -17,9 +17,20 @@ const curveSteps = 24
 func EdgePath(d Diagram, e Edge) []Point {
 	from, _ := d.Unit(e.From)
 	to, _ := d.Unit(e.To)
-	p0 := Point{X: from.X + from.W, Y: from.PortYOf(e.FromPort)}
+	if e.Down {
+		return downPath(from, to, e.FromPort)
+	}
+	p0 := Point{X: from.OutX(), Y: from.PortYOf(e.FromPort)}
 	if to.Parent == from.ID {
 		p0.X = from.X + lanePad/2 // into a lane: from the container's left, not back across it
+		if from.Boxed {
+			// …from the card's foot, straight down to the first step (of a stack: onto its top)
+			p0 = Point{X: to.X, Y: from.Y + from.HeadH}
+			if from.Down {
+				p0.X = to.X + entryGutter
+				return []Point{p0, {X: p0.X, Y: to.Y}}
+			}
+		}
 	}
 	p3 := Point{X: to.X, Y: to.PortY()}
 	if p0.Y == p3.Y {
@@ -35,6 +46,39 @@ func EdgePath(d Diagram, e Edge) []Point {
 		out = append(out, Point{X: int64(math.Round(x)), Y: int64(math.Round(y))})
 	}
 	return out
+}
+
+// downPath is the way from a step to the one stacked under it in a loop's box: out of the port to the right of the
+// card, down beside it, left through the gap between the two cards, down beside the next one's left edge and into
+// its in port. A port further down the card runs further out, so two arrows of one step do not run over each other.
+func downPath(from, to Unit, port string) []Point {
+	p0 := Point{X: from.OutX(), Y: from.PortYOf(port)}
+	p3 := Point{X: to.X, Y: to.PortY()}
+	out := p0.X + exitGutter + int64(portIndex(from, port))*gutterStep
+	in := p3.X - entryGutter
+	bottom := from.Y + from.H
+	mid := (bottom + to.Y) / 2
+	if to.Y <= bottom {
+		mid = bottom + columnGap/4 // the next step is not below: still leave the card by its foot
+	}
+	return []Point{p0, {X: out, Y: p0.Y}, {X: out, Y: mid}, {X: in, Y: mid}, {X: in, Y: p3.Y}, p3}
+}
+
+// portIndex is the position of the unit's out port id among its ports: 0 for the first (done) and for a unit that
+// has no such port.
+func portIndex(u Unit, id string) int {
+	for i, p := range u.Ports {
+		if p == id {
+			return i
+		}
+	}
+	return 0
+}
+
+// flowsDown says whether the node list unit u is in runs top to bottom: it is a step of a loop drawn stacked.
+func flowsDown(d Diagram, u Unit) bool {
+	parent, ok := d.Unit(u.Parent)
+	return u.Parent != "" && ok && parent.Down
 }
 
 // UnitAt is the innermost unit containing p.
@@ -211,14 +255,18 @@ const sideReach = 140
 // unit.
 func InsertNear(d Diagram, p Point, exclude string) (list string, index int, ok bool) {
 	horizontal := runsHorizontally(d)
-	along := func(pt Point) int64 {
-		if horizontal {
-			return pt.X
+	// Where the flow runs a step or an arrow is in, which is down in a stacked loop and else as the flow runs.
+	axes := func(down bool) (along, side func(Point) int64) {
+		x := func(pt Point) int64 { return pt.X }
+		y := func(pt Point) int64 { return pt.Y }
+		if horizontal && !down {
+			return x, y
 		}
-		return pt.Y
+		return y, x
 	}
 	if u, found := UnitAt(d, p); found && u.ID != exclude && u.Kind != KindContainer && !isLaneOwner(d, u.ID) {
 		if l, i, split := SplitPath(u.Path); split {
+			along, _ := axes(flowsDown(d, u))
 			mid := Point{X: u.X + u.W/2, Y: u.Y + u.H/2}
 			if along(p) >= along(mid) {
 				i += len(u.Nodes) // after the whole unit: a strip or a request block is not split by a drop
@@ -232,16 +280,11 @@ func InsertNear(d Diagram, p Point, exclude string) (list string, index int, ok 
 		if e.From == exclude || e.To == exclude {
 			continue
 		}
+		along, side := axes(e.Down)
 		path := EdgePath(d, e)
 		lo, hi := extent(path, along)
 		if along(p) < lo-gapMargin || along(p) > hi+gapMargin {
 			continue
-		}
-		side := func(pt Point) int64 {
-			if horizontal {
-				return pt.Y
-			}
-			return pt.X
 		}
 		sideLo, sideHi := extent(path, side)
 		if side(p) < sideLo-sideReach || side(p) > sideHi+sideReach {
@@ -272,6 +315,9 @@ func extent(path []Point, f func(Point) int64) (lo, hi int64) {
 // today) rather than top to bottom: the first edge is wider than it is tall.
 func runsHorizontally(d Diagram) bool {
 	for _, e := range d.Edges {
+		if from, _ := d.Unit(e.From); e.Down || (e.Into && from.Down) {
+			continue // arrows inside a stacked loop run down whatever way the flow runs
+		}
 		path := EdgePath(d, e)
 		first, last := path[0], path[len(path)-1]
 		return math.Abs(float64(last.X-first.X)) >= math.Abs(float64(last.Y-first.Y))

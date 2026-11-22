@@ -49,6 +49,7 @@ const (
 	CodeNodeContract     Code = "FLW-NODE-010"
 	CodeNodeAttach       Code = "FLW-NODE-011"
 	CodeNodeRemovedType  Code = "FLW-NODE-012"
+	CodeNodeLoopControl  Code = "FLW-NODE-013"
 
 	CodeImportUnmapped  Code = "FLW-IMPORT-001"
 	CodeImportInvalid   Code = "FLW-IMPORT-002"
@@ -133,6 +134,9 @@ const (
 	CodeFlowTagEmpty  Code = "FLW-FLOW-004"
 	CodeFlowNone      Code = "FLW-FLOW-005"
 
+	CodeStatusUnknown Code = "FLW-STATUS-001"
+	CodeStatusInvalid Code = "FLW-STATUS-002"
+
 	CodeCycleNeeds   Code = "FLW-CYC-001"
 	CodeCycleSubflow Code = "FLW-CYC-002"
 
@@ -167,17 +171,21 @@ const (
 	CodeSecretHost            Code = "FLW-SEC-005" //nolint:gosec // see above
 	CodeSecretShipped         Code = "FLW-SEC-006" //nolint:gosec // see above
 
-	CodeRequestNotFound    Code = "FLW-REQ-001"
-	CodeRequestAmbiguous   Code = "FLW-REQ-002"
-	CodeRequestFileOutside Code = "FLW-REQ-003"
-	CodeRequestEnvUnknown  Code = "FLW-REQ-004"
-	CodeRequestHeader      Code = "FLW-REQ-005"
-	CodeRequestFileRead    Code = "FLW-REQ-006"
-	CodeRequestExampleName Code = "FLW-REQ-007"
-	CodeRequestEnvExtends  Code = "FLW-REQ-008"
-	CodeRequestMethod      Code = "FLW-REQ-009"
-	CodeRequestMethodCase  Code = "FLW-REQ-010"
-	CodeRequestEnvShipped  Code = "FLW-REQ-011"
+	CodeRequestNotFound     Code = "FLW-REQ-001"
+	CodeRequestAmbiguous    Code = "FLW-REQ-002"
+	CodeRequestFileOutside  Code = "FLW-REQ-003"
+	CodeRequestEnvUnknown   Code = "FLW-REQ-004"
+	CodeRequestHeader       Code = "FLW-REQ-005"
+	CodeRequestFileRead     Code = "FLW-REQ-006"
+	CodeRequestExampleName  Code = "FLW-REQ-007"
+	CodeRequestEnvExtends   Code = "FLW-REQ-008"
+	CodeRequestMethod       Code = "FLW-REQ-009"
+	CodeRequestMethodCase   Code = "FLW-REQ-010"
+	CodeRequestEnvShipped   Code = "FLW-REQ-011"
+	CodeRequestEnvGroup     Code = "FLW-REQ-012"
+	CodeRequestEnvGroupBase Code = "FLW-REQ-013"
+	CodeRequestEnvGroupUse  Code = "FLW-REQ-014"
+	CodeRequestEnvColour    Code = "FLW-REQ-015"
 
 	CodeRunAssertFailed   Code = "FLW-RUN-001"
 	CodeRunAssertWarning  Code = "FLW-RUN-002"
@@ -264,6 +272,7 @@ func codeTable() map[Code]codeInfo {
 
 		CodeNodeUnknownType:  {e, `unknown node type "{type}" — hint: use one of the step types offered when you add a step`},
 		CodeNodeRemovedType:  {e, `node type "{type}" no longer exists` + hintMarker + "use {use}"},
+		CodeNodeLoopControl:  {e, `loop control "{node}" is not inside the body of a loop` + hintMarker + "it can only end an item or leave a loop, so put it in the body of a batch or run_till step (inside a condition or parallel there is fine)"},
 		CodeNodeDuplicateID:  {e, `duplicate node id "{node}" in flow — hint: rename one of the steps`},
 		CodeNodeNeedsSibling: {e, `needs "{target}" is not a sibling node` + hintMarker + "needs can only reference nodes in the same list"},
 		CodeNodeMissingField: {e, `node type "{type}" requires "{field}"`},
@@ -355,6 +364,9 @@ func codeTable() map[Code]codeInfo {
 		CodeFlowNone:      {e, "there is no flow to run" + hintMarker + "add a flow, or check --collection"},
 		CodeFlowAmbiguous: {e, `"{ref}" matches flows in {count} collections` + hintMarker + "use --collection"},
 
+		CodeStatusUnknown: {e, `status "{status}" of {where} is not one of this collection's statuses` + hintMarker + "use {known}, or add it under `statuses:` in flowi.yaml"},
+		CodeStatusInvalid: {e, `status "{name}": {detail}` + hintMarker + "fix it under `statuses:` in flowi.yaml"},
+
 		CodeCycleNeeds:   {e, "dependency cycle: {cycle} — hint: remove one needs link to break the loop"},
 		CodeCycleSubflow: {e, "subflow cycle: {cycle} — hint: make one of the flows stop calling the other"},
 
@@ -390,17 +402,21 @@ func codeTable() map[Code]codeInfo {
 		CodeSecretFromEnvironment: {e, `secret "{name}" of environment "{env}" is provided by an environment variable, not stored` + hintMarker + "read it from where that variable is set"},
 		CodeSecretUndeclared:      {e, `"{name}" is not a secret variable of environment "{env}"` + hintMarker + "declare it as `{name}: { secret: true }` in environments/{env}.yaml"},
 
-		CodeRequestNotFound:    {e, `no request matches "{ref}"`},
-		CodeRequestAmbiguous:   {e, `"{ref}" matches requests in {count} collections` + hintMarker + "use --collection"},
-		CodeRequestFileOutside: {e, `file "{path}" is outside the collection`},
-		CodeRequestEnvShipped:  {e, `environment "{env}" comes with the collection "{collection}" and is not in the workspace yet` + hintMarker + "copy it with `flowi env import {env}`, then try again"},
-		CodeRequestEnvUnknown:  {e, `environment "{env}" not found` + hintMarker + "see `flowi env ls`"},
-		CodeRequestHeader:      {e, "invalid header {name}: {detail}"},
-		CodeRequestFileRead:    {e, `file "{path}" cannot be read: {detail}`},
-		CodeRequestEnvExtends:  {e, `environment "{env}" cannot be built: {detail}` + hintMarker + "check the `extends:` line and the variables of the environment file"},
-		CodeRequestMethod:      {e, `"{method}" cannot be sent as an HTTP method` + hintMarker + "a method is one word of letters, digits and !#$%&'*+-.^_`|~: GET, QUERY, PROPFIND, PURGE or your own"},
-		CodeRequestMethodCase:  {w, `method "{method}" is not written as {spelling}` + hintMarker + "method names are case-sensitive on the wire: a server that knows {spelling} will not know {method}"},
-		CodeRequestExampleName: {e, `invalid example name "{name}"` + hintMarker + "use letters, digits, '.', '_' and '-', not starting with '.'"},
+		CodeRequestNotFound:     {e, `no request matches "{ref}"`},
+		CodeRequestAmbiguous:    {e, `"{ref}" matches requests in {count} collections` + hintMarker + "use --collection"},
+		CodeRequestFileOutside:  {e, `file "{path}" is outside the collection`},
+		CodeRequestEnvShipped:   {e, `environment "{env}" comes with the collection "{collection}" and is not in the workspace yet` + hintMarker + "copy it with `flowi env import {env}`, then try again"},
+		CodeRequestEnvGroup:     {e, `environment "{env}" has groups that cannot be used: {detail}` + hintMarker + "change the `groups:` line of the environment file, or remove it to put the environment in the default group"},
+		CodeRequestEnvGroupBase: {w, `environment "{env}" is in {group} but builds on "{base}", which is in {baseGroup}` + hintMarker + "put the base in {group} as well, or Compare environments for it will show values inherited from an environment it does not list"},
+		CodeRequestEnvColour:    {e, `environment "{env}": "{colour}" is not a colour an environment can have` + hintMarker + "choose one of the colours the Manage environments screen offers, or none for the default"},
+		CodeRequestEnvGroupUse:  {e, `environment group "{group}": {detail}` + hintMarker + "see the groups on the Manage environments screen"},
+		CodeRequestEnvUnknown:   {e, `environment "{env}" not found` + hintMarker + "see `flowi env ls`"},
+		CodeRequestHeader:       {e, "invalid header {name}: {detail}"},
+		CodeRequestFileRead:     {e, `file "{path}" cannot be read: {detail}`},
+		CodeRequestEnvExtends:   {e, `environment "{env}" cannot be built: {detail}` + hintMarker + "check the `extends:` line and the variables of the environment file"},
+		CodeRequestMethod:       {e, `"{method}" cannot be sent as an HTTP method` + hintMarker + "a method is one word of letters, digits and !#$%&'*+-.^_`|~: GET, QUERY, PROPFIND, PURGE or your own"},
+		CodeRequestMethodCase:   {w, `method "{method}" is not written as {spelling}` + hintMarker + "method names are case-sensitive on the wire: a server that knows {spelling} will not know {method}"},
+		CodeRequestExampleName:  {e, `invalid example name "{name}"` + hintMarker + "use letters, digits, '.', '_' and '-', not starting with '.'"},
 
 		CodeRunAssertFailed:   {e, "assertion failed: {check}{message}"},
 		CodeRunAssertWarning:  {w, "assertion failed: {check}{message}"},

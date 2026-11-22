@@ -19,6 +19,7 @@ import (
 	"github.com/santhosh-tekuri/jsonschema/v6"
 
 	"github.com/githugt/flowi/lib/internal/nodes"
+	"github.com/githugt/flowi/lib/model"
 	"github.com/githugt/flowi/lib/settings"
 )
 
@@ -340,5 +341,128 @@ func TestSchemas_should_reject_an_unknown_dataset_driver(t *testing.T) {
 
 	if err := compile(t, "request").Validate(v); err == nil {
 		t.Fatal("want an error")
+	}
+}
+
+// Before: the environment schema had no `groups`, so an editor's schema check flagged the line as an unknown key.
+func TestEnvironmentSchema_should_accept_groups_and_refuse_the_names_validation_refuses(t *testing.T) {
+	sch := compile(t, "environment")
+	instance := func(groups any) any {
+		return map[string]any{"id": "01J9ZE3M4N5P6Q7R8S9T0VWXYZ", "groups": groups}
+	}
+
+	tests := []struct {
+		name  string
+		group any
+		ok    bool
+	}{
+		{"a plain name", []any{"checkout services"}, true},
+		{"two groups", []any{"checkout", "payments"}, true},
+		{"the default token beside a name", []any{"checkout", "default"}, true},
+		{"the default's name with a capital", []any{"checkout", "DEFAULT"}, false},
+		{"none", []any{}, true},
+		{"the default's own name", []any{"Default"}, false},
+		{"empty", []any{""}, false},
+		{"a space at the end", []any{"checkout "}, false},
+		{"a repeat", []any{"a", "a"}, false},
+		{"one name, not a list", "checkout", false},
+		{"not text", []any{3}, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := sch.Validate(instance(tt.group))
+
+			if (err == nil) != tt.ok {
+				t.Fatalf("group %v: err %v, want ok=%v", tt.group, err, tt.ok)
+			}
+		})
+	}
+}
+
+func TestWorkspaceSchema_should_accept_environment_groups_and_refuse_a_name_validation_refuses(t *testing.T) {
+	sch := compile(t, "workspace")
+	instance := func(groups ...any) any {
+		return map[string]any{"id": "01J9ZE3M4N5P6Q7R8S9T0VWXYZ", "environment_groups": groups}
+	}
+
+	if err := sch.Validate(instance("checkout", "data jobs")); err != nil {
+		t.Fatalf("a good list: %v", err)
+	}
+	for _, bad := range []any{"Default", "", "x ", 3} {
+		if err := sch.Validate(instance(bad)); err == nil {
+			t.Errorf("accepted %v", bad)
+		}
+	}
+	if err := sch.Validate(instance("a", "a")); err == nil {
+		t.Error("accepted a repeated group")
+	}
+}
+
+// Before: a file with `status:` was refused as an unknown key.
+func TestSchemas_should_accept_a_status_and_refuse_one_the_validator_would_refuse(t *testing.T) {
+	cases := []struct {
+		kind string
+		doc  map[string]any
+	}{
+		{"folder", map[string]any{}},
+		{"request", map[string]any{"id": "01J9ZE3M4N5P6Q7R8S9T0VWXYZ", "versions": map[string]any{"1": map[string]any{"method": "GET", "url": "http://x"}}}},
+		{"flow", map[string]any{"id": "01J9ZE3M4N5P6Q7R8S9T0VWXYZ", "nodes": []any{}}},
+	}
+	for _, c := range cases {
+		sch := compile(t, c.kind)
+		with := func(status any) any {
+			doc := map[string]any{"status": status}
+			for k, v := range c.doc {
+				doc[k] = v
+			}
+			return doc
+		}
+
+		for _, good := range []string{"review", "in-development", "needs_design", "v2"} {
+			if err := sch.Validate(with(good)); err != nil {
+				t.Errorf("%s: %q refused: %v", c.kind, good, err)
+			}
+		}
+		for _, bad := range []any{"Review", "needs design", "", "-x", 3} {
+			if err := sch.Validate(with(bad)); err == nil {
+				t.Errorf("%s: %v accepted", c.kind, bad)
+			}
+		}
+	}
+}
+
+func TestManifestSchema_should_take_statuses_and_offer_exactly_the_colours_and_icons_the_model_does(t *testing.T) {
+	sch := compile(t, "manifest")
+	instance := func(statuses ...any) any {
+		return map[string]any{"format": 1, "id": "01J9ZE3M4N5P6Q7R8S9T0VWXYZ", "statuses": statuses}
+	}
+
+	if err := sch.Validate(instance(map[string]any{"name": "needs-design", "color": "pink", "icon": "bookmark"}, map[string]any{"name": "later"})); err != nil {
+		t.Fatalf("good statuses: %v", err)
+	}
+	for _, bad := range []any{
+		map[string]any{"color": "pink"},
+		map[string]any{"name": "a", "color": "mauve"},
+		map[string]any{"name": "a", "icon": "nope"},
+		map[string]any{"name": "a", "colour": "pink"},
+	} {
+		if err := sch.Validate(instance(bad)); err == nil {
+			t.Errorf("accepted %v", bad)
+		}
+	}
+	for _, color := range model.StatusColors() {
+		if err := sch.Validate(instance(map[string]any{"name": "a", "color": color})); err != nil {
+			t.Errorf("the model's colour %q is refused by the schema: %v", color, err)
+		}
+	}
+	for _, icon := range model.StatusIcons() {
+		if err := sch.Validate(instance(map[string]any{"name": "a", "icon": icon})); err != nil {
+			t.Errorf("the model's icon %q is refused by the schema: %v", icon, err)
+		}
+	}
+	for _, s := range model.DefaultStatuses() {
+		if err := sch.Validate(instance(map[string]any{"name": s.Name, "color": s.Color, "icon": s.Icon})); err != nil {
+			t.Errorf("default %q: %v", s.Name, err)
+		}
 	}
 }

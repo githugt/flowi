@@ -51,6 +51,16 @@ exec flowi import mermaid sketch.mmd --collection api
 stdout 'FLW-MERMAID-001'
 exists api/flows/mermaid/sketch.arazzo.yaml
 
+# --into puts the requests in a folder of the collection (nested as deep as you like), and says what it left alone.
+exec flowi import curl paste.txt --collection api --into demo/captures
+exists api/requests/demo/captures/curl/post-v1-users.req.yaml
+exec flowi import curl paste.txt --collection api --into demo/captures --skip-existing
+stdout '^Imported 0 files into api$'
+stdout '^Left 2 files as they are, because they already exist'
+stdout '^  = requests/demo/captures/curl/post-v1-users.req.yaml$'
+! exec flowi import curl paste.txt --collection api --into ../outside
+stderr 'FLW-WRITE'
+
 # Insomnia, Thunder Client and Hoppscotch exports.
 exec flowi import insomnia insomnia.json --collection api
 stdout 'Tools/Ping'

@@ -25,6 +25,10 @@
         "type": "string",
         "minLength": 1
       }
+    },
+    "status": {
+      "$ref": "common.schema.json#/$defs/statusName",
+      "description": "The default development status of everything under the folder that does not set its own."
     }
   }
 }

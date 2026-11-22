@@ -52,7 +52,7 @@ flowi diff user-creation --rev main          # what changed in this flow, step b
 
 | Command | What it does |
 |---|---|
-| `init`, `workspace mount/ls`, `ls`, `new` | Create and mount collections; list and create requests and flows (`flowi new flow team/chain --from two-calls`) |
+| `init`, `workspace mount/ls`, `ls`, `new` | Create and mount collections; list and create requests and flows (`flowi new flow team/chain --from two-calls`); `ls --tag <tag>` or `--status review` lists only what carries the tag or has the [development status](../lib/docs/reference/status-and-tags.md) |
 | `send <request>` | Send one saved request: HTTP, gRPC, a message (publish to or receive from Kafka, MQTT, NATS, SQS and more) or a database query. `--env`, `--with name=value`, `--prefer-version`, `--flowi-overlay`, `--pin` to keep the answer as an example, `--check` to only test the connection of a message or database request |
 | `run <flow>` | Run a flow with a live progress tree. `--tag <tag>` or `--all` runs many flows (`--fail-fast` stops at the first that does not pass). `--input`, `--seed` to repeat generated values, `--matrix env=local,staging` to run every combination, `--data users.csv` to run once per row of a CSV or JSON file (see [data-driven runs](../lib/docs/data-driven-runs.md)), `--overlay`, `--bundle` to keep the run for offline replay, `--report junit=report.xml` (also `json`, `markdown`, `text`, `mermaid`, `har`) |
 | `impact <request>` | List everything that uses a request, and whether each still fits its contract. Exits 1 if something is broken |

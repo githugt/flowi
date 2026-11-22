@@ -20,7 +20,8 @@ const BASELINE: Record<string, [number, number, number]> = {
   'CommandPalette.svelte': [1, 0, 0],
   'DebugBar.svelte': [1, 0, 0],
   'Dropdown.svelte': [1, 0, 0],
-  'EnvEditor.svelte': [3, 0, 0],
+  'ColourPicker.svelte': [2, 0, 0], // the swatches of EnvEditor, moved here to be shared with Manage environments
+  'EnvEditor.svelte': [1, 0, 0],
   'ExprHelp.svelte': [1, 0, 0],
   'FileTree.svelte': [1, 0, 0],
   'FlowEditor.svelte': [1, 0, 0],

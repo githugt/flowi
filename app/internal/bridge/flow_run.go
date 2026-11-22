@@ -281,6 +281,35 @@ func (s *FlowService) LoadHistory(node string) {
 	_ = s.edit(node, func(o *openFlow) error { o.history.Load(); return nil })
 }
 
+// DeleteRun deletes the saved run id of the flow. The Runs tab gets the new list.
+func (s *FlowService) DeleteRun(node, id string) error {
+	done := make(chan error, 1)
+	if err := s.edit(node, func(o *openFlow) error {
+		o.history.Delete(id, func(err error) { done <- err })
+		return nil
+	}); err != nil {
+		return err
+	}
+	return <-done
+}
+
+// ClearRuns deletes every saved run of the flow and says how many there were. The Runs tab gets the empty list.
+func (s *FlowService) ClearRuns(node string) (int, error) {
+	type result struct {
+		n   int
+		err error
+	}
+	done := make(chan result, 1)
+	if err := s.edit(node, func(o *openFlow) error {
+		o.history.Clear(func(n int, err error) { done <- result{n, err} })
+		return nil
+	}); err != nil {
+		return 0, err
+	}
+	r := <-done
+	return r.n, r.err
+}
+
 // CompareRuns compares saved run from with saved run to (indexes, newest
 // first): the status and time of each top-level step.
 func (s *FlowService) CompareRuns(node string, from, to int) []DiffView {

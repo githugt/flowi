@@ -3,6 +3,7 @@
 package asyncapi
 
 import (
+	"fmt"
 	"os"
 	"strings"
 	"testing"
@@ -239,5 +240,89 @@ operations:
 	// Assert
 	if diags.HasErrors() || len(got.Requests) != 1 || got.Requests[0].Versions[0].Async == nil || got.Requests[0].Versions[0].Async.Protocol != "mqtt" {
 		t.Fatalf("diags %v requests %+v", diags, got.Requests)
+	}
+}
+
+// The document a person imported by pasting it: AsyncAPI 3.0, a WebSocket server and two operations, one that sends
+// and waits for the reply (`echo`) and one that only listens (`receiveTicks`).
+func TestImport_Given_a_websocket_document_with_a_reply_Then_both_operations_become_ws_requests(t *testing.T) {
+	res := load(t, "websocket-echo.yaml")
+
+	echo := byOperation(res, "echo")
+	ticks := byOperation(res, "receiveTicks")
+
+	if len(res.Requests) != 2 {
+		t.Fatalf("want 2 requests, got %d: %+v", len(res.Requests), res.Requests)
+	}
+	e, k := echo.Versions[0].Async, ticks.Versions[0].Async
+	if echo.Path != "echo" || echo.Name != "Echo (send a message, get it back)" || ticks.Path != "receiveTicks" || ticks.Name != "Receive ticks" {
+		t.Fatalf("paths and names: %q %q, %q %q", echo.Path, echo.Name, ticks.Path, ticks.Name)
+	}
+	if e.Protocol != "ws" || e.Server != "ws://localhost:8080" || e.Channel != "/ws" {
+		t.Fatalf("echo %+v", e)
+	}
+	// A send with a reply is both: it sends the example and waits for what comes back.
+	if e.Send == nil || e.Receive == nil || !strings.Contains(e.Send.Body.JSON, `"hello": "flowi"`) {
+		t.Fatalf("echo should send the example and receive the reply: %+v", e)
+	}
+	if k.Protocol != "ws" || k.Channel != "/ws/ticks" || k.Send != nil || k.Receive == nil {
+		t.Fatalf("ticks %+v", k)
+	}
+}
+
+const flowiExtensionsDoc = `
+asyncapi: 3.0.0
+info: {title: Extensions, version: 1.0.0}
+servers:
+  local: {host: "localhost:4566", protocol: sqs, x-flowi-scheme: http}
+channels:
+  q: {address: demo, servers: [{$ref: "#/servers/local"}], messages: {m: {payload: {type: string}}}}
+operations:
+  readQueue:
+    action: receive
+    channel: {$ref: "#/channels/q"}
+    x-flowi-binding: {region: eu-west-1, access_key_id: nope, nonsense: 1}
+`
+
+func TestImport_Given_flowi_extensions_Then_the_scheme_and_bindings_are_applied_and_credentials_refused(t *testing.T) {
+	res, diags := Import([]byte(flowiExtensionsDoc), Options{NewID: newID()})
+
+	queue := byOperation(res, "readQueue").Versions[0].Async
+
+	if queue == nil || queue.Server != "http://localhost:4566" {
+		t.Fatalf("queue %+v", queue)
+	}
+	if len(queue.Binding) != 1 || queue.Binding[0].Key != "region" || queue.Binding[0].Value != "eu-west-1" {
+		t.Fatalf("queue binding %+v (a credential and an unknown name must not be imported)", queue.Binding)
+	}
+	text := fmt.Sprint(diags)
+	for _, want := range []string{"access_key_id", "nonsense"} {
+		if !strings.Contains(text, want) {
+			t.Errorf("diagnostics do not mention %q: %s", want, text)
+		}
+	}
+}
+
+func TestImport_Given_x_flowi_binding_on_a_redis_stream_Then_mode_and_start_are_bindings(t *testing.T) {
+	doc := `
+asyncapi: 3.0.0
+info: {title: Redis, version: 1.0.0}
+servers:
+  local: {host: "localhost:6379", protocol: redis}
+channels:
+  stream: {address: "flowi:demo:stream", messages: {m: {payload: {type: string}}}}
+operations:
+  readStream:
+    action: receive
+    channel: {$ref: "#/channels/stream"}
+    x-flowi-binding: {mode: stream, start: 0}
+`
+	res, diags := Import([]byte(doc), Options{NewID: newID()})
+
+	got := byOperation(res, "readStream").Versions[0].Async
+
+	if diags.HasErrors() || got == nil || len(got.Binding) != 2 ||
+		got.Binding[0] != (model.KeyValue{Key: "mode", Value: "stream"}) || got.Binding[1] != (model.KeyValue{Key: "start", Value: "0"}) {
+		t.Fatalf("diags %v, async %+v", diags, got)
 	}
 }

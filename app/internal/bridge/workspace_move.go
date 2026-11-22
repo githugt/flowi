@@ -58,6 +58,28 @@ func withMove(entries []MenuEntry, ws *vm.Workspace, ids []string) []MenuEntry {
 	return slices.Insert(entries, at, move)
 }
 
+// withLabelsEntry adds Tags and status… to the menu of one request, flow or folder, after Rename (or Move to…).
+func withLabelsEntry(entries []MenuEntry, ws *vm.Workspace, ids []string) []MenuEntry {
+	if len(ids) != 1 {
+		return entries
+	}
+	if k := ws.Node(ids[0]).Kind; k != vm.NodeRequest && k != vm.NodeFlow && k != vm.NodeFolder {
+		return entries
+	}
+	entry := MenuEntry{Action: "labels", Label: "Tags and status…", Dialog: "labels"}
+	at := slices.IndexFunc(entries, func(e MenuEntry) bool { return e.Action == "move" }) + 1
+	if at == 0 {
+		at = slices.IndexFunc(entries, func(e MenuEntry) bool { return e.Action == "rename" }) + 1
+	}
+	if at == 0 {
+		at = slices.IndexFunc(entries, func(e MenuEntry) bool { return e.Action == "delete" })
+	}
+	if at < 0 {
+		at = len(entries)
+	}
+	return slices.Insert(entries, at, entry)
+}
+
 // MoveTargets lists where requests can go: every collection, its request
 // folders under it, in tree order.
 func (s *WorkspaceService) MoveTargets() []MoveTargetView { return s.PlaceTargets("requests") }

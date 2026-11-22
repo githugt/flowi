@@ -70,3 +70,64 @@ func TestNodes_should_know_the_stop_node(t *testing.T) {
 		t.Fatalf("a stop node was refused: %+v", got)
 	}
 }
+
+func TestLoopControl_should_be_valid_only_in_a_loop_body_at_any_depth(t *testing.T) {
+	// Before: loop_control did not exist; a stop was the only way out and it ended the run.
+	step := model.Node{ID: "out", Type: "loop_control", Params: params("action", "leave")}
+	note := model.Node{ID: "n", Type: "note", Params: params("text", "x")}
+	cond := func(id string, then ...model.Node) model.Node {
+		return model.Node{ID: id, Type: "condition", Params: params("check", "true"), Then: then}
+	}
+	batch := func(body ...model.Node) model.Node {
+		return model.Node{ID: "each", Type: "batch", Params: []model.Field{{Key: "times", Value: int64(2)}}, Body: body}
+	}
+	tests := []struct {
+		name     string
+		nodes    []model.Node
+		wantPath string // "" means valid
+	}{
+		{name: "in_a_batch_body", nodes: []model.Node{batch(step)}},
+		{name: "in_a_run_till_body", nodes: []model.Node{{ID: "poll", Type: "run_till", Params: params("until", "false"), Body: []model.Node{step}}}},
+		{name: "in_a_condition_in_the_body", nodes: []model.Node{batch(cond("c", step))}},
+		{name: "in_a_parallel_branch_in_the_body", nodes: []model.Node{batch(model.Node{ID: "par", Type: "parallel", Branches: []model.Branch{
+			{ID: "one", Nodes: []model.Node{step}}, {ID: "two", Nodes: []model.Node{note}}}})}},
+		{name: "in_a_loop_in_a_condition_in_a_loop", nodes: []model.Node{batch(cond("c", model.Node{ID: "inner", Type: "batch", Params: []model.Field{{Key: "times", Value: int64(1)}}, Body: []model.Node{step}}))}},
+		{name: "at_the_top_level", nodes: []model.Node{step}, wantPath: "$.nodes[0]"},
+		{name: "in_a_condition_outside_a_loop", nodes: []model.Node{cond("c", step)}, wantPath: "$.nodes[0].then[0]"},
+		{name: "in_a_parallel_outside_a_loop", nodes: []model.Node{{ID: "par", Type: "parallel", Branches: []model.Branch{
+			{ID: "one", Nodes: []model.Node{step}}, {ID: "two", Nodes: []model.Node{note}}}}}, wantPath: "$.nodes[0].branches[0].nodes[0]"},
+		{name: "after_a_loop_not_in_it", nodes: []model.Node{batch(note), step}, wantPath: "$.nodes[1]"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			f := newFixture(t)
+			c := f.collection("c")
+			f.flow(&c, "x", tt.nodes...)
+
+			got := Validate(Target{Collections: []model.Collection{c}})
+
+			if tt.wantPath == "" {
+				if len(got) != 0 {
+					t.Fatalf("a loop control in a loop was refused: %v", codesOf(got))
+				}
+				return
+			}
+			if d := only(t, got, diag.CodeNodeLoopControl); d.Path != tt.wantPath {
+				t.Fatalf("path %q, want %q", d.Path, tt.wantPath)
+			}
+		})
+	}
+}
+
+func TestLoopControl_Given_a_bad_action_Then_FLW_NODE_005(t *testing.T) {
+	f := newFixture(t)
+	c := f.collection("c")
+	step := model.Node{ID: "out", Type: "loop_control", Params: params("action", "break")}
+	f.flow(&c, "x", model.Node{ID: "each", Type: "batch", Params: []model.Field{{Key: "times", Value: int64(2)}}, Body: []model.Node{step}})
+
+	got := Validate(Target{Collections: []model.Collection{c}})
+
+	if d := only(t, got, diag.CodeNodeParam); d.Path != "$.nodes[0].body[0].action" {
+		t.Fatalf("path %q", d.Path)
+	}
+}

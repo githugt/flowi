@@ -20,7 +20,7 @@ import (
 func listSections() []string { return []string{"requests", "flows", "blueprints", "envs"} }
 
 func newLsCommand(i do.Injector) *cobra.Command {
-	var tag string
+	var tag, status string
 	cmd := &cobra.Command{
 		Use:       "ls [requests|flows|blueprints|envs]",
 		Short:     "List the contents of mounted collections",
@@ -39,7 +39,7 @@ func newLsCommand(i do.Injector) *cobra.Command {
 				return err
 			}
 			for _, c := range s.Workspace.Collections() {
-				printCollection(cmd.OutOrStdout(), c, sections, tag)
+				printCollection(cmd.OutOrStdout(), c, sections, tag, status)
 			}
 			if slices.Contains(sections, "envs") {
 				printEnvironments(cmd.OutOrStdout(), s.Workspace.Environments())
@@ -48,24 +48,25 @@ func newLsCommand(i do.Injector) *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVar(&tag, "tag", "", "list only the requests and flows that carry this tag (their own or their folder's)")
+	cmd.Flags().StringVar(&status, "status", "", "list only the requests and flows with this development status (their own, or else their nearest folder's)")
 	return cmd
 }
 
-func printCollection(w io.Writer, c model.Collection, sections []string, tag string) {
-	if tag != "" {
-		c = onlyTagged(c, tag)
+func printCollection(w io.Writer, c model.Collection, sections []string, tag, status string) {
+	if tag != "" || status != "" {
+		c = onlyMatching(c, tag, status)
 	}
 	fmt.Fprintf(w, "%s (%s)\n", c.Manifest.Name, c.Manifest.ID)
 	if slices.Contains(sections, "requests") && len(c.Requests) > 0 {
 		fmt.Fprintln(w, "  Requests")
 		printTree(w, entriesOf(c.Requests, func(r model.Request) (string, string) {
-			return r.Path, fmt.Sprintf("%s  (%s)  [%s]%s", r.Name, r.Path, versionList(r), tagSuffix(c.RequestTags(r)))
+			return r.Path, fmt.Sprintf("%s  (%s)  [%s]%s", r.Name, r.Path, versionList(r), labelSuffix(c.RequestStatus(r), c.RequestTags(r)))
 		}))
 	}
 	if slices.Contains(sections, "flows") && len(c.Flows) > 0 {
 		fmt.Fprintln(w, "  Flows")
 		printTree(w, entriesOf(c.Flows, func(f model.Flow) (string, string) {
-			return f.Path, fmt.Sprintf("%s  (%s)%s", f.Name, f.Path, tagSuffix(c.FlowTags(f)))
+			return f.Path, fmt.Sprintf("%s  (%s)%s", f.Name, f.Path, labelSuffix(c.FlowStatus(f), c.FlowTags(f)))
 		}))
 	}
 	if slices.Contains(sections, "blueprints") && len(c.Blueprints) > 0 {
@@ -76,12 +77,26 @@ func printCollection(w io.Writer, c model.Collection, sections []string, tag str
 	}
 }
 
-// onlyTagged keeps the requests and flows that carry tag. Blueprints have no tags, so none are listed.
-func onlyTagged(c model.Collection, tag string) model.Collection {
+// onlyMatching keeps the requests and flows that carry tag and have the status (either may be empty: no condition).
+// Blueprints have neither, so none are listed.
+func onlyMatching(c model.Collection, tag, status string) model.Collection {
 	out := c
-	out.Requests = slices.DeleteFunc(slices.Clone(c.Requests), func(r model.Request) bool { return !slices.Contains(c.RequestTags(r), tag) })
-	out.Flows = c.FlowsTagged(tag)
+	out.Requests = slices.DeleteFunc(slices.Clone(c.Requests), func(r model.Request) bool {
+		return tag != "" && !slices.Contains(c.RequestTags(r), tag) || status != "" && c.RequestStatus(r).Name != status
+	})
+	out.Flows = slices.DeleteFunc(slices.Clone(c.Flows), func(f model.Flow) bool {
+		return tag != "" && !slices.Contains(c.FlowTags(f), tag) || status != "" && c.FlowStatus(f).Name != status
+	})
 	out.Blueprints = nil
+	return out
+}
+
+// labelSuffix is "  status:review  #a #b": the resolved status, then the tags, or nothing for neither.
+func labelSuffix(status model.StatusOf, tags []string) string {
+	out := tagSuffix(tags)
+	if status.Name != "" {
+		out = "  status:" + status.Name + out
+	}
 	return out
 }
 

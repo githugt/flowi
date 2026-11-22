@@ -60,6 +60,7 @@ func (s *WorkspaceService) Menu(ids []string) []MenuEntry {
 			}
 		}
 		out = withMove(out, ws, ids)
+		out = withLabelsEntry(out, ws, ids)
 	})
 	return out
 }

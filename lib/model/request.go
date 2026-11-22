@@ -134,7 +134,10 @@ func (a Async) Action() string {
 type Request struct {
 	Meta
 	// Tags label the request; the tags of its folders apply as well.
-	Tags      []string
+	Tags []string
+	// Status is the development status of the request ("review"); "" for none of its own, in which case the nearest
+	// folder above it that has one applies (Collection.RequestStatus).
+	Status    string
 	Path      string
 	Operation string // the OpenAPI operationId of its first version; Arazzo steps refer to it
 	Default   string

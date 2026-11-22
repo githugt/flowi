@@ -22,6 +22,7 @@ func (c *Codec) DecodeWorkspace(file string, data []byte) (model.Workspace, diag
 	ws.Meta = m.meta()
 	ws.Collections = m.mounts()
 	ws.Schedules = m.schedules()
+	ws.EnvironmentGroups = m.stringList("environment_groups")
 	ws.Settings = c.settingsChild(d, m, settings.LayerWorkspace)
 	m.closeStrict()
 	return ws, d.diags
@@ -105,6 +106,7 @@ func (c *Codec) EncodeWorkspace(ws model.Workspace) ([]byte, error) {
 	}
 	o.put("collections", mounts)
 	o.put("schedules", encodeSchedules(ws.Schedules))
+	o.put("environment_groups", stringsToYAML(ws.EnvironmentGroups))
 	o.put("settings", c.encodeSettings(ws.Settings))
 	return marshal(o.items)
 }

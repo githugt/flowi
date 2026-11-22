@@ -19,6 +19,8 @@
   import type { TreeNode } from './lib/types'
   import { rootsForGroup, type RailGroup } from './lib/railgroups'
   import { filterTree, firstLeaf } from './lib/treefilter'
+  import { labelChoices, toggleTerm } from './lib/devstatus'
+  import IconButton from './IconButton.svelte'
 
   // peek: shown floating from the rail, with a Pin open button; otherwise it has the fold button.
   // group: when shown from a rail icon, the part of the tree that icon stands for.
@@ -52,6 +54,27 @@
   })
   const roots = $derived(filterTree(ordered, filterQuery))
   const noMatches = $derived(!!filterQuery.trim() && roots.length === 0)
+
+  // The filter button lists the statuses and tags the rows carry; picking one adds `status:x` or `tag:y` to the field
+  // (and a second pick takes it off), so the menu and the typed syntax are the same thing.
+  let filterOpen = $state(false)
+  let filterAt = $state<MenuAt>({ x: 0, y: 0 })
+  let filterItems = $state<MenuItem[]>([])
+  function filterMenu(e: MouseEvent) {
+    const { statuses, tags } = labelChoices(ordered)
+    const has = (term: string) => query.split(/\s+/).some((p) => p.toLowerCase() === term)
+    const pick = (term: string) => () => {
+      query = toggleTerm(query, term)
+      tick().then(() => jumpField?.focus())
+    }
+    filterItems = [
+      ...statuses.map((s) => ({ label: `Status: ${s.name.replace(/[-_]+/g, ' ')}`, icon: s.icon, checked: has(`status:${s.name}`), onselect: pick(`status:${s.name}`) })),
+      ...tags.map((t, i) => ({ label: `Tag: ${t.tag} (${t.count})`, checked: has(`tag:${t.tag}`), separated: i === 0 && statuses.length > 0, onselect: pick(`tag:${t.tag}`) })),
+    ]
+    if (!filterItems.length) return ui.toast('Nothing has a status or a tag yet. Right-click a request, flow or folder, then Tags and status…')
+    filterAt = anchorAt((e.currentTarget as HTMLElement).getBoundingClientRect(), { end: true, gap: -2 })
+    filterOpen = !filterOpen
+  }
 
   // Enter opens the first hit, the down arrow moves into the list, Escape empties the field.
   function jumpKeys(e: KeyboardEvent) {
@@ -142,7 +165,11 @@
       <button class="pin" title="Fold the sidebar to a rail" aria-label="Fold the sidebar" onclick={onfold}>«</button>
     {/if}
   </div>
-  <div class="jump"><SearchField bind:value={query} bind:el={jumpField} placeholder="Jump to…" label="Jump to a request, flow or environment" onkeydown={jumpKeys} /></div>
+  <div class="jump">
+    <SearchField bind:value={query} bind:el={jumpField} placeholder="Jump to…" label="Jump to a request, flow or environment (tag:x and status:y narrow it)" onkeydown={jumpKeys} />
+    <IconButton icon="filter" label="Filter by status or tag" hint="Filter by status or tag" aria-haspopup="menu" aria-expanded={filterOpen} onclick={filterMenu} />
+    {#if filterOpen}<Menu at={filterAt} label="Filter by status or tag" items={filterItems} onclose={() => (filterOpen = false)} />{/if}
+  </div>
   <div class="tree" role="tree" tabindex="-1" onkeydown={treeKeys}>
     {#each roots as node, i (node.id)}
       <TreeItem {node} depth={0} tint={app.rainbow.length ? app.rainbow[i % app.rainbow.length] : ''} query={filterQuery} />
@@ -198,7 +225,8 @@
   .caret { display: inline-flex; color: var(--muted); }
   .pin { --wails-draggable: no-drag; margin-left: auto; white-space: nowrap; flex: none; background: none; border: 1px solid var(--line); border-radius: var(--r-md); color: var(--muted); font: inherit; font-size: var(--fs-sm); padding: 1px 8px; }
   .pin:hover { color: var(--text); border-color: var(--accent); }
-  .jump { margin: 0 8px 6px; }
+  .jump { margin: 0 8px 6px; display: flex; align-items: center; gap: 2px; }
+  .jump > :global(:first-child) { flex: 1; min-width: 0; }
   /* The tools sit in a strip at the foot, out of the way of the tree; their menu opens upward. */
   .rail { position: relative; flex: none; display: flex; gap: 2px; padding: 6px 8px; border-top: 1px solid var(--line); }
   .rail .end { margin-left: auto; }

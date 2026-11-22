@@ -306,9 +306,6 @@ func (a *App) Shutdown() {
 	a.passphrase.Close()
 	a.replayer.Close()
 	a.schedules.Close()
-	if err := a.importer.Close(); err != nil {
-		a.logger.Warn("the pasted text was not removed", "Event", "PasteFileLeft", "Error", err)
-	}
 	a.session.writer.Wait()
 }
 

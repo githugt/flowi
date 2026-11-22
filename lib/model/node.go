@@ -13,7 +13,7 @@ func NodeTypes() []NodeType {
 		"request", "fetch", "webhook", "subflow",
 		"set",
 		"assert", "fuzz", "condition",
-		"delay", "batch", "run_till", "parallel", "stop",
+		"delay", "batch", "run_till", "parallel", "stop", "loop_control",
 		"log", "note", "digest", "save",
 	}
 }
@@ -158,6 +158,10 @@ type Node struct {
 	// Color is a colour from NodeColors the canvas draws the step in; "" for
 	// the category's own. It is cosmetic: a run never reads it.
 	Color string
+	// Skipped says the step does not run, in any run of the flow, until the mark is taken off: the step and
+	// everything inside it are reported as skipped, and the steps that read what it would have made get no value.
+	// (A run can also skip steps for that run only: see RunOptions.Skip.)
+	Skipped bool
 
 	Request  *RequestCall
 	Subflow  *SubflowCall

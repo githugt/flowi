@@ -5,9 +5,11 @@ package vm
 import (
 	"context"
 	"fmt"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	flowi "github.com/githugt/flowi/lib"
 	"github.com/githugt/flowi/lib/diag"
@@ -41,7 +43,8 @@ const (
 	SourceFileOrPaste                   // a file or pasted text (curl, Mermaid)
 )
 
-// SourceModeOf is how the wizard asks for a kind's source.
+// SourceModeOf is how the wizard asks for a kind's source. Any kind but a folder can also be
+// pasted as text: SourceFileOrPaste only says the kind is usually pasted (a command, a sketch).
 func SourceModeOf(kind flowi.ImportKind) SourceMode {
 	switch kind {
 	case flowi.ImportBruno:
@@ -80,7 +83,13 @@ type ImportProblem struct {
 type ImportRow struct {
 	Rel    string
 	Exists bool
+	Same   bool // it exists and the import would write exactly what is there
 	Remove bool // a stale tool-owned file removed when overwriting
+	Kind   flowi.PlannedKind
+	Name   string // the title of a request or flow, the name of an environment; "" for the rest
+	// ExistingName is the title of the request or flow already at this path when it is a different one, "" otherwise.
+	ExistingName string
+	Verb         string // what a request shows where an HTTP request shows its method (GET, MQTT, SQS …); "" for the rest
 }
 
 // ImportWizard imports a document (M5 Decision 8, M6 Decision 12): pick
@@ -99,17 +108,85 @@ type ImportWizard struct {
 	detected    string // what the source was recognised as, for the screen; "" when not
 	overlay     string // overlay files or URLs, separated by ";"
 	collection  model.ID
+	into        string // the folder of the collection the requests and flows go in; "" for where the importer puts them
 	plan        *flowi.ImportPlan
 	err, done   string
+	outcome     ImportOutcome // what the last import did, in words
 	busy        bool
+	pending     int // previews being made; a stale one still counts until it comes back
 	previews    int // successful previews so far
 	onChange    []func()
+	sched       Scheduler // times the automatic preview; nil previews only when asked
+	cancelAuto  func()    // stops the automatic preview that is waiting, if one is
 }
+
+// ImportPreviewDelay is how long the wizard waits after the last change of a choice before it previews by itself:
+// long enough for typing or a paste to settle, short enough to feel immediate.
+const ImportPreviewDelay = 400 * time.Millisecond
 
 // NewImportWizard returns a wizard for OpenAPI; ws is reloaded after an
 // import.
 func NewImportWizard(b Backend, w *Worker, ws *Workspace) *ImportWizard {
 	return &ImportWizard{b: b, w: w, ws: ws, kind: flowi.ImportOpenAPI}
+}
+
+// SetScheduler makes the wizard preview by itself, ImportPreviewDelay after the last change of a choice that leaves it
+// with a source to read and a place to put it.
+//
+// Before: the preview came only from a Preview button, and the window kept that button behind "More options" for a
+// pasted address, so the first thing the person saw of an import was a screen that had read nothing.
+func (iw *ImportWizard) SetScheduler(s Scheduler) { iw.sched = s }
+
+// schedulePreview arranges the automatic preview, replacing one that is waiting. It does nothing without a scheduler
+// or without something ready to read.
+func (iw *ImportWizard) schedulePreview() {
+	iw.stopScheduled()
+	if iw.sched == nil || iw.Waiting() != "" {
+		return
+	}
+	iw.cancelAuto = iw.sched.After(ImportPreviewDelay, func() {
+		iw.cancelAuto = nil
+		iw.Preview()
+	})
+}
+
+func (iw *ImportWizard) stopScheduled() {
+	if iw.cancelAuto != nil {
+		iw.cancelAuto()
+		iw.cancelAuto = nil
+	}
+}
+
+// Waiting says in words what the wizard needs before it can preview, "" when it can: a source, a place to import into,
+// and for an address, one that is complete.
+func (iw *ImportWizard) Waiting() string {
+	switch {
+	case iw.collection == "":
+		return "Choose where to import into."
+	case !iw.HasSource():
+		if SourceModeOf(iw.kind) == SourceFolder {
+			return "Choose the folder to import."
+		}
+		return "Choose a file or paste the text to see what would be imported."
+	case !iw.Pasted() && !addressComplete(iw.file):
+		return "Waiting for a complete address."
+	}
+	return ""
+}
+
+// addressComplete is false for an address that is still being typed ("https://exa"): it needs a host with a dot, a
+// port or the name localhost. Anything that is not an address (a path) is complete.
+func addressComplete(file string) bool {
+	file = strings.TrimSpace(file)
+	if !flowi.IsImportURL(file) {
+		return true
+	}
+	u, err := url.Parse(file)
+	if err != nil || u.Hostname() == "" {
+		return false
+	}
+	h := u.Hostname()
+	return strings.Contains(h, ".") || u.Port() != "" || h == "localhost"
 }
 
 // OnChange registers f to run after any state change.
@@ -133,6 +210,7 @@ func (iw *ImportWizard) Load() {
 		iw.choices = choices
 		if iw.collection == "" && len(choices) > 0 {
 			iw.collection = choices[0].ID
+			iw.schedulePreview()
 		}
 		iw.changed()
 	})
@@ -196,13 +274,48 @@ func (iw *ImportWizard) SetPaste(text string) {
 // Paste is the pasted text.
 func (iw *ImportWizard) Paste() string { return iw.paste }
 
-// SetCollection chooses the target collection; it discards the preview.
-func (iw *ImportWizard) SetCollection(id model.ID) { iw.choose(func() { iw.collection = id }) }
+// SetCollection chooses the target collection, at its top; it discards the preview.
+func (iw *ImportWizard) SetCollection(id model.ID) { iw.SetTarget(id, "") }
+
+// SetTarget chooses the target collection and the folder in it ("" for the top of the collection, "a/b" for a
+// sub-folder); it discards the preview. The folder is the one of the requests tree and is made by the import when
+// it is not there yet.
+func (iw *ImportWizard) SetTarget(id model.ID, folder string) {
+	iw.choose(func() { iw.collection, iw.into = id, strings.Trim(folder, "/") })
+}
+
+// Folder is the folder of the collection the import goes into, "" for the top.
+func (iw *ImportWizard) Folder() string { return iw.into }
+
+// HasSource says whether there is something to preview: pasted text, a file, a folder or an address.
+func (iw *ImportWizard) HasSource() bool {
+	return iw.collection != "" && (strings.TrimSpace(iw.file) != "" || (iw.paste != "" && SourceModeOf(iw.kind) != SourceFolder))
+}
+
+// Previewing says whether a preview is being made right now.
+func (iw *ImportWizard) Previewing() bool { return iw.pending > 0 }
+
+// Pasted says whether the source is text the person pasted, not a file.
+func (iw *ImportWizard) Pasted() bool { return iw.paste != "" && SourceModeOf(iw.kind) != SourceFolder }
 
 // choose applies a choice and discards the preview it invalidates.
 func (iw *ImportWizard) choose(set func()) {
 	set()
 	iw.plan, iw.err, iw.done = nil, "", ""
+	iw.outcome = ImportOutcome{}
+	iw.schedulePreview()
+	iw.changed()
+}
+
+// StartOver forgets the source, the preview and the result of an import that is done, so the screen opens on a
+// fresh import, into the same place. Choices that say what to import (kind, file, text, overlays) go; where it goes stays.
+//
+// Before: opening the import screen again showed the last import's source, its whole preview and "Imported …", so what
+// had already been imported looked like what was about to be.
+func (iw *ImportWizard) StartOver() {
+	iw.stopScheduled()
+	iw.file, iw.paste, iw.overlay, iw.detected = "", "", "", ""
+	iw.plan, iw.err, iw.done, iw.outcome = nil, "", "", ImportOutcome{}
 	iw.changed()
 }
 
@@ -211,21 +324,31 @@ type previewResult struct {
 	err  error
 }
 
-// Preview reads the source and plans the import in the background.
+// Preview reads the source and plans the import in the background. It does nothing without a source (see
+// HasSource): there is nothing to show yet, and a screen asks again when one is chosen.
 func (iw *ImportWizard) Preview() {
-	kind, file, paste, collection, overlay := iw.kind, iw.file, iw.paste, iw.collection, iw.overlay
+	iw.stopScheduled()
+	if !iw.HasSource() {
+		return
+	}
+	kind, file, paste, collection, into, overlay := iw.kind, iw.file, iw.paste, iw.collection, iw.into, iw.overlay
+	iw.pending++
+	iw.changed()
 	Run(iw.w, func() previewResult {
 		src, err := readSource(kind, file, paste)
 		if err != nil {
 			return previewResult{err: err}
 		}
+		src.Into = into
 		if src.Overlays, err = readOverlays(kind, overlay); err != nil {
 			return previewResult{err: err}
 		}
 		plan, err := iw.b.PreviewImportSource(src, collection)
 		return previewResult{plan: plan, err: err}
 	}, func(r previewResult) {
-		if kind != iw.kind || file != iw.file || paste != iw.paste || collection != iw.collection || overlay != iw.overlay {
+		iw.pending--
+		if kind != iw.kind || file != iw.file || paste != iw.paste || collection != iw.collection || into != iw.into || overlay != iw.overlay {
+			iw.changed()
 			return // a choice changed meanwhile: this preview is stale
 		}
 		iw.plan, iw.err, iw.done = nil, "", ""
@@ -272,8 +395,8 @@ func readSource(kind flowi.ImportKind, file, paste string) (flowi.ImportSource, 
 	switch {
 	case SourceModeOf(kind) == SourceFolder:
 		src.Dir = file
-	case SourceModeOf(kind) == SourceFileOrPaste && paste != "":
-		src.Name, src.Data = "pasted text", []byte(paste)
+	case paste != "":
+		src.Name, src.Data = flowi.PastedSourceName, []byte(paste)
 	case flowi.IsImportURL(file):
 		data, name, err := flowi.FetchImportSource(context.Background(), file)
 		if err != nil {
@@ -342,7 +465,7 @@ func (iw *ImportWizard) Rows() []ImportRow {
 	}
 	rows := make([]ImportRow, len(iw.plan.Files))
 	for i, f := range iw.plan.Files {
-		rows[i] = ImportRow{Rel: f.Rel, Exists: f.Exists, Remove: f.Remove}
+		rows[i] = ImportRow{Rel: f.Rel, Exists: f.Exists, Same: f.Same, Remove: f.Remove, Kind: f.Kind, Name: f.Name, ExistingName: f.ExistingName, Verb: f.Verb}
 	}
 	return rows
 }
@@ -371,28 +494,68 @@ func (iw *ImportWizard) Lossy() []string {
 	return out
 }
 
-// Summary counts the previewed requests, flows and files.
+// Summary counts what the previewed import makes: its requests and flows, then what else it writes.
 func (iw *ImportWizard) Summary() string {
 	if iw.plan == nil {
 		return ""
 	}
-	requests, flows := 0, 0
-	for _, r := range iw.Rows() {
-		if strings.HasSuffix(r.Rel, ".req.yaml") {
-			requests++
-		}
-		if strings.HasSuffix(r.Rel, ".arazzo.yaml") {
-			flows++
+	return summaryOf(iw.Rows(), iw.Existing())
+}
+
+// contentKind names a kind of file in a sentence.
+type contentKind struct {
+	kind     flowi.PlannedKind
+	singular string
+}
+
+// contentKinds are the kinds of file a person thinks of as what they import; the rest (kept documents, schemas)
+// are written for the import's own sake.
+func contentKinds() []contentKind {
+	return []contentKind{
+		{flowi.PlannedRequest, "request"}, {flowi.PlannedFlow, "flow"}, {flowi.PlannedEnvironment, "environment"},
+		{flowi.PlannedAuth, "authentication"}, {flowi.PlannedExample, "example"}, {flowi.PlannedProto, ".proto file"},
+	}
+}
+
+// summaryOf is "2 requests, 0 flows; 1 kept document; 1 already exists".
+func summaryOf(rows []ImportRow, existing int) string {
+	count := map[flowi.PlannedKind]int{}
+	for _, r := range rows {
+		count[r.Kind]++
+	}
+	// Requests and flows are always named, even at none: "0 flows" says the document had none.
+	parts := []string{plural(count[flowi.PlannedRequest], "request"), plural(count[flowi.PlannedFlow], "flow")}
+	for _, k := range contentKinds()[2:] {
+		if n := count[k.kind]; n > 0 {
+			parts = append(parts, plural(n, k.singular))
 		}
 	}
-	out := fmt.Sprintf("%s, %s, %s", plural(requests, "request"), plural(flows, "flow"), plural(len(iw.plan.Files), "file"))
-	switch n := iw.Existing(); {
-	case n == 1:
+	out := strings.Join(parts, ", ")
+	var extra []string
+	if n := count[flowi.PlannedDocument]; n > 0 {
+		extra = append(extra, plural(n, "kept document"))
+	}
+	if n := len(rows) - countOf(count, contentKinds()) - count[flowi.PlannedDocument]; n > 0 {
+		extra = append(extra, plural(n, "supporting file"))
+	}
+	if len(extra) > 0 {
+		out += "; " + strings.Join(extra, ", ")
+	}
+	switch {
+	case existing == 1:
 		out += "; 1 already exists"
-	case n > 1:
-		out += fmt.Sprintf("; %d already exist", n)
+	case existing > 1:
+		out += fmt.Sprintf("; %d already exist", existing)
 	}
 	return out
+}
+
+func countOf(count map[flowi.PlannedKind]int, kinds []contentKind) int {
+	n := 0
+	for _, k := range kinds {
+		n += count[k.kind]
+	}
+	return n
 }
 
 // CanImport is true once a preview is shown, not yet imported and not
@@ -414,21 +577,163 @@ func (iw *ImportWizard) Import(existing ExistingFiles, partial bool) {
 	iw.busy = true
 	plan := *iw.plan
 	o := flowi.ApplyOptions{Overwrite: existing == ImportOverwrite, SkipExisting: existing == ImportSkipExisting}
-	written := len(plan.Files)
-	if o.SkipExisting {
-		written -= iw.Existing()
+	type applied struct {
+		report flowi.ImportReport
+		err    error
 	}
-	Run(iw.w, func() error { return iw.b.ApplyImport(plan, o) }, func(err error) {
+	Run(iw.w, func() applied {
+		r, err := iw.b.ApplyImportReport(plan, o)
+		return applied{r, err}
+	}, func(a applied) {
 		iw.busy, iw.err = false, ""
-		if err != nil {
-			iw.err = ErrorText(err)
+		if a.err != nil {
+			iw.err = ErrorText(a.err)
 			iw.changed()
 			return
 		}
-		iw.done = fmt.Sprintf("Imported %s into %s", plural(written, "file"), iw.collectionName(plan.Collection))
+		iw.outcome = describeReport(a.report, iw.targetName(plan.Collection, plan.Into))
+		iw.done = iw.outcome.Headline
+		iw.plan = nil // what was previewed has been dealt with: the screen shows what happened, not the plan again
 		iw.changed()
 		iw.ws.Load()
 	})
+}
+
+// Outcome says in detail what the last import did.
+func (iw *ImportWizard) Outcome() ImportOutcome { return iw.outcome }
+
+// TargetName says where the import goes in words: "Shop", or "Shop / demo / websocket" for a folder.
+func (iw *ImportWizard) TargetName() string { return iw.targetName(iw.collection, iw.into) }
+
+// targetName is "Shop" or "Shop / demo / websocket": where the import went.
+func (iw *ImportWizard) targetName(id model.ID, folder string) string {
+	name := iw.collectionName(id)
+	if folder == "" {
+		return name
+	}
+	return name + " / " + strings.ReplaceAll(folder, "/", " / ")
+}
+
+// ImportOutcome is what an import did, for the screen: a headline, and a note for everything that was not simply
+// written (a file kept because it exists, one replaced, one already the same).
+type ImportOutcome struct {
+	Headline string
+	// Notes are what the person should look at: a file kept because it exists, one replaced, one removed. Details are
+	// what happened as a matter of course (a copy of the document kept for updates).
+	Notes   []string
+	Details []string
+	// Wrote is how many requests, flows and the like were written or replaced; 0 means nothing the person would
+	// call imported happened, whatever else was kept.
+	Wrote int
+}
+
+// describeReport turns the report of ApplyImportReport into words.
+//
+// Before: "Imported 2 files into Shop" counted the kept copy of the document as a file and said nothing of a request
+// that was kept because one of that name was already there, so an import that wrote one request and kept another
+// looked like it had made two, or none.
+func describeReport(r flowi.ImportReport, target string) ImportOutcome {
+	written, replaced := contentCounts(r.Written), contentCounts(r.Replaced)
+	out := ImportOutcome{Wrote: written.total + replaced.total}
+	switch {
+	case written.total > 0 && replaced.total > 0:
+		out.Headline = fmt.Sprintf("Imported %s into %s, and replaced %s", written.words(), target, replaced.words())
+	case written.total > 0:
+		out.Headline = fmt.Sprintf("Imported %s into %s", written.words(), target)
+	case replaced.total > 0:
+		out.Headline = fmt.Sprintf("Replaced %s in %s", replaced.words(), target)
+	default:
+		out.Headline = "Nothing was imported into " + target
+	}
+	for _, f := range r.Kept {
+		switch {
+		case isContent(f.Kind) && f.Same:
+			out.Notes = append(out.Notes, fmt.Sprintf("Your %s %s (%s) is already the same as the one in the source.", kindWord(f.Kind), quoted(f), f.Rel))
+		case isContent(f.Kind):
+			out.Notes = append(out.Notes, fmt.Sprintf("Kept your %s %s (%s): it already exists, and you chose to keep yours.", kindWord(f.Kind), quoted(f), f.Rel))
+		}
+	}
+	if n := len(contentOf(r.Unchanged)); n > 0 {
+		out.Notes = append(out.Notes, fmt.Sprintf("%s already matched what you have and did not change.", plural(n, "file")))
+	}
+	if n := len(r.Removed); n > 0 {
+		out.Notes = append(out.Notes, fmt.Sprintf("Removed %s the document no longer has.", plural(n, "stale file")))
+	}
+	for _, f := range r.Written {
+		if f.Kind == flowi.PlannedDocument {
+			out.Details = append(out.Details, fmt.Sprintf("Kept a copy of the document in %s, for updating these requests later.", f.Rel))
+		}
+	}
+	if out.Wrote == 0 && len(r.Kept) > 0 {
+		out.Notes = append([]string{"Everything it would write was already there, so nothing changed. Choose \"Overwrite them\" to replace yours, or import into another folder."}, out.Notes...)
+	}
+	return out
+}
+
+func isContent(kind flowi.PlannedKind) bool {
+	for _, k := range contentKinds() {
+		if k.kind == kind {
+			return true
+		}
+	}
+	return false
+}
+
+func contentOf(list []flowi.PlannedFile) []flowi.PlannedFile {
+	var out []flowi.PlannedFile
+	for _, f := range list {
+		if isContent(f.Kind) {
+			out = append(out, f)
+		}
+	}
+	return out
+}
+
+// kindWord is what to call a kind of file in a sentence.
+func kindWord(kind flowi.PlannedKind) string {
+	for _, k := range contentKinds() {
+		if k.kind == kind {
+			return k.singular
+		}
+	}
+	return "file"
+}
+
+// quoted is the name of a file in quotes, or its path when it has no name.
+func quoted(f flowi.PlannedFile) string {
+	if f.Name == "" {
+		return f.Rel
+	}
+	return "\u201c" + f.Name + "\u201d"
+}
+
+// counts is how many of each kind of content a list holds.
+type counts struct {
+	by    map[flowi.PlannedKind]int
+	total int
+}
+
+func contentCounts(list []flowi.PlannedFile) counts {
+	c := counts{by: map[flowi.PlannedKind]int{}}
+	for _, f := range contentOf(list) {
+		c.by[f.Kind]++
+		c.total++
+	}
+	return c
+}
+
+// words is "2 requests and 1 flow".
+func (c counts) words() string {
+	var parts []string
+	for _, k := range contentKinds() {
+		if n := c.by[k.kind]; n > 0 {
+			parts = append(parts, plural(n, k.singular))
+		}
+	}
+	if len(parts) < 2 {
+		return strings.Join(parts, "")
+	}
+	return strings.Join(parts[:len(parts)-1], ", ") + " and " + parts[len(parts)-1]
 }
 
 func (iw *ImportWizard) collectionName(id model.ID) string {

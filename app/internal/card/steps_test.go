@@ -136,6 +136,16 @@ func TestSummarize_Given_each_other_step_Then_subline_rows_and_ports_follow_the_
 			rows:    []string{"message: no token"},
 			ports:   []string{"fail"},
 		},
+		{name: "loop_control_next_in_a_batch", node: step("x", "loop_control"), subline: "Next item", ports: []string{"done"}},
+		{name: "loop_control_next_in_a_run_till", node: step("x", "loop_control", "action", "next"), facts: card.Facts{Loop: "run_till"}, subline: "Next round", ports: []string{"done"}},
+		{
+			name:    "loop_control_leave",
+			node:    step("x", "loop_control", "action", "leave", "message", "found it"),
+			facts:   card.Facts{Loop: "run_till"},
+			subline: "Leave the loop",
+			rows:    []string{"message: found it"},
+			ports:   []string{"done"},
+		},
 		{name: "note", node: step("n", "note", "text", "remember the cookie"), subline: "remember the cookie", ports: nil},
 	}
 	for _, tt := range tests {
