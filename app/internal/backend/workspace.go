@@ -206,7 +206,7 @@ func (b *Workspace) GRPCMethods(ctx context.Context, t flowi.RequestTarget, v mo
 	return b.ws.GRPCMethods(ctx, t, v, o)
 }
 
-// TestConnection tests the connection of a message or database version.
+// TestConnection tests the connection of a version of any kind of request.
 func (b *Workspace) TestConnection(ctx context.Context, t flowi.RequestTarget, v model.RequestVersion, o flowi.SendOptions) (engine.Probe, error) {
 	b.guard.Check("TestConnection")
 	return b.ws.TestConnection(ctx, t, v, o)
@@ -436,6 +436,12 @@ func (b *Workspace) CheckFlowDraft(t flowi.FlowTarget, f model.Flow) diag.List {
 	return b.ws.CheckFlowDraft(t, f)
 }
 
+// ParseFlowSnippet reads copied steps, which may name their requests by path alone.
+func (b *Workspace) ParseFlowSnippet(t flowi.FlowTarget, text string) (model.Flow, diag.List, error) {
+	b.guard.Check("ParseFlowSnippet")
+	return b.ws.ParseFlowSnippet(t, text)
+}
+
 func (b *Workspace) ParseFlowSource(t flowi.FlowTarget, text string) (model.Flow, diag.List, error) {
 	b.guard.Check("ParseFlowSource")
 	return b.ws.ParseFlowSource(t, text)
@@ -534,6 +540,16 @@ func (b *Workspace) ImpactAgainst(collection model.ID, name string, spec []byte)
 	return res, err
 }
 
+func (b *Workspace) SpecLintRules(collection model.ID) ([]flowi.SpecRule, error) {
+	b.guard.Check("SpecLintRules")
+	return b.ws.SpecLintRules(collection)
+}
+
+func (b *Workspace) SetSpecLintRule(collection model.ID, rule, level string) error {
+	b.guard.Check("SetSpecLintRule")
+	return b.ws.SetSpecLintRule(collection, rule, level)
+}
+
 func (b *Workspace) SpecNames(collection model.ID) []string {
 	b.guard.Check("SpecNames")
 	specs, err := b.ws.KeptSpecs(collection)
@@ -545,6 +561,27 @@ func (b *Workspace) SpecNames(collection model.ID) []string {
 		out[i] = s.Name
 	}
 	return out
+}
+
+func (b *Workspace) DescriptionFiles(collection model.ID) []string {
+	b.guard.Check("DescriptionFiles")
+	files, _ := b.ws.DescriptionFiles(collection)
+	return files
+}
+
+func (b *Workspace) ExportItems(collection model.ID) ([]flowi.ExportItem, error) {
+	b.guard.Check("ExportItems")
+	return b.ws.ExportItems(collection)
+}
+
+func (b *Workspace) ExportDescription(collection model.ID, id string) ([]byte, error) {
+	b.guard.Check("ExportDescription")
+	return b.ws.ExportDescription(collection, id)
+}
+
+func (b *Workspace) CollectionImpact(collection model.ID) ([]analysis.Report, error) {
+	b.guard.Check("CollectionImpact")
+	return b.ws.CollectionImpact(collection)
 }
 
 func (b *Workspace) LastAccess(t flowi.FlowTarget) (flowi.SavedAccess, bool) {

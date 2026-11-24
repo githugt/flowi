@@ -23,6 +23,14 @@ export class Card {
              */
             this["badge"] = "";
         }
+        if (/** @type {any} */(false)) {
+            /**
+             * what the badge is coloured as, when that is not the badge itself
+             * @member
+             * @type {string | undefined}
+             */
+            this["verb"] = undefined;
+        }
         if (!("subline" in $$source)) {
             /**
              * @member
@@ -68,22 +76,22 @@ export class Card {
      * @returns {Card}
      */
     static createFrom($$source = {}) {
-        const $$createField2_0 = $$createType1;
         const $$createField3_0 = $$createType1;
-        const $$createField4_0 = $$createType3;
-        const $$createField5_0 = $$createType5;
+        const $$createField4_0 = $$createType1;
+        const $$createField5_0 = $$createType3;
+        const $$createField6_0 = $$createType5;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("rows" in $$parsedSource) {
-            $$parsedSource["rows"] = $$createField2_0($$parsedSource["rows"]);
+            $$parsedSource["rows"] = $$createField3_0($$parsedSource["rows"]);
         }
         if ("more" in $$parsedSource) {
-            $$parsedSource["more"] = $$createField3_0($$parsedSource["more"]);
+            $$parsedSource["more"] = $$createField4_0($$parsedSource["more"]);
         }
         if ("ports" in $$parsedSource) {
-            $$parsedSource["ports"] = $$createField4_0($$parsedSource["ports"]);
+            $$parsedSource["ports"] = $$createField5_0($$parsedSource["ports"]);
         }
         if ("guards" in $$parsedSource) {
-            $$parsedSource["guards"] = $$createField5_0($$parsedSource["guards"]);
+            $$parsedSource["guards"] = $$createField6_0($$parsedSource["guards"]);
         }
         return new Card(/** @type {Partial<Card>} */($$parsedSource));
     }

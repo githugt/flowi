@@ -831,3 +831,24 @@ func TestPlanAuths_Given_a_name_the_collection_has_Then_the_new_one_is_numbered_
 		t.Fatalf("renamed %v files %d err %v", renamed, len(files), err)
 	}
 }
+
+// Before: an OpenRPC import kept nothing but the requests, so its description could not be checked afterwards.
+func TestImportOpenRPC_should_keep_the_document_so_it_can_be_linted(t *testing.T) {
+	w, c := petsCollection(t)
+	doc := `{"openrpc":"1.2.6","info":{"title":"Calc","version":"1"},"methods":[{"name":"add","params":[],"result":{"name":"sum","schema":{"type":"number"}}}]}`
+
+	plan, err := w.PreviewImportSource(ImportSource{Kind: ImportOpenRPC, Name: "calc.json", Data: []byte(doc)}, c)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := w.ApplyImport(plan, ApplyOptions{}); err != nil {
+		t.Fatal(err)
+	}
+
+	if !slices.Contains(relsOf(plan), "descriptions/calc.openrpc.json") {
+		t.Fatalf("files %v", relsOf(plan))
+	}
+	if got, _ := w.LintSpecs(c); len(got) == 0 || got[0].Args["spec"] != "calc" {
+		t.Fatalf("findings %v, want the missing description of the kept OpenRPC", got)
+	}
+}

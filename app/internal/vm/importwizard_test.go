@@ -396,6 +396,43 @@ func TestImportWizard_nothing_is_scheduled_without_a_source_or_for_a_half_typed_
 	}
 }
 
+// Before: each pause in typing a path was previewed, so the half-typed "/tmp/api" showed a "no such file" failure on the
+// way to "/tmp/api.yaml".
+func TestImportWizard_a_path_with_nothing_at_it_is_waited_for_not_previewed(t *testing.T) {
+	iw, b, w, file := newImportWizard(t)
+	sched := &manualScheduler{}
+	iw.SetScheduler(sched)
+
+	iw.SetFile(file[:len(file)-len(".yaml")])
+	sched.fire()
+	w.Wait()
+
+	if sched.started != 0 || len(b.PreviewedSources) != 0 || iw.Err() != "" || iw.Waiting() != "There is no file at that path yet." {
+		t.Fatalf("scheduled %d, previews %d, err %q, waiting %q", sched.started, len(b.PreviewedSources), iw.Err(), iw.Waiting())
+	}
+	iw.SetFile(file)
+	if sched.started != 1 || iw.Waiting() != "" {
+		t.Fatalf("scheduled %d, waiting %q", sched.started, iw.Waiting())
+	}
+	iw.SetKind(flowi.ImportBruno)
+	iw.SetFile(filepath.Join(t.TempDir(), "nowhere"))
+	if iw.Waiting() != "There is no folder at that path yet." {
+		t.Fatalf("waiting %q", iw.Waiting())
+	}
+}
+
+// Before: it kept the kind of the import before it, or the one a pasted text was recognised as.
+func TestImportWizard_StartOver_returns_to_the_first_kind(t *testing.T) {
+	iw, _, _, _ := newImportWizard(t)
+	iw.SetDetected(flowi.ImportAsyncAPI, "AsyncAPI 3.0.0")
+
+	iw.StartOver()
+
+	if iw.Kind() != flowi.ImportOpenAPI || iw.Detected() != "" {
+		t.Fatalf("kind %q detected %q", iw.Kind(), iw.Detected())
+	}
+}
+
 func TestImportWizard_changing_the_folder_previews_again_and_a_stale_preview_is_dropped(t *testing.T) {
 	iw, b, w, file := newImportWizard(t)
 	sched := &manualScheduler{}

@@ -7,7 +7,8 @@
   import { tick } from 'svelte'
   import { app } from './lib/app.svelte'
   import StatusIcon from './StatusIcon.svelte'
-  import { commandList, filterCommands, itemCommands } from './lib/commands'
+  import { commandList, filterCommands, itemCommands, overviewCommands } from './lib/commands'
+  import { pageNode } from './lib/collectionpage'
   import SearchField from './SearchField.svelte'
   import Icon from './Icon.svelte'
 
@@ -15,7 +16,11 @@
   let index = $state(0)
   let field = $state<HTMLInputElement>()
   let list = $state<HTMLDivElement>()
-  const commands = $derived(app.paletteOpen ? commandList((a) => app.onMenu(a), app.paletteContext()) : [])
+  const commands = $derived(
+    app.paletteOpen
+      ? [...commandList((a) => app.onMenu(a), app.paletteContext()), ...overviewCommands(app.tree?.roots ?? [], (id, label) => app.openScreen(pageNode(id), label))]
+      : [],
+  )
   // The workspace's requests, flows and environments are reached from the same box. With no text, the items that are
   // open lead (a short "recent" list); with text, every match shows. A leading ">" asks for commands only.
   const tabIds = $derived(app.tabs.map((t) => t.node).reverse())

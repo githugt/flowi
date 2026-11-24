@@ -109,8 +109,18 @@ func (w *Workspace) NewRequest(collection model.ID, path string) (RequestTarget,
 // and channel, and sends (sse: receives) one message. An unknown protocol is
 // FLW-ASYNC-001.
 func (w *Workspace) NewAsyncRequest(collection model.ID, path, protocol string) (RequestTarget, error) {
+	a, err := StarterAsync(protocol)
+	if err != nil {
+		return RequestTarget{}, err
+	}
+	return w.newRequestWith(collection, path, model.RequestVersion{Label: "1", Async: a})
+}
+
+// StarterAsync is the async block a new request of protocol starts with: an empty server and channel, sending one
+// message (sse: receiving). An unknown protocol is FLW-ASYNC-001.
+func StarterAsync(protocol string) (*model.Async, error) {
 	if !model.KnownProtocol(protocol) {
-		return RequestTarget{}, diagErr(diag.CodeAsyncProtocol, map[string]string{"protocol": protocol})
+		return nil, diagErr(diag.CodeAsyncProtocol, map[string]string{"protocol": protocol})
 	}
 	a := &model.Async{Protocol: protocol}
 	if protocol == model.ProtocolServiceBus {
@@ -125,7 +135,7 @@ func (w *Workspace) NewAsyncRequest(collection model.ID, path, protocol string) 
 	} else {
 		a.Send = &model.AsyncSend{}
 	}
-	return w.newRequestWith(collection, path, model.RequestVersion{Label: "1", Async: a})
+	return a, nil
 }
 
 // NewGRPCRequest is NewRequest for a gRPC request: its version "1" has an
@@ -138,12 +148,20 @@ func (w *Workspace) NewGRPCRequest(collection model.ID, path string) (RequestTar
 // "1" has a server and a query that run as they are on any store of that driver, and one param to show how a value
 // is passed. An unknown driver is FLW-DATA-001.
 func (w *Workspace) NewDatasetRequest(collection model.ID, path, driver string) (RequestTarget, error) {
+	d, err := StarterDataset(driver)
+	if err != nil {
+		return RequestTarget{}, err
+	}
+	return w.newRequestWith(collection, path, model.RequestVersion{Label: "1", Dataset: &d})
+}
+
+// StarterDataset is the dataset block a new request of driver starts with. An unknown driver is FLW-DATA-001.
+func StarterDataset(driver string) (model.Dataset, error) {
 	starter, ok := datasetStarters()[driver]
 	if !ok {
-		return RequestTarget{}, diagErr(diag.CodeDatasetRequest, map[string]string{"detail": "the driver is one of " + strings.Join(model.DatasetDrivers(), ", ")})
+		return model.Dataset{}, diagErr(diag.CodeDatasetRequest, map[string]string{"detail": "the driver is one of " + strings.Join(model.DatasetDrivers(), ", ")})
 	}
-	d := model.Dataset{Driver: driver, Server: starter.server, Query: starter.query, Params: []string{"hello"}}
-	return w.newRequestWith(collection, path, model.RequestVersion{Label: "1", Dataset: &d})
+	return model.Dataset{Driver: driver, Server: starter.server, Query: starter.query, Params: []string{"hello"}}, nil
 }
 
 // datasetStarters is the server and query a new dataset request of each driver starts with. The server has no
@@ -169,12 +187,20 @@ func fileStarters() map[string]struct{ path, query string } {
 // NewFileRequest is NewRequest for a data file request of the given format (any of model.DataFileFormats): its
 // version "1" has a path and a query that run as they are on a file of that format. An unknown format is FLW-DATA-001.
 func (w *Workspace) NewFileRequest(collection model.ID, path, format string) (RequestTarget, error) {
+	f, err := StarterFile(format)
+	if err != nil {
+		return RequestTarget{}, err
+	}
+	return w.newRequestWith(collection, path, model.RequestVersion{Label: "1", File: &f})
+}
+
+// StarterFile is the data file block a new request of format starts with. An unknown format is FLW-DATA-001.
+func StarterFile(format string) (model.DataFile, error) {
 	starter, ok := fileStarters()[format]
 	if !ok {
-		return RequestTarget{}, diagErr(diag.CodeDatasetRequest, map[string]string{"detail": "the format is one of " + strings.Join(model.DataFileFormats(), ", ")})
+		return model.DataFile{}, diagErr(diag.CodeDatasetRequest, map[string]string{"detail": "the format is one of " + strings.Join(model.DataFileFormats(), ", ")})
 	}
-	f := model.DataFile{Format: format, Path: starter.path, Query: starter.query}
-	return w.newRequestWith(collection, path, model.RequestVersion{Label: "1", File: &f})
+	return model.DataFile{Format: format, Path: starter.path, Query: starter.query}, nil
 }
 
 // GeneratedGRPC is what GenerateGRPCRequests did.

@@ -8,7 +8,8 @@ export const CANVAS_GESTURES = [
   'Shift-click: select several steps',
   'Delete: remove the selected steps',
   'Double-click a strip: fold or unfold it',
-  'Pinch or Ctrl+scroll: zoom',
+  'Scroll wheel or pinch: zoom',
+  'Ctrl+scroll or two-finger scroll: move the view (Shift+scroll sideways)',
 ]
 
 /** The text of the shortcut sheet: the menu shortcuts, tab keys, then the canvas gestures. */

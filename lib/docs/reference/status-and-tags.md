@@ -22,7 +22,7 @@ A status has a name, a colour and an icon. Every collection has five, in the ord
 | `in-development` | blue   | code     |
 | `review`         | purple | eye      |
 | `testing`        | amber  | flask    |
-| `production`     | green  | rocket   |
+| `production`     | green  | shield   |
 
 A collection adds its own, or changes the colour and icon of a default, under `statuses:` in its `flowi.yaml`:
 
@@ -30,11 +30,14 @@ A collection adds its own, or changes the colour and icon of a default, under `s
 statuses:
   - name: needs-design      # lower-case letters, digits, '-' and '_'; at most 40 characters
     color: pink             # gray, blue, sky, teal, green, amber, red, pink or purple (default gray)
-    icon: bookmark          # planning, code, eye, flask, rocket, flag, star, bug, bolt, lock, archive,
+    icon: bookmark          # planning, code, eye, flask, shield, flag, star, bug, bolt, lock, archive,
                             # bookmark, pause, clock or alert (default flag)
   - name: testing           # a default's name: recolours it, and it keeps its place in the order
     color: red
 ```
+
+`production` used to be drawn with a rocket. A collection that still names `icon: rocket` keeps working, but the
+window no longer offers it and `production` now has a shield.
 
 The colours are names for theme colours, not hex values: each is drawn from a token that is checked for contrast on
 every theme, so no status can be unreadable on one. A name given twice keeps its first definition.

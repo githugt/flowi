@@ -41,6 +41,7 @@ func checks() []check {
 		checkRetries,
 		checkAttach,
 		checkColors,
+		checkArrows,
 		checkConcurrentWrites,
 		checkSubflowInputs,
 		checkReferences,

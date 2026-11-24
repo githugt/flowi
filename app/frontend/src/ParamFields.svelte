@@ -30,7 +30,7 @@
     {:else if p.kind === 'enum'}
       <Field label={`${p.name}${p.required ? ' *' : ''}`}>
         <Select value={p.value} onchange={(e) => FlowService.SetParam(node, p.name, e.currentTarget.value)}>
-          <option value=""></option>
+          <option value="">{p.default ? `${p.default} (default)` : ''}</option>
           {#each p.enum ?? [] as o}<option value={o}>{o}</option>{/each}
         </Select>
       </Field>

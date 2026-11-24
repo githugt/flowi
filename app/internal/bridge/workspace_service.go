@@ -15,7 +15,10 @@ type TreeNode struct {
 	Label    string      `json:"label"`
 	Kind     string      `json:"kind"` // collection, missing, requests, folder, request, environments, environment, flows, flow, broken
 	Method   string      `json:"method,omitempty"`
-	Name     string      `json:"name,omitempty"` // what a folder's order calls it: the file or folder name
+	Type     string      `json:"type,omitempty"`     // a request: http, grpc, message, db or file; a flow: flow
+	TypeName string      `json:"typeName,omitempty"` // that in words: HTTP, gRPC, Async, Database, Data file, Flow
+	Where    string      `json:"where,omitempty"`    // "Collection / folder / subfolder": where a request, flow or folder lives
+	Name     string      `json:"name,omitempty"`     // what a folder's order calls it: the file or folder name
 	Draft    bool        `json:"draft,omitempty"`
 	Scratch  bool        `json:"scratch,omitempty"` // the Drafts try-out space
 	Tree     string      `json:"tree,omitempty"`    // folders and groups: requests or flows; requests can be dropped only on the first
@@ -52,7 +55,10 @@ func kindNames() map[vm.NodeKind]string {
 }
 
 // WorkspaceService is the workspace tree and the selected environment.
-type WorkspaceService struct{ app *App }
+type WorkspaceService struct {
+	app    *App
+	memory sidebarMemory
+}
 
 // Tree is the workspace now.
 func (s *WorkspaceService) Tree() Tree {
@@ -174,7 +180,7 @@ func (s *WorkspaceService) nodes(ids []string) []TreeNode {
 		n := s.app.workspace.Node(id)
 		out = append(out, TreeNode{
 			ID: id, Label: s.app.workspace.Display(id), Kind: kindNames()[n.Kind],
-			Method: n.Method, Name: entryName(n), Draft: n.Draft, Scratch: n.Scratch, Tree: n.Tree, Detail: n.Detail, Status: markOf(n), Tags: n.Tags, Children: s.nodes(s.app.workspace.Children(id)),
+			Method: n.Method, Type: n.Type, TypeName: n.TypeName, Where: n.Where, Name: entryName(n), Draft: n.Draft, Scratch: n.Scratch, Tree: n.Tree, Detail: n.Detail, Status: markOf(n), Tags: n.Tags, Children: s.nodes(s.app.workspace.Children(id)),
 		})
 	}
 	return out

@@ -60,6 +60,10 @@ export const ICONS: Record<string, string> = {
   stop: 'M6 6h12v12H6z',
   close: 'M6 6l12 12 M18 6L6 18',
   more: 'M4 12a1 1 0 1 0 2 0a1 1 0 1 0-2 0 M11 12a1 1 0 1 0 2 0a1 1 0 1 0-2 0 M18 12a1 1 0 1 0 2 0a1 1 0 1 0-2 0',
+  grpc: 'M4 8h13 M13 4l4 4-4 4 M20 16H7 M11 12l-4 4 4 4',
+  message: 'M4 5h16v11H9l-5 4z M8 9h8 M8 12h5',
+  database: 'M4 6c0-1.7 3.6-3 8-3s8 1.3 8 3-3.6 3-8 3-8-1.3-8-3z M4 6v12c0 1.7 3.6 3 8 3s8-1.3 8-3V6 M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3',
+  table: 'M4 5h16v14H4z M4 10h16 M4 15h16 M10 5v14',
   globe: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18z M3 12h18 M12 3c3 3 3 15 0 18 M12 3c-3 3-3 15 0 18',
   hook: 'M12 3v11a4 4 0 0 1-8 0v-1 M2 11l2 2 2-2 M9 5h6',
   repeat: 'M17 2l4 4-4 4 M3 11V9a3 3 0 0 1 3-3h15 M7 22l-4-4 4-4 M21 13v2a3 3 0 0 1-3 3H3',
@@ -69,13 +73,18 @@ export const ICONS: Record<string, string> = {
   log: 'M6 3h12v18H6z M9 8h6 M9 12h6 M9 16h3',
   flow: 'M4 4h6v6H4z M14 14h6v6h-6z M10 7h4a3 3 0 0 1 3 3v4',
   info: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18z M12 11v5 M12 8h.01',
+  open: 'M14 4h6v6 M20 4l-9 9 M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5',
+  // The two ways a step's arrows are drawn (the card toolbar's arrows tool shows the one in use).
+  elbow: 'M3 7h6a3 3 0 0 1 3 3v4a3 3 0 0 0 3 3h3 M18 14l3 3-3 3',
+  curve: 'M3 7c7 0 7 10 14 10 M17 14l3 3-3 3',
   undo: 'M9 14L4 9l5-5 M4 9h10a6 6 0 0 1 0 12h-3',
   redo: 'M15 14l5-5-5-5 M20 9H10a6 6 0 0 0 0 12h3',
   // The development statuses (model.StatusIcons): each its own shape, so a status is never told by colour alone.
   planning: 'M9 4h6v3H9z M7 5H6a1 1 0 0 0-1 1v14a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V6a1 1 0 0 0-1-1h-1 M9 12h6 M9 16h4',
   eye: 'M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z M12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6z',
   flask: 'M9 3h6 M10 3v6L5 19a1.5 1.5 0 0 0 1.3 2h11.4A1.5 1.5 0 0 0 19 19l-5-10V3 M7.5 15h9',
-  rocket: 'M12 3c3 2 5 5 5 9l-2 3H9l-2-3c0-4 2-7 5-9z M12 9.5h.01 M9 15l-2 4 3-1 M15 15l2 4-3-1',
+  // Production's icon: a shield with a tick (it was a rocket, whose outline was misread). The rocket is gone from the offered icons.
+  shield: 'M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6z M9 12l2 2 4-4',
   flag: 'M5 21V4 M5 4h11l-2 4 2 4H5',
   star: 'M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1L3.2 9.5l6.1-.9z',
   bug: 'M9 7a3 3 0 0 1 6 0 M8 9h8v5a4 4 0 0 1-8 0z M12 9v9 M4 11l4 1 M20 11l-4 1 M4 19l4-2 M20 19l-4-2 M3 15h5 M16 15h5',
@@ -84,6 +93,8 @@ export const ICONS: Record<string, string> = {
   archive: 'M3 5h18v4H3z M5 9v10h14V9 M10 13h4',
   bookmark: 'M7 3h10v18l-5-4-5 4z',
   alert: 'M12 3l10 18H2z M12 10v5 M12 18h.01',
+  // The sidebar's tree view (its list view is `list`).
+  tree: 'M4 5h5 M7 5v14 M7 12h5 M7 19h5 M15 9h5 M15 12h5 M15 19h5',
   tag: 'M3 12V4h8l10 10-8 8z M7.5 8h.01',
   filter: 'M3 5h18l-7 8v6l-4 2v-8z',
 }

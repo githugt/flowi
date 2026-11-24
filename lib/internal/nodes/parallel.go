@@ -13,7 +13,7 @@ func parallelSpec() Spec {
 	return Spec{
 		Type: "parallel", Group: "Control", Summary: "Run branches at once; wait for all, any, or the first success.",
 		Params: []Param{
-			{Name: "wait", Kind: ParamEnum, Enum: []string{"all", "any", "first-success"}, Doc: "Default all."},
+			{Name: "wait", Kind: ParamEnum, Enum: []string{"all", "any", "first-success"}, Default: "all", Doc: "Default all."},
 			{Name: "concurrency", Kind: ParamInt, Min: 1, Doc: "Branches in flight (default: all); capped by the run-wide limit."},
 		},
 		Typed: []string{"branches"},

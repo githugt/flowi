@@ -98,6 +98,9 @@ type Workspace struct {
 	vaultOnce sync.Once
 	vault     *vault.Vault
 
+	lintMu   sync.Mutex             // guards lintMemo
+	lintMemo map[lintKeyT]diag.List // what linting a kept description found, by its inputs
+
 	exampleMu sync.Mutex    // guards example
 	example   *exampleState // the example collection and demo server this workspace opened, nil when none
 

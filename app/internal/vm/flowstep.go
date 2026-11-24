@@ -22,6 +22,19 @@ func (d *FlowDoc) SetColor(id, color string) error {
 	return nil
 }
 
+// SetArrowStyle says how the canvas draws the arrows that leave step id: one of model.NodeArrowStyles, or "" for the
+// default (square). Cosmetic, like the colour: a run never reads it. One undo step.
+func (d *FlowDoc) SetArrowStyle(id, style string) error {
+	if style != "" && !slices.Contains(model.NodeArrowStyles(), style) {
+		return fmt.Errorf("%q is not a way to draw arrows (%v)", style, model.NodeArrowStyles())
+	}
+	if _, ok := d.Node(id); !ok {
+		return fmt.Errorf("no step %s", id)
+	}
+	d.EditNode(id, func(n *model.Node) { n.ArrowStyle = style })
+	return nil
+}
+
 // SetSkipped marks step id as skipped, or takes the mark off. A skipped step does not run in any run of the flow,
 // and the mark is saved with the flow. One undo step.
 func (d *FlowDoc) SetSkipped(id string, skipped bool) error {

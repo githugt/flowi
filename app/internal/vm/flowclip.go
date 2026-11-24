@@ -112,11 +112,18 @@ func dropOutsideArrows(list []model.Node, keep map[string]bool) {
 
 // CopyText is the steps ids as the text a flow's code view shows, for the clipboard: only those steps, so it reads as
 // a small flow. The text is made off the UI goroutine.
-func (d *FlowDoc) CopyText(ids []string, done func(text string), fail func(error)) {
+//
+// portable writes each request and flow a step calls by its path alone, with no id, and fills in the step's name and
+// description: the ids belong to this collection, so a copy that carries them says nothing in another one, while a
+// path can be looked up there. Pasting resolves each path (see PasteText).
+func (d *FlowDoc) CopyText(ids []string, portable bool, done func(text string), fail func(error)) {
 	nodes, err := d.CopySteps(ids)
 	if err != nil {
 		fail(err)
 		return
+	}
+	if portable {
+		makePortable(d.coll, nodes)
 	}
 	t := d.target
 	type result struct {
@@ -135,10 +142,113 @@ func (d *FlowDoc) CopyText(ids []string, done func(text string), fail func(error
 	})
 }
 
+// makePortable rewrites the steps in list, and everything inside them, so each request or flow they call by this
+// collection's own reference is named by its path only, and each step says in words what it calls.
+func makePortable(c model.Collection, list []model.Node) {
+	for i := range list {
+		n := &list[i]
+		FillStepText(c, n)
+		if n.Request != nil && n.Request.Request.Collection == "" {
+			call := *n.Request
+			call.Request = portableRef(call.Request, requestPaths(c))
+			n.Request = &call
+		}
+		if n.Subflow != nil && n.Subflow.Flow.Collection == "" {
+			call := *n.Subflow
+			call.Flow = portableRef(call.Flow, flowPaths(c))
+			n.Subflow = &call
+		}
+		for _, child := range listsOf(n) {
+			makePortable(c, *child)
+		}
+	}
+}
+
+// portableRef is ref without its id, its path brought up to date from paths (by id) when the target is known.
+func portableRef(ref model.Ref, paths map[model.ID]string) model.Ref {
+	if p, ok := paths[ref.ID]; ok {
+		ref.Path = p
+	}
+	ref.ID = ""
+	return ref
+}
+
+func requestPaths(c model.Collection) map[model.ID]string {
+	out := map[model.ID]string{}
+	for _, r := range c.Requests {
+		out[r.ID] = r.Path
+	}
+	return out
+}
+
+func flowPaths(c model.Collection) map[model.ID]string {
+	out := map[model.ID]string{}
+	for _, f := range c.Flows {
+		out[f.ID] = f.Path
+	}
+	return out
+}
+
+// resolveCalls points each request and flow that list (and what is inside it) calls at this collection's own: by id
+// when the collection has it, else by its path. A call it finds nothing for is left as written, so the person can see
+// what it was and pick another; its path (or id, when it has no path) is returned, once each, in the order met.
+// Calls into a dependency are not touched.
+func resolveCalls(c model.Collection, list []model.Node) (unmatched []string) {
+	requests, flows := requestPaths(c), flowPaths(c)
+	byPath := func(paths map[model.ID]string) map[string]model.ID {
+		out := map[string]model.ID{}
+		for id, p := range paths {
+			out[p] = id
+		}
+		return out
+	}
+	requestIDs, flowIDs := byPath(requests), byPath(flows)
+	resolve := func(ref model.Ref, paths map[model.ID]string, ids map[string]model.ID) model.Ref {
+		if ref.Collection != "" || ref.Param != "" {
+			return ref
+		}
+		if p, ok := paths[ref.ID]; ok && ref.ID != "" {
+			ref.Path = p
+			return ref
+		}
+		if id, ok := ids[ref.Path]; ok && ref.Path != "" {
+			ref.ID = id
+			return ref
+		}
+		if name := firstText(ref.Path, string(ref.ID)); name != "" && !slices.Contains(unmatched, name) {
+			unmatched = append(unmatched, name)
+		}
+		return ref
+	}
+	var walk func(list []model.Node)
+	walk = func(list []model.Node) {
+		for i := range list {
+			n := &list[i]
+			if n.Request != nil {
+				call := *n.Request
+				call.Request = resolve(call.Request, requests, requestIDs)
+				n.Request = &call
+			}
+			if n.Subflow != nil {
+				call := *n.Subflow
+				call.Flow = resolve(call.Flow, flows, flowIDs)
+				n.Subflow = &call
+			}
+			for _, child := range listsOf(n) {
+				walk(*child)
+			}
+		}
+	}
+	walk(list)
+	return unmatched
+}
+
 // PasteText reads text as copied steps and puts them in after step `after` (the end when it is empty or not found).
 // Text that is not steps, or has problems, changes nothing and fails with the first problem, since a paste of
-// something else (a URL, a word) is a slip, not an edit. done gets the ids the new top-level steps were given.
-func (d *FlowDoc) PasteText(text, after string, done func(ids []string), fail func(error)) {
+// something else (a URL, a word) is a slip, not an edit. done gets the ids the new top-level steps were given, and
+// the requests and flows this collection has no match for (by id, then by path): those steps are pasted all the same,
+// still pointing at what they were copied with.
+func (d *FlowDoc) PasteText(text, after string, done func(ids []string, unmatched []string), fail func(error)) {
 	t := d.target
 	type result struct {
 		flow  model.Flow
@@ -146,7 +256,7 @@ func (d *FlowDoc) PasteText(text, after string, done func(ids []string), fail fu
 		err   error
 	}
 	Run(d.w, func() result {
-		f, diags, err := d.b.ParseFlowSource(t, text)
+		f, diags, err := d.b.ParseFlowSnippet(t, text)
 		return result{f, diags, err}
 	}, func(r result) {
 		switch {
@@ -158,12 +268,13 @@ func (d *FlowDoc) PasteText(text, after string, done func(ids []string), fail fu
 		case len(r.flow.Nodes) == 0:
 			fail(errors.New("the clipboard holds no steps"))
 		default:
+			unmatched := resolveCalls(d.coll, r.flow.Nodes)
 			ids, err := d.PasteSteps(r.flow.Nodes, after)
 			if err != nil {
 				fail(err)
 				return
 			}
-			done(ids)
+			done(ids, unmatched)
 		}
 	})
 }

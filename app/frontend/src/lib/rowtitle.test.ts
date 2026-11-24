@@ -11,11 +11,16 @@ describe('tree row title', () => {
     expect(rowTitle({ kind: 'group', label: 'Payments' })).toBe('Payments')
   })
 
-  it('draws the verb as bare tinted text in a narrow column, with the title on the row', () => {
-    // Before: the verb was a bordered pill taking a quarter of the sidebar, and long names were cut with no tooltip.
-    expect(item).toContain('title={rowTitle(node)}')
-    expect(item).toContain('<Verb verb={node.method} short pill={false} />')
-    expect(item).toContain('min-width: 44px')
+  it('draws a compact verb pill on requests and flows only, and the folder icon on folders only (Drafts has its own)', () => {
+    // Before: the verb was bare text, and a folder had no mark of its own, so a row of any kind could be
+    // taken for any other; the hover text was the name again, where it is a card now (HoverCard).
+    expect(item).toContain('<Verb verb={node.method} short compact />')
+    expect(item).toContain('<Verb verb="FLOW" compact />')
+    expect(item).toContain("const isFolder = $derived(node.kind === 'folder')")
+    expect(item).toContain('<Icon name="folder"')
+    expect(item).toContain("node.kind === 'collection' && node.scratch")
+    expect(item).not.toContain('title={rowTitle(node)}')
+    expect(item).toContain('hover.enter(')
   })
 
   it('keeps a file that cannot be read in the tree, in red, with the reason, and opens nothing for it', () => {

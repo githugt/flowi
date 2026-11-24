@@ -37,6 +37,9 @@ type NodeDetail struct {
 	// names of the outcomes it ended with: which exit of the step the run took.
 	Tries    int
 	Outcomes []string
+	// Reason says why the step was skipped on purpose (by the person, by the flow, or by its when); "" for a step that
+	// ran or never started.
+	Reason string
 }
 
 // FlowRun runs a flow from the canvas and tracks node statuses.
@@ -338,7 +341,7 @@ func (r *FlowRun) apply(events []engine.Event) {
 				}
 			}
 			d.Outputs = ev.Outputs
-			d.Tries, d.Outcomes = ev.Tries, ev.Outcomes
+			d.Tries, d.Outcomes, d.Reason = ev.Tries, ev.Outcomes, ev.Reason
 			d.Diags = append(d.Diags, DiagLines(ev.Diags)...)
 			status := string(ev.Status)
 			if d.Status != "running" && statusRank(d.Status) > statusRank(status) {

@@ -28,6 +28,7 @@ type Codec interface {
 	DecodeEnvironment(file string, data []byte) (model.Environment, diag.List)
 	DecodeRequest(file, path string, data []byte) (model.Request, diag.List)
 	DecodeFlow(file, path string, data []byte) (model.Flow, diag.List)
+	DecodeFlowSnippet(file, path string, data []byte) (model.Flow, diag.List)
 	DecodeBlueprint(file, path string, data []byte) (model.Blueprint, diag.List)
 	DecodeAuth(file string, data []byte) (model.NamedAuth, diag.List)
 	EncodeManifest(model.Manifest) ([]byte, error)

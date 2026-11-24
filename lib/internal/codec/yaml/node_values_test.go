@@ -68,6 +68,25 @@ func TestNode_Given_a_colour_When_saved_and_loaded_Then_it_round_trips(t *testin
 	}
 }
 
+func TestNode_Given_curved_arrows_When_saved_and_loaded_Then_they_round_trip_and_the_default_writes_nothing(t *testing.T) {
+	// Before: a step had no say in how its arrows were drawn.
+	const src = "id: 01J9ZB3M4N5P6Q7R8S9T0VWXYZ\nnodes:\n  - id: pause\n    type: delay\n    arrow_style: curved\n    duration: 2s\n"
+	c := newCodec()
+
+	f, diags := c.DecodeFlow("f.flow.yaml", "f", []byte(src))
+	requireNoDiagnostics(t, diags)
+	out, err := c.EncodeFlow(f)
+	f.Nodes[0].ArrowStyle = ""
+	plain, perr := c.EncodeFlow(f)
+
+	if err != nil || perr != nil || out == nil || !bytes.Equal(out, []byte(src)) {
+		t.Fatalf("err %v %v output:\n%s", err, perr, out)
+	}
+	if bytes.Contains(plain, []byte("arrow_style")) {
+		t.Fatalf("the default must write no line:\n%s", plain)
+	}
+}
+
 func TestFlow_Given_inputs_When_saved_Then_their_order_and_types_are_kept(t *testing.T) {
 	const src = `id: 01J9ZB3M4N5P6Q7R8S9T0VWXYZ
 inputs:

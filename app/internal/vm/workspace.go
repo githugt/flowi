@@ -43,8 +43,16 @@ type TreeNode struct {
 	Draft      bool     // NodeCollection: not saved to a folder yet
 	Scratch    bool     // NodeCollection: the Drafts try-out space, which is not a collection the person made
 	Method     string   // NodeRequest: the verb of its default version
-	Tree       string   // NodeFolder and the two groups: "requests" or "flows"
-	Detail     string   // NodeBroken: why it could not be read, with the line
+	// Type is what kind of thing a NodeRequest or NodeFlow is: one of TypeIDs for a request, TypeFlow for a flow. The
+	// sidebar filters and labels by it. TypeName is the name a person reads for it ("gRPC", "Async").
+	Type     string
+	TypeName string
+	// Where is the place a NodeRequest, NodeFlow, NodeFolder or NodeBroken lives in, as "Collection / folder / subfolder"
+	// (the collection is "Drafts" for the scratch space): the second line of the sidebar's list view. The collection
+	// itself has none: it is the place.
+	Where  string
+	Tree   string // NodeFolder and the two groups: "requests" or "flows"
+	Detail string // NodeBroken: why it could not be read, with the line
 	// Status is the development status of a NodeRequest, NodeFlow or NodeFolder as it resolves (its own, else the nearest
 	// folder's); the zero value for none. A name the collection does not have is kept with the alert icon.
 	Status model.Status
@@ -456,6 +464,7 @@ func buildSnapshot(b Backend) snapshot {
 		s.drafts[c.Manifest.ID] = b.IsDraft(c.Manifest.ID)
 		addCollection(add, c, s.drafts[c.Manifest.ID])
 	}
+	placeNodes(s.nodes)
 	paths := b.MountedPaths()
 	for _, id := range b.Missing() {
 		add("", TreeNode{ID: "m:" + string(id), Label: paths[id] + " (missing)", Kind: NodeMissing, Collection: id})
@@ -620,7 +629,8 @@ func requestLeaves(c model.Collection) []treeLeaf {
 			label = path.Base(r.Path)
 		}
 		node := TreeNode{ID: "r:" + string(c.Manifest.ID) + ":" + string(r.ID), Label: label, Kind: NodeRequest,
-			Collection: c.Manifest.ID, Request: r.ID, File: r.File, Path: r.Path, Method: verbOf(r)}
+			Collection: c.Manifest.ID, Request: r.ID, File: r.File, Path: r.Path, Method: verbOf(r), Type: requestTypeOf(r)}
+		node.TypeName = TypeName(node.Type)
 		withLabels(&node, c, c.RequestStatus(r), c.RequestTags(r))
 		out[i] = treeLeaf{r.Path, node}
 	}
@@ -645,7 +655,7 @@ func flowLeaves(c model.Collection) []treeLeaf {
 	out := make([]treeLeaf, len(c.Flows))
 	for i, f := range c.Flows {
 		node := TreeNode{ID: "f:" + string(c.Manifest.ID) + ":" + string(f.ID), Label: path.Base(f.Path), Kind: NodeFlow,
-			Collection: c.Manifest.ID, Flow: f.ID, File: f.File, Path: f.Path}
+			Collection: c.Manifest.ID, Flow: f.ID, File: f.File, Path: f.Path, Type: TypeFlow, TypeName: TypeName(TypeFlow)}
 		withLabels(&node, c, c.FlowStatus(f), c.FlowTags(f))
 		out[i] = treeLeaf{f.Path, node}
 	}
@@ -664,4 +674,42 @@ func verbOf(r model.Request) string {
 		return ""
 	}
 	return Verb(r.Versions[defaultIndex(r)])
+}
+
+// requestTypeOf is the type of the version a request opens on; HTTP for a request with no version yet.
+func requestTypeOf(r model.Request) string {
+	if len(r.Versions) == 0 {
+		return TypeHTTP
+	}
+	return TypeOf(r.Versions[defaultIndex(r)])
+}
+
+// placeNodes sets Where on every request, flow, folder and unreadable file: the collection's name, then the folders
+// above the row.
+//
+// Before: the sidebar's rows told where they live only by the group rows above them (Requests, then the folders), so a
+// flat list of hits could not say which collection or folder a hit was in.
+func placeNodes(nodes map[string]TreeNode) {
+	for id, n := range nodes {
+		switch n.Kind {
+		case NodeRequest, NodeFlow, NodeFolder, NodeBroken:
+		default:
+			continue
+		}
+		n.Where = WhereOf(nodes["c:"+string(n.Collection)].Label, n.Path)
+		nodes[id] = n
+	}
+}
+
+// WhereOf is "Collection / folder / subfolder" for an item whose path in its collection is itemPath: the folders above it,
+// not its own name. A top-level item (or a collection with no name) has just the collection.
+func WhereOf(collection, itemPath string) string {
+	parts := []string{}
+	if collection != "" {
+		parts = append(parts, collection)
+	}
+	if dir := path.Dir(itemPath); dir != "." && dir != "/" && dir != "" {
+		parts = append(parts, strings.Split(dir, "/")...)
+	}
+	return strings.Join(parts, " / ")
 }

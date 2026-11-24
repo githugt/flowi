@@ -28,6 +28,8 @@ type Card struct {
 	Skipped  bool       `json:"skipped"`            // this run leaves the step out
 	SkipNote string     `json:"skipNote,omitempty"` // "login is skipped, so this has no value", on a step that reads from one
 	Break    bool       `json:"break"`              // a debug session pauses before this step
+	// ArrowStyle is how the arrows that leave the step are drawn: "curved", or "" for the default, square.
+	ArrowStyle string `json:"arrowStyle,omitempty"`
 }
 
 // FlowView is an open flow as the canvas shows it.
@@ -278,7 +280,7 @@ func (s *FlowService) cardsOf(o *openFlow, g canvas.Diagram) map[string]Card {
 	for _, u := range g.Units {
 		n, _ := o.doc.Node(u.Nodes[u.Core]) // the request of a block with attached actions, else the only or first node
 		skipped, note := skipMark(skips, u.Nodes)
-		cards[u.ID] = Card{Title: unitTitle(u, n, selected), Tip: unitTip(u, n, selected), Subtitle: unitSubtitle(u, n), Hooks: nonNilTicks(s.hookTicksOf(o, n)), Face: faceOf(o.doc, n), Color: n.Color, Skipped: skipped, SkipNote: note, Break: slices.ContainsFunc(u.Nodes, func(id string) bool { return slices.Contains(debug.Breaks, id) })}
+		cards[u.ID] = Card{Title: unitTitle(u, n, selected), Tip: unitTip(u, n, selected), Subtitle: unitSubtitle(u, n), Hooks: nonNilTicks(s.hookTicksOf(o, n)), Face: faceOf(o.doc, n), Color: n.Color, ArrowStyle: n.ArrowStyle, Skipped: skipped, SkipNote: note, Break: slices.ContainsFunc(u.Nodes, func(id string) bool { return slices.Contains(debug.Breaks, id) })}
 	}
 	return cards
 }

@@ -79,7 +79,11 @@ func (m *mapping) ref(key string) (model.Ref, bool) {
 	if r, isParam := rm.paramRef(); isParam {
 		return r, true
 	}
-	r := model.Ref{Collection: rm.str("collection"), ID: rm.id(), Path: rm.str("path")}
+	r := model.Ref{Collection: rm.str("collection")}
+	if !m.d.snippet || rm.has("id") || !rm.has("path") {
+		r.ID = rm.id()
+	}
+	r.Path = rm.str("path")
 	rm.closeStrict()
 	return r, true
 }

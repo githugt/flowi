@@ -19,7 +19,7 @@ func saveSpec() Spec {
 		Params: []Param{
 			{Name: "key", Kind: ParamName, Required: true, Doc: "What the value is saved as: a plain file name without extension."},
 			{Name: "value", Kind: ParamAny, Required: true, Doc: `What to save, e.g. "{{nodes.login}}".`},
-			{Name: "mode", Kind: ParamEnum, Enum: []string{"overwrite", "latest-by-status", "append"}, Doc: "overwrite (default): `<key>.json`; latest-by-status: `<key>/<status>.json` from `value.status`; append: a line in `<key>.ndjson`."},
+			{Name: "mode", Kind: ParamEnum, Enum: []string{"overwrite", "latest-by-status", "append"}, Default: "overwrite", Doc: "overwrite (default): `<key>.json`; latest-by-status: `<key>/<status>.json` from `value.status`; append: a line in `<key>.ndjson`."},
 		},
 		Run: runSave,
 	}

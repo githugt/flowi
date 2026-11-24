@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { commandList, filterCommands, itemCommands, type Command, type PaletteContext } from './commands'
+import { commandList, filterCommands, itemCommands, overviewCommands, type Command, type PaletteContext } from './commands'
 
 const run = () => {}
 const cmd = (id: string, title: string, keys = ''): Command => ({ id, title, keys, icon: '', run })
@@ -148,5 +148,23 @@ describe('itemCommands', () => {
     filterCommands(got, 'pets')[0].run()
 
     expect(opened).toBe('r:shop:get')
+  })
+})
+
+// Before: the collection page opened only from the sidebar row's menu.
+describe('overviewCommands', () => {
+  it('Given collections When built Then each has an overview command that opens its page by id', () => {
+    const roots = [
+      { id: 'c:shop', label: 'Shop', kind: 'collection' },
+      { id: 'e:dev', label: 'dev', kind: 'environment' },
+      { id: 'c:pets', label: 'Pets', kind: 'collection' },
+    ] as never
+    const opened: string[] = []
+
+    const got = overviewCommands(roots, (id, label) => opened.push(`${id}/${label}`))
+    got[1].run()
+
+    expect(got.map((c) => c.title)).toEqual(['Overview of Shop', 'Overview of Pets'])
+    expect(opened).toEqual(['pets/Pets'])
   })
 })

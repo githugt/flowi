@@ -414,6 +414,27 @@ func (r *Request) SetDefault() {
 	r.changed()
 }
 
+// SetName gives the request its own name, "" for none. The name is the request's, not a version's, so it is kept
+// by saving and not in the edit slot.
+//
+// Before: a request's name was only ever set by an import; the screen had nowhere to write one.
+func (r *Request) SetName(name string) {
+	if len(r.draft.Versions) == 0 || r.deleting || r.draft.Name == name {
+		return
+	}
+	r.draft.Name = name
+	r.rev++
+	if sameSaved(r.draft, r.disk) && r.orphan == "" {
+		r.becameClean()
+	} else {
+		r.dirty = true
+	}
+	r.changed()
+	for _, f := range r.onEdit {
+		f()
+	}
+}
+
 // NewVersionFromCurrent copies the selected version as label and selects
 // it. The label must be a valid, unused version label.
 func (r *Request) NewVersionFromCurrent(label string) error {
@@ -908,7 +929,7 @@ func (r *Request) FlushResult(done func(stored bool)) {
 		r.changed()
 		done(false)
 	case !r.slotable():
-		r.autosaveProb = "These changes (a new version or default) can only be kept by saving."
+		r.autosaveProb = "These changes (a new version, default or name) can only be kept by saving."
 		r.changed()
 		done(false)
 	default:
@@ -937,7 +958,7 @@ func (r *Request) autosaved(err error) {
 // selected version differs from the file.
 func (r *Request) slotable() bool {
 	d, k := r.draft, r.disk
-	if d.Default != k.Default || len(d.Versions) != len(k.Versions) {
+	if d.Default != k.Default || d.Name != k.Name || len(d.Versions) != len(k.Versions) {
 		return false
 	}
 	for i := range d.Versions {

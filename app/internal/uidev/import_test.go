@@ -21,6 +21,7 @@ operations:
 
 func TestBackend_PreviewImportSource_should_plan_the_document_it_is_given_and_ApplyImportReport_should_show_it_in_the_collection(t *testing.T) {
 	b := uidev.New()
+	t.Cleanup(func() { _ = b.Close() })
 	src := flowi.ImportSource{Kind: flowi.ImportAsyncAPI, Name: flowi.PastedSourceName, Data: []byte(socket), Into: "demo/ws"}
 
 	plan, err := b.PreviewImportSource(src, uidev.Collection().Manifest.ID)

@@ -1,9 +1,17 @@
 // Shapes of the views Go publishes (see internal/bridge).
+import type { TypeChoice } from './requesttype'
+
 export interface TreeNode {
   id: string
   label: string
   kind: string
   method?: string
+  /** A request: http, grpc, message, db or file; a flow: flow. */
+  type?: string
+  /** That in words: HTTP, gRPC, Async, Database, Data file, Flow. */
+  typeName?: string
+  /** "Collection / folder / subfolder": where a request, flow or folder lives. */
+  where?: string
   /** A `broken` row: why the file could not be read, "unresolved git merge conflict (line 14)". */
   detail?: string
   /** What a folder's order calls it: the file or folder name ("" for rows that cannot be reordered). */
@@ -160,6 +168,8 @@ export interface FaceGuard {
 
 export interface Face {
   badge: string
+  /** What the badge is coloured as (the method, protocol, store or file format) when it is not the badge's own word. */
+  verb?: string
   subline: string
   rows: FaceRow[]
   more: FaceRow[]
@@ -174,6 +184,7 @@ export interface Card {
   hooks?: HookTick[] // a request step: the hooks that run around it
   face?: Face
   color?: string // the colour the person gave the step
+  arrowStyle?: string // how the arrows leaving the step are drawn: 'curved', or absent for the default, square
   skipped?: boolean // this run leaves the step out
   skipNote?: string // on a step that reads from a skipped one: why it has no value
   break?: boolean // a debug session pauses before this step
@@ -223,6 +234,7 @@ export interface Param {
   doc: string
   required: boolean
   enum?: string[]
+  default?: string
   value: string
   complex?: boolean
 }
@@ -399,6 +411,8 @@ export interface RunView {
   seed?: string
   statuses: Record<string, string>
   results: Record<string, string>
+  /** The steps the run skipped on purpose (by you, in the flow, or by their when): it went on past them. */
+  through?: string[]
   /** The steps that ran, placed on the run's clock and ordered by start. */
   timeline: TimelineBar[]
 }
@@ -673,6 +687,9 @@ export interface RequestView {
   name: string
   path: string
   kind: 'http' | 'async' | 'grpc' | 'dataset'
+  /** The id of its type in `types`: http, grpc, async:ws, db:postgres, file:csv. */
+  type: string
+  types: TypeChoice[]
   verb: string
   versions: string[]
   versionNames: string[]
@@ -1384,4 +1401,34 @@ export interface VariableHint {
   environment: string
   name: string
   secret: boolean
+}
+
+/** What the sidebar remembers for this person (Go: bridge.SidebarView). */
+export interface SidebarMemory {
+  /** The tree rows of the starred collections, in the order they were starred. */
+  favourites: string[]
+  /** The requests and flows opened last, newest first. */
+  recent: { id: string; label: string; kind: string; method?: string; type?: string; typeName?: string; where?: string }[]
+}
+
+/** What the sidebar shows beside an environment: whether sends use it, and what is unresolved in it (Go: bridge.EnvStateView). */
+export interface EnvState {
+  file: string
+  name: string
+  active: boolean
+  issues: { brief: string; hint: string }[]
+}
+
+/** The card shown when the pointer rests on a row (Go: bridge.HoverView). */
+export interface HoverCardView {
+  title: string
+  kind: string
+  verb?: string
+  where?: string
+  targetLabel?: string
+  target?: string
+  description?: string
+  facts: { label: string; value: string }[]
+  problems: { severity: string; code?: string; message: string; hint?: string }[]
+  moreProblems?: number
 }

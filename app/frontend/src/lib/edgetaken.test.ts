@@ -35,7 +35,9 @@ describe('throughStatus', () => {
   it('counts a step skipped on purpose as passed, for its arrows', () => {
     expect(throughStatus('skipped', true)).toBe('passed')
   })
-  it('leaves a step skipped by its when, or any other status, as it is', () => {
+  // Before: a step skipped by its when counted like one that never started because something failed before it, so the
+  // arrow into it stayed dark. The run now says which steps it skipped on purpose (RunView.through), and only those pass.
+  it('leaves a step that was skipped for any other reason, or any other status, as it is', () => {
     expect(throughStatus('skipped', false)).toBe('skipped')
     expect(throughStatus('failed', true)).toBe('failed')
     expect(throughStatus('passed', true)).toBe('passed')

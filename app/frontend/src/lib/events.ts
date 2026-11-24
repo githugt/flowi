@@ -6,7 +6,7 @@ import { Events } from '@wailsio/runtime'
 export const eventNames = [
   'authprompt', 'auths', 'blueprints', 'clipboard', 'close', 'deleted', 'environment', 'flow', 'flowhistory', 'flowrun', 'hooks',
   'import', 'manager', 'matrix', 'menu', 'notice', 'open', 'panels', 'passphrase', 'quit-requested', 'reorder-needs-confirm',
-  'replayer', 'request', 'schedules', 'secrets', 'settings', 'spec-origin', 'telemetry', 'tracing', 'trash', 'welcome', 'workspace',
+  'replayer', 'request', 'schedules', 'secrets', 'settings', 'sidebar', 'spec-origin', 'telemetry', 'tracing', 'trash', 'welcome', 'workspace',
 ] as const
 
 export type EventName = (typeof eventNames)[number]

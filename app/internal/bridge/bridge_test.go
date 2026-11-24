@@ -12,6 +12,7 @@ import (
 	"runtime"
 	"slices"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -25,11 +26,14 @@ import (
 )
 
 type published struct {
+	mu    sync.Mutex // the session writer emits notices from its own goroutine
 	names []string
 	last  map[string]any
 }
 
 func (p *published) emit(name string, data any) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
 	p.names = append(p.names, name)
 	if p.last == nil {
 		p.last = map[string]any{}
@@ -298,6 +302,22 @@ func TestFlowService_Run_should_publish_statuses_and_summary(t *testing.T) {
 
 	if ev.Run.Running || ev.Run.Statuses["a"] != "passed" || ev.Run.Results["a"] != "passed · 5ms" || ev.Run.Summary != "passed · 1 passed · seed 7" {
 		t.Fatalf("run %+v", ev.Run)
+	}
+}
+
+// Before: a step skipped by its when was reported like one that never started because something failed before it, so the
+// canvas could not light the arrow into it. The run view now lists the steps it skipped on purpose.
+func TestFlowService_Run_should_list_the_steps_skipped_on_purpose_as_the_run_going_through_them(t *testing.T) {
+	flows, v, pub := openRunnable(t, []engine.Event{
+		engine.NodeFinished{Path: "a", Node: "a", Status: engine.StatusSkipped}, // never started: not through
+		engine.NodeFinished{Path: "b", Node: "b", Status: engine.StatusSkipped, Reason: "its when was false"},
+	})
+
+	flows.Run(v.Node, nil)
+	got := pub.last["flowrun"].(bridge.FlowRunEvent).Run.Through
+
+	if len(got) != 1 || got[0] != "b" {
+		t.Fatalf("through %v", got)
 	}
 }
 

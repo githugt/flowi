@@ -39,6 +39,7 @@ type Param struct {
 	Doc      string   `json:"doc"`
 	Required bool     `json:"required"`
 	Enum     []string `json:"enum,omitempty"`
+	Default  string   `json:"default,omitempty"` // an enum's choice when the field is absent: the form shows it
 	Value    string   `json:"value"`
 	Complex  bool     `json:"complex,omitempty"` // a list or mapping: edited in the file
 }
@@ -263,7 +264,7 @@ func paramsOf(n model.Node, spec flowi.NodeSpec) []Param {
 		}
 		v := vm.ParamValue(n, p.Name)
 		_, text := v.(string)
-		param := Param{Name: p.Name, Kind: p.Kind, Doc: p.Doc, Required: p.Required, Enum: p.Enum, Value: vm.ParamText(n, p.Name)}
+		param := Param{Name: p.Name, Kind: p.Kind, Doc: p.Doc, Required: p.Required, Enum: p.Enum, Default: p.Default, Value: vm.ParamText(n, p.Name)}
 		switch v.(type) {
 		case nil, bool, int, int64, float64, string:
 		default:

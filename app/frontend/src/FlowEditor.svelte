@@ -18,6 +18,7 @@
   import { LIVE, closeRunPanel, runPanelsOf, toggleRunPanel } from './lib/runpanels.svelte'
   import Canvas, { type DragInfo } from './Canvas.svelte'
   import { copy, paste } from './lib/clip'
+  import { pasteNote } from './lib/pastenote'
   import { clipAction } from './lib/flowkeys'
   import SidePanel from './SidePanel.svelte'
   import RunMenu from './RunMenu.svelte'
@@ -137,7 +138,7 @@
     wasRunning = running
   })
 
-  const help = 'Drag a step onto a line or between steps to move it there, or into empty space to place it freely · drag one card out of a strip to reorder it · drag from a port to a step to add needs · Shift-click or Ctrl+A selects several · Ctrl+C and Ctrl+V copy and paste steps · Delete removes · pinch to zoom'
+  const help = 'Drag a step onto a line or between steps to move it there, or into empty space to place it freely · drag one card out of a strip to reorder it · drag from a port to a step to add needs · Shift-click or Ctrl+A selects several · Ctrl+C and Ctrl+V copy and paste steps · Delete removes · scroll wheel or pinch to zoom, Ctrl+scroll to move the view'
 
   function moreMenu(e: MouseEvent) {
     const r = (e.currentTarget as HTMLElement).getBoundingClientRect()
@@ -185,8 +186,8 @@
       else {
         const text = await paste()
         if (text === null) return ui.toast('Could not read the clipboard here.')
-        const ids = (await FlowService.PasteSteps(node, text)) as string[]
-        ui.toast(ids.length === 1 ? 'Pasted 1 step' : `Pasted ${ids.length} steps`)
+        const pasted = await FlowService.PasteSteps(node, text)
+        ui.toast(pasteNote(pasted.ids.length, pasted.unmatched))
       }
     } catch (e) {
       ui.toast(errorText(e))
@@ -361,6 +362,13 @@
     const skipped = view.skips.steps.includes(step)
     const items: MenuItem[] = []
     if (calls) items.push({ label: type === 'request' ? 'Open request' : 'Open flow', run: () => void openStepTarget(node, step) })
+    // Copying changes nothing, so it works without Edit. The steps are the selection when this one is in it.
+    const copied = view.selection.includes(step) ? view.selection : [step]
+    const what = copied.length === 1 ? 'the step' : 'the steps'
+    items.push({ label: copied.length === 1 ? 'Copy' : `Copy ${copied.length} steps`, run: async () => void copy(await FlowService.CopySteps(node, copied), what) })
+    items.push({ label: 'Copy as portable', run: async () => void copy(await FlowService.CopyStepsPortable(node, copied), `${what} as portable`) })
+    if (editing) items.push({ label: 'Paste', run: () => void clipKey('paste') })
+    if (editing) items.push({ label: '', separator: true, run: () => {} })
     if (editing) {
       items.push({ label: 'Skip this step', checked: skipped, run: () => toggleSkip(step) })
       items.push({ label: 'Pause before this step', checked: view.debug.breaks.includes(step), run: () => void FlowService.ToggleBreak(node, step) })
@@ -372,6 +380,7 @@
     if (items.length) ui.openMenu(e.clientX, e.clientY, items)
   }
   const onColour = (step: string, colour: string) => FlowService.SetColor(node, step, colour).catch(ui.fail)
+  const onArrows = (step: string, style: string) => FlowService.SetArrowStyle(node, step, style).catch(ui.fail)
   // The step a new one would follow, when it gives a status to route by: a request, a URL call or a webhook.
   const routeAfter = $derived.by(() => {
     if (!popup) return ''
@@ -465,6 +474,7 @@
         selection={view.selection}
         statuses={view.run.statuses}
         results={view.run.results}
+        through={view.run.through}
         {slot}
         editable={editing}
         onselect={(step, additive) => (additive ? FlowService.ToggleSelect(node, step) : FlowService.Select(node, step))}
@@ -483,6 +493,7 @@
         onadd={editing ? openPopup : undefined}
         ontoolbar={editing ? onTool : undefined}
         oncolour={editing ? onColour : undefined}
+        onarrows={editing ? onArrows : undefined}
         oncase={editing ? openCase : undefined}
         start={view.start}
         end={view.end}

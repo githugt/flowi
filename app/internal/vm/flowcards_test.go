@@ -63,6 +63,25 @@ func TestCardFacts_Given_a_message_request_Then_kind_target_and_extras_come_from
 	}
 }
 
+// Before: the pill of a message, gRPC or query step was coloured by its action word (PUBLISH, SQL), which has no colour,
+// so only HTTP steps wore one.
+func TestCardFacts_Given_each_kind_of_request_Then_the_facts_carry_the_verb_its_pill_is_coloured_as(t *testing.T) {
+	cases := map[model.ID]string{"R1": "GET", "R2": "MQTT", "R3": "GRPC"}
+	for id, want := range cases {
+		n := model.Node{ID: "n", Type: "request", Request: &model.RequestCall{Request: model.Ref{ID: id}}}
+
+		got := vm.CardFacts(cardCollection(), n)
+
+		if got.Verb != want {
+			t.Errorf("%s: verb %q, want %q", id, got.Verb, want)
+		}
+	}
+	db := model.RequestVersion{Label: "1", Dataset: &model.Dataset{Driver: "postgres"}}
+	if got := vm.VersionFacts(db); got.Verb != "POSTGRES" {
+		t.Errorf("database verb %q", got.Verb)
+	}
+}
+
 func TestCardFacts_Given_a_grpc_request_Then_it_is_unary_with_metadata_counted(t *testing.T) {
 	n := model.Node{ID: "n", Type: "request", Request: &model.RequestCall{Request: model.Ref{ID: "R3"}}}
 

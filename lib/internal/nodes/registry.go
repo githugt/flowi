@@ -38,7 +38,8 @@ type Param struct {
 	Kind     ParamKind
 	Required bool
 	Enum     []string
-	Min, Max int64 // ParamInt bounds; 0 and 0 mean unbounded
+	Default  string // ParamEnum: the choice that applies when the field is absent; the form shows it
+	Min, Max int64  // ParamInt bounds; 0 and 0 mean unbounded
 	Doc      string
 }
 

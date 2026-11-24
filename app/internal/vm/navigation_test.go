@@ -222,6 +222,10 @@ func TestWorkspaceVM_FlowFromRequests_should_chain_one_request_node_per_request(
 	if nodes[0].Request.Request.ID != "R1" || nodes[0].Request.Request.Path != "auth/login" || len(nodes[0].Needs) != 0 {
 		t.Fatalf("first %+v", nodes[0])
 	}
+	// Before: the steps were only ids and paths, so the flow said nothing about what each one is for.
+	if nodes[0].Name != "Login" || nodes[0].Description != "POST /login" || nodes[1].Description != "POST /verify" {
+		t.Fatalf("text %q %q / %q", nodes[0].Name, nodes[0].Description, nodes[1].Description)
+	}
 	// Behaviour change: the nodes used to be written needing the one before. Nodes
 	// run in list order and a node without needs depends on the previous one by
 	// itself (design §7.2), so those needs said nothing and showed up in the

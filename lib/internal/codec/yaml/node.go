@@ -55,6 +55,7 @@ func (m *mapping) flowNode() model.Node {
 		Attach:         m.str("attach"),
 		AttachAt:       m.str("attach_at"),
 		Color:          m.str("color"),
+		ArrowStyle:     m.str("arrow_style"),
 		Skipped:        m.boolean("skip"),
 	}
 	switch n.Type {
@@ -214,6 +215,7 @@ func encodeNode(n model.Node) any {
 	o.put("attach", n.Attach)
 	o.put("attach_at", n.AttachAt)
 	o.put("color", n.Color)
+	o.put("arrow_style", n.ArrowStyle)
 	o.put("skip", n.Skipped)
 	if n.Timeout > 0 {
 		o.put("timeout", formatDuration(n.Timeout))

@@ -12,7 +12,7 @@ import { moved } from './reorder'
 import { screens } from './screens'
 import type { PastedKind } from './paste'
 import { EnvironmentService, FlowService, HooksService, PanelsService, PassphraseService, RequestService, SessionService, SettingsService, SystemService, TrashService, WorkspaceService } from '../../bindings/github.com/githugt/flowi/app/internal/bridge'
-import type { HooksView, SettingsView, Panels, EnvView, FlowView, HistoryRow, RequestView, RunView, Tree, TreeNode } from './types'
+import type { EnvState, HooksView, SettingsView, Panels, EnvView, FlowView, HistoryRow, RequestView, RunView, SidebarMemory, Tree, TreeNode } from './types'
 import { themeMode } from './theme'
 import { rememberTheme } from './themecache'
 import { rememberClosed, takeReopen, type ClosedTab } from './closedtabs'
@@ -42,6 +42,8 @@ const UNDO_MS = 8000
 
 class AppState {
   tree = $state<Tree | null>(null)
+  /** What the sidebar remembers for this person: the starred collections and the recently opened requests and flows. */
+  sidebar = $state<SidebarMemory>({ favourites: [], recent: [] })
   /** The open request uses {{env.…}} values and no environment is selected: set by MissingBar, which the chip reads to turn amber. */
   envWanted = $state(false)
   tabs = $state<Tab[]>([])
@@ -52,6 +54,9 @@ class AppState {
   trends = $state<Record<string, { trend: string; slowNote: string }>>({})
   requests = $state<Record<string, RequestView>>({})
   envs = $state<Record<string, EnvView>>({})
+  /** What is unresolved in each environment, by tree row ("e:" + file); the sidebar's Environments show it. */
+  envIssues = $state<Record<string, number>>({})
+  #envIssuesAsked = 0
   hooks = $state<Record<string, HooksView>>({})
   settings = $state<SettingsView | null>(null)
   // Whether the replayer and the schedule runner are working, kept from their events so the footer can say so after
@@ -133,6 +138,20 @@ class AppState {
     })
   }
 
+  /** Asks what is unresolved in each environment; an answer that a newer question has overtaken is dropped. */
+  async refreshEnvIssues() {
+    const asked = ++this.#envIssuesAsked
+    try {
+      const states = (await EnvironmentService.States()) as unknown as EnvState[]
+      if (asked !== this.#envIssuesAsked) return
+      const next: Record<string, number> = {}
+      for (const s of states) if (s.issues.length) next['e:' + s.file] = s.issues.length
+      if (!sameData(this.envIssues, next)) this.envIssues = next
+    } catch {
+      // The sidebar shows no count rather than a wrong one; the hover card and the Secrets screen say what is wrong.
+    }
+  }
+
   /** Documents whose tab was closed: late events for them are dropped. */
   #closed = new ClosedSet()
 
@@ -140,6 +159,12 @@ class AppState {
     // An event that repeats what is held is dropped: replacing a deep $state with an equal copy wakes every reader.
     onEvent('workspace', (data) => {
       if (!sameData(this.tree, data)) this.tree = data as Tree
+      void this.refreshEnvIssues()
+    })
+    // The vault is read to see which secrets hold a value, so the answer comes after the event, not with it.
+    onEvent('secrets', () => void this.refreshEnvIssues())
+    onEvent('sidebar', (data) => {
+      if (!sameData(this.sidebar, data)) this.sidebar = data as SidebarMemory
     })
     onEvent('flow', (data) => {
       const v = data as unknown as FlowView
@@ -224,9 +249,11 @@ class AppState {
     // restored (so `restored` stays false and the tabs of the last session are not overwritten by an empty window).
     // Before: they ran one after the other, and a rejection ended init() with nothing but a console error.
     try {
-      const [panels, tree] = await Promise.all([PanelsService.State(), WorkspaceService.Tree()])
+      const [panels, tree, sidebar] = await Promise.all([PanelsService.State(), WorkspaceService.Tree(), WorkspaceService.Sidebar()])
       this.panels = panels as unknown as Panels
       this.tree = tree as unknown as Tree
+      this.sidebar = sidebar as unknown as SidebarMemory
+      void this.refreshEnvIssues() // reads the vault: not waited for
       await this.restoreSession()
       this.sweepDrafts()
     } catch (e) {
@@ -452,6 +479,8 @@ class AppState {
     }
     if (!this.tabs.some((t) => t.node === n.id)) this.tabs.push({ node: n.id, label: n.label, kind: n.kind })
     if (activate && current()) this.active = n.id
+    // What is opened on purpose is what Recent lists; the tabs a restored session brings back are not.
+    if (activate && (n.kind === 'request' || n.kind === 'flow')) WorkspaceService.NoteOpened(n.id).catch(ui.fail)
   }
 
   /** Opens the hooks editor of an open request as a tab of its own. */

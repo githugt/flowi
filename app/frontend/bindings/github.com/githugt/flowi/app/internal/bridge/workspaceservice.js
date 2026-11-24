@@ -30,6 +30,14 @@ export function AddStatus(node, name, color, icon, dropComments) {
 }
 
 /**
+ * ClearRecent empties the Recent tab.
+ * @returns {$CancellablePromise<void>}
+ */
+export function ClearRecent() {
+    return $Call.ByID(1662808628);
+}
+
+/**
  * Do runs a menu action on rows. text is what its prompt asked (a path or
  * name) and protocol the async protocol. Results come back as events:
  * "open" with a row to open, "notice" with a problem, "clipboard" with text
@@ -56,6 +64,18 @@ export function EnvironmentOffers() {
 }
 
 /**
+ * Hover is the card for tree row `node`: what it is, where it lives, what it talks to, what it says about itself and
+ * what is wrong with it, so a person can tell rows apart without opening them.
+ * @param {string} node
+ * @returns {$CancellablePromise<$models.HoverView>}
+ */
+export function Hover(node) {
+    return $Call.ByID(3544155848, node).then(/** @type {($result: any) => any} */(($result) => {
+        return $$createType2($result);
+    }));
+}
+
+/**
  * ImportEnvironments copies the environments collection ships that the
  * workspace lacks into the workspace, and returns their names. Secret
  * variables come over as declarations: their values are set in the
@@ -65,7 +85,7 @@ export function EnvironmentOffers() {
  */
 export function ImportEnvironments(collection) {
     return $Call.ByID(58660773, collection).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType2($result);
+        return $$createType3($result);
     }));
 }
 
@@ -77,7 +97,7 @@ export function ImportEnvironments(collection) {
  */
 export function Inside(id) {
     return $Call.ByID(3621508002, id).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType2($result);
+        return $$createType3($result);
     }));
 }
 
@@ -88,7 +108,7 @@ export function Inside(id) {
  */
 export function Labels(node) {
     return $Call.ByID(2880758765, node).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType3($result);
+        return $$createType4($result);
     }));
 }
 
@@ -100,7 +120,7 @@ export function Labels(node) {
  */
 export function Location(node) {
     return $Call.ByID(3823764941, node).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType4($result);
+        return $$createType5($result);
     }));
 }
 
@@ -111,7 +131,7 @@ export function Location(node) {
  */
 export function Menu(ids) {
     return $Call.ByID(347913881, ids).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType6($result);
+        return $$createType7($result);
     }));
 }
 
@@ -135,7 +155,7 @@ export function MoveInto(ids, row) {
  */
 export function MoveTargets() {
     return $Call.ByID(3646977023).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType8($result);
+        return $$createType9($result);
     }));
 }
 
@@ -209,6 +229,15 @@ export function NewScratchRequest() {
 }
 
 /**
+ * NoteOpened records that the window opened request or flow row `node`, for the Recent tab.
+ * @param {string} node
+ * @returns {$CancellablePromise<void>}
+ */
+export function NoteOpened(node) {
+    return $Call.ByID(2249482203, node);
+}
+
+/**
  * PlaceTargets lists where something of tree ("requests" or "flows") can go: every collection
  * and the folders of that tree below it, in tree order.
  * @param {string} tree
@@ -216,7 +245,7 @@ export function NewScratchRequest() {
  */
 export function PlaceTargets(tree) {
     return $Call.ByID(2138337117, tree).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType8($result);
+        return $$createType9($result);
     }));
 }
 
@@ -285,23 +314,44 @@ export function SetLabels(node, tags, status, dropComments) {
 }
 
 /**
+ * Sidebar is what the sidebar remembers now: the starred collections and the recent requests and flows.
+ * @returns {$CancellablePromise<$models.SidebarView>}
+ */
+export function Sidebar() {
+    return $Call.ByID(2228153562).then(/** @type {($result: any) => any} */(($result) => {
+        return $$createType10($result);
+    }));
+}
+
+/**
+ * ToggleFavourite stars the collection of tree row `node`, or takes its star off.
+ * @param {string} node
+ * @returns {$CancellablePromise<void>}
+ */
+export function ToggleFavourite(node) {
+    return $Call.ByID(1933077621, node);
+}
+
+/**
  * Tree is the workspace now.
  * @returns {$CancellablePromise<$models.Tree>}
  */
 export function Tree() {
     return $Call.ByID(1035379242).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType9($result);
+        return $$createType11($result);
     }));
 }
 
 // Private type creation functions
 const $$createType0 = $models.EnvOffer.createFrom;
 const $$createType1 = $Create.Array($$createType0);
-const $$createType2 = $Create.Array($Create.Any);
-const $$createType3 = $models.LabelsView.createFrom;
-const $$createType4 = $models.LocationView.createFrom;
-const $$createType5 = $models.MenuEntry.createFrom;
-const $$createType6 = $Create.Array($$createType5);
-const $$createType7 = $models.MoveTargetView.createFrom;
-const $$createType8 = $Create.Array($$createType7);
-const $$createType9 = $models.Tree.createFrom;
+const $$createType2 = $models.HoverView.createFrom;
+const $$createType3 = $Create.Array($Create.Any);
+const $$createType4 = $models.LabelsView.createFrom;
+const $$createType5 = $models.LocationView.createFrom;
+const $$createType6 = $models.MenuEntry.createFrom;
+const $$createType7 = $Create.Array($$createType6);
+const $$createType8 = $models.MoveTargetView.createFrom;
+const $$createType9 = $Create.Array($$createType8);
+const $$createType10 = $models.SidebarView.createFrom;
+const $$createType11 = $models.Tree.createFrom;

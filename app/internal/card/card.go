@@ -50,6 +50,7 @@ type Port struct {
 // (empty parts), plus any filled row that did not fit under the four.
 type Card struct {
 	Badge   string  `json:"badge"`
+	Verb    string  `json:"verb,omitempty"` // what the badge is coloured as, when that is not the badge itself
 	Subline string  `json:"subline"`
 	Rows    []Row   `json:"rows"`
 	More    []Row   `json:"more"`
@@ -101,6 +102,9 @@ type Facts struct {
 	// Receives.
 	Method          string
 	Sends, Receives bool
+	// Verb is the word whose colour the step's pill is drawn in: the HTTP method, or the protocol, database or
+	// file format (WS, KAFKA, POSTGRES, CSV…). The pill's own word is the action (PUBLISH, SQL), which has none.
+	Verb string
 
 	Query, Variables, Headers int
 	Body                      string // "JSON", "text", "1 message"…

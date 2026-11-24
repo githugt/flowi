@@ -135,3 +135,36 @@ func envViewOf(node string, e *vm.Environment) EnvView {
 
 // bases is never nil, so the front end can loop over it.
 func bases(e *vm.Environment) []string { return append([]string{}, e.Bases()...) }
+
+// EnvIssueView is one unresolved thing in an environment, with what to do about it.
+type EnvIssueView struct {
+	Brief string `json:"brief"`
+	Hint  string `json:"hint"`
+}
+
+// EnvStateView is what the sidebar shows beside an environment row.
+type EnvStateView struct {
+	File   string         `json:"file"` // the row's file, which keys the rows
+	Name   string         `json:"name"`
+	Active bool           `json:"active"` // requests are sent with it now
+	Issues []EnvIssueView `json:"issues"`
+}
+
+// States says which environment is selected and what is unresolved in each (a secret without a value, a base that is
+// not there). It reads the vault's names, so call it off the actor; the window asks again when the tree or the secrets
+// change.
+func (s *EnvironmentService) States() []EnvStateView {
+	envs := s.app.backend.Environments()
+	infos, err := s.app.backend.Secrets()
+	var selected string
+	s.app.actor.Do(func() { selected = s.app.workspace.SelectedEnv() })
+	out := []EnvStateView{}
+	for _, st := range vm.EnvironmentStates(envs, infos, selected, err == nil) {
+		v := EnvStateView{File: st.File, Name: st.Name, Active: st.Active, Issues: []EnvIssueView{}}
+		for _, i := range st.Issues {
+			v.Issues = append(v.Issues, EnvIssueView{Brief: i.Brief, Hint: i.Hint})
+		}
+		out = append(out, v)
+	}
+	return out
+}

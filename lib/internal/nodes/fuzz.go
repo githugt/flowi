@@ -25,7 +25,7 @@ func fuzzSpec() Spec {
 		Typed: []string{"request", "version", "overlay", "hooks", "with", "headers"},
 		Params: []Param{
 			{Name: "count", Kind: ParamInt, Min: 1, Max: maxFuzzCases, Doc: "How many bad bodies to send (default 20). They are spread over the fields, in a fixed order."},
-			{Name: "expect", Kind: ParamEnum, Enum: []string{"no_server_error", "rejected"},
+			{Name: "expect", Kind: ParamEnum, Enum: []string{"no_server_error", "rejected"}, Default: "no_server_error",
 				Doc: "What passes: no_server_error (default) fails on a 5xx or no answer; rejected also fails when the server accepts a bad body (a 2xx or 3xx)."},
 		},
 		Run: runFuzz,

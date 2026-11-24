@@ -172,14 +172,16 @@ type Backend struct {
 	ConnectionProbe engine.Probe        // what TestConnection returns
 	ConnectionErr   error               // TestConnection fails with it
 
-	ScheduleList []model.Schedule           // Schedules lists these; the schedule calls change them
-	ScheduleErr  error                      // AddSchedule, SaveSchedule and RemoveSchedule fail with it
-	TriggerSet   bool                       // a trigger token exists
-	TokenErr     error                      // NewTriggerToken fails with it
-	ArazzoNotes  diag.List                  // ExportArazzo lists these as what had no Arazzo equivalent
-	ArazzoErr    error                      // ExportArazzo fails with it
-	Kept         map[model.ID]model.Flow    // KeepFlowEdits stores here, by flow
-	ParsedFlow   *model.Flow                // ParseFlowSource returns this flow (else the stored flow, unchanged)
+	ScheduleList []model.Schedule        // Schedules lists these; the schedule calls change them
+	ScheduleErr  error                   // AddSchedule, SaveSchedule and RemoveSchedule fail with it
+	TriggerSet   bool                    // a trigger token exists
+	TokenErr     error                   // NewTriggerToken fails with it
+	ArazzoNotes  diag.List               // ExportArazzo lists these as what had no Arazzo equivalent
+	ArazzoErr    error                   // ExportArazzo fails with it
+	Kept         map[model.ID]model.Flow // KeepFlowEdits stores here, by flow
+	ParsedFlow   *model.Flow             // ParseFlowSource returns this flow (else the stored flow, unchanged)
+	// SourcedFlow is the flow FlowSource was last asked to write: what a copy put on the clipboard.
+	SourcedFlow  model.Flow
 	SourceDiags  diag.List                  // ParseFlowSource reports these
 	EnvImpacts   map[string]flowi.EnvImpact // EnvironmentImpact answers with this, by environment file
 	DraftDiags   diag.List                  // CheckFlowDraft reports these
@@ -972,6 +974,7 @@ func (f *Backend) ExportArazzo(t flowi.FlowTarget) ([]byte, diag.List, error) {
 // FlowSource shows a flow as "nodes: <count>"; its Arazzo file is a fixed document.
 func (f *Backend) FlowSource(t flowi.FlowTarget, fl model.Flow) (flowi.FlowText, error) {
 	f.record("FlowSource " + string(t.Flow))
+	f.SourcedFlow = fl
 	return flowi.FlowText{Flow: fmt.Sprintf("nodes: %d\n", len(fl.Nodes)), File: "arazzo: 1.1.0\n"}, nil
 }
 
@@ -984,6 +987,15 @@ func (f *Backend) CheckFlowDraft(t flowi.FlowTarget, _ model.Flow) diag.List {
 // ParseFlowSource returns ParsedFlow, with SourceDiags as what is wrong with the text.
 func (f *Backend) ParseFlowSource(t flowi.FlowTarget, _ string) (model.Flow, diag.List, error) {
 	f.record("ParseFlowSource " + string(t.Flow))
+	if f.ParsedFlow != nil {
+		return *f.ParsedFlow, f.SourceDiags, nil
+	}
+	return model.Flow{}, f.SourceDiags, nil
+}
+
+// ParseFlowSnippet answers as ParseFlowSource does.
+func (f *Backend) ParseFlowSnippet(t flowi.FlowTarget, _ string) (model.Flow, diag.List, error) {
+	f.record("ParseFlowSnippet " + string(t.Flow))
 	if f.ParsedFlow != nil {
 		return *f.ParsedFlow, f.SourceDiags, nil
 	}
@@ -1536,6 +1548,11 @@ type Checks struct {
 	Coverage analysis.Coverage
 	Impact   flowi.SpecImpact
 	Specs    []string
+	Files    []string           // what DescriptionFiles returns
+	Exports  []flowi.ExportItem // what ExportItems lists
+	Exported map[string]string  // the text ExportDescription returns, by id
+	Impacts  []analysis.Report  // what CollectionImpact returns
+	Rules    []flowi.SpecRule   // what SpecLintRules returns
 	Access   flowi.AccessReport
 	Saved    *flowi.SavedAccess // what LastAccess finds; nil: no check kept
 	Drift    flowi.DriftReport
@@ -1569,6 +1586,36 @@ func (f *Backend) ImpactAgainst(collection model.ID, name string, spec []byte) (
 }
 
 func (f *Backend) SpecNames(model.ID) []string { return f.Check.Specs }
+
+func (f *Backend) DescriptionFiles(model.ID) []string { return f.Check.Files }
+
+func (f *Backend) ExportItems(model.ID) ([]flowi.ExportItem, error) {
+	return f.Check.Exports, f.Check.Err
+}
+
+func (f *Backend) ExportDescription(collection model.ID, id string) ([]byte, error) {
+	f.record("ExportDescription " + string(collection) + " " + id)
+	text, ok := f.Check.Exported[id]
+	if !ok {
+		return nil, flowi.ErrNoExport
+	}
+	return []byte(text), f.Check.Err
+}
+
+func (f *Backend) CollectionImpact(collection model.ID) ([]analysis.Report, error) {
+	f.record("CollectionImpact " + string(collection))
+	return f.Check.Impacts, f.Check.Err
+}
+
+func (f *Backend) SpecLintRules(collection model.ID) ([]flowi.SpecRule, error) {
+	f.record("SpecLintRules " + string(collection))
+	return f.Check.Rules, f.Check.Err
+}
+
+func (f *Backend) SetSpecLintRule(collection model.ID, rule, level string) error {
+	f.record("SetSpecLintRule " + string(collection) + " " + rule + " " + level)
+	return f.Check.Err
+}
 
 func (f *Backend) CheckAccess(_ context.Context, _ flowi.FlowTarget, o flowi.AccessOptions) (flowi.AccessReport, error) {
 	f.record("CheckAccess " + o.Owner)

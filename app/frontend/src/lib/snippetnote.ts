@@ -7,7 +7,7 @@ export function snippetCopied(hasSecrets: boolean, excluded: boolean): string {
   return excluded ? 'the snippet (secrets left out)' : 'the snippet'
 }
 
-/** The tooltip of the </> button beside Send: it copies the snippet in the format chosen on the Code tab. */
+/** The tooltip of the </> button beside Send: it opens the Code tab and copies the snippet in the format chosen there. */
 export function copyCodeLabel(format: string): string {
   return format ? `Copy as ${format}` : 'Copy as code'
 }

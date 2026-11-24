@@ -63,6 +63,7 @@ type App struct {
 	auths      *AuthsService
 	trash      *TrashService
 	checks     *ChecksService
+	collection *CollectionService
 	hooks      *HooksService
 	session    *SessionService
 	welcome    *WelcomeService
@@ -163,6 +164,7 @@ func (a *App) buildServices(logger *slog.Logger, tracer vm.Tracer) {
 	a.auths = newAuthsService(a)
 	a.trash = &TrashService{app: a}
 	a.checks = &ChecksService{app: a}
+	a.collection = &CollectionService{app: a}
 	a.hooks = newHooksService(a)
 	a.session = newSessionService(a, logger)
 	a.welcome = newWelcomeService(a)
@@ -174,12 +176,14 @@ func (a *App) buildServices(logger *slog.Logger, tracer vm.Tracer) {
 // change publishes the "workspace" event with the new Tree. The Problems
 // panel is filled at once, so what is wrong shows without asking.
 func (a *App) Start(ctx context.Context) {
+	a.tree.loadSidebar() // reads the disk: not on the UI goroutine
 	a.actor.Do(func() {
 		a.workspace.OnChange(func() {
 			a.treeReady.mark()
 			a.emit("workspace", a.tree.tree())
 		})
 		a.workspace.OnLabelChange(func() { a.emit("workspace", a.tree.tree()) })
+		a.workspace.OnChange(func() { a.emit("sidebar", a.tree.sidebarView()) }) // a row that is gone leaves Recent
 		a.workspace.OnWatchProblem(func(err error) {
 			a.emit("notice", Notice{Level: "error", Text: "Changes made outside Flowi may not show up: the file watcher failed (" + vm.ErrorText(err) + "). Flowi tries again."})
 		})
@@ -256,6 +260,9 @@ func (a *App) Trash() *TrashService { return a.trash }
 // Checks is the service for the Checks screen.
 func (a *App) Checks() *ChecksService { return a.checks }
 
+// Collection is the service for the page of one collection.
+func (a *App) Collection() *CollectionService { return a.collection }
+
 // Hooks is the service for the hook editor.
 func (a *App) Hooks() *HooksService { return a.hooks }
 
@@ -307,6 +314,9 @@ func (a *App) Shutdown() {
 	a.replayer.Close()
 	a.schedules.Close()
 	a.session.writer.Wait()
+	if w := a.tree.memory.writer; w != nil {
+		w.Wait()
+	}
 }
 
 // SetQuit installs what ends the application.

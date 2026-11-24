@@ -11,7 +11,9 @@ import (
 	"regexp"
 	"slices"
 	"strconv"
+	"strings"
 
+	"github.com/githugt/flowi/lib/asyncapi"
 	"github.com/githugt/flowi/lib/diag"
 	"github.com/githugt/flowi/lib/model"
 	"github.com/githugt/flowi/lib/openapi"
@@ -202,8 +204,8 @@ func importKept(kept KeptSpec) (openapi.Result, error) {
 func mergeWithExisting(c model.Collection, base map[string]model.Request, req model.Request) (model.Request, diag.List) {
 	file := filepath.Join(c.Root, "requests", filepath.FromSlash(req.Path)+".req.yaml")
 	i := slices.IndexFunc(c.Requests, func(x model.Request) bool { return x.File == file })
-	if i < 0 {
-		return req, nil
+	if i < 0 || !sameRequest(c.Requests[i], req) {
+		return req, nil // nothing there, or a different request: it is not merged into (the import goes beside it)
 	}
 	var prev *model.Request
 	if b, ok := base[req.Path]; ok {
@@ -246,3 +248,31 @@ func (w *Workspace) PreviewSpecUpdate(collection model.ID, name string, data []b
 
 // ErrNoKeptSpec is returned for a kept spec name the collection does not have.
 var ErrNoKeptSpec = errors.New("the collection keeps no spec of that name")
+
+// previousAsyncImport is what the previous import of the kept AsyncAPI document called name made of each request,
+// by path: the base a re-import merges against. nil when the document was not kept or cannot be read.
+func previousAsyncImport(root, name string) map[string]model.Request {
+	for _, l := range lintables(root) {
+		if l.proto || l.name != name || !strings.Contains(filepath.Base(l.file), ".asyncapi.") {
+			continue
+		}
+		data, overlays, err := l.read()
+		if err != nil {
+			return nil
+		}
+		applied, diags := specoverlay.Apply(data, overlays)
+		if diags.HasErrors() {
+			return nil
+		}
+		r, diags := asyncapi.Import(applied, asyncapi.Options{NewID: func() model.ID { return "" }})
+		if diags.HasErrors() {
+			return nil
+		}
+		out := map[string]model.Request{}
+		for _, req := range r.Requests {
+			out[req.Path] = req
+		}
+		return out
+	}
+	return nil
+}

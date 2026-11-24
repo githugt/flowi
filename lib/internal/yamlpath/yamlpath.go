@@ -36,3 +36,27 @@ func isPlain(k string) bool {
 	}
 	return true
 }
+
+// Parent is path without its last step: "$.a.b[1]" is "$.a.b", "$.paths.'/pets/{id}'.get" is "$.paths.'/pets/{id}'".
+// The parent of "$.a" is "$" and of "$" is "".
+func Parent(path string) string {
+	switch {
+	case path == "$" || path == "":
+		return ""
+	case strings.HasSuffix(path, "]"):
+		if i := strings.LastIndex(path, "["); i >= 0 {
+			return path[:i]
+		}
+	case strings.HasSuffix(path, "'"):
+		// a quoted key: back to the ".'" that opens it, skipping an escaped quote inside
+		for i := len(path) - 2; i > 0; i-- {
+			if path[i] == '\'' && path[i-1] == '.' && (i < 2 || path[i-2] != '\\') {
+				return path[:i-1]
+			}
+		}
+	}
+	if i := strings.LastIndex(path, "."); i > 0 {
+		return path[:i]
+	}
+	return "$"
+}

@@ -104,6 +104,7 @@ func run() error {
 			application.NewService(app.Auths()),
 			application.NewService(app.Trash()),
 			application.NewService(app.Checks()),
+			application.NewService(app.Collection()),
 			application.NewService(app.Hooks()),
 			application.NewService(app.Session()),
 			application.NewService(app.Passphrase()),

@@ -1,6 +1,6 @@
 import type { TreeNode } from './types'
 import { fold } from './fold'
-import { hasLabelTerms, labelsMatch, labelText, parseQuery, type LabelQuery } from './devstatus'
+import { hasLabelTerms, labelsMatch, labelText, parseQuery, type FilterContext, type LabelQuery } from './devstatus'
 
 // Rows that open something when clicked; every other kind is a group that holds rows.
 const LEAF_KINDS = ['request', 'environment', 'flow', 'missing', 'broken']
@@ -14,32 +14,33 @@ const wordsOf = (query: string): string[] =>
   query
     .toLowerCase()
     .split(/\s+/)
-    .filter((w) => w && !/^(#|tag:|status:)/.test(w))
+    .filter((w) => w && !/^(#|tag:|status:|type:|in:|has:)/.test(w))
 
-function matchesAll(n: TreeNode, q: LabelQuery): boolean {
+function matchesAll(n: TreeNode, q: LabelQuery, ctx: FilterContext): boolean {
   // A row is found by its name and verb as before, and now by its status name and its tags too.
   const text = fold(`${n.label} ${n.method ?? ''} ${labelText(n)}`)
-  return q.words.every((w) => text.includes(w)) && labelsMatch(n, q)
+  return q.words.every((w) => text.includes(w)) && labelsMatch(n, q, ctx)
 }
 
-function keep(n: TreeNode, q: LabelQuery): TreeNode | undefined {
+function keep(n: TreeNode, q: LabelQuery, ctx: FilterContext): TreeNode | undefined {
   // A group whose own name matches shows whole: the user named the place, so everything in it is a hit. Not when the
   // query asks for a tag or a status, which are about the rows and not the place.
-  if (!hasLabelTerms(q) && (isLeaf(n) ? matchesAll(n, q) : q.words.every((w) => fold(n.label).includes(w)))) return n
-  if (isLeaf(n)) return hasLabelTerms(q) && matchesAll(n, q) ? n : undefined
-  const kids = (n.children ?? []).flatMap((c) => keep(c, q) ?? [])
+  if (!hasLabelTerms(q) && (isLeaf(n) ? matchesAll(n, q, ctx) : q.words.every((w) => fold(n.label).includes(w)))) return n
+  if (isLeaf(n)) return hasLabelTerms(q) && matchesAll(n, q, ctx) ? n : undefined
+  const kids = (n.children ?? []).flatMap((c) => keep(c, q, ctx) ?? [])
   return kids.length ? { ...n, children: kids } : undefined
 }
 
 /**
  * The part of the tree that answers a "Jump to…" query: rows whose label, method, status or tags contain every word,
- * with the groups that lead to them; `tag:smoke` and `status:review` narrow it to rows with that tag or status. The
+ * with the groups that lead to them; `tag:smoke`, `status:review`, `type:grpc`, `in:hyperverge` and `has:problems` narrow
+ * it to rows with that tag, status, type, place or problems (see lib/devstatus). The
  * tree itself comes back for a blank query. Nothing is changed in place.
  */
-export function filterTree(roots: TreeNode[], query: string): TreeNode[] {
+export function filterTree(roots: TreeNode[], query: string, ctx: FilterContext = {}): TreeNode[] {
   const q = parseQuery(query)
   if (!q.words.length && !hasLabelTerms(q)) return roots
-  return roots.flatMap((r) => keep(r, q) ?? [])
+  return roots.flatMap((r) => keep(r, q, ctx) ?? [])
 }
 
 /** The first row, top to bottom, that opens something rather than holding rows. */

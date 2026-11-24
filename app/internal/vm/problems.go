@@ -17,6 +17,8 @@ type Problem struct {
 	Severity string // error | warning
 	Code     string
 	Message  string // with its hint
+	Brief    string // the message alone
+	Hint     string // what to do about it; "" when the code has none
 	File     string
 	Where    string // file name with line and column
 	Node     string // tree node to open on click; "" when the file has no screen
@@ -58,7 +60,8 @@ func (p *Problems) Refresh() {
 }
 
 func (p *Problems) problemOf(d diag.Diagnostic) Problem {
-	msg, hint := diag.English().Message(d)
+	brief, hint := diag.English().Message(d)
+	msg := brief
 	if hint != "" {
 		msg += " (" + hint + ")"
 	}
@@ -70,7 +73,7 @@ func (p *Problems) problemOf(d diag.Diagnostic) Problem {
 	if d.Severity == diag.SeverityError {
 		sev = "error"
 	}
-	return Problem{Severity: sev, Code: string(d.Code), Message: msg, File: d.File, Where: where, Node: p.nodeFor(d.File)}
+	return Problem{Severity: sev, Code: string(d.Code), Message: msg, Brief: brief, Hint: hint, File: d.File, Where: where, Node: p.nodeFor(d.File)}
 }
 
 // placeOf names a file the way a person finds it: the collection, then the path inside it. Before, only the base

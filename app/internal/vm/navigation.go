@@ -359,7 +359,14 @@ func (ws *Workspace) FlowFromRequests(collection model.ID, path string, requestN
 		if err != nil {
 			return "", err
 		}
-		f := model.Flow{Meta: model.Meta{Name: name}, Nodes: chainOf(requests)}
+		nodes := chainOf(requests)
+		if i := slices.IndexFunc(ws.b.Collections(), func(c model.Collection) bool { return c.Manifest.ID == t.Collection }); i >= 0 {
+			col := ws.b.Collections()[i]
+			for j := range nodes {
+				FillStepText(col, &nodes[j]) // what each step is for, so the flow reads without opening every request
+			}
+		}
+		f := model.Flow{Meta: model.Meta{Name: name}, Nodes: nodes}
 		if err := ws.b.SaveFlow(t, f, false, ""); err != nil {
 			// Do not leave the empty flow behind; the save error is the one to show.
 			_ = ws.b.DeleteFlow(t)

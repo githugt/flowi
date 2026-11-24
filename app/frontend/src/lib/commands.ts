@@ -1,5 +1,6 @@
 // The command palette's list: what the window's menu can do, by name, so it can be reached from the keyboard
 // without knowing where it lives. Each command runs through app.onMenu, the one place a menu item is handled.
+import { collectionOfRow } from './collectionpage'
 import { screens } from './screens'
 import { fold } from './fold'
 import { SIDEBAR_MODES } from './sidebar'
@@ -90,6 +91,16 @@ export function commandList(onMenu: (action: string) => void, ctx: PaletteContex
     ...themeCommands(ctx),
     ...opens,
   ]
+}
+
+/**
+ * One command for each collection that opens its overview page ("Overview of Petstore"), so the page is reached from
+ * the keyboard and not only from the sidebar row's menu.
+ */
+export function overviewCommands(roots: TreeNode[], open: (collection: string, label: string) => void): Command[] {
+  return roots
+    .filter((n) => n.kind === 'collection')
+    .map((n) => ({ id: 'overview:' + n.id, title: `Overview of ${n.label}`, keys: '', icon: 'list', run: () => open(collectionOfRow(n), n.label) }))
 }
 
 const ITEM_ICON: Record<string, string> = { request: 'send', flow: 'flow', environment: 'variables' }

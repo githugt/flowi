@@ -86,12 +86,16 @@ type Backend interface {
 	EnvironmentImpact(file string) (flowi.EnvImpact, error)
 	// Environments are the workspace's own: the same in every collection.
 	Environments() []model.Environment
+	// CollectionEnvironments are the environment files a collection ships in its own environments/ folder.
+	CollectionEnvironments(collection model.ID) ([]model.Environment, diag.List, error)
 	// ExportMermaid is the saved flow as a Mermaid flowchart.
 	ExportMermaid(t flowi.FlowTarget) (string, error)
 	ExportArazzo(t flowi.FlowTarget) ([]byte, diag.List, error)
 	// FlowSource shows f (flow t with unsaved edits) as text; ParseFlowSource reads such text back.
 	FlowSource(t flowi.FlowTarget, f model.Flow) (flowi.FlowText, error)
 	ParseFlowSource(t flowi.FlowTarget, text string) (model.Flow, diag.List, error)
+	// ParseFlowSnippet reads steps copied from a flow, whose requests may be named by path alone, as a portable copy writes.
+	ParseFlowSnippet(t flowi.FlowTarget, text string) (model.Flow, diag.List, error)
 	// CheckFlowDraft validates f in place of flow t and returns the problems in that flow.
 	CheckFlowDraft(t flowi.FlowTarget, f model.Flow) diag.List
 	// KeepFlowEdits stores a flow's unsaved edits for the next start; KeptFlowEdits returns them as source text and forgets them.
@@ -199,6 +203,16 @@ type Backend interface {
 	ImpactAgainst(collection model.ID, name string, spec []byte) (flowi.SpecImpact, error)
 	// SpecNames are the OpenAPI descriptions a collection kept at import.
 	SpecNames(collection model.ID) []string
+	// DescriptionFiles are the API descriptions it kept and the linter reads (OpenAPI, Swagger, AsyncAPI, OpenRPC, .proto), relative to it.
+	DescriptionFiles(collection model.ID) []string
+	// ExportItems lists the API descriptions a collection can hand to others; ExportDescription returns the text of one.
+	ExportItems(collection model.ID) ([]flowi.ExportItem, error)
+	ExportDescription(collection model.ID, id string) ([]byte, error)
+	// CollectionImpact reports, for each request of the collection something uses, whether what uses it still fits its contract.
+	CollectionImpact(collection model.ID) ([]analysis.Report, error)
+	// SpecLintRules lists the spec linter's rules with the level the collection set; SetSpecLintRule changes one ("" for the default).
+	SpecLintRules(collection model.ID) ([]flowi.SpecRule, error)
+	SetSpecLintRule(collection model.ID, rule, level string) error
 	CheckAccess(ctx context.Context, t flowi.FlowTarget, o flowi.AccessOptions) (flowi.AccessReport, error)
 	// LastAccess is the access check last run for the flow, kept in the data folder, if there is one.
 	LastAccess(t flowi.FlowTarget) (flowi.SavedAccess, bool)

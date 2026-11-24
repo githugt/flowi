@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/githugt/flowi/lib/diag"
+	"github.com/githugt/flowi/lib/internal/yamlpath"
 	"github.com/githugt/flowi/lib/model"
 	"github.com/githugt/flowi/lib/settings"
 	"github.com/githugt/flowi/lib/store"
@@ -22,7 +23,7 @@ import (
 func (w *Workspace) Validate() diag.List {
 	w.mu.RLock()
 	defer w.mu.RUnlock()
-	return w.positioned(slices.Concat(w.structuralDiags(), w.contractWarnings(w.collections)))
+	return w.positioned(slices.Concat(w.structuralDiags(), w.contractWarnings(w.collections), w.specDiags(w.collections)))
 }
 
 // validateStructure is Validate without the contract phase.
@@ -78,6 +79,9 @@ func (w *Workspace) positioned(l diag.List) diag.List {
 		if d.Pos.Line == 0 && d.File == w.model.File && d.Path != "" {
 			d = w.locateInFile(d)
 		}
+		if d.Pos.Line == 0 && d.Path != "" && IsSpecDiagnostic(d) {
+			d = w.locateInKept(d)
+		}
 		out = append(out, d)
 	}
 	return out.Sorted()
@@ -94,6 +98,37 @@ func (w *Workspace) locateInFile(d diag.Diagnostic) diag.Diagnostic {
 		d.Pos = pos
 	}
 	return d
+}
+
+// locateInKept positions a finding about a kept description. The path was found in the description with its overlays
+// laid over it, so a place an overlay added is not in the file: the line is then that of the nearest place above it
+// that is.
+func (w *Workspace) locateInKept(d diag.Diagnostic) diag.Diagnostic {
+	data, err := os.ReadFile(d.File)
+	if err != nil {
+		return d
+	}
+	for p := d.Path; p != "$" && p != ""; p = yamlpath.Parent(p) {
+		if pos, ok := w.codec.Locate(data, p); ok {
+			d.Pos = keyLine(data, pos)
+			return d
+		}
+	}
+	return d
+}
+
+// keyLine moves a position that is the first line of a block mapping or list to the "key:" line above it, which is the
+// line a person looks for: the place found for "$.paths./pets.get" is its first field, one line below "get:".
+func keyLine(data []byte, pos diag.Position) diag.Position {
+	lines := strings.Split(string(data), "\n")
+	if pos.Line < 2 || pos.Line > len(lines) {
+		return pos
+	}
+	above := strings.TrimRight(lines[pos.Line-2], " \t\r")
+	if !strings.HasSuffix(above, ":") {
+		return pos
+	}
+	return diag.Position{Line: pos.Line - 1, Column: len(above) - len(strings.TrimLeft(above, " \t")) + 1}
 }
 
 // datasetReadOnly is the datasets.read_only setting as the user's own layers have it. Callers hold mu.

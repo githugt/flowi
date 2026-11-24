@@ -231,7 +231,11 @@ func (w *Workspace) planSource(c model.Collection, src ImportSource) (ImportPlan
 		if fatal.HasErrors() {
 			return ImportPlan{}, fatal.Err()
 		}
-		return w.planResult(c, intoResult(r, src.Into, src.Kind))
+		var keep func(map[string][]byte)
+		if src.Kind == ImportOpenRPC { // the description is kept beside the requests, as an OpenAPI or AsyncAPI one is, so it can be linted
+			keep = func(files map[string][]byte) { planSpecCopy(c, src, "openrpc", files) }
+		}
+		return w.planResultKeeping(c, intoResult(r, src.Into, src.Kind), keep)
 	}
 	var (
 		files map[string][]byte
@@ -424,7 +428,7 @@ func (w *Workspace) planOpenAPI(c model.Collection, src ImportSource) (map[strin
 	for _, req := range r.Requests {
 		req, mergeDiags := mergeWithExisting(c, base, req)
 		diags = append(diags, mergeDiags...)
-		if err := w.planRequest(c, req, r.Schemas[req.Path], ids, files); err != nil {
+		if err := w.planRequest(c, req, r.Schemas[req.Path], ids, files, &diags); err != nil {
 			return nil, nil, err
 		}
 	}
@@ -471,10 +475,15 @@ func (w *Workspace) planAsyncAPI(c model.Collection, src ImportSource) (map[stri
 	}
 	diags = append(overlayDiags, diags...)
 	intoRequests(r.Requests, src.Into)
+	// A request this import replaces keeps what a spec has no place for (checks, extractions, hooks, settings) and
+	// what the person changed, merged against what the previous import of this document made, as for OpenAPI.
+	base := intoBase(previousAsyncImport(c.Root, specBaseName(src)), src.Into)
 	ids := map[model.ID]model.ID{}
 	files := map[string][]byte{}
 	for _, req := range r.Requests {
-		if _, err := w.planRequestFile(c, req, ids, files); err != nil {
+		req, mergeDiags := mergeWithExisting(c, base, req)
+		diags = append(diags, mergeDiags...)
+		if _, err := w.planRequestFile(c, req, ids, files, &diags); err != nil {
 			return nil, nil, err
 		}
 	}
@@ -514,7 +523,7 @@ func (w *Workspace) planProto(c model.Collection, src ImportSource) (map[string]
 		}
 		req := model.Request{Meta: model.Meta{ID: w.newID(), Name: service + "." + m.Name}, Path: joinInto(src.Into, service+"/"+m.Name),
 			Versions: []model.RequestVersion{{Label: "1", GRPC: &g}}}
-		if _, err := w.planRequestFile(c, req, ids, files); err != nil {
+		if _, err := w.planRequestFile(c, req, ids, files, &diags); err != nil {
 			return nil, nil, err
 		}
 	}
@@ -579,8 +588,8 @@ func titleOf(data []byte) string {
 	return title
 }
 
-func (w *Workspace) planRequest(c model.Collection, req model.Request, schemas map[string]map[string]any, ids map[model.ID]model.ID, files map[string][]byte) error {
-	file, err := w.planRequestFile(c, req, ids, files)
+func (w *Workspace) planRequest(c model.Collection, req model.Request, schemas map[string]map[string]any, ids map[model.ID]model.ID, files map[string][]byte, diags *diag.List) error {
+	file, err := w.planRequestFile(c, req, ids, files, diags)
 	if err != nil {
 		return err
 	}
@@ -601,13 +610,23 @@ func (w *Workspace) planRequest(c model.Collection, req model.Request, schemas m
 // request replacing an existing file keeps its id (recorded in ids); a
 // request without an id gets a fresh one. It also keeps the existing
 // file's dirty-edit slot.
-func (w *Workspace) planRequestFile(c model.Collection, req model.Request, ids map[model.ID]model.ID, files map[string][]byte) (string, error) {
+func (w *Workspace) planRequestFile(c model.Collection, req model.Request, ids map[model.ID]model.ID, files map[string][]byte, diags *diag.List) (string, error) {
 	if detail := requestPathProblem(req.Path); detail != "" {
 		return "", diagErr(diag.CodeWriteRequestPath, map[string]string{"path": req.Path, "detail": detail})
 	}
 	req.File = filepath.Join(c.Root, "requests", filepath.FromSlash(req.Path)+".req.yaml")
 	if req.ID == "" {
 		req.ID = w.newID()
+	}
+	if i := slices.IndexFunc(c.Requests, func(x model.Request) bool { return x.File == req.File }); i >= 0 && !sameRequest(c.Requests[i], req) {
+		// A different request is already at this path (two operations that share a name, or one of yours): the import
+		// goes beside it, not over it and not nowhere.
+		was := req.Path
+		req.Path = freeRequestPath(c, req.Path, files)
+		req.File = filepath.Join(c.Root, "requests", filepath.FromSlash(req.Path)+".req.yaml")
+		if diags != nil {
+			*diags = append(*diags, diag.New(diag.CodeImportRenamed, diag.Location{File: req.File}, map[string]string{"path": was, "name": req.Path}))
+		}
 	}
 	if i := slices.IndexFunc(c.Requests, func(x model.Request) bool { return x.File == req.File }); i >= 0 {
 		ids[req.ID], req.ID = c.Requests[i].ID, c.Requests[i].ID
@@ -619,6 +638,45 @@ func (w *Workspace) planRequestFile(c model.Collection, req model.Request, ids m
 	}
 	files[req.File] = data
 	return req.File, nil
+}
+
+// sameRequest says whether an imported request is the one already at its path, as a re-import of the same document
+// would meet it. An operation with an id is the same when the id is; one without is the same when it calls the same
+// thing (method and URL, gRPC method, or protocol, server and channel). With nothing to tell them apart by, it is the
+// same, so a re-import stays a re-import.
+func sameRequest(have, got model.Request) bool {
+	if have.Operation != "" || got.Operation != "" {
+		return have.Operation == got.Operation
+	}
+	if len(have.Versions) == 0 || len(got.Versions) == 0 {
+		return true
+	}
+	return requestTarget(have.Versions[0]) == requestTarget(got.Versions[0])
+}
+
+// requestTarget is what a request version calls, as one string; "" when it says nothing.
+func requestTarget(v model.RequestVersion) string {
+	switch {
+	case v.Async != nil:
+		return strings.Join([]string{"async", v.Async.Protocol, v.Async.Server, v.Async.Channel}, " ")
+	case v.GRPC != nil:
+		return strings.Join([]string{"grpc", v.GRPC.Server, v.GRPC.Method}, " ")
+	case v.URL != "":
+		return strings.ToUpper(v.Method) + " " + v.URL
+	}
+	return ""
+}
+
+// freeRequestPath is path with -2, -3 … after it until no request of the collection and no file already planned has it.
+func freeRequestPath(c model.Collection, path string, files map[string][]byte) string {
+	for n := 2; ; n++ {
+		candidate := path + "-" + strconv.Itoa(n)
+		file := filepath.Join(c.Root, "requests", filepath.FromSlash(candidate)+".req.yaml")
+		taken := slices.ContainsFunc(c.Requests, func(x model.Request) bool { return x.File == file })
+		if _, planned := files[file]; !taken && !planned {
+			return candidate
+		}
+	}
 }
 
 // planStaleSchemas plans the removal of schema files in dir the import
@@ -797,6 +855,12 @@ func (w *Workspace) ExportMermaid(t FlowTarget) (string, error) {
 // path; ids are assigned here, existing files keep theirs, and path refs
 // resolve to the planned or existing request.
 func (w *Workspace) planResult(c model.Collection, r importers.Result) (ImportPlan, error) {
+	return w.planResultKeeping(c, r, nil)
+}
+
+// planResultKeeping is planResult that lets keep add files to the plan (the source document, for one).
+func (w *Workspace) planResultKeeping(c model.Collection, r importers.Result, keep func(files map[string][]byte)) (ImportPlan, error) {
+	var diags diag.List // what planning itself found (a request given another name)
 	ids := map[model.ID]model.ID{}
 	files := map[string][]byte{}
 	byPath := map[string]model.ID{}
@@ -814,7 +878,7 @@ func (w *Workspace) planResult(c model.Collection, r importers.Result) (ImportPl
 				req.Versions[i].Auth = &model.Auth{Use: renamed[a.Use]}
 			}
 		}
-		if _, err := w.planRequestFile(c, req, ids, files); err != nil {
+		if _, err := w.planRequestFile(c, req, ids, files, &diags); err != nil {
 			return ImportPlan{}, err
 		}
 		byPath[req.Path] = cmp.Or(ids[req.ID], req.ID)
@@ -836,7 +900,10 @@ func (w *Workspace) planResult(c model.Collection, r importers.Result) (ImportPl
 	if err := w.planFlows(c, flows, ids, files); err != nil {
 		return ImportPlan{}, err
 	}
-	plan, err := planOf(c, files, r.Diags(), workspace.EnvironmentsDir(w.opts.Paths, w.opts.Name))
+	if keep != nil {
+		keep(files)
+	}
+	plan, err := planOf(c, files, append(r.Diags(), diags...), workspace.EnvironmentsDir(w.opts.Paths, w.opts.Name))
 	plan.Items = r.Items
 	return plan, err
 }

@@ -59,6 +59,7 @@ const (
 	CodeImportSensitive Code = "FLW-IMPORT-006"
 	CodeImportKeptEdit  Code = "FLW-IMPORT-007"
 	CodeImportNoOpID    Code = "FLW-IMPORT-008"
+	CodeImportRenamed   Code = "FLW-IMPORT-009"
 
 	CodeMermaidPlaceholder Code = "FLW-MERMAID-001"
 	CodeMermaidCycle       Code = "FLW-MERMAID-002"
@@ -137,6 +138,9 @@ const (
 	CodeStatusUnknown Code = "FLW-STATUS-001"
 	CodeStatusInvalid Code = "FLW-STATUS-002"
 
+	CodeSidebarSave Code = "FLW-SIDEBAR-001"
+	CodeSidebarRead Code = "FLW-SIDEBAR-002"
+
 	CodeCycleNeeds   Code = "FLW-CYC-001"
 	CodeCycleSubflow Code = "FLW-CYC-002"
 
@@ -146,6 +150,17 @@ const (
 	CodeLintLiteralKey Code = "FLW-LINT-004"
 	CodeLintPlainKey   Code = "FLW-LINT-005"
 	CodeLintPlainGRPC  Code = "FLW-LINT-006"
+
+	CodeSpecInfo       Code = "FLW-SPEC-001"
+	CodeSpecSummary    Code = "FLW-SPEC-002"
+	CodeSpecOperation  Code = "FLW-SPEC-003"
+	CodeSpecTags       Code = "FLW-SPEC-004"
+	CodeSpecSecurity   Code = "FLW-SPEC-005"
+	CodeSpecSuccess    Code = "FLW-SPEC-006"
+	CodeSpecPathCase   Code = "FLW-SPEC-007"
+	CodeSpecUnused     Code = "FLW-SPEC-008"
+	CodeSpecPlaintext  Code = "FLW-SPEC-009"
+	CodeSpecLintConfig Code = "FLW-SPEC-010"
 
 	CodeWSMissing           Code = "FLW-WS-001"
 	CodeWSAlreadyMounted    Code = "FLW-WS-002"
@@ -291,6 +306,7 @@ func codeTable() map[Code]codeInfo {
 		CodeImportSkipped:   {e, "{item} was skipped: {detail}"},
 		CodeImportSensitive: {w, "{where} looked like a credential and was replaced by {placeholder}" + hintMarker + "set the value with flowi secret set"},
 		CodeImportNoOpID:    {w, "the operation {operation} has no operationId, so it is named {name} and an Arazzo step cannot refer to it" + hintMarker + "give it an operationId with an overlay (flowi import --overlay), or in the spec"},
+		CodeImportRenamed:   {w, "a different request is already at {path}, so the imported one is named {name}" + hintMarker + "rename or move one of them, or import into another folder (--into)"},
 		CodeImportKeptEdit:  {w, "{what} was changed both by you and by the spec; your edit was kept" + hintMarker + "compare it with the spec, and save it to the spec overlay if the spec should say so too"},
 
 		CodeMermaidPlaceholder: {w, `"{label}" does not resolve and became a placeholder note: {detail}`},
@@ -365,6 +381,8 @@ func codeTable() map[Code]codeInfo {
 		CodeFlowAmbiguous: {e, `"{ref}" matches flows in {count} collections` + hintMarker + "use --collection"},
 
 		CodeStatusUnknown: {e, `status "{status}" of {where} is not one of this collection's statuses` + hintMarker + "use {known}, or add it under `statuses:` in flowi.yaml"},
+		CodeSidebarSave:   {w, "the sidebar could not keep your {what}: {detail}" + hintMarker + "check that the app's data folder is writable and has room; the {what} work until the app closes"},
+		CodeSidebarRead:   {w, "the saved {what} could not be read and was left out: {detail}" + hintMarker + "nothing to fix: it starts empty and is kept again from now on; delete sidebar.json in the session folder to silence this"},
 		CodeStatusInvalid: {e, `status "{name}": {detail}` + hintMarker + "fix it under `statuses:` in flowi.yaml"},
 
 		CodeCycleNeeds:   {e, "dependency cycle: {cycle} — hint: remove one needs link to break the loop"},
@@ -376,6 +394,17 @@ func codeTable() map[Code]codeInfo {
 		CodeLintPlainGRPC:  {w, "the gRPC call to {host} is not encrypted: {server} is plaintext" + hintMarker + "write grpcs:// to use TLS, unless this host is on a network you trust"},
 		CodeLintPlainKey:   {w, "{field} sends a credential over {scheme} to {host}, which is not encrypted" + hintMarker + "use https (or wss), unless this host is on a network you trust"},
 		CodeLintLiteralKey: {w, "{field} holds a credential typed in directly" + hintMarker + "keep it as a secret and write {{secret.name}} here, so it does not reach git"},
+
+		CodeSpecInfo:       {w, "{spec} does not say what the API is for" + hintMarker + "write info.description in the description, or add it in an overlay"},
+		CodeSpecSummary:    {w, "{where} in {spec} has no summary or description" + hintMarker + "say what it does: summary for a line, description for the detail"},
+		CodeSpecOperation:  {w, "{where} in {spec} has no operationId" + hintMarker + "give it one: Arazzo steps and generated clients refer to an operation by it"},
+		CodeSpecTags:       {w, "{where} in {spec} has no tag" + hintMarker + "tag it, so it is grouped with the others in a folder and in docs"},
+		CodeSpecSecurity:   {w, "{where} in {spec} has no security requirement" + hintMarker + "add security to it or to the description, or write security: [] if it is public on purpose"},
+		CodeSpecSuccess:    {w, "{where} in {spec} documents no 2xx response" + hintMarker + "document what a success returns, so a flow can check it"},
+		CodeSpecPathCase:   {w, "the path {path} in {spec} is not lowercase" + hintMarker + "use lowercase segments, with - between words"},
+		CodeSpecUnused:     {w, "{component} in {spec} is defined but never used" + hintMarker + "remove it, or refer to it with $ref"},
+		CodeSpecPlaintext:  {w, "the server {server} in {spec} is not encrypted" + hintMarker + "use https, unless this host is on a network you trust"},
+		CodeSpecLintConfig: {w, "the spec lint settings: {detail}" + hintMarker + "write rules: with a rule name and off, warning or error; the names are {known}"},
 
 		CodeWSMissing:           {e, "collection {id} not found at {path}" + hintMarker + `run "flowi workspace locate"`},
 		CodeWSAlreadyMounted:    {e, "{path} is already mounted"},

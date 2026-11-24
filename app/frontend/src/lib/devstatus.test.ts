@@ -7,13 +7,13 @@ const mark = (name: string, extra = {}) => ({ name, color: 'blue', icon: 'code',
 
 describe('parseQuery', () => {
   it('splits words from tag and status terms', () => {
-    expect(parseQuery('login tag:Smoke #auth status:Review')).toEqual({ words: ['login'], tags: ['smoke', 'auth'], statuses: ['review'] })
+    expect(parseQuery('login tag:Smoke #auth status:Review')).toMatchObject({ words: ['login'], tags: ['smoke', 'auth'], statuses: ['review'] })
   })
 
   it('drops a term with nothing after it, so it does not empty the list while it is typed', () => {
     const q = parseQuery('tag: # status: x')
 
-    expect(q).toEqual({ words: ['x'], tags: [], statuses: [] })
+    expect(q).toMatchObject({ words: ['x'], tags: [], statuses: [] })
     expect(hasLabelTerms(q)).toBe(false)
   })
 

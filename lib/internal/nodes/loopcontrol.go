@@ -19,7 +19,7 @@ func loopControlSpec() Spec {
 	return Spec{
 		Type: "loop_control", Group: "Control", Summary: "Inside a loop: end this item or round here and go on with the next, or leave the loop. Useful in a branch of a condition.",
 		Params: []Param{
-			{Name: "action", Kind: ParamEnum, Enum: []string{actionNext, actionLeave}, Doc: "What it does: next (default) ends the current item (batch) or round (run_till) here, counts it as passed and goes on with the next one; leave ends the loop: a run_till counts as met, a batch starts no more items and lets the ones already running finish. It acts on the nearest loop around it, and only works inside a batch or run_till body."},
+			{Name: "action", Kind: ParamEnum, Enum: []string{actionNext, actionLeave}, Default: actionNext, Doc: "What it does: next (default) ends the current item (batch) or round (run_till) here, counts it as passed and goes on with the next one; leave ends the loop: a run_till counts as met, a batch starts no more items and lets the ones already running finish. It acts on the nearest loop around it, and only works inside a batch or run_till body."},
 			{Name: "message", Kind: ParamText, Doc: "Why; written to the run log."},
 		},
 		Run: runLoopControl,

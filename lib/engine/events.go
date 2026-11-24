@@ -65,8 +65,8 @@ type NodeFinished struct {
 	Outputs                   map[string]any
 	Diags                     diag.List
 	Depth                     int
-	// Reason says why a node was skipped by the person ("skipped by you");
-	// "" otherwise, including a node skipped by its when.
+	// Reason says why a node was skipped on purpose: "skipped by you", "skipped in the flow" or "its when was false";
+	// "" for a node that never started because something before it failed, or for one that ran.
 	Reason string
 	// Tries is how many times the node ran; more than 1 only for a node with retries that failed at first.
 	Tries int

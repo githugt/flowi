@@ -14,6 +14,9 @@ package uidev
 import (
 	"context"
 	"fmt"
+	"os"
+	"strings"
+	"sync"
 	"time"
 
 	flowi "github.com/githugt/flowi/lib"
@@ -42,12 +45,73 @@ type Backend struct {
 	Pace time.Duration
 
 	sandbox importSandbox // the real importers' collection, see import.go
+
+	varsMu sync.Mutex
+	vars   []model.KeyValue // the collection variables the page edits; nothing is saved to disk
+
+	rulesMu sync.Mutex
+	rules   map[string]string // the spec rule levels the screen has chosen, by rule; nothing is saved to disk
+}
+
+// specRules are the spec linter's rules as the page lists them: the real names, with their defaults.
+func specRules() []flowi.SpecRule {
+	return []flowi.SpecRule{
+		{Name: "info-description", About: "The description says what the API is for.", Default: "warning"},
+		{Name: "operation-description", About: "Every operation (or method, or channel operation) has a summary or a description.", Default: "warning"},
+		{Name: "operation-id", About: "Every operation has an operationId (OpenAPI, Swagger, AsyncAPI 2).", Default: "warning"},
+		{Name: "operation-tags", About: "Every operation has a tag.", Default: "warning"},
+		{Name: "operation-security", About: "Every operation has a security requirement, or says it is public with security: [].", Default: "warning"},
+		{Name: "success-response", About: "Every operation documents a 2xx response.", Default: "warning"},
+		{Name: "unused-component", About: "Every component is referred to somewhere.", Default: "warning"},
+		{Name: "server-encrypted", About: "Servers are encrypted (https, wss, mqtts, amqps…); plain ones are for this machine only.", Default: "warning"},
+		{Name: "path-case", About: "Path segments are lowercase.", Default: "off"},
+	}
+}
+
+// SpecLintRules lists the rules with the levels chosen so far in this session.
+func (b *Backend) SpecLintRules(model.ID) ([]flowi.SpecRule, error) {
+	b.rulesMu.Lock()
+	defer b.rulesMu.Unlock()
+	out := specRules()
+	for i, r := range out {
+		out[i].Level = r.Default
+		if l, ok := b.rules[r.Name]; ok {
+			out[i].Level, out[i].Chosen = l, true
+		}
+	}
+	return out, nil
+}
+
+// SetSpecLintRule keeps a choice in memory; "" forgets it.
+func (b *Backend) SetSpecLintRule(_ model.ID, rule, level string) error {
+	b.rulesMu.Lock()
+	defer b.rulesMu.Unlock()
+	if b.rules == nil {
+		b.rules = map[string]string{}
+	}
+	if level == "" {
+		delete(b.rules, rule)
+	} else {
+		b.rules[rule] = level
+	}
+	return nil
 }
 
 // New returns a backend over the fixture workspace.
 func New() *Backend {
-	b := &vmtest.Backend{Cols: []model.Collection{Collection()}, Name: "UI development"}
+	b := &vmtest.Backend{Cols: append([]model.Collection{Collection()}, sidebarCollections()...), Name: "UI development"}
+	b.DraftIDs = map[model.ID]bool{vmtest.ScratchID: true}
+	// A folder of its own for what the sidebar keeps (stars, recent), so a star can be tried without a notice that it
+	// could not be saved. Gone with the temporary folder: nothing of the person's is touched.
+	if dir, err := os.MkdirTemp("", "flowi-uidev-session-"); err == nil {
+		b.Session = dir
+	}
+	b.Diags = sidebarProblems()
+	// staging's secret holds a value; the payments secrets do not, so the sidebar's Environments show an issue to read.
+	b.SecretList = []flowi.SecretInfo{{Environment: "staging", Name: "password", Set: true}}
 	b.Values = map[string]any{"defaults.environment": "staging"}
+	b.Check.Coverage = madeUpCoverage()
+	b.Check.Exports, b.Check.Exported = madeUpExports()
 	b.EnvGroups = []string{"data jobs"} // a group made on its own, with no environment in it yet
 	// Saved runs, newest first, so the Runs tab has a list to compare, step through and clear.
 	started := time.Date(2026, 1, 15, 9, 0, 0, 0, time.UTC)
@@ -70,7 +134,7 @@ func New() *Backend {
 		b.RunList = append([]flowi.RunSummary{{ID: id, Env: "staging", Status: status, Started: started.Add(time.Duration(i) * time.Hour), Duration: 1500 * time.Millisecond,
 			Nodes: []flowi.RunNodeSummary{{ID: "login", Type: "request", Status: "passed", Duration: 200 * time.Millisecond}, {ID: FailingStep, Type: "request", Status: status, Duration: 300 * time.Millisecond}}}}, b.RunList...)
 	}
-	return &Backend{Backend: b}
+	return &Backend{Backend: b, vars: madeUpVariables()}
 }
 
 // Collection is the fixture: a shop with a login, an order and a health request, two environments, a checkout flow
@@ -123,7 +187,7 @@ func Collection() model.Collection {
 
 	return model.Collection{
 		Root:     "/demo",
-		Manifest: model.Manifest{Meta: model.Meta{ID: "C-demo", Name: "Demo shop"}, File: "/demo/flowi.yaml", Statuses: []model.Status{{Name: "needs-design", Color: "purple", Icon: "bookmark"}}},
+		Manifest: model.Manifest{Meta: model.Meta{ID: "C-demo", Name: "Demo shop", Description: "The shop API: log in, order, pay."}, Variables: madeUpVariables(), File: "/demo/flowi.yaml", Statuses: []model.Status{{Name: "needs-design", Color: "purple", Icon: "bookmark"}}},
 		Folders:  []model.Folder{{Dir: "requests/orders", Status: "in-development", Tags: []string{"orders"}, File: "/demo/requests/orders/_folder.yaml"}},
 		Environments: []model.Environment{
 			{Meta: model.Meta{Name: "staging"}, File: "/demo/environments/staging.yaml", Vars: []model.EnvVar{{Name: "base_url", Value: "https://staging.shop.example"}, {Name: "password", Secret: true}, {Name: "retries", Value: "3"}, {Name: "region", Value: "eu"}}},
@@ -135,6 +199,25 @@ func Collection() model.Collection {
 		Requests: []model.Request{login, orders, create, pay, health},
 		Flows:    []model.Flow{checkout, soak},
 	}
+}
+
+// FlowSource writes a flow as the code view shows it, one block for each step, so the view has steps to put a note above
+// (the fake's own text is only a count). It is not the real encoding: a step is its id, its type and the request it calls.
+func (b *Backend) FlowSource(t flowi.FlowTarget, f model.Flow) (flowi.FlowText, error) {
+	text, err := b.Backend.FlowSource(t, f)
+	if err != nil {
+		return text, err
+	}
+	var out strings.Builder
+	out.WriteString("nodes:\n")
+	for _, n := range f.Nodes {
+		fmt.Fprintf(&out, "  - id: %s\n    type: %s\n", n.ID, n.Type)
+		if n.Request != nil {
+			fmt.Fprintf(&out, "    request:\n      id: %s\n      path: %s\n", n.Request.Request.ID, n.Request.Request.Path)
+		}
+	}
+	text.Flow = out.String()
+	return text, nil
 }
 
 // pace is the pause before each event of a run of the flow.
@@ -159,6 +242,23 @@ func (b *Backend) Send(_ context.Context, t flowi.RequestTarget, _ flowi.SendOpt
 		engine.ResponseReceived{RequestID: string(t.Request), Status: rec.Status, Duration: rec.Timings.Total, Attempt: 1},
 	}
 	return &pacedSend{events: events, result: result, pause: b.pace("")}, nil
+}
+
+// TestConnection answers every kind with a canned verdict, so each way the Test button's result looks can be seen: an
+// HTTP request that is refused, a file that reads, and anything else connecting.
+func (b *Backend) TestConnection(_ context.Context, _ flowi.RequestTarget, v model.RequestVersion, _ flowi.SendOptions) (engine.Probe, error) {
+	took := 42 * time.Millisecond
+	switch {
+	case v.File != nil:
+		return engine.Probe{Status: engine.ProbeOK, Target: v.File.Path, Took: took, Detail: "the file exists and reads as CSV: 1 table (people), 3 rows"}, nil
+	case v.GRPC != nil:
+		return engine.Probe{Status: engine.ProbeOK, Target: v.GRPC.Server, Took: took, Detail: "connected to the server"}, nil
+	case v.Async != nil || v.Dataset != nil:
+		return engine.Probe{Status: engine.ProbeOK, Target: "broker", Took: took, Detail: "connected and signed in"}, nil
+	case strings.Contains(strings.ToLower(v.URL), "orders"):
+		return engine.Probe{Status: engine.ProbeFailed, Target: v.URL, Took: took, Detail: "401 Unauthorized: check the authentication"}, nil
+	}
+	return engine.Probe{Status: engine.ProbeOK, Target: v.URL, Took: took, Detail: "200 OK"}, nil
 }
 
 // RunFlow plays the canned run of the flow: every step passes, except the checkout's FailingStep, and the steps

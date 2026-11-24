@@ -88,11 +88,21 @@ func run(t *testing.T, app *bridge.App, f *feed, node string) bridge.RunView {
 func TestFixture_Should_show_requests_four_environments_and_two_flows_in_the_tree(t *testing.T) {
 	app, _ := start(t)
 
-	requests, flows := nodesOf(app, "request"), nodesOf(app, "flow")
+	// Before: every request and flow in the tree was the shop's; the sidebar fixture adds collections of its own, so the
+	// shop's are the ones whose place starts with its name.
+	inShop := func(nodes []bridge.TreeNode) (n int) {
+		for _, node := range nodes {
+			if strings.HasPrefix(node.Where, "Demo shop") {
+				n++
+			}
+		}
+		return n
+	}
+	requests, flows := inShop(nodesOf(app, "request")), inShop(nodesOf(app, "flow"))
 	envs := app.Workspace().Tree().Environments
 
-	if len(requests) != 5 || len(flows) != 2 || len(envs) != 4 {
-		t.Fatalf("%d requests, %d flows, environments %v", len(requests), len(flows), envs)
+	if requests != 5 || flows != 2 || len(envs) != 4 {
+		t.Fatalf("%d requests, %d flows, environments %v", requests, flows, envs)
 	}
 }
 

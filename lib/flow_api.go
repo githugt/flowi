@@ -243,6 +243,19 @@ func (w *Workspace) ParseFlowSource(t FlowTarget, text string) (model.Flow, diag
 	return f, diags, nil
 }
 
+// ParseFlowSnippet reads text copied from a flow's steps (as FlowSource wrote it, or in the portable form with requests
+// named by path alone) into flow t, as ParseFlowSource does, but without insisting on an id in each reference. The
+// references are not resolved: the caller points them at what this collection has.
+func (w *Workspace) ParseFlowSnippet(t FlowTarget, text string) (model.Flow, diag.List, error) {
+	_, current, err := w.flowFor(t)
+	if err != nil {
+		return model.Flow{}, nil, err
+	}
+	f, diags := w.store.DecodeFlowSnippet(current.File, current.Path, []byte(text))
+	f.ID, f.File, f.Path = current.ID, current.File, current.Path
+	return f, diags, nil
+}
+
 // CheckFlowDraft validates f in place of the flow t names, with the rest of
 // the workspace as it is, and returns the problems in that flow's own file.
 // It is what a draft not yet saved would be reported for; nothing is changed.

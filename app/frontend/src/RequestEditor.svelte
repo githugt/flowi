@@ -76,7 +76,7 @@
   import { WorkspaceService, ManagerService } from '../bindings/github.com/githugt/flowi/app/internal/bridge'
   import type { KeptSpec, SpecOrigin } from './lib/types'
   import OverlayDialog from './OverlayDialog.svelte'
-  import VersionPicker from './VersionPicker.svelte'
+  import RequestTypeBar from './RequestTypeBar.svelte'
   import PartsEditor from './PartsEditor.svelte'
   import DatasetSections from './DatasetSections.svelte'
   import SpecUpdateDialog from './SpecUpdateDialog.svelte'
@@ -579,10 +579,10 @@
           suggest={(t, c) => RequestService.Suggest(node, t, c) as unknown as Promise<any>}
         />
       </div>
+      {#if view.connection}<ConnectionTest {node} info={view.connection} kind="http" />{/if}
       {#if serverHasPassword(view.fullUrl)}
         <span class="pwwarn" role="note" title={PASSWORD_NOTE}>⚠ Password in the URL</span>
       {/if}
-      <span class="fhelp"><ExprHelp context="request.fields" /></span>
     {:else if view.async}
       {@const ab = view.async.block}
       <Dropdown pill title="Protocol" options={protocolOptions} value={ab.Protocol} width="110px" onpick={(p) => RequestService.SetProtocol(node, p)} />
@@ -607,7 +607,7 @@
           {#if fileSource}<Button type="button" title="Choose a folder of data files" onclick={() => pickDataPath(true)}>Folder…</Button>{/if}
         </span>
       {/if}
-      {#if view.connection && !fileSource}<ConnectionTest {node} info={view.connection} />{/if}
+      {#if view.connection}<ConnectionTest {node} info={view.connection} kind={fileSource ? 'file' : 'connect'} />{/if}
       {#if !fileSource && serverHasPassword(db.Server)}
         <span class="pwwarn" role="note" title={PASSWORD_NOTE}>⚠ Password in the file</span>
       {/if}
@@ -618,13 +618,14 @@
         <TemplateField aria="Server" value={gb.Server} placeholder={'grpc://{{env.host}}:50051'} oninput={(t) => RequestService.SetGRPC(node, { ...gb, Server: t } as never)} onenter={() => send()}  spans={(t) => RequestService.URLSpans(node, t) as unknown as Promise<any>} suggest={(t, c) => RequestService.Suggest(node, t, c) as unknown as Promise<any>} />
         <MethodPicker {node} info={view.grpc} />
       </div>
+      {#if view.connection}<ConnectionTest {node} info={view.connection} kind="grpc" />{/if}
     {/if}
     {#if hookBadge(hooks)}
       {@const badge = hookBadge(hooks)!}
       <span class="hookbadge"><Button small title={badge.title} onclick={() => (hooks = 'all')}><Icon name="hooks" size={12} /> {badge.text}</Button></span>
     {/if}
-    {#if view.kind === 'http' && view.snippet.text}
-      <IconButton icon="code" label={copyCodeLabel(view.snippet.format)} onclick={() => void copyOut(view.snippet.text, snippetCopied(!!view.snippet.secrets, view.snippet.exclude))} />
+    {#if view.snippet.text}
+      <IconButton icon="code" label={copyCodeLabel(view.snippet.format)} onclick={() => { chosen = 'Code'; void copyOut(view.snippet.text, snippetCopied(!!view.snippet.secrets, view.snippet.exclude)) }} />
     {/if}
     <div class="send" class:cancel={view.sending} data-tone={view.sending ? 'send' : action.tone} style:--act={`var(--act-${action.tone})`}>
       {#if view.sending}
@@ -637,7 +638,8 @@
     </div>
     </div>
     {#if statusMark}{@const mark = statusMark}<IconButton icon={mark.icon} size={15} label="{statusTitle(mark)}. Change it in Docs." style="color: var(--st-{mark.color}); opacity: {mark.inherited ? 0.75 : 1}" onclick={() => (chosen = 'Docs')} />{/if}
-    <VersionPicker {view} {node} onmanage={() => (overlaysOpen = true)} onnew={newVersion} />
+  </header>
+  <RequestTypeBar {view} {node} onmanage={() => (overlaysOpen = true)} onnew={newVersion}>
     <!-- The pill and Discard keep their room while the version is clean, so the header does not shift when an edit begins. -->
     <span class="edited" class:clean={!view.dirty} aria-hidden={!view.dirty} inert={!view.dirty}>
       <span class="pill" role="status">● Edited</span>
@@ -654,7 +656,7 @@
       <button class="more" aria-label="Save options" aria-haspopup="menu" aria-expanded={menu === 'save'} onclick={(e) => openMenu('save', e)}><Icon name="chevd" size={14} /></button>
       {#if menu === 'save'}<Menu at={menuAt} minWidth={150} label="Save options" items={saveItems} onclose={() => (menu = null)} />{/if}
     </div>
-  </header>
+  </RequestTypeBar>
   {#if detailsOpen}
     <VersionDetails
       label={view.selected}
@@ -893,7 +895,7 @@
   .xmlnote { margin: 4px 0 0; font-size: var(--fs-xs); color: var(--muted); }
   .xmlnote.bad { color: var(--warn); }
   .req { position: absolute; inset: 0; display: flex; flex-direction: column; }
-  header { display: flex; gap: 8px; padding: 12px 16px; border-bottom: 1px solid var(--line); align-items: center; }
+  header { display: flex; gap: 8px; padding: 12px 16px 4px; align-items: center; }
   .addr { flex: 1; min-width: 0; display: flex; align-items: center; height: var(--addr-h); box-sizing: border-box; background: var(--panel); border: 1px solid var(--line); border-radius: var(--r-lg); transition: border-color var(--t-fast) var(--ease-out), box-shadow var(--t-fast) var(--ease-out); }
   .addr:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px var(--tint-accent); }
   /* The fields inside draw no edge of their own: the bar does. */
@@ -1000,7 +1002,6 @@
   .builtin { border-top: 1px solid var(--line); padding-top: 8px; }
   .chain { margin: 0; padding-left: 18px; font: var(--fs-sm) var(--mono); }
   .keepauth { margin-top: 8px; }
-  .fhelp { display: inline-flex; align-items: center; flex: none; }
   .fieldnote { margin: 0 0 6px; }
   .implicit { margin: 4px 0 0; font-size: var(--fs-xs); }
   .implicit code { font-size: var(--fs-xs); }

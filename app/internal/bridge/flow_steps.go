@@ -65,6 +65,18 @@ func (s *FlowService) SetColor(node, step, color string) error {
 	})
 }
 
+// SetArrowStyle says how the arrows that leave step are drawn: "square" (also ""), the default, or "curved". One undo
+// step.
+func (s *FlowService) SetArrowStyle(node, step, style string) error {
+	return s.edit(node, func(o *openFlow) error {
+		if err := o.doc.SetArrowStyle(step, style); err != nil {
+			return err
+		}
+		s.app.emit("flow", s.view(node, o))
+		return nil
+	})
+}
+
 // Duplicate puts a copy of step right after it, selects the copy and returns
 // its id.
 func (s *FlowService) Duplicate(node, step string) (string, error) {

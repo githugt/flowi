@@ -7,6 +7,7 @@
   import Button from './Button.svelte'
   import { markerAt, slotAmong } from './lib/reorder'
   import { screenOf } from './lib/screens'
+  import { pageCollection } from './lib/collectionpage'
   import { onMount, tick } from 'svelte'
   import { SessionService, WorkspaceService } from '../bindings/github.com/githugt/flowi/app/internal/bridge'
   import { closeNotice, closePlan, hasFolder, type CloseMode } from './lib/tabmenu'
@@ -97,6 +98,7 @@
   import EnvCompareScreen from './EnvCompareScreen.svelte'
   import EnvManageScreen from './EnvManageScreen.svelte'
   import ChecksScreen from './ChecksScreen.svelte'
+  import CollectionScreen from './CollectionScreen.svelte'
   import IconButton from './IconButton.svelte'
   import { bandColour, envSwatch } from './lib/envcolours'
   import { createAltTap, isWindows } from './lib/altmenu'
@@ -409,6 +411,8 @@
         <EnvCompareScreen />
       {:else if tab && tab.node === 'screen:checks'}
         <ChecksScreen />
+      {:else if tab && pageCollection(tab.node)}
+        {#key tab.node}<CollectionScreen node={tab.node} />{/key}
       {:else if tab && tab.node === 'screen:replayer'}
         <ReplayerScreen />
       {:else if tab && tab.node === 'screen:schedules'}
