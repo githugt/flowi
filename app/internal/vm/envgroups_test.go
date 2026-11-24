@@ -112,7 +112,7 @@ func TestRenameGroup_Given_the_rules_Then_a_rename_moves_the_whole_group_and_the
 			_, err := vm.RenameGroup(b, envs, tt.from, tt.to, false)
 
 			if err == nil || !strings.Contains(err.Error(), tt.wantErr) || b.Called("RenameEnvironmentGroup "+tt.from+" "+tt.to) {
-				t.Fatalf("err %v, calls %v", err, b.Calls)
+				t.Fatalf("err %v, calls %v", err, b.CallLog())
 			}
 		})
 	}

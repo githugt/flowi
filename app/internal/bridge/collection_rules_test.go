@@ -37,7 +37,7 @@ func TestCollection_SetSpecRule_Then_the_backend_is_told(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !slices.Contains(b.Calls, "SetSpecLintRule C1 path-case error") {
-		t.Fatalf("calls %v", b.Calls)
+	if !slices.Contains(b.CallLog(), "SetSpecLintRule C1 path-case error") {
+		t.Fatalf("calls %v", b.CallLog())
 	}
 }

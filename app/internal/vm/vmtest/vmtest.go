@@ -202,6 +202,14 @@ func (f *Backend) record(call string) {
 	f.Calls = append(f.Calls, call)
 }
 
+// CallLog is a copy of the calls made so far. Tests read the calls through it: the workspace's watch goroutine records
+// its own call while a test reads, so reading Calls unlocked is a data race (seen on the Windows runner under -race).
+func (f *Backend) CallLog() []string {
+	f.Mu.Lock()
+	defer f.Mu.Unlock()
+	return slices.Clone(f.Calls)
+}
+
 // Called reports whether call was made.
 func (f *Backend) Called(call string) bool {
 	f.Mu.Lock()

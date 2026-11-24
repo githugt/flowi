@@ -56,7 +56,7 @@ func TestImportWizard_preview_lists_files_existing_and_lossy_reports(t *testing.
 	w.Wait()
 
 	if !b.Called("PreviewImport arazzo C1") || string(b.Previewed[0]) != "openapi: 3.0.3" {
-		t.Fatalf("calls %v", b.Calls)
+		t.Fatalf("calls %v", b.CallLog())
 	}
 	rows := iw.Rows()
 	if len(rows) != 3 || !rows[0].Exists || rows[1].Exists || iw.Existing() != 1 {

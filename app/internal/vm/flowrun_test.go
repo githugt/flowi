@@ -60,7 +60,7 @@ func TestFlowRun_maps_events_to_this_flows_nodes(t *testing.T) {
 		t.Fatalf("create %+v", c)
 	}
 	if !b.Called("RunFlow") || r.Result().Status != engine.StatusFailed {
-		t.Fatalf("calls %v result %+v", b.Calls, r.Result())
+		t.Fatalf("calls %v result %+v", b.CallLog(), r.Result())
 	}
 }
 

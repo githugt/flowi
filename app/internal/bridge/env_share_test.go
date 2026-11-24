@@ -44,7 +44,7 @@ func TestEnvironmentService_Share_Given_a_saved_environment_When_shared_Then_the
 		t.Fatalf("share %+v err %v", got, err)
 	}
 	if !b.Called("ShareEnvironment " + coll + " staging false") {
-		t.Fatalf("calls %v", b.Calls)
+		t.Fatalf("calls %v", b.CallLog())
 	}
 }
 

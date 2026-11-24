@@ -83,7 +83,7 @@ func TestChecks_SpecChange_Given_a_file_Then_it_is_read_and_the_breakages_name_t
 		t.Fatalf("breakage %+v", got)
 	}
 	if !b.Called("ImpactAgainst C1 pets openapi: 3.0.3\n") {
-		t.Fatalf("calls %v: the file's text should reach the backend", b.Calls)
+		t.Fatalf("calls %v: the file's text should reach the backend", b.CallLog())
 	}
 }
 
@@ -161,7 +161,7 @@ func TestFlowChecks_Access_Then_the_table_has_a_row_for_each_step_with_each_iden
 		t.Fatalf("access %+v err %v", got, err)
 	}
 	if !b.Called("CheckAccess alice") {
-		t.Fatalf("calls %v", b.Calls)
+		t.Fatalf("calls %v", b.CallLog())
 	}
 }
 
@@ -358,7 +358,7 @@ func TestFlowChecks_AcceptDrift_Given_one_request_Then_only_it_is_accepted_and_t
 	// Assert
 	// Before: the drift check was a read-only report; accepting meant leaving it and sending with learning on.
 	if err != nil || !b.Called("AcceptDrift auth/login") || b.Called("AcceptDrift auth/login,auth/verify") {
-		t.Fatalf("err %v calls %v", err, b.Calls)
+		t.Fatalf("err %v calls %v", err, b.CallLog())
 	}
 	login, verify := got.Requests[0], got.Requests[1]
 	if !login.Accepted || len(login.Differences) != 0 || verify.Accepted || len(verify.Differences) != 1 {
@@ -382,7 +382,7 @@ func TestFlowChecks_AcceptDrift_Given_none_listed_Then_all_are_accepted_and_noth
 
 	// Assert
 	if err != nil || !b.Called("AcceptDrift auth/login,auth/verify") || !got.Requests[0].Accepted || !got.Requests[1].Accepted {
-		t.Fatalf("err %v calls %v view %+v", err, b.Calls, got)
+		t.Fatalf("err %v calls %v view %+v", err, b.CallLog(), got)
 	}
 	if !strings.Contains(got.Note, "never rewritten") {
 		t.Fatalf("note %q", got.Note)

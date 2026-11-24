@@ -21,7 +21,7 @@ func TestWorkspaceVM_CreateRequest_Given_no_name_Then_creates_an_untitled_reques
 		w.Wait()
 
 		if !b.Called("NewRequest " + want) {
-			t.Errorf("path %q: calls %v, want NewRequest %s", given, b.Calls, want)
+			t.Errorf("path %q: calls %v, want NewRequest %s", given, b.CallLog(), want)
 		}
 	}
 }
@@ -36,6 +36,6 @@ func TestWorkspaceVM_CreateRequest_Given_untitled_exists_Then_numbers_the_new_on
 	w.Wait()
 
 	if !b.Called("NewRequest untitled-2") {
-		t.Fatalf("calls %v", b.Calls)
+		t.Fatalf("calls %v", b.CallLog())
 	}
 }

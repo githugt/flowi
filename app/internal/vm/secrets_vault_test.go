@@ -32,8 +32,8 @@ func TestSecrets_Lock_Then_the_vault_is_locked_and_the_secrets_are_not_read_agai
 	s.Lock()
 	w.Wait()
 
-	if s.Vault().Unlocked || !slices.Contains(b.Calls, "LockVault") || b.SecretsReads != reads {
-		t.Fatalf("vault %+v, calls %v", s.Vault(), b.Calls)
+	if s.Vault().Unlocked || !slices.Contains(b.CallLog(), "LockVault") || b.SecretsReads != reads {
+		t.Fatalf("vault %+v, calls %v", s.Vault(), b.CallLog())
 	}
 }
 

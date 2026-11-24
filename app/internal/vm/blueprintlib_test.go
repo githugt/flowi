@@ -47,7 +47,7 @@ func TestWorkspace_DeleteBlueprint_should_delete_it(t *testing.T) {
 	w.Wait()
 
 	if !done || !b.Called("DeleteBlueprint BP-POST") {
-		t.Fatalf("done %v calls %v", done, b.Calls)
+		t.Fatalf("done %v calls %v", done, b.CallLog())
 	}
 }
 
@@ -59,7 +59,7 @@ func TestWorkspace_DeleteBlueprint_Given_it_seeds_new_requests_Then_takes_it_out
 
 	// Left in the list it would make every new request fail to seed.
 	if !b.Called("SetUserSetting requests.seed_blueprint=stamp") {
-		t.Fatalf("calls %v", b.Calls)
+		t.Fatalf("calls %v", b.CallLog())
 	}
 }
 
@@ -70,7 +70,7 @@ func TestWorkspace_DeleteBlueprint_Given_it_was_the_only_seed_Then_goes_back_to_
 	w.Wait()
 
 	if !b.Called("SetUserSetting requests.seed_blueprint=default") {
-		t.Fatalf("calls %v", b.Calls)
+		t.Fatalf("calls %v", b.CallLog())
 	}
 }
 
@@ -80,9 +80,9 @@ func TestWorkspace_DeleteBlueprint_Given_it_is_not_in_the_setting_Then_leaves_th
 	ws.DeleteBlueprint(blueprintNamed(ws, "checks"), nil, func(err error) { t.Fatal(err) })
 	w.Wait()
 
-	for _, c := range b.Calls {
+	for _, c := range b.CallLog() {
 		if len(c) > 14 && c[:14] == "SetUserSetting" {
-			t.Fatalf("setting changed: %v", b.Calls)
+			t.Fatalf("setting changed: %v", b.CallLog())
 		}
 	}
 }
@@ -96,7 +96,7 @@ func TestWorkspace_UseBlueprintAsDefault_should_replace_the_seed_for_its_phase(t
 	w.Wait()
 
 	if !done || note != "" || !b.Called("SetUserSetting requests.seed_blueprint=default, stamp") {
-		t.Fatalf("done %v note %q calls %v", done, note, b.Calls)
+		t.Fatalf("done %v note %q calls %v", done, note, b.CallLog())
 	}
 }
 
@@ -108,7 +108,7 @@ func TestWorkspace_UseBlueprintAsDefault_Given_a_flow_blueprint_Then_refuses(t *
 	w.Wait()
 
 	if failed == nil || b.Called("SetUserSetting requests.seed_blueprint=needs") {
-		t.Fatalf("err %v calls %v", failed, b.Calls)
+		t.Fatalf("err %v calls %v", failed, b.CallLog())
 	}
 }
 
@@ -128,9 +128,9 @@ func TestWorkspace_DeleteBlueprint_Given_another_collection_has_the_same_path_Th
 	ws.DeleteBlueprint(blueprintNamed(ws, "checks"), nil, func(err error) { t.Fatal(err) })
 	w.Wait()
 
-	for _, c := range b.Calls {
+	for _, c := range b.CallLog() {
 		if len(c) > 14 && c[:14] == "SetUserSetting" {
-			t.Fatalf("the other collection's checks no longer seeds: %v", b.Calls)
+			t.Fatalf("the other collection's checks no longer seeds: %v", b.CallLog())
 		}
 	}
 }
@@ -141,9 +141,9 @@ func TestWorkspace_DeleteBlueprint_should_not_rewrite_a_setting_it_did_not_chang
 	ws.DeleteBlueprint(blueprintNamed(ws, "checks"), nil, func(err error) { t.Fatal(err) })
 	w.Wait()
 
-	for _, c := range b.Calls {
+	for _, c := range b.CallLog() {
 		if len(c) > 14 && c[:14] == "SetUserSetting" {
-			t.Fatalf("setting rewritten: %v", b.Calls)
+			t.Fatalf("setting rewritten: %v", b.CallLog())
 		}
 	}
 }

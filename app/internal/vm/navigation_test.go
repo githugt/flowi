@@ -128,7 +128,7 @@ func TestWorkspaceVM_Delete_should_remove_the_items_and_report_their_nodes(t *te
 	w.Wait()
 
 	if !slices.Equal(gone, []string{"r:C1:R1", "f:C1:F1", "e:/c/environments/local.yaml"}) {
-		t.Fatalf("gone %v calls %v", gone, b.Calls)
+		t.Fatalf("gone %v calls %v", gone, b.CallLog())
 	}
 	if ws.Node("r:C1:R1").Kind != 0 || ws.Node("f:C1:F1").Kind != 0 || ws.Node("e:/c/environments/local.yaml").Kind != 0 || ws.Node("r:C1:R2").Kind == 0 {
 		t.Fatal("the tree must show the deletion and nothing else")
@@ -147,7 +147,7 @@ func TestWorkspaceVM_Delete_should_send_requests_and_flows_to_the_trash_and_hand
 		t.Fatalf("kept %+v: an environment is not kept, a request and a flow are", kept)
 	}
 	if !b.Called("DeleteRequestToTrash R1") || !b.Called("DeleteFlowToTrash F1") || b.Called("DeleteRequest R1") {
-		t.Fatalf("calls %v", b.Calls)
+		t.Fatalf("calls %v", b.CallLog())
 	}
 	trash, _ := b.ListTrash()
 	if len(trash) != 2 {
@@ -165,7 +165,7 @@ func TestWorkspaceVM_Delete_Given_a_failure_Then_reports_the_ones_gone_and_stops
 	w.Wait()
 
 	if failed == nil || !slices.Equal(gone, []string{"r:C1:R1"}) || b.Called("DeleteRequestToTrash R3") {
-		t.Fatalf("failed %v gone %v calls %v", failed, gone, b.Calls)
+		t.Fatalf("failed %v gone %v calls %v", failed, gone, b.CallLog())
 	}
 }
 
@@ -177,7 +177,7 @@ func TestWorkspaceVM_DuplicateRequest_should_copy_then_open_the_copy(t *testing.
 	w.Wait()
 
 	if opened != "r:C1:R3-copy" || !b.Called("DuplicateRequest health-copy") || ws.Node("r:C1:R3-copy").Kind != vm.NodeRequest {
-		t.Fatalf("opened %q calls %v", opened, b.Calls)
+		t.Fatalf("opened %q calls %v", opened, b.CallLog())
 	}
 }
 
@@ -189,7 +189,7 @@ func TestWorkspaceVM_DuplicateRequestTo_should_copy_into_the_chosen_collection_a
 	w.Wait()
 
 	if opened != "r:C1:R3-copy" || !b.Called("DuplicateRequestTo C1 health-two") {
-		t.Fatalf("opened %q calls %v", opened, b.Calls)
+		t.Fatalf("opened %q calls %v", opened, b.CallLog())
 	}
 }
 
@@ -213,7 +213,7 @@ func TestWorkspaceVM_FlowFromRequests_should_chain_one_request_node_per_request(
 	w.Wait()
 
 	if len(b.SavedFlows) != 1 || opened != "f:C1:new" {
-		t.Fatalf("saved %d opened %q calls %v", len(b.SavedFlows), opened, b.Calls)
+		t.Fatalf("saved %d opened %q calls %v", len(b.SavedFlows), opened, b.CallLog())
 	}
 	nodes := b.SavedFlows[0].Nodes
 	if len(nodes) != 3 {
@@ -269,7 +269,7 @@ func TestWorkspaceVM_FlowFromRequests_Given_a_failed_save_Then_removes_the_empty
 	w.Wait()
 
 	if failed == nil || !b.Called("DeleteFlow new") {
-		t.Fatalf("failed %v calls %v", failed, b.Calls)
+		t.Fatalf("failed %v calls %v", failed, b.CallLog())
 	}
 }
 
@@ -281,7 +281,7 @@ func TestWorkspaceVM_FlowFromRequests_Given_no_requests_Then_fails_without_creat
 	w.Wait()
 
 	if failed == nil || b.Called("NewFlow j/x") {
-		t.Fatalf("failed %v calls %v", failed, b.Calls)
+		t.Fatalf("failed %v calls %v", failed, b.CallLog())
 	}
 }
 
@@ -293,7 +293,7 @@ func TestWorkspaceVM_FlowFromRequests_Given_no_path_Then_makes_an_untitled_flow_
 	w.Wait()
 
 	if !b.Called("NewUntitledFlow C1") || b.Called("NewFlow ") || len(b.SavedFlows) != 1 || len(b.SavedFlows[0].Nodes) != 2 || opened != "f:C1:new" {
-		t.Fatalf("calls %v saved %+v opened %q", b.Calls, b.SavedFlows, opened)
+		t.Fatalf("calls %v saved %+v opened %q", b.CallLog(), b.SavedFlows, opened)
 	}
 }
 
@@ -305,6 +305,6 @@ func TestWorkspace_RenameFolder_should_move_the_folder_through_the_backend(t *te
 	w.Wait()
 
 	if !b.Called("MoveFolder requests/auth -> security") {
-		t.Fatalf("calls %v", b.Calls)
+		t.Fatalf("calls %v", b.CallLog())
 	}
 }

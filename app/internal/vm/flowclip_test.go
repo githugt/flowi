@@ -133,8 +133,8 @@ func TestCopyText_Given_no_selection_Then_it_fails_without_asking_the_backend(t 
 
 	d.CopyText(nil, false, func(string) { t.Fatal("copied nothing") }, func(err error) { failed = err })
 
-	if failed == nil || slices.ContainsFunc(b.Calls, func(c string) bool { return strings.HasPrefix(c, "FlowSource") }) {
-		t.Fatalf("err %v, calls %v", failed, b.Calls)
+	if failed == nil || slices.ContainsFunc(b.CallLog(), func(c string) bool { return strings.HasPrefix(c, "FlowSource") }) {
+		t.Fatalf("err %v, calls %v", failed, b.CallLog())
 	}
 }
 

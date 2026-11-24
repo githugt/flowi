@@ -71,7 +71,7 @@ func TestTelemetry_Choose_should_store_the_level_in_the_user_settings(t *testing
 	q.run(1)
 
 	if tel.Level() != "full" || changed == 0 || !b.Called("SetUserSetting telemetry=full") {
-		t.Fatalf("level %q changed %d calls %v", tel.Level(), changed, b.Calls)
+		t.Fatalf("level %q changed %d calls %v", tel.Level(), changed, b.CallLog())
 	}
 }
 

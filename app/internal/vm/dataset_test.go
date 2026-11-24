@@ -60,7 +60,7 @@ func TestWorkspace_CreateDatasetRequest_should_create_through_the_backend_and_se
 	w.Wait()
 
 	if !b.Called("NewDatasetRequest customers/list sqlite") || !b.Called("SeedRequestHooks new") {
-		t.Fatalf("calls %v", b.Calls)
+		t.Fatalf("calls %v", b.CallLog())
 	}
 }
 
@@ -72,7 +72,7 @@ func TestWorkspace_CreateDatasetRequest_Given_a_file_format_Then_it_creates_a_fi
 	w.Wait()
 
 	if !b.Called("NewFileRequest reports/sales parquet") || b.Called("NewDatasetRequest reports/sales parquet") {
-		t.Fatalf("calls %v", b.Calls)
+		t.Fatalf("calls %v", b.CallLog())
 	}
 }
 

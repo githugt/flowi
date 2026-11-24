@@ -59,8 +59,8 @@ func TestRequestService_TestConnection_should_show_the_verdict_until_the_server_
 	if stale == nil || stale.Status != "" {
 		t.Fatalf("after the server changed the old verdict must not stand: %+v", stale)
 	}
-	if n := len(slices.DeleteFunc(slices.Clone(b.Calls), func(c string) bool { return c != "TestConnection" })); n != 1 {
-		t.Fatalf("calls %v", b.Calls)
+	if n := len(slices.DeleteFunc(slices.Clone(b.CallLog()), func(c string) bool { return c != "TestConnection" })); n != 1 {
+		t.Fatalf("calls %v", b.CallLog())
 	}
 }
 

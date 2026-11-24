@@ -165,11 +165,11 @@ func TestHookEditor_SaveAsBlueprint_should_store_one_phase_and_optionally_make_i
 	w.Wait()
 
 	if !done || !b.Called("CreateHookBlueprint C1 hooks/mine Mine pre 1") {
-		t.Fatalf("done %v calls %v", done, b.Calls)
+		t.Fatalf("done %v calls %v", done, b.CallLog())
 	}
 	// The built-in default keeps the post phase; the new one takes pre.
 	if !b.Called("SetUserSetting requests.seed_blueprint=default, hooks/mine") {
-		t.Fatalf("calls %v", b.Calls)
+		t.Fatalf("calls %v", b.CallLog())
 	}
 }
 
@@ -181,7 +181,7 @@ func TestHookEditor_SaveAsBlueprint_Given_a_phase_with_no_nodes_Then_refuses_wit
 	w.Wait()
 
 	if failed == nil || b.Called("CreateHookBlueprint C1 x X post 0") {
-		t.Fatalf("failed %v calls %v", failed, b.Calls)
+		t.Fatalf("failed %v calls %v", failed, b.CallLog())
 	}
 }
 

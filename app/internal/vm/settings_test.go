@@ -73,7 +73,7 @@ func TestSettingsVM_set_reset_and_appearance_notifies(t *testing.T) {
 	w.Wait()
 
 	if notified != 3 || !b.Called("ResetUserSetting appearance.theme") || field(s, "timeout").Value != "10s" {
-		t.Fatalf("notified %d calls %v", notified, b.Calls)
+		t.Fatalf("notified %d calls %v", notified, b.CallLog())
 	}
 }
 

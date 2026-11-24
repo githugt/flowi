@@ -103,7 +103,7 @@ func TestWorkspaceVM_SetLabels_should_write_through_the_backend_and_show_the_tre
 		t.Fatal(got)
 	}
 	if !b.Called("SetRequestLabels R3 slow,slow,needs review testing") || !b.Called("SetFolderLabels requests/auth auth review") || !b.Called("SetFlowLabels F1  ") {
-		t.Fatalf("calls %v", b.Calls)
+		t.Fatalf("calls %v", b.CallLog())
 	}
 	if n := ws.Node("r:C1:R3"); n.Status.Name != "testing" || !slices.Equal(n.Tags, []string{"needs-review", "slow"}) {
 		t.Errorf("the tree row: %+v %v", n.Status, n.Tags)

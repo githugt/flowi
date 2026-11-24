@@ -64,7 +64,7 @@ func TestWorkspaceService_NewAt_should_create_in_the_place_the_row_stands_for(t 
 
 			opened, _ := pub.last["open"].(string)
 			if !b.Called(tt.wantCall) || opened == "" {
-				t.Fatalf("calls %v, opened %q", b.Calls, opened)
+				t.Fatalf("calls %v, opened %q", b.CallLog(), opened)
 			}
 		})
 	}
@@ -77,7 +77,7 @@ func TestWorkspaceService_NewAt_Given_no_place_Then_it_goes_to_Scratch(t *testin
 
 	opened, _ := pub.last["open"].(string)
 	if !b.Called("Scratch") || !b.Called("NewGRPCRequest untitled") || opened == "" {
-		t.Fatalf("calls %v, opened %q", b.Calls, opened)
+		t.Fatalf("calls %v, opened %q", b.CallLog(), opened)
 	}
 }
 
@@ -99,7 +99,7 @@ func TestWorkspaceService_NewPlaceCollection_should_make_a_draft_collection_and_
 	row := app.Workspace().NewPlaceCollection("  Payments ")
 
 	if row == "" || !b.Called("NewDraft Payments") || !slices.Contains(labelsOf(app.Workspace().PlaceTargets("requests")), "Payments") {
-		t.Fatalf("row %q calls %v", row, b.Calls)
+		t.Fatalf("row %q calls %v", row, b.CallLog())
 	}
 }
 
@@ -111,7 +111,7 @@ func TestWorkspaceService_NewPlaceFolder_should_make_a_folder_below_the_place_an
 
 	got := app.Workspace().PlaceTargets("requests")
 	if row == "" || !b.Called("NewFolder requests/auth/tokens") || !slices.Contains(labelsOf(got), "Shop / auth / tokens") {
-		t.Fatalf("row %q calls %v targets %v", row, b.Calls, labelsOf(got))
+		t.Fatalf("row %q calls %v targets %v", row, b.CallLog(), labelsOf(got))
 	}
 	if placeOf := got[slices.IndexFunc(got, func(m MoveTargetView) bool { return m.Row == row })]; placeOf.Label != "Shop / auth / tokens" {
 		t.Fatalf("the returned row %q is %q", row, placeOf.Label)

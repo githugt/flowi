@@ -36,7 +36,7 @@ func TestWorkspaceVM_NewScratchRequest_should_create_reload_and_open(t *testing.
 	w.Wait()
 
 	if !b.Called("NewScratchRequest") || opened != "r:SCRATCH:new" {
-		t.Fatalf("calls %v, opened %q", b.Calls, opened)
+		t.Fatalf("calls %v, opened %q", b.CallLog(), opened)
 	}
 }
 
@@ -49,7 +49,7 @@ func TestWorkspaceVM_CreateRequest_Given_no_collection_Then_uses_Scratch(t *test
 	w.Wait()
 
 	if !b.Called("Scratch") || !b.Called("NewRequest users/list") || opened != "r:SCRATCH:new" {
-		t.Fatalf("calls %v, opened %q", b.Calls, opened)
+		t.Fatalf("calls %v, opened %q", b.CallLog(), opened)
 	}
 }
 
@@ -62,7 +62,7 @@ func TestWorkspaceVM_CreateFlow_Given_no_collection_Then_uses_Scratch(t *testing
 	w.Wait()
 
 	if !b.Called("Scratch") || !b.Called("NewFlow signup") || opened != "f:SCRATCH:new" {
-		t.Fatalf("calls %v, opened %q", b.Calls, opened)
+		t.Fatalf("calls %v, opened %q", b.CallLog(), opened)
 	}
 }
 
@@ -87,7 +87,7 @@ func TestWorkspaceVM_CreateRequest_Given_a_collection_Then_seeds_its_hooks(t *te
 	w.Wait()
 
 	if !b.Called("SeedRequestHooks new") {
-		t.Fatalf("calls %v", b.Calls)
+		t.Fatalf("calls %v", b.CallLog())
 	}
 }
 
@@ -101,7 +101,7 @@ func TestWorkspaceVM_NewScratchRequest_Then_seeds_its_hooks(t *testing.T) {
 	w.Wait()
 
 	if !b.Called("SeedRequestHooks new") {
-		t.Fatalf("calls %v", b.Calls)
+		t.Fatalf("calls %v", b.CallLog())
 	}
 }
 
@@ -137,7 +137,7 @@ func TestManagerVM_drafts_rows_and_actions(t *testing.T) {
 	}
 	for _, call := range []string{"NewDraft Try", "SaveDraft C2 /keep", "DiscardDraft C2"} {
 		if !b.Called(call) {
-			t.Fatalf("missing %q in %v", call, b.Calls)
+			t.Fatalf("missing %q in %v", call, b.CallLog())
 		}
 	}
 }
@@ -181,7 +181,7 @@ func TestWorkspaceVM_CreateEnvironment_should_create_it_and_open_its_node(t *tes
 	w.Wait()
 
 	if !b.Called("NewEnvironment staging") || opened != "e:/d/staging.yaml" {
-		t.Fatalf("calls %v, opened %q", b.Calls, opened)
+		t.Fatalf("calls %v, opened %q", b.CallLog(), opened)
 	}
 }
 
@@ -195,7 +195,7 @@ func TestWorkspaceVM_CreateUntitledFlow_should_create_without_a_path_in_the_coll
 	w.Wait()
 
 	if !b.Called("NewUntitledFlow C1") || !b.Called("Scratch") || len(opened) != 2 || opened[0] != "f:C1:new" || opened[1] != "f:SCRATCH:new" {
-		t.Fatalf("calls %v, opened %v", b.Calls, opened)
+		t.Fatalf("calls %v, opened %v", b.CallLog(), opened)
 	}
 }
 
@@ -210,6 +210,6 @@ func TestWorkspaceVM_CreateUntitledFlowIn_should_create_inside_the_folder(t *tes
 	w.Wait()
 
 	if !b.Called("NewFlow shared/untitled") || !b.Called("NewUntitledFlow C1") {
-		t.Fatalf("calls %v", b.Calls)
+		t.Fatalf("calls %v", b.CallLog())
 	}
 }

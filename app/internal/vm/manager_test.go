@@ -52,7 +52,7 @@ func TestManagerVM_mount_unmount_relocate_init_call_the_backend_and_reload(t *te
 
 	for _, call := range []string{"Mount /new", "Unmount C2", "Relocate GONE /found", "InitCollection /fresh Fresh"} {
 		if !b.Called(call) {
-			t.Fatalf("missing %q in %v", call, b.Calls)
+			t.Fatalf("missing %q in %v", call, b.CallLog())
 		}
 	}
 	if m.Err() != "" {
@@ -69,8 +69,8 @@ func TestManagerVM_NewCollection_should_create_in_the_location_or_in_flowis_own_
 	m.NewCollection("Shop", "/work/shop")
 	w.Wait()
 
-	if !slices.Contains(b.Calls, "NewDraft Pets") || !slices.Contains(b.Calls, "InitCollection /work/shop Shop") {
-		t.Fatalf("calls %v", b.Calls)
+	if !slices.Contains(b.CallLog(), "NewDraft Pets") || !slices.Contains(b.CallLog(), "InitCollection /work/shop Shop") {
+		t.Fatalf("calls %v", b.CallLog())
 	}
 }
 
@@ -109,7 +109,7 @@ func TestManagerVM_open_bundle_calls_the_backend_and_reloads_so_the_replay_colle
 	w.Wait()
 
 	if !b.Called("OpenBundle /runs/login.flowi-run") {
-		t.Fatalf("calls %v", b.Calls)
+		t.Fatalf("calls %v", b.CallLog())
 	}
 }
 
@@ -120,7 +120,7 @@ func TestManagerVM_open_arazzo_calls_the_backend_with_the_reference_and_reloads(
 	w.Wait()
 
 	if !b.Called("OpenArazzo /docs/check.arazzo.yaml") {
-		t.Fatalf("calls %v", b.Calls)
+		t.Fatalf("calls %v", b.CallLog())
 	}
 }
 
@@ -133,7 +133,7 @@ func TestManagerVM_open_example_calls_the_backend_and_tells_how_it_went(t *testi
 	w.Wait()
 
 	if !b.Called("OpenExample") || len(got) != 1 || got[0] != nil {
-		t.Fatalf("calls %v done %v", b.Calls, got)
+		t.Fatalf("calls %v done %v", b.CallLog(), got)
 	}
 }
 
@@ -145,6 +145,6 @@ func TestManagerVM_allow_secret_host_calls_the_backend_with_the_host_and_tells_h
 	w.Wait()
 
 	if !b.Called("AllowSecretHost api.example.com") || len(got) != 1 || got[0] != nil {
-		t.Fatalf("calls %v done %v", b.Calls, got)
+		t.Fatalf("calls %v done %v", b.CallLog(), got)
 	}
 }

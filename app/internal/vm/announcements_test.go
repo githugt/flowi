@@ -89,7 +89,7 @@ func TestAnnouncements_Dismiss_should_remember_it_and_drop_it_from_the_list(t *t
 	q.run(1)
 
 	if len(a.Items()) != 1 || a.Items()[0].ID != "b" || !b.Called("SetUserSetting announcements_dismissed=old,a") {
-		t.Fatalf("items %+v calls %v", a.Items(), b.Calls)
+		t.Fatalf("items %+v calls %v", a.Items(), b.CallLog())
 	}
 }
 
@@ -104,7 +104,7 @@ func TestAnnouncements_TurnOff_should_switch_the_setting_off_and_clear_the_list(
 	q.run(1)
 
 	if len(a.Items()) != 0 || !b.Called("SetUserSetting announcements=false") {
-		t.Fatalf("items %+v calls %v", a.Items(), b.Calls)
+		t.Fatalf("items %+v calls %v", a.Items(), b.CallLog())
 	}
 }
 

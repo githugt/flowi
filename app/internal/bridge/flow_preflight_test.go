@@ -30,7 +30,7 @@ func TestFlowServicePreflight_should_say_what_the_environment_lacks_before_the_r
 	lines, err := app.Flows().Preflight(v.Node)
 
 	if err != nil || !slices.Equal(lines, []string{"The secret token has no value in staging."}) || !b.Called("PreflightFlow") {
-		t.Fatalf("lines %q err %v calls %v", lines, err, b.Calls)
+		t.Fatalf("lines %q err %v calls %v", lines, err, b.CallLog())
 	}
 }
 

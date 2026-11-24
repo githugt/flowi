@@ -21,7 +21,7 @@ func TestManagerService_Mount_Given_the_folder_is_refused_Then_the_error_comes_b
 	err := app.Manager().Mount("/nowhere")
 
 	if err == nil || !strings.Contains(err.Error(), "no flowi.yaml") || !b.Called("Mount /nowhere") {
-		t.Fatalf("err %v calls %v", err, b.Calls)
+		t.Fatalf("err %v calls %v", err, b.CallLog())
 	}
 }
 
@@ -34,7 +34,7 @@ func TestManagerService_Mount_Given_it_works_Then_no_error_and_the_workspace_is_
 	created := app.Manager().NewCollection("Shop", "/shop")
 
 	if err != nil || created != nil || !b.Called("InitCollection /shop Shop") {
-		t.Fatalf("err %v created %v calls %v", err, created, b.Calls)
+		t.Fatalf("err %v created %v calls %v", err, created, b.CallLog())
 	}
 }
 
@@ -51,7 +51,7 @@ func TestManagerService_OpenExample_Given_the_backend_opens_it_Then_no_error_and
 	badErr := appBad.Manager().OpenExample()
 
 	if okErr != nil || !good.Called("OpenExample") || badErr == nil || !strings.Contains(badErr.Error(), "no free port") {
-		t.Fatalf("ok %v bad %v calls %v", okErr, badErr, good.Calls)
+		t.Fatalf("ok %v bad %v calls %v", okErr, badErr, good.CallLog())
 	}
 }
 
@@ -68,6 +68,6 @@ func TestManagerService_AllowSecretHost_should_pass_the_host_on_and_return_a_ref
 	badErr := appBad.Manager().AllowSecretHost("*")
 
 	if okErr != nil || !good.Called("AllowSecretHost api.example.com") || badErr == nil || !strings.Contains(badErr.Error(), "is not a host") {
-		t.Fatalf("ok %v bad %v calls %v", okErr, badErr, good.Calls)
+		t.Fatalf("ok %v bad %v calls %v", okErr, badErr, good.CallLog())
 	}
 }
