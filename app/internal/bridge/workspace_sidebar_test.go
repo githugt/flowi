@@ -21,6 +21,10 @@ func sidebarApp(t *testing.T, values map[string]any, session string) (*bridge.Ap
 	b := &vmtest.Backend{Cols: []model.Collection{vmtest.SampleCollection()}, Session: session, Values: values}
 	app := bridge.NewApp(b, bridge.NewInlineActor(), pub.emit)
 	app.Start(t.Context())
+	// Starring and opening are saved by a background writer into the session folder; wait for it before the test's
+	// temp folder is removed, which fails with "directory not empty" when a write is still going.
+	// Before: a test that starred without calling Shutdown failed on the CI runners.
+	t.Cleanup(app.Shutdown)
 	return app, pub
 }
 
