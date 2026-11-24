@@ -31,7 +31,7 @@ require (
 	github.com/nats-io/nats.go v1.54.0
 	github.com/oklog/ulid/v2 v2.1.2
 	github.com/parquet-go/parquet-go v0.32.0
-	github.com/pb33f/libopenapi v0.42.3
+	github.com/pb33f/libopenapi v0.42.5
 	github.com/quic-go/quic-go v0.63.0
 	github.com/rabbitmq/amqp091-go v1.16.0
 	github.com/redis/go-redis/v9 v9.23.0
@@ -45,7 +45,7 @@ require (
 	github.com/zalando/go-keyring v0.2.8
 	golang.org/x/crypto v0.58.0
 	golang.org/x/net v0.62.0
-	golang.org/x/sync v0.24.0
+	golang.org/x/sync v0.25.0
 	golang.org/x/text v0.43.0
 	google.golang.org/api v0.310.0
 	google.golang.org/grpc v1.85.0
@@ -106,7 +106,7 @@ require (
 	github.com/parquet-go/bitpack v1.0.0 // indirect
 	github.com/parquet-go/jsonlite v1.0.0 // indirect
 	github.com/pb33f/go-yaml v0.1.1 // indirect
-	github.com/pb33f/jsonpath v0.8.4 // indirect
+	github.com/pb33f/jsonpath v0.8.5 // indirect
 	github.com/pb33f/ordered-map/v2 v2.3.2 // indirect
 	github.com/pierrec/lz4/v4 v4.1.33 // indirect
 	github.com/pkg/browser v0.0.0-20240102092130-5ac0b6a4141c // indirect
