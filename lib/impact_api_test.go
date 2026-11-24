@@ -128,3 +128,34 @@ func TestImpactOfDraft_Given_an_unknown_request_Then_an_error(t *testing.T) {
 		t.Fatal("want an error")
 	}
 }
+
+// Before: impact was asked one request at a time, so a collection's page could not say per operation what reads it.
+func TestCollectionImpact_Given_a_broken_example_When_asked_Then_the_report_of_each_used_request_comes_back(t *testing.T) {
+	w := demoWorkspace(t)
+	id := w.Collections()[0].Manifest.ID
+
+	before, err := w.CollectionImpact(id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	removeToken(t, w)
+	after, err := w.CollectionImpact(id)
+
+	if err != nil || len(before) == 0 {
+		t.Fatalf("before %v err %v", before, err)
+	}
+	status := func(l []analysis.Report, request string) analysis.Status {
+		for _, r := range l {
+			if r.Request == request {
+				return r.Status
+			}
+		}
+		return ""
+	}
+	if status(before, "auth/login") != analysis.Compatible || status(after, "auth/login") != analysis.Broken {
+		t.Fatalf("login was %q, is %q", status(before, "auth/login"), status(after, "auth/login"))
+	}
+	if _, err := w.CollectionImpact("nope"); err == nil {
+		t.Fatal("an unknown collection gave no error")
+	}
+}

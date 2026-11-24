@@ -139,7 +139,16 @@ func outcomeFactsOf(list []model.Outcome) []card.OutcomeFact {
 	return out
 }
 
+// VersionFacts is what a card shows about one version of a request.
+func VersionFacts(v model.RequestVersion) card.Facts { return versionFacts(v) }
+
 func versionFacts(v model.RequestVersion) card.Facts {
+	f := versionFactsOf(v)
+	f.Verb = strings.ToUpper(Verb(v)) // the colour of the step's pill: the method, or the protocol, store or file format
+	return f
+}
+
+func versionFactsOf(v model.RequestVersion) card.Facts {
 	switch {
 	case v.Async != nil:
 		return asyncFacts(v)

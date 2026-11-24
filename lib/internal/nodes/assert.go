@@ -22,7 +22,7 @@ func assertSpec() Spec {
 			{Name: "check", Kind: ParamExpr, Doc: "True or false, written without braces. Give check, schema, problem or any of them."},
 			{Name: "schema", Kind: ParamString, Doc: "The id of an earlier request step: passes when what it received matches the response schema kept for its request."},
 			{Name: "problem", Kind: ParamString, Doc: "The id of an earlier request step: passes when what it received is a problem details document (RFC 9457): application/problem+json, a JSON object whose type, title, status, detail and instance are used as the RFC says."},
-			{Name: "on_fail", Kind: ParamEnum, Enum: []string{"error", "warn"}},
+			{Name: "on_fail", Kind: ParamEnum, Enum: []string{"error", "warn"}, Default: "error"},
 			{Name: "message", Kind: ParamText},
 		},
 		Run: runAssert,

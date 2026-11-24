@@ -118,8 +118,9 @@
         <Button variant="ghost" small danger title="Delete this step" onclick={() => confirmDeleteSteps(node, view.selection.length ? view.selection : [step.id])}>Delete…</Button>
       {/if}
     </div>
-    {#if editing && modes.length > 1}
-      <span class="mode"><Select label="How this step does its job" value={step.type} onchange={(e) => changeMode(e.currentTarget.value)}>
+    {#if modes.length > 1}
+      <!-- Changing it converts the step, which is an edit: without Edit the choice is shown and cannot be changed. -->
+      <span class="mode"><Select label="How this step does its job" disabled={!editing} title={editing ? '' : 'Turn on Edit to change how this step does its job'} value={step.type} onchange={(e) => changeMode(e.currentTarget.value)}>
         {#each modes as m (m.node)}<option value={m.node}>{m.label}</option>{/each}
       </Select></span>
     {/if}
@@ -279,16 +280,6 @@
         </Select>
       {/if}
 
-      {#if step.uses.length || step.usedBy.length}
-        <h4>Values<Hint>Where this step takes values from, and who takes values from it. The canvas draws these as dotted lines under the cards.</Hint></h4>
-        {#each step.uses as u}
-          <button class="lane named" onclick={() => FlowService.Select(node, u.from)}><span>← <code>{u.name}</code>{#if u.type} <span class="type" title="What the value is">{u.type}</span>{/if}</span><span class="muted">from {u.from}</span></button>
-        {/each}
-        {#each step.usedBy as u}
-          <button class="lane named" onclick={() => FlowService.Select(node, u.to)}><span>→ <code>{u.name}</code>{#if u.type} <span class="type" title="What the value is">{u.type}</span>{/if}</span><span class="muted">used by {u.to}</span></button>
-        {/each}
-      {/if}
-
         <h4>When &amp; failure</h4>
         <TemplateField label="Run when (expression)" help="flow.when" placeholder="vars.count > 3" value={step.when} oninput={(v) => text('when', v)} suggest={complete} vocabulary={vocabulary('flow.when')} />
         <Field label="Timeout (e.g. 5s)"><TextInput value={step.timeout} ontext={(v) => text('timeout', v)} /></Field>
@@ -357,13 +348,12 @@
   .skip:hover { color: var(--text); background: var(--tint-hover); }
   .skip.on { color: var(--warn); background: color-mix(in srgb, var(--warn) 14%, transparent); }
   h4 { margin: 8px 0 0; font-size: var(--fs-sm); }
-  .summary, .hint, .muted { color: var(--muted); font-size: var(--fs-sm); margin: 0; }
+  .summary, .hint { color: var(--muted); font-size: var(--fs-sm); margin: 0; }
   .field { display: flex; flex-direction: column; gap: 3px; }
   .label { color: var(--muted); font-size: var(--fs-sm); }
   .field.inline { flex-direction: row; align-items: center; }
   .field.inline .grow { flex: 1; }
   .mode { align-self: flex-start; }
-  .type { color: var(--muted); font-size: var(--fs-xs); border: 1px solid var(--line); border-radius: var(--r-pill); padding: 0 6px; }
   .lane { display: flex; align-items: flex-end; gap: 4px; }
   .lane :global(.field) { flex: 1; }
   .lane.named { align-items: center; justify-content: space-between; }

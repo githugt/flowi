@@ -6,6 +6,7 @@
   import { live } from './lib/live'
   import { ManagerService } from '../bindings/github.com/githugt/flowi/app/internal/bridge'
   import { ui } from './lib/ui.svelte'
+  import { pageNode } from './lib/collectionpage'
   import type { KeptSpec, ManagerView } from './lib/types'
   import PathField from './PathField.svelte'
   import SpecUpdateDialog from './SpecUpdateDialog.svelte'
@@ -122,6 +123,7 @@
         {#if c.missing}<span class="tag bad">missing</span>{/if}
         {#if c.draft}<span class="tag">draft</span>{/if}
         <span class="spacer"></span>
+        {#if !c.draft && !c.missing}<Button onclick={() => app.openScreen(pageNode(c.id), c.name || c.id)}>Overview</Button>{/if}
         {#if c.draft}
           <Button onclick={() => ui.confirm('Delete collection', 'Delete this collection and everything in it? This cannot be undone.', () => ManagerService.Discard(c.id))}>Delete…</Button>
         {:else}

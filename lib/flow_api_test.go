@@ -332,3 +332,20 @@ func TestFlowSource_Given_only_some_steps_Then_the_text_reads_back_as_those_step
 		t.Error("a url was read as steps")
 	}
 }
+
+func TestParseFlowSnippet_Given_a_request_named_by_path_alone_Then_it_is_read_and_the_flow_text_form_refuses_it(t *testing.T) {
+	// Before: steps copied for another collection name each request by path alone, but ParseFlowSource insisted on an id.
+	w := demoWorkspace(t)
+	target, _ := userCreation(t, w)
+	text := "id: " + string(target.Flow) + "\nnodes:\n  - id: call\n    type: request\n    request:\n      path: auth/login\n"
+
+	got, diags, err := w.ParseFlowSnippet(target, text)
+	_, strict, _ := w.ParseFlowSource(target, text)
+
+	if err != nil || len(diags) != 0 || len(got.Nodes) != 1 || got.Nodes[0].Request.Request.Path != "auth/login" || got.Nodes[0].Request.Request.ID != "" {
+		t.Fatalf("got %+v diags %v err %v", got.Nodes, diags, err)
+	}
+	if !strict.HasErrors() {
+		t.Fatal("ParseFlowSource accepted a reference with no id")
+	}
+}

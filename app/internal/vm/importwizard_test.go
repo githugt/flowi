@@ -56,7 +56,7 @@ func TestImportWizard_preview_lists_files_existing_and_lossy_reports(t *testing.
 	w.Wait()
 
 	if !b.Called("PreviewImport arazzo C1") || string(b.Previewed[0]) != "openapi: 3.0.3" {
-		t.Fatalf("calls %v", b.Calls)
+		t.Fatalf("calls %v", b.CallLog())
 	}
 	rows := iw.Rows()
 	if len(rows) != 3 || !rows[0].Exists || rows[1].Exists || iw.Existing() != 1 {
@@ -393,6 +393,43 @@ func TestImportWizard_nothing_is_scheduled_without_a_source_or_for_a_half_typed_
 	iw.SetFile("https://example.com/api.yaml")
 	if sched.started != 1 || iw.Waiting() != "" {
 		t.Fatalf("scheduled %d, waiting %q", sched.started, iw.Waiting())
+	}
+}
+
+// Before: each pause in typing a path was previewed, so the half-typed "/tmp/api" showed a "no such file" failure on the
+// way to "/tmp/api.yaml".
+func TestImportWizard_a_path_with_nothing_at_it_is_waited_for_not_previewed(t *testing.T) {
+	iw, b, w, file := newImportWizard(t)
+	sched := &manualScheduler{}
+	iw.SetScheduler(sched)
+
+	iw.SetFile(file[:len(file)-len(".yaml")])
+	sched.fire()
+	w.Wait()
+
+	if sched.started != 0 || len(b.PreviewedSources) != 0 || iw.Err() != "" || iw.Waiting() != "There is no file at that path yet." {
+		t.Fatalf("scheduled %d, previews %d, err %q, waiting %q", sched.started, len(b.PreviewedSources), iw.Err(), iw.Waiting())
+	}
+	iw.SetFile(file)
+	if sched.started != 1 || iw.Waiting() != "" {
+		t.Fatalf("scheduled %d, waiting %q", sched.started, iw.Waiting())
+	}
+	iw.SetKind(flowi.ImportBruno)
+	iw.SetFile(filepath.Join(t.TempDir(), "nowhere"))
+	if iw.Waiting() != "There is no folder at that path yet." {
+		t.Fatalf("waiting %q", iw.Waiting())
+	}
+}
+
+// Before: it kept the kind of the import before it, or the one a pasted text was recognised as.
+func TestImportWizard_StartOver_returns_to_the_first_kind(t *testing.T) {
+	iw, _, _, _ := newImportWizard(t)
+	iw.SetDetected(flowi.ImportAsyncAPI, "AsyncAPI 3.0.0")
+
+	iw.StartOver()
+
+	if iw.Kind() != flowi.ImportOpenAPI || iw.Detected() != "" {
+		t.Fatalf("kind %q detected %q", iw.Kind(), iw.Detected())
 	}
 }
 

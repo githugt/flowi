@@ -5,8 +5,8 @@
   import { alreadyShown } from './lib/codeecho'
   import { clamp } from './lib/clamp'
   import { EditorView, basicSetup } from 'codemirror'
-  import { Compartment, EditorState, Prec } from '@codemirror/state'
-  import { Decoration, MatchDecorator, ViewPlugin, keymap, type DecorationSet, type ViewUpdate } from '@codemirror/view'
+  import { Compartment, EditorState, Prec, StateEffect, StateField } from '@codemirror/state'
+  import { Decoration, MatchDecorator, ViewPlugin, WidgetType, keymap, type DecorationSet, type ViewUpdate } from '@codemirror/view'
   import { syntaxHighlighting } from '@codemirror/language'
   import { classHighlighter } from '@lezer/highlight'
   import { yaml } from '@codemirror/lang-yaml'
@@ -15,6 +15,7 @@
   import { sqlLanguage } from './lib/sqllang'
   import { onMount } from 'svelte'
   import { templatePattern, type CodeLang } from './lib/highlight'
+  import type { StepNote } from './lib/stepnotes'
 
   let {
     value,
@@ -23,6 +24,7 @@
     holdWhileFocused = false,
     onchange,
     oncursor,
+    notes = [],
   }: {
     value: string
     readonly?: boolean
@@ -32,6 +34,8 @@
     onchange?: (text: string) => void
     /** Called with the 1-based line the caret is on, when the user moves it. */
     oncursor?: (line: number) => void
+    /** Lines of text drawn above some lines, read-only and not part of the text (the code view's comment on each step). */
+    notes?: StepNote[]
   } = $props()
 
   let host: HTMLDivElement
@@ -58,7 +62,52 @@
     { decorations: (p) => p.decorations },
   )
 
+  // Notes sit between lines as widgets: they are not in the document, so they are not saved, copied or edited.
+  class NoteWidget extends WidgetType {
+    text: string
+    indent: number
+    constructor(text: string, indent: number) {
+      super()
+      this.text = text
+      this.indent = indent
+    }
+    eq(other: NoteWidget) {
+      return other.text === this.text && other.indent === this.indent
+    }
+    toDOM() {
+      const el = document.createElement('div')
+      el.className = 'cm-stepnote'
+      el.style.paddingLeft = `${this.indent}ch`
+      el.textContent = '# ' + this.text
+      el.title = 'Made from the request each time this is shown. It is not part of the flow.'
+      return el
+    }
+    ignoreEvent() {
+      return true
+    }
+  }
+  const setNotes = StateEffect.define<StepNote[]>()
+  const noteField = StateField.define<DecorationSet>({
+    create: () => Decoration.none,
+    update(deco, tr) {
+      deco = deco.map(tr.changes)
+      for (const e of tr.effects) {
+        if (!e.is(setNotes)) continue
+        const doc = tr.state.doc
+        deco = Decoration.set(
+          e.value
+            .filter((n) => n.line >= 1 && n.line <= doc.lines)
+            .map((n) => Decoration.widget({ widget: new NoteWidget(n.text, n.indent), block: true, side: -1 }).range(doc.line(n.line).from)),
+          true,
+        )
+      }
+      return deco
+    },
+    provide: (f) => EditorView.decorations.from(f),
+  })
+
   const theme = EditorView.theme({
+    '.cm-stepnote': { color: 'var(--muted)', fontStyle: 'italic', padding: '1px 0', userSelect: 'none', cursor: 'default' },
     '&': { height: '100%', backgroundColor: 'var(--bg)', color: 'var(--text)' },
     '&.cm-focused': { outline: 'none' },
     '.cm-scroller': { fontFamily: 'var(--mono)', fontSize: '12.5px' },
@@ -90,6 +139,7 @@
           language.of(languageFor(lang)),
           syntaxHighlighting(classHighlighter),
           templateMarks,
+          noteField,
           theme,
           access.of(accessFor(readonly)),
           EditorView.updateListener.of((u) => {
@@ -112,6 +162,11 @@
   })
   $effect(() => {
     view?.dispatch({ effects: access.reconfigure(accessFor(readonly)) })
+  })
+  // Set after the text, in the same tick, so the lines the notes name are the ones in the editor.
+  $effect(() => {
+    const list = notes
+    queueMicrotask(() => view?.dispatch({ effects: setNotes.of(list) }))
   })
 
   // Outside changes replace the text; the editor's own changes already match.

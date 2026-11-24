@@ -42,6 +42,10 @@ const skippedByYou = "skipped by you"
 // skippedInFlow is the reason of a node the flow itself marks as skipped.
 const skippedInFlow = "skipped in the flow"
 
+// skippedByWhen is the reason of a node whose when came out false. The run goes on past it as past a node the flow
+// marks as skipped; a node that never started because something before it failed has no reason.
+const skippedByWhen = "its when was false"
+
 // skipSet is the set of node ids and paths in a RunInput's Skip.
 func skipSet(ids []string) map[string]bool {
 	set := make(map[string]bool, len(ids))
@@ -96,7 +100,7 @@ func (r *runner) execNode(ctx context.Context, f *frame, n model.Node, path stri
 		return nodeResult{status: StatusFailed, diags: diags}
 	}
 	if !run {
-		return nodeResult{status: StatusSkipped}
+		return nodeResult{status: StatusSkipped, reason: skippedByWhen}
 	}
 	runner, ok := r.nodeRunner(n.Type)
 	if !ok {

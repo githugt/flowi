@@ -14,7 +14,7 @@ func stopSpec() Spec {
 	return Spec{
 		Type: "stop", Group: "Control", Summary: "End the run here: nothing after it starts. Useful in a branch of a condition.",
 		Params: []Param{
-			{Name: "status", Kind: ParamEnum, Enum: []string{"passed", "failed"}, Doc: "How the run ends: passed (default) is a normal end that skips the rest, failed ends it as a failure."},
+			{Name: "status", Kind: ParamEnum, Enum: []string{"passed", "failed"}, Default: "passed", Doc: "How the run ends: passed (default) is a normal end that skips the rest, failed ends it as a failure."},
 			{Name: "message", Kind: ParamText, Doc: "Why it stops; written to the run log, or into the failure."},
 		},
 		Run: runStop,

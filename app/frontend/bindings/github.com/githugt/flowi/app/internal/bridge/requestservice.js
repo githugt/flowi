@@ -965,6 +965,16 @@ export function SetMultipart(node, on) {
 }
 
 /**
+ * SetName gives the request its own name, "" for none; saving keeps it.
+ * @param {string} node
+ * @param {string} name
+ * @returns {$CancellablePromise<void>}
+ */
+export function SetName(node, name) {
+    return $Call.ByID(2706022065, node, name);
+}
+
+/**
  * SetOutcomes replaces the named ways the version can end, in order. An empty list (or nil) is the defaults,
  * success and failure.
  * @param {string} node
@@ -1174,6 +1184,17 @@ export function SuggestCopyName(node) {
  */
 export function SuggestSavePath(node) {
     return $Call.ByID(137184286, node);
+}
+
+/**
+ * SwitchType makes the selected version another type of request, keeping what the types share and what can be
+ * carried across, and says in a notice what was left behind. It is an edit: Discard undoes it.
+ * @param {string} node
+ * @param {string} id
+ * @returns {$CancellablePromise<void>}
+ */
+export function SwitchType(node, id) {
+    return $Call.ByID(2918835010, node, id);
 }
 
 /**

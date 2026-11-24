@@ -51,7 +51,7 @@ func summarizeRequest(n model.Node, f Facts) Card {
 	if !ok {
 		rule = kindRules()["http"]
 	}
-	c := Card{Badge: badgeOf(f, rule), Subline: f.Target, Ports: donePorts()}
+	c := Card{Badge: badgeOf(f, rule), Verb: f.Verb, Subline: f.Target, Ports: donePorts()}
 	if len(f.Outcomes) > 0 {
 		c.Ports = outcomePorts(f.Outcomes)
 	}

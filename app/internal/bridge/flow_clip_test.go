@@ -60,7 +60,8 @@ func TestFlowService_PasteSteps_Given_steps_text_Then_they_follow_the_selected_s
 	b.ParsedFlow = &model.Flow{Nodes: []model.Node{{ID: "a", Type: "log"}, {ID: "n", Type: "log"}}}
 	flows.Select(v.Node, "a")
 
-	ids, err := flows.PasteSteps(v.Node, "text")
+	pasted, err := flows.PasteSteps(v.Node, "text")
+	ids := pasted.IDs
 
 	got := lastViewOr(pub, v)
 	if err != nil || len(ids) != 2 || !slices.Equal(got.Selection, []string{ids[0], ids[1]}) {
@@ -75,9 +76,31 @@ func TestFlowService_PasteSteps_Given_steps_text_Then_they_follow_the_selected_s
 func TestFlowService_PasteSteps_Given_text_that_is_not_steps_Then_it_fails_and_the_flow_is_unchanged(t *testing.T) {
 	flows, v, pub, _ := openClip(t)
 
-	ids, err := flows.PasteSteps(v.Node, "https://example.com")
+	pasted, err := flows.PasteSteps(v.Node, "https://example.com")
+	ids := pasted.IDs
 
 	if err == nil || ids != nil || len(lastViewOr(pub, v).Diagram.Units) != len(v.Diagram.Units) {
 		t.Fatalf("ids %v, err %v", ids, err)
+	}
+}
+
+func TestFlowService_PasteSteps_Given_a_request_this_collection_lacks_Then_the_steps_are_pasted_and_it_is_reported(t *testing.T) {
+	flows, v, _, b := openClip(t)
+	b.ParsedFlow = &model.Flow{Nodes: []model.Node{{ID: "n", Type: "request", Request: &model.RequestCall{Request: model.Ref{Path: "orders/create"}}}}}
+
+	pasted, err := flows.PasteSteps(v.Node, "text")
+
+	if err != nil || len(pasted.IDs) != 1 || !slices.Equal(pasted.Unmatched, []string{"orders/create"}) {
+		t.Fatalf("pasted %+v, err %v", pasted, err)
+	}
+}
+
+func TestFlowService_CopyStepsPortable_Given_a_step_Then_it_is_copied_without_ids(t *testing.T) {
+	flows, v, _, b := openClip(t)
+
+	text, err := flows.CopyStepsPortable(v.Node, []string{"a"})
+
+	if err != nil || text == "" || len(b.SourcedFlow.Nodes) != 1 {
+		t.Fatalf("text %q, err %v, written %+v", text, err, b.SourcedFlow.Nodes)
 	}
 }

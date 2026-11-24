@@ -27,6 +27,10 @@
     toolbar = false,
     ontool,
     oncolour,
+    arrowStyle = '',
+    onarrows,
+    onopen,
+    openLabel = '',
     oncase,
     onrow,
     onport,
@@ -50,6 +54,10 @@
     breakpoint?: boolean // a debug session pauses before this step: a red dot in the header
     ontool?: (tool: 'add' | 'skip' | 'break' | 'duplicate' | 'delete', e: MouseEvent) => void
     oncolour?: (colour: string) => void // '' for the category's own
+    arrowStyle?: string // how the arrows leaving the step are drawn: 'curved', or '' for the default, square
+    onarrows?: (style: string) => void // '' for square, 'curved' for curves
+    onopen?: () => void // a request or subflow step: the small "open" button in the header opens what it calls, in its own tab
+    openLabel?: string // what that button says: "Open request" or "Open flow"
     oncase?: (index: number, e: MouseEvent) => void // a case's port label was clicked: edit its test in place
     onrow?: (key: string) => void
     onport?: (e: PointerEvent, port: string) => void // the pointer went down on an outcome port (done, fail or a named one): a link starts
@@ -85,12 +93,17 @@
   // The toolbar floats above the card (above the note, when there is one); the swatches open beside it.
   const TOOLS = [
     { id: 'colour', icon: 'palette', label: 'Colour' },
+    { id: 'arrows', icon: 'elbow', label: 'Arrows' },
     { id: 'add', icon: 'plus', label: 'Add a step after this one' },
     { id: 'skip', icon: 'skip', label: 'Skip this step in the next runs' },
     { id: 'break', icon: 'breakpoint', label: 'Pause before this step when debugging' },
     { id: 'duplicate', icon: 'copy', label: 'Duplicate this step' },
     { id: 'delete', icon: 'trash', label: 'Delete this step' },
   ] as const
+  // The arrows tool shows what its arrows are now and says what a press does: square is the default, a press makes curves.
+  const toolIcon = (t: (typeof TOOLS)[number]) => (t.id === 'arrows' && arrowStyle === 'curved' ? 'curve' : t.icon)
+  const toolLabel = (t: (typeof TOOLS)[number]) =>
+    t.id === 'arrows' ? (arrowStyle === 'curved' ? 'Arrows from this step are curved: draw them square' : 'Arrows from this step are square: draw them as curves') : t.label
   const BTN = 32
   const barTop = $derived(note ? -80 : -48)
   let swatches = $state(false)
@@ -99,6 +112,7 @@
   })
   function tool(id: (typeof TOOLS)[number]['id'], e: MouseEvent) {
     if (id === 'colour') swatches = !swatches
+    else if (id === 'arrows') onarrows?.(arrowStyle === 'curved' ? '' : 'curved')
     else ontool?.(id, e)
   }
 </script>
@@ -118,7 +132,7 @@
       <text class="chip" x={12 + chipW / 2} y="27.5" text-anchor="middle" style:fill="var(--on-tile)">{face.badge}</text>
     {:else}
       <!-- The chip wears the verb's own colour, as the pill in the tree does, not the one blue of every request. -->
-      <g style:--v={`var(--v-${verbKey(face.badge ?? '')})`}>
+      <g style:--v={`var(--v-${verbKey(face.verb || face.badge || '')})`}>
         <rect class="verbtile" x="12" y="9" width={chipW} height="28" rx="8" />
         <text class="chip" x={12 + chipW / 2} y="27.5" text-anchor="middle" style:fill="var(--v)">{face.badge}</text>
       </g>
@@ -127,7 +141,16 @@
     <rect class="tile" x="12" y="9" width="28" height="28" rx="8" style:fill={`var(${tile})`} />
     <g class="tileicon" transform="translate(16 13)" style:color={colour ? 'var(--on-tile)' : 'var(--text)'}><Icon name={typeIcon(type)} size={20} /></g>
   {/if}
-  <text class="title" class:big={tiled} x={headX} y={tiled ? 31 : 28}>{clipWidth(title, Math.floor((w - headX - 30) / (tiled ? 11 : 7.6)))}<title>{tip || title}</title></text>
+  <text class="title" class:big={tiled} x={headX} y={tiled ? 31 : 28}>{clipWidth(title, Math.floor((w - headX - 30 - (onopen && !tiled ? 34 : 0)) / (tiled ? 11 : 7.6)))}<title>{tip || title}</title></text>
+  <!-- Double-click opens the request too, but nothing on the card said so: a button in the header, quiet until the card is hovered or chosen. -->
+  {#if onopen && !tiled}
+    <g class="opencard" role="button" tabindex="-1" aria-label={openLabel} transform={`translate(${w - (mark !== 'none' ? 64 : 40)} 12)`}
+      onpointerdown={(e) => e.stopPropagation()} ondblclick={(e) => e.stopPropagation()} onclick={(e) => { e.stopPropagation(); onopen() }} onkeydown={() => {}}>
+      <title>{openLabel}</title>
+      <rect x="-2" y="-2" width="24" height="24" rx="7" />
+      <g transform="translate(2 2)"><Icon name="open" size={16} /></g>
+    </g>
+  {/if}
   <!-- How it went is a shape as well as a colour: a tick, a cross, or a ring for a step still running. -->
   {#if mark !== 'none'}
     <g class="state {status}" transform={`translate(${w - 28} 12)`} aria-hidden="true">
@@ -210,11 +233,11 @@
     <g class="toolbar" transform={`translate(0 ${barTop})`} role="toolbar" aria-label="Step tools">
       <rect class="bar" width={TOOLS.length * BTN + 12} height="40" rx="12" />
       {#each TOOLS as t, i (t.id)}
-        <g class="tool" class:on={(t.id === 'skip' && skipped) || (t.id === 'break' && breakpoint) || (t.id === 'colour' && swatches)} role="button" tabindex="-1" aria-label={t.label}
+        <g class="tool" class:on={(t.id === 'skip' && skipped) || (t.id === 'break' && breakpoint) || (t.id === 'colour' && swatches)} role="button" tabindex="-1" aria-label={toolLabel(t)}
           onpointerdown={(e) => e.stopPropagation()} onclick={(e) => tool(t.id, e)} onkeydown={() => {}}>
-          <title>{t.label}</title>
+          <title>{toolLabel(t)}</title>
           <rect x={6 + i * BTN} y="4" width={BTN} height="32" rx="8" />
-          <g class="toolicon" transform={`translate(${6 + i * BTN + 8} 12)`}><Icon name={t.icon} size={16} /></g>
+          <g class="toolicon" transform={`translate(${6 + i * BTN + 8} 12)`}><Icon name={toolIcon(t)} size={16} /></g>
         </g>
       {/each}
       {#if swatches}
@@ -310,6 +333,10 @@
   .dataport path { fill: none; stroke: var(--data); stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; pointer-events: none; }
   .stepcard:hover .dataport, .selected .dataport { opacity: 1; }
   .dataport:hover rect { fill: color-mix(in srgb, var(--data) 28%, var(--bg)); }
+  .opencard { cursor: pointer; opacity: 0.45; transition: opacity 0.15s; color: var(--muted); }
+  .opencard rect { fill: transparent; }
+  .opencard:hover rect { fill: var(--tint-hover); }
+  .stepcard:hover .opencard, .selected .opencard, .opencard:hover { opacity: 1; color: var(--text); }
   .portadd { cursor: pointer; opacity: 0; transition: opacity 0.15s; }
   .portadd circle { fill: var(--bg); stroke-width: 1.6; stroke-dasharray: 3 2; }
   .portadd path { fill: none; stroke-width: 1.6; stroke-linecap: round; pointer-events: none; }

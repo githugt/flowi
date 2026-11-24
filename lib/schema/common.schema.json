@@ -123,6 +123,13 @@
           ],
           "description": "With attach: draw this node in a stack above or below that request, not beside it."
         },
+        "arrow_style": {
+          "enum": [
+            "square",
+            "curved"
+          ],
+          "description": "How the canvas draws the arrows that leave this step: square, with rounded corners (the default), or curved. A view only."
+        },
         "request": {
           "$ref": "#/$defs/ref"
         },
@@ -885,6 +892,7 @@
             "code",
             "eye",
             "flask",
+            "shield",
             "rocket",
             "flag",
             "star",
@@ -897,7 +905,7 @@
             "clock",
             "alert"
           ],
-          "description": "Default flag."
+          "description": "Default flag. \"rocket\" is still read (an older default for production) but no longer offered."
         }
       }
     }

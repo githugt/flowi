@@ -5,10 +5,12 @@ package flowi
 import (
 	"os"
 	"path/filepath"
+	"reflect"
 	"slices"
 	"strings"
 	"testing"
 
+	"github.com/githugt/flowi/lib/diag"
 	"github.com/githugt/flowi/lib/model"
 	"github.com/githugt/flowi/lib/store"
 )
@@ -51,7 +53,7 @@ func TestPreviewImportSource_Given_a_pasted_websocket_document_Then_the_plan_nam
 	}
 }
 
-func TestApplyImportReport_Given_a_request_of_the_same_path_and_keep_mine_Then_it_is_reported_as_kept_not_written(t *testing.T) {
+func TestApplyImportReport_Given_a_different_request_at_the_same_path_and_keep_mine_Then_the_import_goes_beside_it(t *testing.T) {
 	w, c := petsCollection(t)
 	// A request called echo is already there, like the HTTP one of a demo server.
 	existing := model.Request{Meta: model.Meta{ID: w.newID(), Name: "echo"}, Path: "echo", Versions: []model.RequestVersion{{Label: "1", Method: "POST", URL: "http://localhost:8080/echo"}}}
@@ -66,49 +68,33 @@ func TestApplyImportReport_Given_a_request_of_the_same_path_and_keep_mine_Then_i
 	if err != nil {
 		t.Fatal(err)
 	}
-	// Before: ApplyImport said nothing; the window printed "Imported 2 files" (3 planned, 1 existing) while one
-	// request was written and the other was kept, and none of it said which.
-	if got := namesOf(report.Written, PlannedRequest); !slices.Equal(got, []string{"Receive ticks"}) {
+	// Before: the WebSocket echo was dropped ("kept yours") or, with Overwrite, replaced the HTTP one: two operations that
+	// share a name could not both be had. Now the import is named echo-2 and says so.
+	if got := namesOf(report.Written, PlannedRequest); !slices.Equal(got, []string{"Echo (send a message, get it back)", "Receive ticks"}) {
 		t.Errorf("written requests %v", got)
 	}
-	if got := namesOf(report.Kept, PlannedRequest); !slices.Equal(got, []string{"echo"}) {
-		t.Errorf("kept requests %v", got)
-	}
-	if len(report.Written) != 2 || len(report.Kept) != 1 || len(report.Replaced)+len(report.Unchanged)+len(report.Removed) != 0 {
+	if len(report.Kept) != 0 || len(report.Written) != 3 {
 		t.Errorf("report %+v", report)
 	}
-	if got := requestAt(t, w, c, "echo"); got.Name != "echo" {
-		t.Errorf("the request kept is %q", got.Name)
+	if got := requestAt(t, w, c, "echo"); got.Name != "echo" || got.Versions[0].Method != "POST" {
+		t.Errorf("the request that was there is %+v", got)
+	}
+	if got := requestAt(t, w, c, "echo-2"); got.Versions[0].Async == nil {
+		t.Errorf("echo-2 is %+v", got)
+	}
+	var renamed []string
+	for _, d := range plan.Diags {
+		if d.Code == diag.CodeImportRenamed {
+			renamed = append(renamed, d.Args["path"]+" -> "+d.Args["name"])
+		}
+	}
+	if !slices.Equal(renamed, []string{"echo -> echo-2"}) {
+		t.Errorf("the plan says %v", renamed)
 	}
 }
 
-func TestPreviewImportSource_Given_a_different_request_at_the_same_path_Then_the_plan_names_the_one_in_the_way(t *testing.T) {
-	w, c := petsCollection(t)
-	// A NATS request called "Subscribe to flowi.demo.ticks" has the operation id receiveTicks, so it holds the file
-	// the WebSocket operation of the same id would write.
-	existing := model.Request{Meta: model.Meta{ID: w.newID(), Name: "Subscribe to flowi.demo.ticks"}, Path: "receiveTicks", Versions: []model.RequestVersion{{Label: "1", Method: "GET", URL: "http://localhost/ticks"}}}
-	writeRequest(t, w, c, existing)
-
-	plan, err := w.PreviewImportSource(pastedWebSocket(t), c)
-
-	if err != nil {
-		t.Fatal(err)
-	}
-	// Before: the plan only said the file existed, so a person who could not find "receiveTicks" in the sidebar
-	// (it is listed under the title of the NATS request) could not tell where the clash was.
-	got := map[string]string{}
-	for _, f := range plan.Files {
-		got[f.Rel] = f.ExistingName
-	}
-	if got["requests/receiveTicks.req.yaml"] != "Subscribe to flowi.demo.ticks" {
-		t.Errorf("existing names %v", got)
-	}
-	if got["requests/echo.req.yaml"] != "" {
-		t.Errorf("a new file has no existing name: %v", got)
-	}
-}
-
-func TestApplyImportReport_Given_overwrite_Then_the_request_is_replaced_and_an_identical_one_unchanged(t *testing.T) {
+// Before: importing the same document again with Keep mine put nothing new down; a re-import must stay a re-import.
+func TestApplyImportReport_Given_the_same_document_twice_and_keep_mine_Then_the_second_is_kept_not_renamed(t *testing.T) {
 	w, c := petsCollection(t)
 	first, err := w.PreviewImportSource(pastedWebSocket(t), c)
 	if err == nil {
@@ -117,7 +103,111 @@ func TestApplyImportReport_Given_overwrite_Then_the_request_is_replaced_and_an_i
 	if err != nil {
 		t.Fatal(err)
 	}
-	writeRequest(t, w, c, model.Request{Meta: model.Meta{ID: w.newID(), Name: "mine"}, Path: "echo", Versions: []model.RequestVersion{{Label: "1", Method: "GET", URL: "http://x"}}})
+	again, err := w.PreviewImportSource(pastedWebSocket(t), c)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	report, err := w.ApplyImportReport(again, ApplyOptions{SkipExisting: true})
+
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(report.Written) != 0 || len(report.Kept) != 3 {
+		t.Fatalf("report %+v", report)
+	}
+	if rels := relsOf(again); slices.Contains(rels, "requests/echo-2.req.yaml") {
+		t.Fatalf("a re-import was renamed: %v", rels)
+	}
+}
+
+func TestPreviewImportSource_Given_a_different_request_at_the_same_path_Then_the_plan_puts_the_import_beside_it_and_says_so(t *testing.T) {
+	w, c := petsCollection(t)
+	// A request titled "Subscribe to flowi.demo.ticks" holds the file the WebSocket operation receiveTicks would write.
+	existing := model.Request{Meta: model.Meta{ID: w.newID(), Name: "Subscribe to flowi.demo.ticks"}, Path: "receiveTicks", Versions: []model.RequestVersion{{Label: "1", Method: "GET", URL: "http://localhost/ticks"}}}
+	writeRequest(t, w, c, existing)
+
+	plan, err := w.PreviewImportSource(pastedWebSocket(t), c)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Before: the plan said "exists (Subscribe to flowi.demo.ticks): yours is kept", so the operation was lost.
+	got := map[string]bool{}
+	for _, f := range plan.Files {
+		got[f.Rel] = f.Exists
+	}
+	if exists, planned := got["requests/receiveTicks-2.req.yaml"]; !planned || exists {
+		t.Errorf("files %v, want a new receiveTicks-2", got)
+	}
+	if _, planned := got["requests/receiveTicks.req.yaml"]; planned {
+		t.Errorf("the plan still writes over the request that is there: %v", got)
+	}
+	msg := ""
+	for _, d := range plan.Diags {
+		if d.Code == diag.CodeImportRenamed {
+			msg, _ = diag.English().Message(d)
+		}
+	}
+	if !strings.Contains(msg, "receiveTicks") || !strings.Contains(msg, "receiveTicks-2") {
+		t.Errorf("message %q", msg)
+	}
+}
+
+// Before: re-importing an AsyncAPI document with Overwrite replaced each request wholesale, so the person's title and
+// checks were gone; only an OpenAPI import merged.
+func TestApplyImportReport_Given_overwrite_and_a_changed_asyncapi_document_Then_the_request_keeps_what_the_person_added_and_takes_the_documents_change(t *testing.T) {
+	w, c := petsCollection(t)
+	first, err := w.PreviewImportSource(pastedWebSocket(t), c)
+	if err == nil {
+		err = w.ApplyImport(first, ApplyOptions{})
+	}
+	if err != nil {
+		t.Fatal(err)
+	}
+	before := requestAt(t, w, c, "echo")
+	edited := before
+	edited.Name = "mine"
+	edited.Versions = slices.Clone(before.Versions)
+	edited.Versions[0].Assert = []string{"status == 101"}
+	writeRequest(t, w, c, edited)
+	changed := pastedWebSocket(t)
+	changed.Data = []byte(strings.Replace(string(changed.Data), "address: /ws\n", "address: /ws-v2\n", 1))
+	again, err := w.PreviewImportSource(changed, c)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	report, err := w.ApplyImportReport(again, ApplyOptions{Overwrite: true})
+
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(report.Replaced) == 0 {
+		t.Fatalf("nothing was replaced: %+v", report)
+	}
+	got := requestAt(t, w, c, "echo")
+	if got.Name != "mine" || !slices.Equal(got.Versions[0].Assert, []string{"status == 101"}) {
+		t.Errorf("what the person added is gone: name %q asserts %v", got.Name, got.Versions[0].Assert)
+	}
+	if reflect.DeepEqual(got.Versions[0].Async, before.Versions[0].Async) {
+		t.Errorf("the document's new address was not taken: %+v", got.Versions[0].Async)
+	}
+}
+
+// A re-import of the same document changes nothing: what the person edited is theirs, and the rest is what it was.
+func TestApplyImportReport_Given_overwrite_and_the_same_asyncapi_document_Then_an_edited_request_is_unchanged(t *testing.T) {
+	w, c := petsCollection(t)
+	first, err := w.PreviewImportSource(pastedWebSocket(t), c)
+	if err == nil {
+		err = w.ApplyImport(first, ApplyOptions{})
+	}
+	if err != nil {
+		t.Fatal(err)
+	}
+	edited := requestAt(t, w, c, "echo")
+	edited.Name = "mine"
+	writeRequest(t, w, c, edited)
 	again, err := w.PreviewImportSource(pastedWebSocket(t), c)
 	if err != nil {
 		t.Fatal(err)
@@ -128,11 +218,8 @@ func TestApplyImportReport_Given_overwrite_Then_the_request_is_replaced_and_an_i
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := namesOf(report.Replaced, PlannedRequest); !slices.Equal(got, []string{"Echo (send a message, get it back)"}) {
-		t.Errorf("replaced %v", got)
-	}
-	if len(report.Unchanged) != 2 || len(report.Written) != 0 { // the document and receiveTicks are what they were
-		t.Errorf("report %+v", report)
+	if len(report.Replaced) != 0 || len(report.Written) != 0 || requestAt(t, w, c, "echo").Name != "mine" {
+		t.Fatalf("report %+v", report)
 	}
 }
 

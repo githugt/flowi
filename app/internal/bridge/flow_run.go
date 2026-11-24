@@ -26,6 +26,9 @@ type RunView struct {
 	Statuses map[string]string `json:"statuses"` // by step id
 	Results  map[string]string `json:"results"`  // by step id: "passed · 120ms"
 	Timeline []TimelineBar     `json:"timeline"` // the steps on the run's clock, by start
+	// Through lists the steps the run skipped on purpose (by you, in the flow, or by their when): the run goes on past
+	// them, so the canvas lights the arrows into and out of them. A step that never started is not in it.
+	Through []string `json:"through"`
 }
 
 // VarsView is what the flow does with variables and secrets.
@@ -379,7 +382,7 @@ func runComparisonViewOf(c vm.RunComparison) RunComparisonView {
 
 // runViewOf builds the RunView; call it on the actor.
 func runViewOf(o *openFlow) RunView {
-	v := RunView{Running: o.run.Running(), Error: o.run.Err(), Statuses: map[string]string{}, Results: map[string]string{}}
+	v := RunView{Running: o.run.Running(), Error: o.run.Err(), Statuses: map[string]string{}, Results: map[string]string{}, Through: []string{}}
 	v.Timeline = timelineOf(o.doc.NodeIDs(), o.run.Detail, o.run.Began(), time.Now())
 	for _, id := range o.doc.NodeIDs() {
 		d, ok := o.run.Detail(id)
@@ -388,6 +391,9 @@ func runViewOf(o *openFlow) RunView {
 		}
 		v.Statuses[id] = d.Status
 		v.Results[id] = resultLine(d)
+		if d.Status == "skipped" && d.Reason != "" {
+			v.Through = append(v.Through, id)
+		}
 	}
 	if r := o.run.Result(); r.RunID != "" && v.Error == "" && !v.Running {
 		v.Summary = runSummary(string(r.Status), r.Seed, v.Statuses)

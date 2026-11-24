@@ -34,6 +34,12 @@ func NodeColors() []string {
 	return []string{"blue", "green", "amber", "pink", "purple", "teal", "black", "red", "sky"}
 }
 
+// NodeArrowStyles are the ways the canvas may draw the arrows that leave a step: "square" (the default, drawn when none
+// is set) runs them with square, rounded corners; "curved" draws them as curves.
+func NodeArrowStyles() []string {
+	return []string{"square", "curved"}
+}
+
 // HookControl decides which API hooks a request node runs. Mode is "all"
 // (default) or "none"; Skip lists "pre", "post" and/or "message".
 type HookControl struct {
@@ -158,6 +164,9 @@ type Node struct {
 	// Color is a colour from NodeColors the canvas draws the step in; "" for
 	// the category's own. It is cosmetic: a run never reads it.
 	Color string
+	// ArrowStyle is how the canvas draws the arrows that leave this step, one of NodeArrowStyles; "" is square. Like
+	// Color it is cosmetic: a run never reads it.
+	ArrowStyle string
 	// Skipped says the step does not run, in any run of the flow, until the mark is taken off: the step and
 	// everything inside it are reported as skipped, and the steps that read what it would have made get no value.
 	// (A run can also skip steps for that run only: see RunOptions.Skip.)

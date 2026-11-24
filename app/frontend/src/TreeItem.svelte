@@ -8,7 +8,11 @@
   import { rowMenu } from './lib/menus'
   import { ui } from './lib/ui.svelte'
   import Verb from './Verb.svelte'
+  import Icon from './Icon.svelte'
+  import IconButton from './IconButton.svelte'
   import StatusIcon from './StatusIcon.svelte'
+  import { hover } from './lib/hovercard.svelte'
+  import { subtitle, type RowNode, type SectionId } from './lib/sidebarview'
   import { highlightParts } from './lib/treefilter'
   import { WorkspaceService } from '../bindings/github.com/githugt/flowi/app/internal/bridge'
   import { moved } from './lib/reorder'
@@ -17,12 +21,19 @@
   import { flowResult, requestResult } from './lib/rowmark'
 
   // query: the "Jump to…" text; while there is one, groups show open so every hit is visible, and rows keep their order.
-  let { node, depth, parent, tint = '', query = '' }: { node: TreeNode; depth: number; parent?: TreeNode; tint?: string; query?: string } = $props()
+  // section: the part of the sidebar the row is in; a collection is in two (Requests and Flows), so its fold is kept
+  // for each. flat: the list view, a row with its place under its name, and no folding.
+  let { node, depth, parent, tint = '', query = '', section = '', flat = false }: { node: RowNode; depth: number; parent?: RowNode; tint?: string; query?: string; section?: SectionId | ''; flat?: boolean } = $props()
   // Each level indents by this much; the guide line under a group sits at the middle of its chevron.
   const INDENT = 12
-  const open = $derived(treeState.isOpen(node.id))
+  const foldKey = $derived(node.kind === 'collection' && section ? `${section}|${node.id}` : node.id)
+  const open = $derived(treeState.isOpen(foldKey))
   const shown = $derived(open || !!query)
-  const branch = $derived(!['request', 'environment', 'flow', 'missing', 'broken'].includes(node.kind))
+  const branch = $derived(!flat && !['request', 'environment', 'flow', 'missing', 'broken'].includes(node.kind))
+  // A collection or a folder has the folder icon; a request or a flow has its pill instead, so the two are told apart.
+  const isFolder = $derived(node.kind === 'folder')
+  const starred = $derived(node.kind === 'collection' && app.sidebar.favourites.includes(node.id))
+  const starrable = $derived(node.kind === 'collection' && !node.scratch)
   const active = $derived(app.active === node.id)
 
   const markable = $derived(['request', 'flow', 'environment'].includes(node.kind))
@@ -44,6 +55,7 @@
   }
 
   function click(e: MouseEvent) {
+    hover.leave()
     if (justDragged) {
       justDragged = false
       return
@@ -61,7 +73,7 @@
     app.marked = []
     app.markAnchor = node.id
     if (node.kind === 'broken') return void ui.toast(rowTitle(node) + '. Fix the file in a text editor; Flowi reads it again when it changes.', 'warn')
-    if (branch) treeState.toggle(node.id)
+    if (branch) treeState.toggle(foldKey)
     else app.open(node)
   }
 
@@ -70,10 +82,10 @@
   // other marked rows when the dragged one is marked): before, a drag could only reorder.
   // A press only becomes a drag after a few pixels; the click that ends a drag is not a click.
   // A filtered parent lists only some of its children, so the order it would save would be wrong.
-  const reorderable = $derived(!query && !!parent && !!node.name && ['request', 'flow', 'folder'].includes(node.kind) && ['requests', 'flows', 'folder'].includes(parent.kind))
+  const reorderable = $derived(!query && !flat && !!parent && !!node.name && ['request', 'flow', 'folder'].includes(node.kind) && ['requests', 'flows', 'folder', 'collection'].includes(parent.kind))
   const movable = $derived(node.kind === 'request')
   // Rows requests can be dropped into.
-  const container = $derived(node.kind === 'collection' || (node.kind === 'requests' || node.kind === 'folder') && node.tree === 'requests')
+  const container = $derived(!flat && ((node.kind === 'collection' && section !== 'flows') || (node.kind === 'folder' && node.tree === 'requests')))
   let drag = $state<{ startY: number; active: boolean; over: string; after: boolean; into: string } | null>(null)
   let justDragged = false
 
@@ -87,6 +99,7 @@
     if (!drag) return
     if (!drag.active && Math.abs(e.clientY - drag.startY) < 5) return
     drag.active = true
+    hover.leave()
     drag.over = drag.into = ''
     app.treeDrop = null
     const row = document.elementFromPoint(e.clientX, e.clientY)?.closest<HTMLElement>('[data-tree-row]')
@@ -118,7 +131,8 @@
     // Dropped after the row under it: its place, unless the dragged row was above it (the list shifts up).
     const to = d.after ? (from < target ? target : target + 1) : from < target ? target - 1 : target
     const next = moved(names, from, clamp(to, 0, names.length - 1))
-    if (next.join('/') !== names.join('/')) WorkspaceService.Reorder(parent.id, next, false)
+    // A collection in a section stands for the group of its children (Requests or Flows): that is what is reordered.
+    if (next.join('/') !== names.join('/')) WorkspaceService.Reorder(parent.groupId ?? parent.id, next, false)
   }
 
   // F2 renames and Delete deletes the row in focus, through the same menu entries (and questions) as the right-click.
@@ -136,24 +150,36 @@
   }
 </script>
 
-<div role="treeitem" aria-selected={active} aria-expanded={branch ? shown : undefined} class:leaf={!branch}>
-  <button class="row" title={rowTitle(node)} class:active class:marked class:broken={node.kind === 'broken'} class:group={branch} class:heading={branch && depth === 0} class:dragging={drag?.active}
+<div role="treeitem" aria-selected={active} aria-expanded={branch ? shown : undefined} class:leaf={!branch} class:flat>
+  <button class="row" class:active class:marked class:broken={node.kind === 'broken'} class:coll={node.kind === 'collection'} class:flat class:dragging={drag?.active}
     class:dropBefore={app.treeDrop?.id === node.id && !app.treeDrop.into && !app.treeDrop.after}
     class:dropAfter={app.treeDrop?.id === node.id && !app.treeDrop.into && app.treeDrop.after}
-    class:dropInto={app.treeDrop?.id === node.id && app.treeDrop.into}
-    data-tree-row={node.id} style:--tint={tint || undefined} data-markable={markable ? '' : undefined} data-drop={container ? '' : undefined} style:padding-left={`${8 + depth * INDENT}px`}
-    onclick={click} onkeydown={keys} oncontextmenu={contextmenu} onpointerdown={down} onpointermove={move} onpointerup={up} onpointercancel={up}>
-    <span class="twist" class:open={shown} aria-hidden="true">{#if branch}<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6" /></svg>{/if}</span>
-    {#if node.kind === 'request' && node.method}<span class="method"><Verb verb={node.method} short pill={false} /></span>{:else if node.kind === 'flow'}<span class="method"><Verb verb="FLOW" pill={false} /></span>{:else if node.kind === 'broken'}<span class="method"><span class="unmerged" role="img" aria-label="Cannot load">⚠ unmerged</span></span>{/if}
-    <span class="label">{#if query}{#each highlightParts(node.label, query) as part}{#if part.hit}<mark>{part.text}</mark>{:else}{part.text}{/if}{/each}{:else}{node.label}{/if}</span>
+    class:dropInto={container && app.treeDrop?.id === node.id && app.treeDrop.into}
+    data-tree-row={node.id} style:--tint={tint || undefined} data-markable={markable ? '' : undefined} data-drop={container ? '' : undefined} style:padding-left={flat ? undefined : `${8 + depth * INDENT}px`}
+    onclick={click} onkeydown={keys} oncontextmenu={contextmenu} onpointerdown={(e) => { hover.leave(); down(e) }} onpointermove={move} onpointerup={up} onpointercancel={up}
+    onpointerenter={(e) => hover.enter(e.currentTarget, node.id)} onpointerleave={() => hover.leave()} onfocus={(e) => hover.enter(e.currentTarget, node.id)} onblur={() => hover.leave()}>
+    {#if !flat}<span class="twist" class:open={shown} aria-hidden="true">{#if branch}<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6" /></svg>{/if}</span>{/if}
+    {#if isFolder}<span class="folder" aria-hidden="true"><Icon name="folder" size={14} /></span>
+    {:else if node.kind === 'collection' && node.scratch}<span class="folder" aria-hidden="true"><Icon name="note" size={14} /></span>
+    {:else if node.kind === 'environment'}<span class="folder" aria-hidden="true"><Icon name="globe" size={14} /></span>
+    {:else if node.kind === 'request' && node.method}<span class="method"><Verb verb={node.method} short compact /></span>{:else if node.kind === 'flow'}<span class="method"><Verb verb="FLOW" compact /></span>{:else if node.kind === 'broken'}<span class="method"><span class="unmerged" role="img" aria-label="Cannot load">⚠ unmerged</span></span>{/if}
+    <span class="text"><span class="label">{#if query}{#each highlightParts(node.label, query) as part}{#if part.hit}<mark>{part.text}</mark>{:else}{part.text}{/if}{/each}{:else}{node.label}{/if}</span>{#if flat && subtitle(node)}<span class="sub">{subtitle(node)}</span>{/if}</span>
     {#if node.status}<StatusIcon mark={node.status} size={12} />{/if}
     {#if markable && app.isDirty(node.id)}<span class="dirtydot" title="Unsaved changes" role="img" aria-label="Unsaved changes"></span>{/if}
+    {#if node.kind === 'environment'}
+      {#if app.tree?.selected === node.label}<span class="active">Active</span>{/if}
+      {#if app.envIssues[node.id]}<span class="issues">{app.envIssues[node.id]} unresolved</span>{/if}
+    {/if}
     {#if result}<span class="result {result}" title={result === 'passed' ? 'The last run passed' : 'The last run failed'} role="img" aria-label={result === 'passed' ? 'The last run passed' : 'The last run failed'}>{result === 'passed' ? '✓' : '✗'}</span>{/if}
+    {#if starrable}<span class="starslot" aria-hidden="true"></span>{/if}
   </button>
+  {#if starrable}
+    <span class="star" class:on={starred}><IconButton icon="star" size={13} filled={starred} label={starred ? `Take ${node.label} off the favourites` : `Add ${node.label} to the favourites`} hint={starred ? 'Favourite: click to unpin' : 'Pin to the top'} aria-pressed={starred} onclick={() => WorkspaceService.ToggleFavourite(node.id)} /></span>
+  {/if}
   {#if branch && shown}
     <div class="kids" role="group" style:--guide={`${8 + depth * INDENT + 6}px`}>
       {#each node.children ?? [] as child (child.id)}
-        <TreeItem node={child} depth={depth + 1} parent={node} {query} />
+        <TreeItem node={child} depth={depth + 1} parent={node} {query} {section} />
       {/each}
     </div>
   {/if}
@@ -162,6 +188,8 @@
 <style>
   /* A row far off screen is not laid out or painted: a collection of thousands of requests stays quick to scroll. */
   .leaf { content-visibility: auto; contain-intrinsic-size: auto var(--row-h); }
+  [role='treeitem'] { position: relative; }
+  .leaf.flat { contain-intrinsic-size: auto var(--row-h-lg); }
   /* A collection row tinted by the custom palette's rainbow (the colour is the palette's; the text stays the theme's). */
   .row[style*="--tint"] { background: color-mix(in srgb, var(--tint) 22%, transparent); }
   .row {
@@ -189,21 +217,37 @@
   .row.active { background: var(--tint-sel); }
   /* The 2px bar marks keyboard focus only; the open row is shown by its fill. */
   .row:focus-visible { outline: none; box-shadow: inset 2px 0 0 var(--accent); }
-  /* Sub-groups (Requests, Flows …) read as quiet sentence-case headings; only a collection's root keeps capitals. */
-  .group { color: var(--muted); font-weight: 600; font-size: var(--fs-sm); }
-  .heading { font-size: var(--fs-xs); text-transform: uppercase; letter-spacing: 0.05em; }
+  /* A collection reads a little stronger than the folders and requests under it. Only folders have the folder icon, so a
+     folder is not taken for a collection; Drafts, the one special collection, has a note. */
+  .coll { font-weight: 600; }
+  .folder { flex: none; display: inline-flex; color: var(--muted); }
+  .coll .folder { color: var(--text); }
+  .text { min-width: 0; display: flex; flex-direction: column; }
+  /* The list view: a row is two lines, the name and where it lives, so a hit among many says which collection and folder it is in. */
+  .row.flat { height: auto; min-height: var(--row-h-lg); padding: 4px 8px; }
+  .sub { color: var(--muted); font-size: var(--fs-xs); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  /* The star sits over the end of a collection's row: faint until the row is pointed at, then solid, and it stays when on. */
+  .starslot { flex: none; width: 24px; }
+  .star { position: absolute; right: 2px; top: calc((var(--row-h) - 24px) / 2); opacity: 0; transition: opacity var(--t-fast) var(--ease-out); }
+  [role='treeitem']:hover > .star, .star:focus-within, .star.on { opacity: 1; }
+  .star.on { color: var(--warn); }
+  .star.on :global(.iconbtn) { color: var(--warn); }
   .twist { flex: none; width: 12px; height: 12px; color: var(--muted); display: grid; place-items: center; transition: transform var(--t-fast) var(--ease-out); }
   .twist.open { transform: rotate(90deg); }
   .row.broken .label { color: var(--fail); text-decoration: line-through; text-decoration-color: color-mix(in srgb, var(--fail) 50%, transparent); }
   .unmerged { color: var(--fail); font-size: var(--fs-xs); white-space: nowrap; }
   .label mark { background: none; color: var(--accent); font-weight: 700; }
   .dirtydot { flex: none; width: 7px; height: 7px; border-radius: 50%; background: var(--accent); margin-left: var(--sp-1); }
+  /* An environment row: a green "Active" flag for the one sends use, and what is unresolved in it, at the row's end. */
+  .active { flex: none; margin-left: auto; padding: 1px 8px; border-radius: var(--r-pill); font-size: var(--fs-xs); font-weight: 600; color: var(--ok); background: color-mix(in srgb, var(--ok) 16%, transparent); }
+  .issues { flex: none; margin-left: auto; font-size: var(--fs-xs); color: var(--muted); }
+  .active + .issues { margin-left: var(--sp-1); }
   .result { flex: none; font-size: var(--fs-xs); margin-left: var(--sp-1); }
   .result.passed { color: var(--ok); }
   .result.failed { color: var(--fail); }
   .label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   /* Wide enough for the longest short verb (KAFKA, PATCH) so the names after the pills line up. */
-  .method { flex: none; min-width: 44px; display: inline-flex; }
+  .method { flex: none; min-width: 48px; display: inline-flex; }
   /* A guide line down a group's children, shown while the pointer is over the tree. */
   .kids { position: relative; }
   .kids::before { content: ''; position: absolute; top: 0; bottom: 0; left: var(--guide); width: 1px; background: var(--line); opacity: 0; pointer-events: none; transition: opacity var(--t-base) var(--ease-out); }

@@ -14,10 +14,13 @@ stderr 'missing.db'
 ! stdout .
 stderr 'FAILED'
 
-# An HTTP request has no connection test; that is told as a usage error (exit 2).
+# An HTTP request is tested with a HEAD to its address, and the status says the verdict. The demo server has nothing at
+# /ping, so this one fails with the status and a hint (exit 4).
+# Before: an HTTP request had no connection test, and this was told as a usage error (exit 2).
 server-url shop/environments/local.yaml
 ! exec flowi send ping --check --env local
-stderr 'no connection test'
+stderr 'FAILED'
+stderr '404 Not Found'
 ! stdout .
 
 -- shop/flowi.yaml --

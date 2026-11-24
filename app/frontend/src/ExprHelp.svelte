@@ -5,6 +5,7 @@
   import Popover from './Popover.svelte'
   import { copy } from './lib/clip'
   import Button from './Button.svelte'
+  import HelpButton from './HelpButton.svelte'
   import Tabs from './Tabs.svelte'
   import { SystemService } from '../bindings/github.com/githugt/flowi/app/internal/bridge'
   import type { ExprHelpView } from './lib/types'
@@ -35,7 +36,7 @@
   const rows = $derived(help ? help[tab] : [])
 </script>
 
-<button type="button" class="q" bind:this={opener} title="What can I write here?" aria-label="Help with this expression" aria-haspopup="dialog" aria-expanded={open} onclick={toggle}>?</button>
+<span class="ask"><HelpButton bind:el={opener} label="Help with this expression" title="What can I write here?" aria-haspopup="dialog" aria-expanded={open} onclick={toggle} /></span>
 
 {#if open && help}
   <Popover x={at.x} y={at.y} width={440} height={420} maxHeight="min(70vh, 560px)" label={help.title} onclose={close}>
@@ -62,8 +63,7 @@
 {/if}
 
 <style>
-  .q { width: 16px; height: 16px; padding: 0; margin-left: 6px; border-radius: 50%; border: 1px solid var(--line); background: transparent; color: var(--muted); font: 600 10px/1 inherit; cursor: pointer; vertical-align: middle; }
-  .q:hover, .q[aria-expanded='true'] { color: var(--accent); border-color: var(--accent); }
+  .ask { display: inline-flex; vertical-align: middle; margin-left: 6px; }
   .help { font-size: var(--fs-sm); color: var(--text); }
   h4 { margin: 0 0 4px; font-size: var(--fs-md); }
   h5 { margin: 10px 0 4px; font-size: var(--fs-xs); color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }

@@ -25,8 +25,15 @@ func TestFormatsFor_should_offer_the_tool_of_the_request_kind(t *testing.T) {
 		{"postgres", engine.PreviewRequest{Method: "SQL", URL: "postgres://u@h/db"}, []Format{Psql}},
 		{"mysql", engine.PreviewRequest{Method: "SQL", URL: "mysql://u@h/db"}, []Format{MySQL}},
 		{"sqlite file", engine.PreviewRequest{Method: "SQL", URL: "data/app.db"}, []Format{SQLite}},
-		{"a data file is read by Flowi, not by a client", engine.PreviewRequest{Method: "SQL", URL: "data/people.csv"}, nil},
-		{"no common tool", engine.PreviewRequest{Method: "SQS", URL: "sqs://q"}, nil},
+		{"a csv file is queried with duckdb", engine.PreviewRequest{Method: "SQL", URL: "data/people.csv"}, []Format{DuckDB}},
+		{"a folder of files has no tool", engine.PreviewRequest{Method: "SQL", URL: "data/"}, nil},
+		{"sqs", engine.PreviewRequest{Method: "SQS", URL: "https://sqs.eu-west-1.amazonaws.com/1/q"}, []Format{AwsCLI}},
+		{"sns", engine.PreviewRequest{Method: "SNS", URL: "sns://t"}, []Format{AwsCLI}},
+		{"pubsub", engine.PreviewRequest{Method: "PUBSUB", URL: "pubsub://p/t"}, []Format{Gcloud}},
+		{"amqp", engine.PreviewRequest{Method: "AMQP", URL: "amqp://h/q"}, []Format{AmqpTools}},
+		{"sse", engine.PreviewRequest{Method: "SSE", URL: "https://h/events"}, []Format{Curl}},
+		{"service bus", engine.PreviewRequest{Method: "BUS", URL: "sb://ns.servicebus.windows.net/q"}, []Format{Curl}},
+		{"amqp 1.0 has no common tool", engine.PreviewRequest{Method: "AMQP1", URL: "amqp://h/q"}, nil},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -86,6 +93,37 @@ func TestGenerate_should_write_the_command_of_each_kind(t *testing.T) {
 		{"sqlite", SQLite,
 			engine.PreviewRequest{Method: "SQL", URL: "data/app.db", BodyKind: "text", Body: "SELECT 1"},
 			"sqlite3 'data/app.db' \\\n  'SELECT 1'"},
+		// Before: these kinds had no Code section.
+		{"sse", Curl,
+			engine.PreviewRequest{Method: "SSE", URL: "https://h/events", Headers: []engine.Header{{Name: "Authorization", Value: "Bearer <secret>"}}},
+			"curl -N 'https://h/events' \\\n  -H 'Accept: text/event-stream' \\\n  -H 'Authorization: Bearer <secret>'"},
+		{"service bus send", Curl,
+			engine.PreviewRequest{Method: "BUS", URL: "sb://ns.servicebus.windows.net/orders", BodyKind: "text", Body: "hi"},
+			"curl -X POST 'https://ns.servicebus.windows.net/orders/messages' \\\n  -H \"Authorization: Bearer $(az account get-access-token --resource https://servicebus.azure.net --query accessToken --output tsv)\" \\\n  --data-raw 'hi'"},
+		{"sqs send", AwsCLI,
+			engine.PreviewRequest{Method: "SQS", URL: "https://sqs.eu-west-1.amazonaws.com/1/orders", BodyKind: "text", Body: "hi"},
+			"aws sqs send-message \\\n  --queue-url 'https://sqs.eu-west-1.amazonaws.com/1/orders' \\\n  --message-body 'hi'"},
+		{"sqs receive by name", AwsCLI,
+			engine.PreviewRequest{Method: "SQS", URL: "sqs://orders"},
+			"aws sqs receive-message \\\n  --queue-url \"$(aws sqs get-queue-url --queue-name 'orders' --query QueueUrl --output text)\" \\\n  --max-number-of-messages 1 \\\n  --wait-time-seconds 10"},
+		{"sns publish to an arn", AwsCLI,
+			engine.PreviewRequest{Method: "SNS", URL: "sns://arn:aws:sns:eu-west-1:1:alerts", BodyKind: "text", Body: "up"},
+			"aws sns publish \\\n  --topic-arn 'arn:aws:sns:eu-west-1:1:alerts' \\\n  --message 'up'"},
+		{"pubsub publish", Gcloud,
+			engine.PreviewRequest{Method: "PUBSUB", URL: "pubsub://projects/shop/topics/orders", BodyKind: "text", Body: "hi"},
+			"gcloud pubsub topics publish 'orders' \\\n  --message 'hi' \\\n  --project 'shop'"},
+		{"pubsub pull", Gcloud,
+			engine.PreviewRequest{Method: "PUBSUB", URL: "pubsub://projects/shop/subscriptions/mine"},
+			"gcloud pubsub subscriptions pull 'mine' \\\n  --limit 1 \\\n  --auto-ack \\\n  --project 'shop'"},
+		{"amqp publish", AmqpTools,
+			engine.PreviewRequest{Method: "AMQP", URL: "amqp://bob:<secret>@mq:5672/orders", BodyKind: "text", Body: "hi"},
+			"amqp-publish --url='amqp://bob:<secret>@mq:5672' \\\n  --routing-key='orders' \\\n  --body='hi'"},
+		{"amqp get", AmqpTools,
+			engine.PreviewRequest{Method: "AMQP", URL: "amqp://mq/orders"},
+			"amqp-get --url='amqp://mq' \\\n  --queue='orders'"},
+		{"duckdb over a csv", DuckDB,
+			engine.PreviewRequest{Method: "SQL", URL: "data/people.csv", BodyKind: "text", Body: "SELECT * FROM people"},
+			"duckdb -c 'CREATE VIEW \"people\" AS SELECT * FROM read_csv('\\''data/people.csv'\\''); SELECT * FROM people'"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -110,7 +148,7 @@ func TestGenerate_Given_a_tool_that_does_not_fit_the_request_Then_it_says_so(t *
 }
 
 func TestLabel_should_name_the_other_tools(t *testing.T) {
-	for _, f := range []Format{Grpcurl, Mosquitto, Kcat, NatsCLI, RedisCLI, Websocat, Psql, MySQL, SQLite} {
+	for _, f := range []Format{Grpcurl, Mosquitto, Kcat, NatsCLI, RedisCLI, Websocat, Psql, MySQL, SQLite, AwsCLI, Gcloud, AmqpTools, DuckDB} {
 		if Label(f) == string(f) {
 			t.Errorf("%s has no label", f)
 		}

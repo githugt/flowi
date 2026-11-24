@@ -12,6 +12,7 @@ import (
 	"runtime"
 	"slices"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -25,11 +26,14 @@ import (
 )
 
 type published struct {
+	mu    sync.Mutex // the session writer emits notices from its own goroutine
 	names []string
 	last  map[string]any
 }
 
 func (p *published) emit(name string, data any) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
 	p.names = append(p.names, name)
 	if p.last == nil {
 		p.last = map[string]any{}
@@ -298,6 +302,22 @@ func TestFlowService_Run_should_publish_statuses_and_summary(t *testing.T) {
 
 	if ev.Run.Running || ev.Run.Statuses["a"] != "passed" || ev.Run.Results["a"] != "passed · 5ms" || ev.Run.Summary != "passed · 1 passed · seed 7" {
 		t.Fatalf("run %+v", ev.Run)
+	}
+}
+
+// Before: a step skipped by its when was reported like one that never started because something failed before it, so the
+// canvas could not light the arrow into it. The run view now lists the steps it skipped on purpose.
+func TestFlowService_Run_should_list_the_steps_skipped_on_purpose_as_the_run_going_through_them(t *testing.T) {
+	flows, v, pub := openRunnable(t, []engine.Event{
+		engine.NodeFinished{Path: "a", Node: "a", Status: engine.StatusSkipped}, // never started: not through
+		engine.NodeFinished{Path: "b", Node: "b", Status: engine.StatusSkipped, Reason: "its when was false"},
+	})
+
+	flows.Run(v.Node, nil)
+	got := pub.last["flowrun"].(bridge.FlowRunEvent).Run.Through
+
+	if len(got) != 1 || got[0] != "b" {
+		t.Fatalf("through %v", got)
 	}
 }
 
@@ -1105,10 +1125,8 @@ func TestRequestService_ComparePrevious_should_list_what_changed_since_the_earli
 }
 
 func countCalls(b *vmtest.Backend, call string) int {
-	b.Mu.Lock()
-	defer b.Mu.Unlock()
 	n := 0
-	for _, c := range b.Calls {
+	for _, c := range b.CallLog() {
 		if c == call {
 			n++
 		}
@@ -1128,7 +1146,7 @@ func TestRequestService_EvalChecks_should_judge_checks_on_the_shown_response_wit
 		t.Fatalf("%+v", got)
 	}
 	if countCalls(b, "Send") != sent {
-		t.Fatalf("a check was tried by sending: %v", b.Calls)
+		t.Fatalf("a check was tried by sending: %v", b.CallLog())
 	}
 }
 
@@ -1284,7 +1302,7 @@ func TestRequestService_SaveAsNew_should_copy_to_the_chosen_place_and_open_it_le
 
 	opened, _ := pub.last["open"].(string)
 	if opened == "" || opened == v.Node || !b.Called("DuplicateRequestTo C1 auth/login-two") || pub.last["close"] != nil {
-		t.Fatalf("open %q close %v calls %v", opened, pub.last["close"], b.Calls)
+		t.Fatalf("open %q close %v calls %v", opened, pub.last["close"], b.CallLog())
 	}
 }
 
@@ -1295,7 +1313,7 @@ func TestRequestService_SaveAsNew_Given_a_row_that_is_not_a_place_Then_a_notice_
 
 	notice, _ := pub.last["notice"].(bridge.Notice)
 	if notice.Level != "error" || b.Called("DuplicateRequestTo C1 x") {
-		t.Fatalf("notice %+v calls %v", notice, b.Calls)
+		t.Fatalf("notice %+v calls %v", notice, b.CallLog())
 	}
 }
 
@@ -1848,7 +1866,7 @@ func TestApp_KeepFlowEdits_Given_an_edited_flow_When_it_is_opened_again_Then_the
 	}
 
 	if err != nil || !back.Called("KeepFlowEdits F1") || !back.Called("KeptFlowEdits F1") {
-		t.Fatalf("err %v calls %v", err, back.Calls)
+		t.Fatalf("err %v calls %v", err, back.CallLog())
 	}
 	if got := lastView(pub); !got.Dirty {
 		t.Fatal("the kept edit did not come back as an unsaved change")

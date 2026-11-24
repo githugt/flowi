@@ -66,23 +66,26 @@ func (r *Request) EditAsync(f func(a *model.Async)) {
 // options the new protocol does not know are dropped, so the switch never
 // leaves the version invalid.
 func (r *Request) SetProtocol(protocol string) {
-	r.EditAsync(func(a *model.Async) {
-		a.Protocol = protocol
-		known := model.AsyncBindings(protocol)
-		a.Binding = slices.DeleteFunc(a.Binding, func(kv model.KeyValue) bool { return !slices.Contains(known, kv.Key) })
-		switch protocol {
-		case model.ProtocolSSE: // a one-way stream: it listens, and cannot send
-			a.Send = nil
-			if a.Receive == nil {
-				a.Receive = &model.AsyncReceive{}
-			}
-		case model.ProtocolSNS: // it only publishes
-			a.Receive = nil
-			if a.Send == nil {
-				a.Send = &model.AsyncSend{}
-			}
+	r.EditAsync(func(a *model.Async) { moveProtocol(a, protocol) })
+}
+
+// moveProtocol sets a's protocol and fits the rest of the block to it.
+func moveProtocol(a *model.Async, protocol string) {
+	a.Protocol = protocol
+	known := model.AsyncBindings(protocol)
+	a.Binding = slices.DeleteFunc(a.Binding, func(kv model.KeyValue) bool { return !slices.Contains(known, kv.Key) })
+	switch protocol {
+	case model.ProtocolSSE: // a one-way stream: it listens, and cannot send
+		a.Send = nil
+		if a.Receive == nil {
+			a.Receive = &model.AsyncReceive{}
 		}
-	})
+	case model.ProtocolSNS: // it only publishes
+		a.Receive = nil
+		if a.Send == nil {
+			a.Send = &model.AsyncSend{}
+		}
+	}
 }
 
 // cloneAsync deep-copies an async block, so an edit never reaches the copy

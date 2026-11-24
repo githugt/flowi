@@ -3,6 +3,7 @@
 package sqs_test
 
 import (
+	"context"
 	"crypto/md5" //nolint:gosec // SQS defines MD5OfMessageBody; the SDK checks it
 	"encoding/hex"
 	"encoding/json"
@@ -115,7 +116,7 @@ func (f *fakeSQS) serve(w http.ResponseWriter, r *http.Request) {
 	case "SendMessage":
 		out = f.sendMessage(w, in)
 	case "ReceiveMessage":
-		out = f.receiveMessage(in)
+		out = f.receiveMessage(r.Context(), in)
 	case "DeleteMessage":
 		out = f.deleteMessage(in)
 	case "ChangeMessageVisibility":
@@ -177,9 +178,17 @@ func (f *fakeSQS) sendMessage(w http.ResponseWriter, in map[string]any) map[stri
 	return map[string]any{"MessageId": m.id, "MD5OfMessageBody": hex.EncodeToString(sum[:])}
 }
 
-func (f *fakeSQS) receiveMessage(in map[string]any) map[string]any {
+// receiveMessage long-polls for up to 40 ms. It stops as soon as the client has gone: a poll its caller gave up on must
+// not take a message that is returned to the queue after that, as the running server drops an abandoned request.
+//
+// Before: the abandoned poll of a receive that had finished took the message the transport had just returned to the
+// queue (receives 2, hidden for 30 s), so a test that checked it was visible again failed on a slow runner.
+func (f *fakeSQS) receiveMessage(ctx context.Context, in map[string]any) map[string]any {
 	deadline := time.Now().Add(40 * time.Millisecond)
 	for {
+		if ctx.Err() != nil {
+			return map[string]any{}
+		}
 		if msgs := f.takeVisible(in); len(msgs) > 0 || time.Now().After(deadline) {
 			return map[string]any{"Messages": msgs}
 		}

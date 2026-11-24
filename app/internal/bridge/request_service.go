@@ -60,8 +60,10 @@ type RequestView struct {
 	Node           string               `json:"node"`
 	Name           string               `json:"name"`
 	Path           string               `json:"path"`
-	Kind           string               `json:"kind"` // http, async, grpc or dataset
-	Verb           string               `json:"verb"` // GET, POST …, or the protocol (MQTT, GRPC …): what the tab and pickers colour
+	Kind           string               `json:"kind"`  // http, async, grpc or dataset
+	Type           string               `json:"type"`  // the id of its type in Types: http, grpc, async:ws, db:postgres, file:csv
+	Types          []TypeChoice         `json:"types"` // every type it can be switched to
+	Verb           string               `json:"verb"`  // GET, POST …, or the protocol (MQTT, GRPC …): what the tab and pickers colour
 	Versions       []string             `json:"versions"`
 	VersionNames   []string             `json:"versionNames"` // each version's title, "" when it has none; in the order of Versions
 	Selected       string               `json:"selected"`
@@ -145,7 +147,7 @@ func (s *RequestService) open(node string) (RequestView, error) {
 	req.SetScheduler(s.app.scheduler)
 	o := &openRequest{req: req, format: vm.ViewJSON, snip: vm.NewSnippet(s.app.backend, s.app.worker, s.app.workspace, req, s.snippetExcludesSecrets())}
 	req.OnChange(func() {
-		s.app.workspace.SetLabel(node, untitledName(s.app.workspace, node, req))
+		s.app.workspace.SetLabel(node, shownLabel(s.app.workspace, node, req))
 		s.app.emit("request", s.view(node, o))
 	})
 	req.OnEdit(o.snip.Refresh)
@@ -273,7 +275,7 @@ func (s *RequestService) view(node string, o *openRequest) RequestView {
 		kind = "dataset"
 	}
 	v := RequestView{
-		Node: node, Name: d.Name, Path: d.Path, Kind: kind, Verb: vm.Verb(r.Current()), Versions: r.Labels(), VersionNames: versionNamesOf(d), Selected: r.SelectedLabel(), Default: d.Default,
+		Node: node, Name: d.Name, Path: d.Path, Kind: kind, Type: vm.TypeOf(r.Current()), Types: typeChoices(), Verb: vm.Verb(r.Current()), Versions: r.Labels(), VersionNames: versionNamesOf(d), Selected: r.SelectedLabel(), Default: d.Default,
 		BodyKind: string(r.BodyKind()), BodyFormat: string(r.BodyFormat()), Multipart: r.Multipart(), Auth: authViewOf(r, s.app.workspace.NamedAuths()),
 		Dirty: r.Dirty(), OnDisk: r.ChangedOnDisk(), NeedsDrop: r.NeedsDropConfirm(), Error: r.Err(), Current: emptyCollections(r.Current()), FullURL: vm.URLWithQuery(r.Current().URL, r.Current().Query), HookChain: nonNil(r.HookChain()),
 		InScratch: s.app.workspace.InScratch(node), Snippet: snippetViewOf(o.snip), Pipeline: pipelineOf(r, s.app.send.TraceFor(t)), Live: liveOf(s.app.send.TraceFor(t)), Async: asyncInfoOf(r), GRPC: grpcInfoOf(r), Dataset: datasetInfoOf(r), Connection: connectionOf(r), Sending: s.app.send.RunningFor(t), SendError: s.app.send.ErrFor(t),
@@ -646,6 +648,26 @@ func (s *RequestService) SaveAsNew(node, placeRow, text string) {
 			func(row string) { s.app.emit("open", row) },
 			func(err error) { s.app.emit("notice", Notice{Level: "error", Text: vm.ErrorText(err)}) })
 	})
+}
+
+// shownLabel is what the tree and the tab call the request while it is open: a try-out request's URL, else the name as
+// typed (the file's last part when the name is cleared), so a name shows as it is written and not only once saved.
+// "" when that is what the tree already shows.
+//
+// Before: a name typed in the request bar reached the sidebar and the tab only after Save.
+func shownLabel(ws *vm.Workspace, node string, req *vm.Request) string {
+	if u := untitledName(ws, node, req); u != "" {
+		return u
+	}
+	d := req.Draft()
+	want := d.Name
+	if want == "" {
+		want = path.Base(d.Path)
+	}
+	if want == ws.Node(node).Label {
+		return ""
+	}
+	return want
 }
 
 // untitledName is what names a try-out request in the tree and its tab: its

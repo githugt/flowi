@@ -197,3 +197,29 @@ func TestTagsInUse_should_count_what_requests_flows_and_folders_carry_most_used_
 		t.Fatalf("got %+v", got)
 	}
 }
+
+// Before: production was drawn with a rocket, whose outline was read as something else. It is a shield now; a file that
+// still says `icon: rocket` must keep loading, and the window must not offer the rocket again.
+func TestCheckStatus_Given_the_old_rocket_icon_When_checked_Then_it_is_read_but_not_offered(t *testing.T) {
+	var production model.Status
+	for _, s := range model.DefaultStatuses() {
+		if s.Name == "production" {
+			production = s
+		}
+	}
+
+	oldFile := model.CheckStatus(model.Status{Name: "live", Icon: "rocket"})
+
+	if production.Icon != "shield" {
+		t.Errorf("production icon = %q, want shield", production.Icon)
+	}
+	if oldFile != nil {
+		t.Errorf("an older file naming the rocket was refused: %v", oldFile)
+	}
+	if slices.Contains(model.StatusIcons(), "rocket") {
+		t.Errorf("the rocket is still offered: %v", model.StatusIcons())
+	}
+	if !slices.Contains(model.StatusIcons(), "shield") {
+		t.Errorf("the shield is not offered: %v", model.StatusIcons())
+	}
+}

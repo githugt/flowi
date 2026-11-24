@@ -87,9 +87,29 @@ func mergeVersion(base *model.RequestVersion, ours, theirs model.RequestVersion,
 	m.URL = pick(base.URL, ours.URL, theirs.URL, eq, named(conflict, "the URL"))
 	m.Docs = pick(base.Docs, ours.Docs, theirs.Docs, eq, named(conflict, "the docs"))
 	m.Body = pick(base.Body, ours.Body, theirs.Body, deepEq, named(conflict, "the body"))
+	if theirs.Async != nil && ours.Async != nil {
+		m.Async = mergeAsync(base.Async, ours.Async, theirs.Async, conflict)
+	}
 	m.Query = mergePairs(base.Query, ours.Query, theirs.Query, "query parameter", conflict)
 	m.Headers = mergePairs(base.Headers, ours.Headers, theirs.Headers, "header", conflict)
 	return m
+}
+
+// mergeAsync is the three-way merge of what an async version does: where it connects, what it sends and what it waits
+// for, and the protocol's own options. A version whose previous import had no async part is merged as one with
+// nothing, so a field the person set is kept and the rest is the document's.
+func mergeAsync(base, ours, theirs *model.Async, conflict func(string)) *model.Async {
+	if base == nil {
+		base = &model.Async{}
+	}
+	m := *theirs
+	m.Protocol = pick(base.Protocol, ours.Protocol, theirs.Protocol, eq, named(conflict, "the protocol"))
+	m.Server = pick(base.Server, ours.Server, theirs.Server, eq, named(conflict, "the server"))
+	m.Channel = pick(base.Channel, ours.Channel, theirs.Channel, eq, named(conflict, "the channel"))
+	m.Send = pick(base.Send, ours.Send, theirs.Send, sameValue, named(conflict, "what it sends"))
+	m.Receive = pick(base.Receive, ours.Receive, theirs.Receive, sameValue, named(conflict, "what it waits for"))
+	m.Binding = pick(base.Binding, ours.Binding, theirs.Binding, sameValue, named(conflict, "the protocol's options"))
+	return &m
 }
 
 // pick is the three-way choice for one field: ours when we changed it,
@@ -152,6 +172,9 @@ func versionByLabel(r model.Request, label string) (model.RequestVersion, bool) 
 }
 
 func eq(a, b string) bool { return a == b }
+
+// sameValue is deep equality for the three-way choice of a field that is not a string.
+func sameValue[T any](a, b T) bool { return reflect.DeepEqual(a, b) }
 
 func deepEq(a, b model.Body) bool { return reflect.DeepEqual(a, b) }
 

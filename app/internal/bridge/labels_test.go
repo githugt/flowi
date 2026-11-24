@@ -80,7 +80,7 @@ func TestWorkspaceService_SetLabels_should_write_and_show_the_new_mark_in_the_tr
 	ask, err := app.Workspace().SetLabels(health.ID, []string{"smoke"}, "testing", false)
 
 	if ask || err != nil || !b.Called("SetRequestLabels R3 smoke testing") {
-		t.Fatalf("ask %v err %v calls %v", ask, err, b.Calls)
+		t.Fatalf("ask %v err %v calls %v", ask, err, b.CallLog())
 	}
 	if got := nodeNamed(t, app.Workspace().Tree().Roots, "Health"); got.Status == nil || got.Status.Name != "testing" || !slices.Equal(got.Tags, []string{"smoke"}) {
 		t.Fatalf("row %+v %v", got.Status, got.Tags)

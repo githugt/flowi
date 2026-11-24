@@ -136,7 +136,7 @@ func TestSendVM_pin_example(t *testing.T) {
 	f.w.Wait()
 
 	if !f.b.Called("PinExample ok") || !strings.HasSuffix(got, "ok.json") {
-		t.Fatalf("got %q calls %v", got, f.b.Calls)
+		t.Fatalf("got %q calls %v", got, f.b.CallLog())
 	}
 }
 

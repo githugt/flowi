@@ -10,6 +10,7 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"time"
 
 	flowi "github.com/githugt/flowi/lib"
 	"github.com/githugt/flowi/lib/model"
@@ -24,6 +25,7 @@ import (
 // be seen working on a document of its own.
 type importSandbox struct {
 	once sync.Once
+	dir  string
 	ws   *flowi.Workspace
 	id   model.ID
 	err  error
@@ -32,11 +34,13 @@ type importSandbox struct {
 // open makes the workspace and its collection on first use.
 func (s *importSandbox) open() (*flowi.Workspace, model.ID, error) {
 	s.once.Do(func() {
-		dir, err := os.MkdirTemp("", "flowi-uidev-import-")
+		sweepSandboxes(os.TempDir(), staleSandboxAge, time.Now())
+		dir, err := os.MkdirTemp("", sandboxPrefix)
 		if err != nil {
 			s.err = fmt.Errorf("making the import sandbox: %w", err)
 			return
 		}
+		s.dir = dir
 		ws, _, err := flowi.OpenWorkspace(context.Background(), flowi.WorkspaceOptions{Paths: settings.Paths{ConfigDir: filepath.Join(dir, "config")}, Home: dir})
 		if err != nil {
 			s.err = fmt.Errorf("opening the import sandbox: %w", err)
@@ -50,6 +54,43 @@ func (s *importSandbox) open() (*flowi.Workspace, model.ID, error) {
 		s.ws, s.id = ws, m.ID
 	})
 	return s.ws, s.id, s.err
+}
+
+const (
+	sandboxPrefix = "flowi-uidev-import-"
+	// staleSandboxAge is how old a sandbox folder must be before a later start removes it: one of a server still
+	// running is younger (a server killed without cleaning up is how an old one is left).
+	staleSandboxAge = 12 * time.Hour
+)
+
+// Close removes the sandbox folder, when one was made. The server calls it when it stops.
+//
+// Before: each run that imported anything left its folder in the temp directory for good.
+func (b *Backend) Close() error {
+	if b.sandbox.dir == "" {
+		return nil
+	}
+	return os.RemoveAll(b.sandbox.dir)
+}
+
+// sweepSandboxes removes the sandbox folders of earlier runs in dir that are older than olderThan, and returns how
+// many it removed. Only real folders with this server's prefix go.
+func sweepSandboxes(dir string, olderThan time.Duration, now time.Time) int {
+	found, err := filepath.Glob(filepath.Join(dir, sandboxPrefix+"*"))
+	if err != nil {
+		return 0
+	}
+	removed := 0
+	for _, f := range found {
+		info, err := os.Lstat(f)
+		if err != nil || !info.IsDir() || now.Sub(info.ModTime()) < olderThan {
+			continue
+		}
+		if os.RemoveAll(f) == nil {
+			removed++
+		}
+	}
+	return removed
 }
 
 // PreviewImportSource plans the import with the real importers into the sandbox collection.

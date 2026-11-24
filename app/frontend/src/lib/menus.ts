@@ -6,6 +6,7 @@ import type { MenuEntry } from './types'
 import { addToFlowTargets, requestOfRow } from './addtoflow'
 import { errorText } from './errors'
 import { plural } from './plural'
+import { collectionOfRow, pageNode } from './collectionpage'
 
 const needsTabsClosed = ['rename', 'delete', 'discardDraft']
 
@@ -14,6 +15,9 @@ export async function rowMenu(id: string): Promise<MenuItem[]> {
   if (!app.marked.includes(id)) app.marked = []
   const entries = (await WorkspaceService.Menu(ids)) as unknown as MenuEntry[]
   const items: MenuItem[] = entries.map((e) => ({ label: e.label, run: () => run(e, ids) }))
+  // A collection's row also opens its page: what it is about, how it stands, what it uses and how it is set up.
+  const collection = ids.length === 1 ? collectionOfRow(app.find(ids[0])) : ''
+  if (collection) items.unshift({ label: 'Collection overview', run: () => app.openScreen(pageNode(collection), app.find(ids[0])?.label ?? 'Collection') })
   // Wherever a flow can be made, it can also be made from a blueprint, there.
   const at = items.findIndex((_, i) => entries[i].action === 'newFlow')
   if (at >= 0 && ids.length === 1) {

@@ -13,11 +13,22 @@ import (
 // DecodeFlow reads a *.flow.yaml file. path is relative to flows/ without
 // the suffix.
 func (c *Codec) DecodeFlow(file, path string, data []byte) (model.Flow, diag.List) {
+	return c.decodeFlow(file, path, data, false)
+}
+
+// DecodeFlowSnippet reads steps as DecodeFlow does, but a request or flow reference may have a path and no id: the
+// form a portable copy writes, resolved against the collection the steps are pasted into.
+func (c *Codec) DecodeFlowSnippet(file, path string, data []byte) (model.Flow, diag.List) {
+	return c.decodeFlow(file, path, data, true)
+}
+
+func (c *Codec) decodeFlow(file, path string, data []byte, snippet bool) (model.Flow, diag.List) {
 	f := model.Flow{Path: path, File: file}
 	d, root, ok := c.parse(file, data)
 	if !ok {
 		return f, d.diags
 	}
+	d.snippet = snippet
 	m, ok := d.mapping(root, "$", "flow")
 	if !ok {
 		return f, d.diags

@@ -122,6 +122,12 @@ func (s *Store) DecodeFlowBody(file, path string, data []byte) (model.Flow, diag
 	return s.codec.DecodeFlow(file, path, data)
 }
 
+// DecodeFlowSnippet reads steps copied from a flow, as DecodeFlowBody does, but lets a request or flow reference have a
+// path and no id (a portable copy); diagnostics are positioned in data.
+func (s *Store) DecodeFlowSnippet(file, path string, data []byte) (model.Flow, diag.List) {
+	return s.codec.DecodeFlowSnippet(file, path, data)
+}
+
 // DecodeBlueprint reads the text of a blueprint file; diagnostics are
 // positioned in data.
 func (s *Store) DecodeBlueprint(file, path string, data []byte) (model.Blueprint, diag.List) {

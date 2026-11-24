@@ -48,6 +48,9 @@ func Label(f Format) string {
 	if l, ok := otherLabels()[f]; ok {
 		return l
 	}
+	if l, ok := moreLabels()[f]; ok {
+		return l
+	}
 	return string(f)
 }
 
@@ -58,6 +61,9 @@ func Generate(f Format, r engine.PreviewRequest) (string, error) {
 	}
 	switch f {
 	case Curl:
+		if text, ok := curlForKind(r); ok {
+			return text, nil
+		}
 		return curl(r), nil
 	case Wget:
 		return wget(r), nil

@@ -394,3 +394,11 @@ func TestSummarize_Given_a_query_that_may_write_Then_the_card_says_so(t *testing
 		t.Fatalf("writes %+v reads %+v", writes, reads)
 	}
 }
+
+func TestSummarize_Given_facts_with_a_verb_Then_the_card_carries_it_beside_the_action_word(t *testing.T) {
+	c := card.Summarize(model.Node{Type: "request"}, card.Facts{Kind: "kafka", Sends: true, Verb: "KAFKA"})
+
+	if c.Badge != "PRODUCE" || c.Verb != "KAFKA" {
+		t.Fatalf("badge %q verb %q", c.Badge, c.Verb)
+	}
+}

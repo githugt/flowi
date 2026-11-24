@@ -14,7 +14,7 @@ const (
 // the steps inside the loop: the run is the same either way.
 func loopLayoutParam() Param {
 	return Param{
-		Name: "layout", Kind: ParamEnum, Enum: []string{LoopLayoutVertical, LoopLayoutHorizontal},
+		Name: "layout", Kind: ParamEnum, Enum: []string{LoopLayoutVertical, LoopLayoutHorizontal}, Default: LoopLayoutVertical,
 		Doc: "How the canvas draws the steps in the body: vertical (default) stacks them top to bottom in a box under the loop, horizontal puts them in one row. It changes only the picture, not the run.",
 	}
 }

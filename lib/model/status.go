@@ -28,7 +28,7 @@ func DefaultStatuses() []Status {
 		{Name: "in-development", Color: "blue", Icon: "code"},
 		{Name: "review", Color: "purple", Icon: "eye"},
 		{Name: "testing", Color: "amber", Icon: "flask"},
-		{Name: "production", Color: "green", Icon: "rocket"},
+		{Name: "production", Color: "green", Icon: "shield"},
 	}
 }
 
@@ -42,10 +42,15 @@ func StatusColors() []string {
 // checks that it has a drawing for each.
 func StatusIcons() []string {
 	return []string{
-		"planning", "code", "eye", "flask", "rocket", "flag", "star", "bug", "bolt", "lock", "archive", "bookmark",
+		"planning", "code", "eye", "flask", "shield", "flag", "star", "bug", "bolt", "lock", "archive", "bookmark",
 		"pause", "clock", "alert",
 	}
 }
+
+// legacyStatusIcons are icons files may still name but the window no longer offers or uses by default: "production"
+// was drawn with a rocket until it was replaced by a shield (the rocket's shape was misread). A collection that set
+// it keeps working.
+func legacyStatusIcons() []string { return []string{"rocket"} }
 
 const (
 	defaultStatusColor = "gray"
@@ -78,7 +83,7 @@ func CheckStatus(s Status) error {
 	if s.Color != "" && !slices.Contains(StatusColors(), s.Color) {
 		return fmt.Errorf("%q is not a status colour (use %s)", s.Color, strings.Join(StatusColors(), ", "))
 	}
-	if s.Icon != "" && !slices.Contains(StatusIcons(), s.Icon) {
+	if s.Icon != "" && !slices.Contains(StatusIcons(), s.Icon) && !slices.Contains(legacyStatusIcons(), s.Icon) {
 		return fmt.Errorf("%q is not a status icon (use %s)", s.Icon, strings.Join(StatusIcons(), ", "))
 	}
 	return nil

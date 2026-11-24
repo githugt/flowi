@@ -446,6 +446,18 @@ export function CopySteps(node, ids) {
 }
 
 /**
+ * CopyStepsPortable is CopySteps for putting the steps in another collection: each request and flow a step calls is
+ * written by its path, not its id, and each step is given a name and a description saying what it calls. Pasting it
+ * finds the same paths in the collection it lands in.
+ * @param {string} node
+ * @param {string[]} ids
+ * @returns {$CancellablePromise<string>}
+ */
+export function CopyStepsPortable(node, ids) {
+    return $Call.ByID(1448436642, node, ids);
+}
+
+/**
  * Debug runs the flow and pauses before the first breakpoint.
  * @param {string} node
  * @param {{ [_ in string]?: string }} inputs
@@ -666,15 +678,16 @@ export function Open(node) {
 }
 
 /**
- * PasteSteps adds the steps in text, as CopySteps made it, after the last selected step (at the end when none is
- * selected), and selects them. It is one undoable edit. Text that is not steps changes nothing and fails.
+ * PasteSteps adds the steps in text, as CopySteps or CopyStepsPortable made it, after the last selected step (at the
+ * end when none is selected), and selects them. Each request or flow a step calls is looked up in this flow's
+ * collection, by id and then by path. It is one undoable edit. Text that is not steps changes nothing and fails.
  * @param {string} node
  * @param {string} text
- * @returns {$CancellablePromise<string[]>}
+ * @returns {$CancellablePromise<$models.Pasted>}
  */
 export function PasteSteps(node, text) {
     return $Call.ByID(806089273, node, text).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType9($result);
+        return $$createType15($result);
     }));
 }
 
@@ -707,7 +720,7 @@ export function Preflight(node) {
  */
 export function Preview(node, unit, step, lift, x, y, snap) {
     return $Call.ByID(167706761, node, unit, step, lift, x, y, snap).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType15($result);
+        return $$createType16($result);
     }));
 }
 
@@ -833,7 +846,7 @@ export function Run(node, inputs) {
  */
 export function RunMatrix(node, dims, inputs) {
     return $Call.ByID(124973761, node, dims, inputs).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType16($result);
+        return $$createType17($result);
     }));
 }
 
@@ -857,7 +870,7 @@ export function RunPart(node, scope, inputs) {
  */
 export function RunSteps(node, id) {
     return $Call.ByID(3958383595, node, id).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType17($result);
+        return $$createType18($result);
     }));
 }
 
@@ -951,7 +964,7 @@ export function SelectAll(node) {
  */
 export function Sequence(node, others) {
     return $Call.ByID(1938749126, node, others).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType18($result);
+        return $$createType19($result);
     }));
 }
 
@@ -966,6 +979,18 @@ export function Sequence(node, others) {
  */
 export function SetArrow(node, $from, to, outcomes) {
     return $Call.ByID(1671889798, node, $from, to, outcomes);
+}
+
+/**
+ * SetArrowStyle says how the arrows that leave step are drawn: "square" (also ""), the default, or "curved". One undo
+ * step.
+ * @param {string} node
+ * @param {string} step
+ * @param {string} style
+ * @returns {$CancellablePromise<void>}
+ */
+export function SetArrowStyle(node, step, style) {
+    return $Call.ByID(2309220203, node, step, style);
 }
 
 /**
@@ -1226,7 +1251,7 @@ export function SetValues(node, rows) {
  */
 export function Source(node) {
     return $Call.ByID(1216649946, node).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType19($result);
+        return $$createType20($result);
     }));
 }
 
@@ -1237,7 +1262,7 @@ export function Source(node) {
  */
 export function StandaloneArazzo(node) {
     return $Call.ByID(387293967, node).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType20($result);
+        return $$createType21($result);
     }));
 }
 
@@ -1318,7 +1343,7 @@ export function Undo(node) {
  */
 export function WireChoices(node, $from, to) {
     return $Call.ByID(252791798, node, $from, to).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType21($result);
+        return $$createType22($result);
     }));
 }
 
@@ -1332,7 +1357,7 @@ export function WireChoices(node, $from, to) {
  */
 export function WirePreview(node, $from, path) {
     return $Call.ByID(2928313070, node, $from, path).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType22($result);
+        return $$createType23($result);
     }));
 }
 
@@ -1347,7 +1372,7 @@ export function WirePreview(node, $from, path) {
  */
 export function WireTargets(node, $from, kind) {
     return $Call.ByID(421071552, node, $from, kind).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType24($result);
+        return $$createType25($result);
     }));
 }
 
@@ -1390,13 +1415,14 @@ const $$createType11 = $models.SuggestionView.createFrom;
 const $$createType12 = $Create.Array($$createType11);
 const $$createType13 = $models.NodeData.createFrom;
 const $$createType14 = $models.FlowView.createFrom;
-const $$createType15 = canvas$0.Slot.createFrom;
-const $$createType16 = $models.MatrixView.createFrom;
-const $$createType17 = $models.SavedRunView.createFrom;
-const $$createType18 = $models.SequenceView.createFrom;
-const $$createType19 = $models.FlowSourceView.createFrom;
-const $$createType20 = $models.StandaloneView.createFrom;
-const $$createType21 = $models.WireChoices.createFrom;
-const $$createType22 = $models.WirePreviewView.createFrom;
-const $$createType23 = $models.WireTargetView.createFrom;
-const $$createType24 = $Create.Array($$createType23);
+const $$createType15 = $models.Pasted.createFrom;
+const $$createType16 = canvas$0.Slot.createFrom;
+const $$createType17 = $models.MatrixView.createFrom;
+const $$createType18 = $models.SavedRunView.createFrom;
+const $$createType19 = $models.SequenceView.createFrom;
+const $$createType20 = $models.FlowSourceView.createFrom;
+const $$createType21 = $models.StandaloneView.createFrom;
+const $$createType22 = $models.WireChoices.createFrom;
+const $$createType23 = $models.WirePreviewView.createFrom;
+const $$createType24 = $models.WireTargetView.createFrom;
+const $$createType25 = $Create.Array($$createType24);

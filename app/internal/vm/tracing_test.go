@@ -74,7 +74,7 @@ func TestTracing_Save_should_store_the_settings_and_switch_the_exporter_on(t *te
 		t.Fatalf("tracer %+v on %v", ft.cfg, ft.on)
 	}
 	if !b.Called("SetUserSetting otel.endpoint=http://localhost:4318") || tr.View().Problem != "" {
-		t.Fatalf("calls %v problem %q", b.Calls, tr.View().Problem)
+		t.Fatalf("calls %v problem %q", b.CallLog(), tr.View().Problem)
 	}
 }
 
@@ -154,7 +154,7 @@ func TestTracing_Save_Given_no_headers_Then_the_stored_ones_are_kept(t *testing.
 	q.run(1)
 
 	if ft.cfg.Headers["Authorization"] != "Bearer x" || b.Called("SetUserSetting otel.headers=") {
-		t.Fatalf("headers %v calls %v", ft.cfg.Headers, b.Calls)
+		t.Fatalf("headers %v calls %v", ft.cfg.Headers, b.CallLog())
 	}
 }
 
@@ -180,7 +180,7 @@ func TestTracing_Save_Given_a_comma_in_a_header_value_Then_it_is_stored_escaped_
 	q.run(1)
 
 	if !b.Called(`SetUserSetting otel.headers=X-Tags=a\,b`) || tr.View().Problem != "" {
-		t.Fatalf("calls %v problem %q", b.Calls, tr.View().Problem)
+		t.Fatalf("calls %v problem %q", b.CallLog(), tr.View().Problem)
 	}
 }
 

@@ -130,8 +130,8 @@ func TestWorkspace_CreateAsyncRequest_should_create_through_the_backend_and_open
 	ws.CreateAsyncRequest("C1", "orders/placed", "mqtt", func(id string) { opened = id }, func(err error) { t.Fatal(err) })
 	w.Wait()
 
-	if !slices.Contains(b.Calls, "NewAsyncRequest orders/placed mqtt") || opened == "" {
-		t.Fatalf("calls %v opened %q", b.Calls, opened)
+	if !slices.Contains(b.CallLog(), "NewAsyncRequest orders/placed mqtt") || opened == "" {
+		t.Fatalf("calls %v opened %q", b.CallLog(), opened)
 	}
 }
 
@@ -179,7 +179,7 @@ func TestWorkspace_CreateAsyncRequest_should_seed_the_starting_hooks(t *testing.
 	w.Wait()
 
 	if !b.Called("SeedRequestHooks new") {
-		t.Fatalf("calls %v", b.Calls)
+		t.Fatalf("calls %v", b.CallLog())
 	}
 }
 

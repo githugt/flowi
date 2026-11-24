@@ -66,3 +66,16 @@ func (w *Workspace) contractWarnings(cs []model.Collection) diag.List {
 	reports, diags := analysis.Analyze(cs, w.contracts())
 	return append(diags, analysis.Warnings(reports)...)
 }
+
+// CollectionImpact is the impact report of every request of the collection that something uses (a flow, a hook, a
+// check), against the contract each has: what a page of the collection needs to say, per operation, whether what
+// reads its responses still fits. A request nothing uses has no report.
+func (w *Workspace) CollectionImpact(collection model.ID) ([]analysis.Report, error) {
+	w.mu.RLock()
+	defer w.mu.RUnlock()
+	if _, ok := w.collection(collection); !ok {
+		return nil, diagErr(diag.CodeWSUnknownCollection, map[string]string{"name": string(collection)})
+	}
+	reports, _ := analysis.Analyze(w.collections, w.contracts())
+	return slices.DeleteFunc(reports, func(r analysis.Report) bool { return r.CollectionID != collection }), nil
+}

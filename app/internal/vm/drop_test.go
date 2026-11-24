@@ -30,8 +30,8 @@ func TestWorkspaceVM_DropOn_should_move_a_request_into_a_folder_or_to_the_top_of
 	top := ws.DropOn(login, ws.Node("c:C1"), nil, nil)
 	w.Wait()
 
-	if !started || !top || len(b.Calls) < 2 || !b.Called("MoveRequest") {
-		t.Fatalf("started %v top %v calls %v", started, top, b.Calls)
+	if !started || !top || len(b.CallLog()) < 2 || !b.Called("MoveRequest") {
+		t.Fatalf("started %v top %v calls %v", started, top, b.CallLog())
 	}
 }
 
@@ -42,8 +42,8 @@ func TestWorkspaceVM_DropOn_should_ignore_a_drop_that_changes_nothing(t *testing
 	onItsFolder := ws.DropOn(login, ws.Node("c:C1/requests/auth"), nil, nil)
 	onARequest := ws.DropOn(login, ws.Node("r:C1:R3"), nil, nil)
 
-	if onItsFolder || onARequest || len(b.Calls) > 1 {
-		t.Fatalf("onItsFolder %v onARequest %v calls %v", onItsFolder, onARequest, b.Calls)
+	if onItsFolder || onARequest || len(b.CallLog()) > 1 {
+		t.Fatalf("onItsFolder %v onARequest %v calls %v", onItsFolder, onARequest, b.CallLog())
 	}
 }
 
@@ -56,7 +56,7 @@ func TestWorkspaceVM_DropOn_should_move_a_folder_but_never_into_itself(t *testin
 	onSelf := ws.DropOn(auth, auth, nil, nil)
 
 	if !into || onSelf || !b.Called("MoveFolder requests/auth -> archive/auth") {
-		t.Fatalf("into %v onSelf %v calls %v", into, onSelf, b.Calls)
+		t.Fatalf("into %v onSelf %v calls %v", into, onSelf, b.CallLog())
 	}
 }
 
@@ -69,6 +69,6 @@ func TestWorkspaceVM_DeleteFolder_and_ContentsOf_should_delete_and_count(t *test
 	w.Wait()
 
 	if requests != 2 || flows != 0 || !b.Called("DeleteFolder requests/auth") {
-		t.Fatalf("contents %d %d calls %v", requests, flows, b.Calls)
+		t.Fatalf("contents %d %d calls %v", requests, flows, b.CallLog())
 	}
 }

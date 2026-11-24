@@ -41,8 +41,10 @@ func newSendCommand(i do.Injector) *cobra.Command {
 		Long: "Send a request (by path, e.g. auth/login, or id) with its hooks, and print the response.\n\n" +
 			"The response body goes to standard output and everything else to standard error, so the\n" +
 			"body can be piped (flowi send auth/login | jq .token).\n\n" +
-			"With --check nothing is sent: for a message or database request it connects, signs in with the credentials the\n" +
-			"request uses and disconnects, so a wrong address or password shows at once and not after a timeout.",
+			"With --check nothing is sent: a message or database request connects, signs in with the credentials the request\n" +
+			"uses and disconnects; an HTTP request goes out as a HEAD with its headers and authentication but no body; a gRPC\n" +
+			"request connects and sends its metadata without calling a method; a data file is opened and read for its tables.\n" +
+			"A wrong address, path or password shows at once and not after a timeout.",
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error { return runSend(cmd, i, args[0], f) },
 	}
@@ -206,7 +208,7 @@ func logSendFinished(i do.Injector, t flowi.RequestTarget, res engine.SendResult
 
 // runCheck tests the connection of a request. The verdict goes to standard error, like the rest of what is not a
 // response body; the exit code says it: 0 connected, 4 the service did not answer or refused the sign-in, 2 the
-// request could not be rendered or has no connection test.
+// request could not be rendered or has no connection test (gRPC-Web).
 func runCheck(cmd *cobra.Command, ws *flowi.Workspace, target flowi.RequestTarget, opts flowi.SendOptions) error {
 	probe, err := ws.TestSavedConnection(cmd.Context(), target, opts)
 	if err != nil {

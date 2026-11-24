@@ -105,3 +105,23 @@ func TestRun_Given_a_step_the_flow_marks_skipped_Then_it_does_not_execute_in_any
 		t.Fatalf("result %+v b %+v c %+v", res, b, c)
 	}
 }
+
+func TestRun_Given_a_step_whose_when_is_false_Then_it_is_skipped_with_that_reason_and_the_run_goes_on(t *testing.T) {
+	// Before: a step skipped by its when had no reason, so the window could not tell it from a step that never started
+	// because an earlier one failed, and left the arrow into it dark.
+	f := newFixture(t)
+	gated := setValues("b", model.SetValue{Name: "b", Value: "{{2}}"})
+	gated.When = "false"
+	fl := f.addFlow("skip-when",
+		setValues("a", model.SetValue{Name: "a", Value: "{{1}}"}),
+		gated,
+		flowNode("c", "note", "text", "b={{vars.b ?? 'none'}}"))
+
+	events, res := runFlow(testCtx(t), t, f.deps(), f.runInput(fl))
+
+	b, _ := finishedNode(events, "b")
+	c, _ := finishedNode(events, "c")
+	if res.Status != StatusPassed || b.Status != StatusSkipped || b.Reason != "its when was false" || c.Outputs["text"] != "b=none" {
+		t.Fatalf("result %+v b %+v c %+v", res, b, c)
+	}
+}

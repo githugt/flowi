@@ -158,7 +158,11 @@ func (iw *ImportWizard) stopScheduled() {
 }
 
 // Waiting says in words what the wizard needs before it can preview, "" when it can: a source, a place to import into,
-// and for an address, one that is complete.
+// and for an address, one that is complete, and for a path, something there.
+//
+// Before: each letter of a typed path was previewed once typing paused, so "/home/me/api" flashed a "no such file"
+// failure on the way to "/home/me/api.yaml". A path with nothing at it is now waited for, not reported as a failure;
+// Refresh still says so when the person asks.
 func (iw *ImportWizard) Waiting() string {
 	switch {
 	case iw.collection == "":
@@ -170,8 +174,19 @@ func (iw *ImportWizard) Waiting() string {
 		return "Choose a file or paste the text to see what would be imported."
 	case !iw.Pasted() && !addressComplete(iw.file):
 		return "Waiting for a complete address."
+	case !iw.Pasted() && !flowi.IsImportURL(strings.TrimSpace(iw.file)) && !pathExists(iw.file):
+		if SourceModeOf(iw.kind) == SourceFolder {
+			return "There is no folder at that path yet."
+		}
+		return "There is no file at that path yet."
 	}
 	return ""
+}
+
+// pathExists says whether something is at the path, with the spaces around a typed path left out.
+func pathExists(p string) bool {
+	_, err := os.Stat(strings.TrimSpace(p))
+	return err == nil
 }
 
 // addressComplete is false for an address that is still being typed ("https://exa"): it needs a host with a dot, a
@@ -308,12 +323,14 @@ func (iw *ImportWizard) choose(set func()) {
 }
 
 // StartOver forgets the source, the preview and the result of an import that is done, so the screen opens on a
-// fresh import, into the same place. Choices that say what to import (kind, file, text, overlays) go; where it goes stays.
+// fresh import, into the same place. Choices that say what to import (kind, file, text, overlays) go, and the kind returns to the first one; where it goes stays.
 //
 // Before: opening the import screen again showed the last import's source, its whole preview and "Imported …", so what
-// had already been imported looked like what was about to be.
+// had already been imported looked like what was about to be; and the kind stayed as the last import (or its paste's
+// detection) left it, so an unrecognised paste sat on a stale kind.
 func (iw *ImportWizard) StartOver() {
 	iw.stopScheduled()
+	iw.kind = flowi.ImportOpenAPI
 	iw.file, iw.paste, iw.overlay, iw.detected = "", "", "", ""
 	iw.plan, iw.err, iw.done, iw.outcome = nil, "", "", ImportOutcome{}
 	iw.changed()

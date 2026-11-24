@@ -16,7 +16,7 @@
   // The canvas renders a laid-out Diagram as SVG. Pan, pinch-zoom and drag
   // happen here, locally; the Go side hears of a drop once, on release, and
   // answers every pointer move of a drag with the slot to mark.
-  import { wheelAction } from './lib/wheel'
+  import { wheelReader } from './lib/wheel'
   import { clamp } from './lib/clamp'
   import { minimapView, minimapWorthIt } from './lib/minimap'
   import { untrack, type Snippet } from 'svelte'
@@ -26,7 +26,7 @@
   import { detailLevel, portRadius } from './lib/detail'
   import { edgeTaken, running, throughStatus } from './lib/edgetaken'
   import type { Card, DataEdge, Diagram, Edge, Face, Lane, Slot, Unit } from './lib/types'
-  import { STACK, downPoints, roundedPath } from './lib/stackpath'
+  import { STACK, downPoints, roundedPath, routeCentre, squarePoints, turnsBack } from './lib/stackpath'
   import StepCard from './StepCard.svelte'
   import EdgeCard from './EdgeCard.svelte'
   import { edgeCards, keepStart } from './lib/edgecards'
@@ -47,6 +47,7 @@
     selection,
     statuses,
     results,
+    through = [],
     slot,
     editable = true,
     onselect,
@@ -64,6 +65,7 @@
     onadd,
     ontoolbar,
     oncolour,
+    onarrows,
     oncase,
     ondrag,
     ondrop,
@@ -87,6 +89,7 @@
     selection: string[]
     statuses: Record<string, string>
     results: Record<string, string>
+    through?: string[] // steps the run skipped on purpose: it went on past them, so their arrows count as taken
     slot: Slot | null
     editable?: boolean // structure changes (move, lift, connect) need Edit; pan and select do not
     onselect: (step: string, additive: boolean) => void
@@ -111,6 +114,7 @@
     onadd?: (clientX: number, clientY: number, near: { step: string; before: boolean } | null) => void
     ontoolbar?: (tool: 'add' | 'skip' | 'break' | 'duplicate' | 'delete', step: string, e: MouseEvent) => void // the selected card's toolbar
     oncolour?: (step: string, colour: string) => void
+    onarrows?: (step: string, style: string) => void // the selected card's arrows tool: '' for square, 'curved'
     oncase?: (step: string, index: number, e: MouseEvent) => void // a Route's case port label (Edit only)
     ondrag: (info: DragInfo) => void
     ondrop: (info: DragInfo) => void
@@ -259,10 +263,60 @@
     return downPoints({ x: exitX(a), y: portYOf(a, e.fromPort) }, { x: at(b).x, y: portY(b) }, at(a).y + a.h, at(b).y, port)
   }
 
-  /** Where the middle of an arrow is: on its middle stretch for a stacked one, halfway along the way else. */
+  /** Whether the arrows that leave a step are drawn as curves: the person chose it for the step; square is the default. */
+  const curved = (u: Unit) => cards[u.id]?.arrowStyle === 'curved'
+
+  /** The arrow's ends, its cards and its port as the square routes want them. */
+  function ends(e: Edge) {
+    const a = byId.get(e.from)
+    const b = byId.get(e.to)
+    if (!a || !b || (e.fail && !a.card)) return null
+    const span = (u: Unit) => ({ top: at(u).y, bottom: at(u).y + u.h })
+    return { a, b, from: { x: exitX(a), y: portYOf(a, e.fromPort) }, to: { x: at(b).x, y: portY(b) }, sa: span(a), sb: span(b), port: Math.max(a.ports?.indexOf(e.fromPort ?? '') ?? 0, 0) }
+  }
+
+  // Several arrows into one step would run down the same line beside it. Each takes a lane of its own, ordered so that
+  // none crosses another: for an arrow that steps up or down to a step on its right, the arrow from furthest away takes
+  // the lane by the step (a nearer one's level run would cross it otherwise); for one that goes round the cards, the
+  // nearest does (its way back crosses the others' otherwise). They join only on the short stretch into the port.
+  const lanes = $derived.by(() => {
+    const into = new Map<string, { e: Edge; dist: number; back: boolean }[]>()
+    for (const e of diagram.edges) {
+      const g = !e.into && !e.down && ends(e)
+      if (!g || curved(g.a)) continue
+      const route = squarePoints(g.from, g.to, g.sa, g.sb, g.port)
+      if (route.length < 4) continue // straight: nothing runs beside the step
+      const back = turnsBack(g.from.x, g.to.x)
+      const dist = Math.abs((back ? route[2].y : g.from.y) - g.to.y)
+      into.set(e.to, [...(into.get(e.to) ?? []), { e, dist, back }])
+    }
+    const out = new Map<Edge, number>()
+    for (const list of into.values()) {
+      const order = (x: { dist: number; back: boolean }, y: { dist: number; back: boolean }) => (x.back ? x.dist - y.dist : y.dist - x.dist)
+      const stepped = list.filter((x) => !x.back).sort(order)
+      const round = list.filter((x) => x.back).sort(order)
+      for (const [i, x] of [...stepped, ...round].entries()) out.set(x.e, i)
+    }
+    return out
+  })
+
+  /**
+   * The corners of an arrow that is drawn with square corners instead of a curve: one between steps stacked in a loop's
+   * box, and by default every other (the person can choose curves for a step's arrows, which are then null here). A step
+   * put behind or beside the one it follows gets a way round the cards, since a curve there swings out and back through
+   * them. Decided from where the cards are now, so dragging a step reshapes its arrows as it goes.
+   */
+  function routeOf(e: Edge): { x: number; y: number }[] | null {
+    if (e.down) return downRoute(e)
+    const g = ends(e)
+    if (!g || curved(g.a)) return null
+    return squarePoints(g.from, g.to, g.sa, g.sb, g.port, lanes.get(e) ?? 0)
+  }
+
+  /** Where the middle of an arrow is: on its middle stretch for a squared one, halfway along the way else. */
   function routeMid(e: Edge, a: Unit, b: Unit): { x: number; y: number } {
-    const route = e.down ? downRoute(e) : null
-    if (route) return { x: (route[2].x + route[3].x) / 2, y: route[2].y }
+    const route = routeOf(e)
+    if (route) return routeCentre(route)
     return { x: (exitX(a) + at(b).x) / 2, y: (portY(a) + portY(b)) / 2 }
   }
 
@@ -333,7 +387,7 @@
     const b = byId.get(e.to)
     if (!a || !b) return ''
     if (e.fail && !a.card) return failPath(e)
-    const route = e.down ? downRoute(e) : null
+    const route = routeOf(e)
     if (route) return roundedPath(route)
     const x1 = exitX(a)
     const y1 = portYOf(a, e.fromPort)
@@ -361,11 +415,12 @@
     return { x: (clientX - r.left - view.x) / view.k, y: (clientY - r.top - view.y) / view.k, snap: SNAP_PX / view.k }
   }
 
-  // Trackpad pinch arrives as a wheel event with ctrlKey set (Chromium,
-  // WebView2); two-finger scroll is a plain wheel event.
+  // A mouse wheel zooms and Ctrl+wheel pans. Trackpad pinch arrives as a wheel event with ctrlKey set (Chromium,
+  // WebView2) and zooms; two-finger scroll is a plain wheel event and pans. See lib/wheel.ts.
+  const readWheel = wheelReader()
   function onwheel(e: WheelEvent) {
     e.preventDefault()
-    const act = wheelAction(e)
+    const act = readWheel(e)
     if (act.kind === 'zoom') {
       const p = local(e)
       zoomAt(p.x, p.y, act.factor)
@@ -576,7 +631,7 @@
     const a = byId.get(e.from)
     const b = byId.get(e.to)
     if (!a || !b) return null
-    if (e.down) return routeMid(e, a, b)
+    if (routeOf(e)) return routeMid(e, a, b)
     const failFromStrip = e.fail && !a.card
     const x1 = failFromStrip ? at(a).x + a.w / 2 : exitX(a)
     const y1 = failFromStrip ? at(a).y + a.h : portYOf(a, e.fromPort)
@@ -780,8 +835,8 @@
     const b = byId.get(e.to)
     return !!a && !!b && edgeTaken(e, flowStatus(a), flowStatus(b))
   }
-  // What an arrow reads of a step: one skipped on purpose (its card is hatched) lets the run through, as passed.
-  const flowStatus = (u: Unit) => throughStatus(statusOf(u), !!cards[u.id]?.skipped)
+  // What an arrow reads of a step: one skipped on purpose (its card is hatched, or the run skipped it by its when) lets the run through, as passed.
+  const flowStatus = (u: Unit) => throughStatus(statusOf(u), !!cards[u.id]?.skipped || (u.nodes.length === 1 && through.includes(u.nodes[0])))
   const going = $derived(running(statuses))
   // The arrow out of Start is taken once the first step ran, the one into End once the last step got through.
   const startTaken = $derived.by(() => {
@@ -1009,7 +1064,8 @@
         {#if u.card && card?.face}
           <StepCard {u} detail={detail} portR={portR} face={card.face} title={card.title} tip={card.tip} selected={selectedUnits.has(u.id)} {status} result={resultOf(u)} skipped={card.skipped} breakpoint={card.break} note={card.skipNote} colour={card.color || undefined}
             toolbar={!!ontoolbar && editable && selection.length === 1 && selectedUnits.has(u.id) && !moving && !link}
-            ontool={(tool, e) => ontoolbar?.(tool, u.nodes[u.core ?? 0], e)} oncolour={(c) => oncolour?.(u.nodes[u.core ?? 0], c)}
+            ontool={(tool, e) => ontoolbar?.(tool, u.nodes[u.core ?? 0], e)} oncolour={(c) => oncolour?.(u.nodes[u.core ?? 0], c)} arrowStyle={card.arrowStyle} onarrows={(style) => onarrows?.(u.nodes[u.core ?? 0], style)}
+            onopen={onopen && (u.types[0] === 'request' || u.types[0] === 'subflow') ? () => onopen(u.nodes[u.core ?? 0]) : undefined} openLabel={u.types[0] === 'subflow' ? 'Open flow' : 'Open request'}
             oncase={oncase ? (i, e) => oncase(u.nodes[u.core ?? 0], i, e) : undefined}
             onrow={(key) => rowClicked(u, key)} onport={(e, port) => onport(e, u, port)} pickedPorts={pickedPorts.unit === u.id ? pickedPorts.ports : []} onaddon={onaddon && editable && !endsRun(u) ? (port, e) => onaddon(coreOf(u), outcomeOfPort(port), e.clientX, e.clientY) : undefined} ondataport={ondata ? (e) => ondataport(e, u) : undefined} />
         {:else if u.headW}

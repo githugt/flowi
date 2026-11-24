@@ -5,6 +5,8 @@ package bridge
 import (
 	"fmt"
 	"os"
+
+	"github.com/githugt/flowi/app/internal/vm"
 )
 
 // FlowSourceView is the text of a flow: the flow body (editable) and the
@@ -12,6 +14,9 @@ import (
 type FlowSourceView struct {
 	Flow string `json:"flow"`
 	File string `json:"file"`
+	// Comments say, by step id, what each request or flow step calls. The code view shows them above the steps; they
+	// are made from the requests and flows each time and are not part of the text.
+	Comments map[string]string `json:"comments"`
 }
 
 // Source is the flow's text as it stands now, unsaved edits included.
@@ -22,8 +27,9 @@ func (s *FlowService) Source(node string) (FlowSourceView, error) {
 	}
 	ch := make(chan result, 1)
 	err := s.edit(node, func(o *openFlow) error {
+		comments := vm.StepComments(o.doc.Collection(), o.doc.Draft())
 		o.doc.Source(
-			func(flow, file string) { ch <- result{v: FlowSourceView{Flow: flow, File: file}} },
+			func(flow, file string) { ch <- result{v: FlowSourceView{Flow: flow, File: file, Comments: comments}} },
 			func(err error) { ch <- result{err: err} },
 		)
 		return nil

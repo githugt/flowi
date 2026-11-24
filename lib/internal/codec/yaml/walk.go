@@ -19,6 +19,9 @@ type decoder struct {
 	// blueprint is set while decoding a blueprint, where a reference may be
 	// {param: name} instead of {id, path}.
 	blueprint bool
+	// snippet is set while decoding steps copied from a flow to be put in another (DecodeFlowSnippet), where a
+	// reference may name its target by path alone: the id belongs to the collection the steps came from.
+	snippet bool
 }
 
 func (d *decoder) add(code diag.Code, path string, n ast.Node, args map[string]string) {

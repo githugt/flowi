@@ -9,6 +9,7 @@
   import type { FlowView, StandaloneView } from './lib/types'
   import { ui } from './lib/ui.svelte'
   import { stepAtLine } from './lib/codeStep'
+  import { stepNotes } from './lib/stepnotes'
   import CodeEditor from './CodeEditor.svelte'
 
   // editable follows the flow editor's Edit: the code could be changed while the canvas could not.
@@ -16,6 +17,9 @@
   let tab = $state<'flow' | 'file' | 'standalone'>('flow')
   let text = $state('')
   let file = $state('')
+  // What each request or flow step calls, by step id: drawn above the steps in the text, never part of it.
+  let comments = $state<Record<string, string | undefined>>({})
+  const stepNoteList = $derived(stepNotes(text, comments))
   let edited = $state(false)
   let problems = $state<string[]>([])
   // What is wrong with the flow once applied: it is applied all the same, so these are told, not blocking.
@@ -60,6 +64,7 @@
     FlowService.Source(view.node).then((s) => {
       text = s.flow
       file = s.file
+      comments = s.comments ?? {}
     })
   })
 
@@ -89,6 +94,7 @@
     notes = []
     const s = await FlowService.Source(view.node)
     text = s.flow
+    comments = s.comments ?? {}
   }
 
   function jump(p: string) {
@@ -124,7 +130,7 @@
     </Tabs>
   </div>
   <p class="hint">
-    {#if tab === 'file'}What saving writes. Read-only.{:else if tab === 'standalone'}For other tools: standard steps only, the saved flow and the flows it calls. Read-only.{:else if editable}The flow itself. Apply to change the flow (one undo step).{:else}The flow itself. Read-only while viewing: press Edit to change it.{/if}
+    {#if tab === 'file'}What saving writes. Read-only.{:else if tab === 'standalone'}For other tools: standard steps only, the saved flow and the flows it calls. Read-only.{:else if editable}The flow itself. Apply to change the flow (one undo step). The grey lines above the steps say what they call; they are not part of the flow.{:else}The flow itself. Read-only while viewing: press Edit to change it. The grey lines above the steps say what they call; they are not part of the flow.{/if}
   </p>
   {#if problems.length}
     <ul class="problems">
@@ -142,6 +148,7 @@
         bind:this={editor}
         value={text}
         readonly={!editable}
+        notes={stepNoteList}
         oncursor={followCursor}
         onchange={(t) => {
           if (t !== text) {

@@ -38,7 +38,7 @@ func otherLabels() map[Format]string {
 }
 
 // FormatsFor lists the formats that can say r, in display order: the HTTP ones for an HTTP request, the tool of its
-// protocol for another kind, and none when no common command-line tool speaks it (SQS, Pub/Sub, a data file).
+// protocol for another kind, and none when no common command-line tool speaks it (AMQP 1.0, a folder of data files).
 func FormatsFor(r engine.PreviewRequest) []Format {
 	switch kind := kindOf(r); kind {
 	case "":
@@ -49,10 +49,14 @@ func FormatsFor(r engine.PreviewRequest) []Format {
 		if f, ok := sqlTool(r.URL); ok {
 			return []Format{f}
 		}
+		if f, ok := fileTool(r.URL); ok {
+			return f
+		}
 	default:
 		if f, ok := messageTool()[kind]; ok {
 			return []Format{f}
 		}
+		return moreTools(kind)
 	}
 	return nil
 }
@@ -76,6 +80,12 @@ func kindOf(r engine.PreviewRequest) string {
 
 // generateOther renders r in a format of the other kinds; ok is false when f is not one of them.
 func generateOther(f Format, r engine.PreviewRequest) (text string, ok bool, err error) {
+	if text, ok := generateMore(f, r); ok {
+		if !contains(FormatsFor(r), f) {
+			return "", true, fmt.Errorf("%s cannot say this request: it is %s", moreLabels()[f], describeKind(r))
+		}
+		return text, true, nil
+	}
 	if _, known := otherLabels()[f]; !known {
 		return "", false, nil
 	}

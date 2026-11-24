@@ -48,7 +48,7 @@ func TestEnvVM_toggle_secret_moves_value_to_vault_and_never_into_the_file(t *tes
 	saved := b.SavedEnvs[0]
 	i := slices.IndexFunc(saved.Vars, func(v model.EnvVar) bool { return v.Name == "api_key" })
 	if i < 0 || !saved.Vars[i].Secret || saved.Vars[i].Value != "" || !b.Called("SetSecret staging/api_key") {
-		t.Fatalf("saved %+v calls %v", saved.Vars, b.Calls)
+		t.Fatalf("saved %+v calls %v", saved.Vars, b.CallLog())
 	}
 	if after := env.Rows(); slices.ContainsFunc(after, func(r vm.EnvVarRow) bool { return r.Value == "k-123" }) || env.Dirty() {
 		t.Fatalf("value kept after save: %+v dirty %v", after, env.Dirty())
@@ -66,7 +66,7 @@ func TestEnvVM_turning_a_secret_off_unsets_the_vault_value(t *testing.T) {
 	w.Wait()
 
 	if !b.Called("DiscardSecret staging/password") || b.SavedEnvs[0].Vars[1].Value != "plain-now" {
-		t.Fatalf("calls %v saved %+v", b.Calls, b.SavedEnvs)
+		t.Fatalf("calls %v saved %+v", b.CallLog(), b.SavedEnvs)
 	}
 }
 
@@ -82,7 +82,7 @@ func TestEnvVM_removing_a_secret_variable_discards_its_vault_value(t *testing.T)
 	w.Wait()
 
 	if !b.Called("DiscardSecret staging/password") || b.Called("UnsetSecret staging/password") {
-		t.Fatalf("calls %v", b.Calls)
+		t.Fatalf("calls %v", b.CallLog())
 	}
 }
 
@@ -94,7 +94,7 @@ func TestEnvVM_save_keeps_existing_secret_when_no_new_value(t *testing.T) {
 	w.Wait()
 
 	if b.Called("SetSecret staging/password") || b.Called("DiscardSecret staging/password") {
-		t.Fatalf("calls %v", b.Calls)
+		t.Fatalf("calls %v", b.CallLog())
 	}
 }
 
@@ -287,7 +287,7 @@ func TestEnvVM_Given_a_renamed_secret_When_saved_Then_the_stored_value_is_kept_u
 	w.Wait()
 
 	if b.Called("DiscardSecret staging/password") || len(b.SavedEnvs) != 0 {
-		t.Fatalf("the first Save went on: calls %v", b.Calls)
+		t.Fatalf("the first Save went on: calls %v", b.CallLog())
 	}
 	if !strings.Contains(env.Err(), "password") || !env.Dirty() {
 		t.Fatalf("err %q dirty %v", env.Err(), env.Dirty())
@@ -295,7 +295,7 @@ func TestEnvVM_Given_a_renamed_secret_When_saved_Then_the_stored_value_is_kept_u
 	env.Save(false)
 	w.Wait()
 	if !b.Called("DiscardSecret staging/password") {
-		t.Fatalf("the confirmed Save did not go on: %v", b.Calls)
+		t.Fatalf("the confirmed Save did not go on: %v", b.CallLog())
 	}
 }
 
@@ -310,7 +310,7 @@ func TestEnvVM_Given_a_confirmation_When_the_rows_change_Then_it_is_asked_again(
 	w.Wait()
 
 	if b.Called("DiscardSecret staging/password") {
-		t.Fatalf("a changed edit was confirmed by the old answer: %v", b.Calls)
+		t.Fatalf("a changed edit was confirmed by the old answer: %v", b.CallLog())
 	}
 }
 

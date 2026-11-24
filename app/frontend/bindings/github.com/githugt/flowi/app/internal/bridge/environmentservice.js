@@ -225,6 +225,18 @@ export function ShareTargets() {
 }
 
 /**
+ * States says which environment is selected and what is unresolved in each (a secret without a value, a base that is
+ * not there). It reads the vault's names, so call it off the actor; the window asks again when the tree or the secrets
+ * change.
+ * @returns {$CancellablePromise<$models.EnvStateView[]>}
+ */
+export function States() {
+    return $Call.ByID(1128445588).then(/** @type {($result: any) => any} */(($result) => {
+        return $$createType8($result);
+    }));
+}
+
+/**
  * Unset lists the env.* and secret.* variables the workspace's requests and
  * flows use that environment node (with its unsaved edits) does not define,
  * so its tab can offer them as rows to fill in.
@@ -233,7 +245,7 @@ export function ShareTargets() {
  */
 export function Unset(node) {
     return $Call.ByID(2264062559, node).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType8($result);
+        return $$createType10($result);
     }));
 }
 
@@ -245,5 +257,7 @@ const $$createType3 = $models.EnvView.createFrom;
 const $$createType4 = $models.EnvShareView.createFrom;
 const $$createType5 = $models.Choice.createFrom;
 const $$createType6 = $Create.Array($$createType5);
-const $$createType7 = $models.MissingVar.createFrom;
+const $$createType7 = $models.EnvStateView.createFrom;
 const $$createType8 = $Create.Array($$createType7);
+const $$createType9 = $models.MissingVar.createFrom;
+const $$createType10 = $Create.Array($$createType9);

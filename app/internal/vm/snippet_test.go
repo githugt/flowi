@@ -69,8 +69,10 @@ func TestSnippetVM_Given_a_grpc_message_or_query_Then_the_format_is_the_tool_of_
 }
 
 func TestSnippetVM_Given_a_kind_no_common_tool_speaks_Then_it_says_so_instead_of_writing_curl(t *testing.T) {
+	// Before: SQS, SNS, Pub/Sub, Service Bus, AMQP, SSE and data files said this; now only AMQP 1.0 and a folder of data
+	// files do, as no common command-line tool speaks them.
 	b := sampleBackend()
-	b.PreviewResult = engine.Preview{Masked: engine.PreviewRequest{Method: "SQS", URL: "sqs://queue", BodyKind: "text", Body: "x"}}
+	b.PreviewResult = engine.Preview{Masked: engine.PreviewRequest{Method: "AMQP1", URL: "amqp://queue", BodyKind: "text", Body: "x"}}
 	s, _ := newSnippetVM(t, b, true)
 
 	s.Refresh()

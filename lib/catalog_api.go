@@ -25,6 +25,7 @@ type NodeParam struct {
 	Doc      string
 	Required bool
 	Enum     []string
+	Default  string // an enum's choice when the field is absent
 	Min, Max int64
 }
 
@@ -34,7 +35,7 @@ func NodeCatalog() []NodeSpec {
 	for _, s := range nodes.Specs() {
 		spec := NodeSpec{Type: string(s.Type), Group: s.Group, Summary: s.Summary, MapForm: s.MapForm, Typed: s.Typed}
 		for _, p := range s.Params {
-			spec.Params = append(spec.Params, NodeParam{Name: p.Name, Kind: kindName(p.Kind), Doc: p.Doc, Required: p.Required, Enum: p.Enum, Min: p.Min, Max: p.Max})
+			spec.Params = append(spec.Params, NodeParam{Name: p.Name, Kind: kindName(p.Kind), Doc: p.Doc, Required: p.Required, Enum: p.Enum, Default: p.Default, Min: p.Min, Max: p.Max})
 		}
 		out = append(out, spec)
 	}

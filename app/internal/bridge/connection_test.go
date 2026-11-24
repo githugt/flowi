@@ -59,8 +59,8 @@ func TestRequestService_TestConnection_should_show_the_verdict_until_the_server_
 	if stale == nil || stale.Status != "" {
 		t.Fatalf("after the server changed the old verdict must not stand: %+v", stale)
 	}
-	if n := len(slices.DeleteFunc(slices.Clone(b.Calls), func(c string) bool { return c != "TestConnection" })); n != 1 {
-		t.Fatalf("calls %v", b.Calls)
+	if n := len(slices.DeleteFunc(slices.Clone(b.CallLog()), func(c string) bool { return c != "TestConnection" })); n != 1 {
+		t.Fatalf("calls %v", b.CallLog())
 	}
 }
 
@@ -82,9 +82,11 @@ func TestRequestService_TestConnection_should_report_a_refusal_and_a_failure_to_
 	}
 }
 
-func TestRequestService_Open_Given_an_http_request_Then_it_has_no_connection_test(t *testing.T) {
+func TestRequestService_Open_Given_an_http_request_Then_it_offers_the_test_and_the_verdict_ends_with_the_address(t *testing.T) {
+	// Before: an HTTP request had no connection test, so a wrong host showed only on a real send.
 	pub := &published{}
-	app := bridge.NewApp(&vmtest.Backend{Cols: []model.Collection{vmtest.SampleCollection()}}, bridge.NewInlineActor(), pub.emit)
+	b := &vmtest.Backend{Cols: []model.Collection{vmtest.SampleCollection()}, ConnectionProbe: engine.Probe{Status: engine.ProbeOK, Target: "https://api.test/x", Detail: "200 OK"}}
+	app := bridge.NewApp(b, bridge.NewInlineActor(), pub.emit)
 	app.Start(t.Context())
 	var node string
 	for _, n := range app.Workspace().Tree().Roots[0].Children[0].Children {
@@ -97,8 +99,19 @@ func TestRequestService_Open_Given_an_http_request_Then_it_has_no_connection_tes
 	if _, err := app.Requests().Open(node); err != nil {
 		t.Fatal(err)
 	}
+	opened, ok := pub.last["request"].(bridge.RequestView)
+	app.Requests().TestConnection(node)
+	tested := pub.last["request"].(bridge.RequestView).Connection
+	app.Requests().SetURL(node, "https://other.test/x")
+	stale := pub.last["request"].(bridge.RequestView).Connection
 
-	if v, ok := pub.last["request"].(bridge.RequestView); !ok || v.Connection != nil {
-		t.Fatalf("view %+v", pub.last["request"])
+	if !ok || opened.Connection == nil || opened.Connection.Status != "" {
+		t.Fatalf("an HTTP request offers the test, not yet tried: %+v", pub.last["request"])
+	}
+	if tested == nil || tested.Status != "ok" || tested.Detail != "200 OK" {
+		t.Fatalf("tested %+v", tested)
+	}
+	if stale == nil || stale.Status != "" {
+		t.Fatalf("after the address changed the old verdict must not stand: %+v", stale)
 	}
 }

@@ -4,6 +4,7 @@ package vm
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"time"
 
@@ -25,15 +26,13 @@ type ConnectionTest struct {
 	key string
 }
 
-// CanTestConnection says whether the selected version is a kind of request that can be tested without sending it:
-// a message or a database query. HTTP, gRPC and data files cannot.
+// CanTestConnection says whether the request has a version to test without sending it. Every kind has a test of its
+// own: an HTTP request goes out as a HEAD, a gRPC one connects and signs in, a message or a database connects, and a
+// data file is opened and read for its tables. A kind or an option that has none (gRPC-Web) says so in the result.
+//
+// Before: only a message or a database query could be tested; an HTTP request, a gRPC call and a data file could not.
 func (r *Request) CanTestConnection() bool {
-	v := r.Current()
-	if v.Async != nil {
-		return true
-	}
-	d := v.SQL()
-	return d != nil && v.Dataset != nil
+	return len(r.draft.Versions) > 0
 }
 
 // Connection is the last test of the selected version's connection, empty once the server, the credentials or the
@@ -49,6 +48,35 @@ func (r *Request) Connection() ConnectionTest {
 // body, a header, the channel's message) leaves the result standing.
 func connectionKey(v model.RequestVersion) string {
 	var b strings.Builder
+	switch {
+	case v.Async != nil, v.GRPC != nil, v.Dataset != nil, v.File != nil:
+	default: // HTTP: where it goes and how it signs in
+		b.WriteString(v.URL)
+		for _, kv := range v.Query {
+			if !kv.Disabled {
+				b.WriteString("|q:" + kv.Key + "=" + kv.Value)
+			}
+		}
+		for _, kv := range v.Headers {
+			if !kv.Disabled {
+				b.WriteString("|h:" + kv.Key + "=" + kv.Value)
+			}
+		}
+		if v.Auth != nil {
+			fmt.Fprintf(&b, "|auth:%+v", *v.Auth)
+		}
+	}
+	if g := v.GRPC; g != nil {
+		b.WriteString(g.Server + "|" + strings.Join(g.Proto, ","))
+		for _, kv := range v.Headers {
+			if !kv.Disabled {
+				b.WriteString("|h:" + kv.Key + "=" + kv.Value)
+			}
+		}
+	}
+	if f := v.File; f != nil {
+		b.WriteString(f.Format + "|" + f.Path)
+	}
 	if a := v.Async; a != nil {
 		b.WriteString(a.Protocol + "|" + a.Server)
 		for _, kv := range a.Binding {

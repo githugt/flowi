@@ -7,9 +7,11 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/githugt/flowi/lib/diag"
 	"github.com/githugt/flowi/lib/model"
+	"github.com/githugt/flowi/lib/transport"
 )
 
 func newID() func() model.ID {
@@ -267,6 +269,18 @@ func TestImport_Given_a_websocket_document_with_a_reply_Then_both_operations_bec
 	}
 	if k.Protocol != "ws" || k.Channel != "/ws/ticks" || k.Send != nil || k.Receive == nil {
 		t.Fatalf("ticks %+v", k)
+	}
+}
+
+// A receive-only request is written with no count and no timeout, so it waits as the engine and the editor say: for
+// one message, up to 30 seconds. One tick answers "does this stream work?", and the person can ask for more.
+func TestImport_Given_a_receive_only_websocket_Then_it_waits_for_one_message_for_thirty_seconds(t *testing.T) {
+	k := byOperation(load(t, "websocket-echo.yaml"), "receiveTicks").Versions[0].Async
+
+	got := transport.Receive{Count: k.Receive.Count, Timeout: k.Receive.Timeout}.Normalized()
+
+	if k.Receive.Count != 0 || k.Receive.Timeout != 0 || got.Count != 1 || got.Timeout != 30*time.Second {
+		t.Fatalf("written %+v, run as %+v", k.Receive, got)
 	}
 }
 

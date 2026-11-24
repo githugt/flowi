@@ -1125,6 +1125,15 @@ export class Node {
              */
             this["Color"] = "";
         }
+        if (!("ArrowStyle" in $$source)) {
+            /**
+             * ArrowStyle is how the canvas draws the arrows that leave this step, one of NodeArrowStyles; "" is square. Like
+             * Color it is cosmetic: a run never reads it.
+             * @member
+             * @type {string}
+             */
+            this["ArrowStyle"] = "";
+        }
         if (!("Skipped" in $$source)) {
             /**
              * Skipped says the step does not run, in any run of the flow, until the mark is taken off: the step and
@@ -1214,15 +1223,15 @@ export class Node {
         const $$createField4_0 = $$createType11;
         const $$createField5_0 = $$createType11;
         const $$createField6_0 = $$createType11;
-        const $$createField18_0 = $$createType17;
-        const $$createField19_0 = $$createType19;
-        const $$createField20_0 = $$createType10;
-        const $$createField21_0 = $$createType21;
-        const $$createField22_0 = $$createType10;
+        const $$createField19_0 = $$createType17;
+        const $$createField20_0 = $$createType19;
+        const $$createField21_0 = $$createType10;
+        const $$createField22_0 = $$createType21;
         const $$createField23_0 = $$createType10;
-        const $$createField24_0 = $$createType23;
-        const $$createField25_0 = $$createType25;
-        const $$createField26_0 = $$createType8;
+        const $$createField24_0 = $$createType10;
+        const $$createField25_0 = $$createType23;
+        const $$createField26_0 = $$createType25;
+        const $$createField27_0 = $$createType8;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("Needs" in $$parsedSource) {
             $$parsedSource["Needs"] = $$createField4_0($$parsedSource["Needs"]);
@@ -1234,31 +1243,31 @@ export class Node {
             $$parsedSource["AfterOutcome"] = $$createField6_0($$parsedSource["AfterOutcome"]);
         }
         if ("Request" in $$parsedSource) {
-            $$parsedSource["Request"] = $$createField18_0($$parsedSource["Request"]);
+            $$parsedSource["Request"] = $$createField19_0($$parsedSource["Request"]);
         }
         if ("Subflow" in $$parsedSource) {
-            $$parsedSource["Subflow"] = $$createField19_0($$parsedSource["Subflow"]);
+            $$parsedSource["Subflow"] = $$createField20_0($$parsedSource["Subflow"]);
         }
         if ("Body" in $$parsedSource) {
-            $$parsedSource["Body"] = $$createField20_0($$parsedSource["Body"]);
+            $$parsedSource["Body"] = $$createField21_0($$parsedSource["Body"]);
         }
         if ("Branches" in $$parsedSource) {
-            $$parsedSource["Branches"] = $$createField21_0($$parsedSource["Branches"]);
+            $$parsedSource["Branches"] = $$createField22_0($$parsedSource["Branches"]);
         }
         if ("Then" in $$parsedSource) {
-            $$parsedSource["Then"] = $$createField22_0($$parsedSource["Then"]);
+            $$parsedSource["Then"] = $$createField23_0($$parsedSource["Then"]);
         }
         if ("Else" in $$parsedSource) {
-            $$parsedSource["Else"] = $$createField23_0($$parsedSource["Else"]);
+            $$parsedSource["Else"] = $$createField24_0($$parsedSource["Else"]);
         }
         if ("Cases" in $$parsedSource) {
-            $$parsedSource["Cases"] = $$createField24_0($$parsedSource["Cases"]);
+            $$parsedSource["Cases"] = $$createField25_0($$parsedSource["Cases"]);
         }
         if ("Values" in $$parsedSource) {
-            $$parsedSource["Values"] = $$createField25_0($$parsedSource["Values"]);
+            $$parsedSource["Values"] = $$createField26_0($$parsedSource["Values"]);
         }
         if ("Params" in $$parsedSource) {
-            $$parsedSource["Params"] = $$createField26_0($$parsedSource["Params"]);
+            $$parsedSource["Params"] = $$createField27_0($$parsedSource["Params"]);
         }
         return new Node(/** @type {Partial<Node>} */($$parsedSource));
     }

@@ -291,7 +291,7 @@ func TestFlowDoc_Arazzo_should_export_the_saved_flow_with_a_note_for_what_has_no
 	w.Wait()
 
 	if text != "arazzo: 1.0.1\n" || len(notes) != 1 || notes[0] == "" || !b.Called("ExportArazzo F1") {
-		t.Fatalf("text %q notes %v calls %v", text, notes, b.Calls)
+		t.Fatalf("text %q notes %v calls %v", text, notes, b.CallLog())
 	}
 }
 
@@ -411,7 +411,7 @@ func TestFlowDoc_Source_should_show_the_draft_with_unsaved_edits(t *testing.T) {
 	w.Wait()
 
 	if flowText != "nodes: 4\n" || fileText != "arazzo: 1.1.0\n" || !b.Called("FlowSource F1") {
-		t.Fatalf("flow %q file %q calls %v", flowText, fileText, b.Calls)
+		t.Fatalf("flow %q file %q calls %v", flowText, fileText, b.CallLog())
 	}
 }
 
@@ -602,7 +602,7 @@ func TestFlowDoc_KeepEdits_Given_no_edits_Then_keeps_nothing(t *testing.T) {
 	err := d.KeepEdits()
 
 	if err != nil || b.Called("KeepFlowEdits F1") {
-		t.Fatalf("err %v calls %v", err, b.Calls)
+		t.Fatalf("err %v calls %v", err, b.CallLog())
 	}
 }
 

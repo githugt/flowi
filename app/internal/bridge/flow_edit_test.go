@@ -161,6 +161,21 @@ func TestAddRequestStep_Given_a_request_id_Then_the_new_step_calls_it_and_an_unk
 	}
 }
 
+// Before: a request put into a flow with "Add to flow" was a bare id and path, so nothing said what the step was for.
+func TestAddRequestStep_Given_a_request_Then_the_step_is_named_and_described_by_it(t *testing.T) {
+	flows, v, pub := openTwoUnits(t)
+	existing := flows.TargetOf(v.Node, "login")
+	id := existing[strings.LastIndex(existing, ":")+1:]
+
+	step, err := flows.AddRequestStep(v.Node, id)
+	flows.Select(v.Node, step)
+	got := lastView(pub).Form.Step
+
+	if err != nil || got.Name != "Login" || got.Description != "POST /login" {
+		t.Fatalf("step %+v (%v)", got, err)
+	}
+}
+
 // Before: a step's retries could not be set from the window.
 func TestSetText_should_set_retries_and_their_wait_on_a_request_step_and_refuse_nonsense(t *testing.T) {
 	flows, v, pub := openTwoUnits(t)

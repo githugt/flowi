@@ -21,7 +21,7 @@ func TestWorkspaceVM_CreateFolder_should_show_an_empty_folder_in_the_tree(t *tes
 
 	n := ws.Node("c:C1/requests/billing")
 	if n.Kind != vm.NodeFolder || n.Path != "billing" || n.Tree != "requests" || !b.Called("NewFolder requests/billing") {
-		t.Fatalf("node %+v calls %v", n, b.Calls)
+		t.Fatalf("node %+v calls %v", n, b.CallLog())
 	}
 }
 
@@ -49,7 +49,7 @@ func TestWorkspaceVM_CreateFolder_Given_no_name_Then_makes_new_folder_inside_the
 		w.Wait()
 
 		if !b.Called("NewFolder " + want) {
-			t.Errorf("name %q: calls %v, want NewFolder %s", given, b.Calls, want)
+			t.Errorf("name %q: calls %v, want NewFolder %s", given, b.CallLog(), want)
 		}
 	}
 }

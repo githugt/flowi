@@ -42,7 +42,9 @@ func run(dist string, port int) error {
 
 	var wails *application.App
 	emit := func(name string, data any) { wails.Event.Emit(name, data) }
-	app := bridge.NewApp(uidev.New(), bridge.NewActor(ctx), emit)
+	backend := uidev.New()
+	defer func() { _ = backend.Close() }() // the import sandbox's folder in the temp directory
+	app := bridge.NewApp(backend, bridge.NewActor(ctx), emit, bridge.WithCollectionVariables(backend))
 	wails = application.New(application.Options{
 		Name:        "Flowi UI development",
 		Description: "Flowi front end over a made-up workspace",
@@ -77,6 +79,7 @@ func services(app *bridge.App) []application.Service {
 		application.NewService(app.Auths()),
 		application.NewService(app.Trash()),
 		application.NewService(app.Checks()),
+		application.NewService(app.Collection()),
 		application.NewService(app.Hooks()),
 		application.NewService(app.Session()),
 		application.NewService(app.Passphrase()),

@@ -79,7 +79,7 @@ func TestWorkspace_CreateGRPCRequest_should_create_through_the_backend_and_seed_
 	w.Wait()
 
 	if !b.Called("NewGRPCRequest orders/get") || !b.Called("SeedRequestHooks new") {
-		t.Fatalf("calls %v", b.Calls)
+		t.Fatalf("calls %v", b.CallLog())
 	}
 }
 
@@ -192,6 +192,6 @@ func TestWorkspace_GenerateGRPCRequests_should_create_through_the_backend_and_re
 	w.Wait()
 
 	if !b.Called("GenerateGRPCRequests localhost:9090 1") || len(got.Created) != 1 || len(got.Skipped) != 1 {
-		t.Fatalf("calls %v result %+v", b.Calls, got)
+		t.Fatalf("calls %v result %+v", b.CallLog(), got)
 	}
 }

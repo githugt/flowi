@@ -910,7 +910,10 @@ func (s *FlowService) AddRequestStep(node, request string) (string, error) {
 			list, index = l, i+1
 		}
 		ref := model.Ref{Collection: choice.Dep, ID: model.ID(choice.ID), Path: choice.Path}
-		id = d.Insert("request", list, index, func(n *model.Node) { n.Request = &model.RequestCall{Request: ref} })
+		id = d.Insert("request", list, index, func(n *model.Node) {
+			n.Request = &model.RequestCall{Request: ref}
+			vm.FillStepText(d.Collection(), n)
+		})
 		o.selected = id
 		s.app.emit("flow", s.view(node, o))
 		return nil

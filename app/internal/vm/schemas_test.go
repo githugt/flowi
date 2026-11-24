@@ -53,7 +53,7 @@ func TestSchemas_Delete_should_remove_the_schema_and_show_the_rest(t *testing.T)
 	w.Wait()
 
 	if !b.Called("DeleteSchema request 0") || len(s.Items()) != 2 {
-		t.Fatalf("calls %v items %d", b.Calls, len(s.Items()))
+		t.Fatalf("calls %v items %d", b.CallLog(), len(s.Items()))
 	}
 }
 

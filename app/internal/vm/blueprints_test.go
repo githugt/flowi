@@ -43,7 +43,7 @@ func TestWorkspaceVM_CreateFlowFromBlueprint_should_create_reload_and_open_the_f
 	w.Wait()
 
 	if !b.Called("NewFlowFromBlueprint BP1 chain first=auth/verify") || opened != "f:C1:new" {
-		t.Fatalf("calls %v, opened %q", b.Calls, opened)
+		t.Fatalf("calls %v, opened %q", b.CallLog(), opened)
 	}
 }
 
@@ -56,7 +56,7 @@ func TestWorkspaceVM_CreateFlowFromBlueprint_Given_no_collection_Then_uses_Scrat
 	w.Wait()
 
 	if !b.Called("Scratch") || opened != "f:SCRATCH:new" {
-		t.Fatalf("calls %v, opened %q", b.Calls, opened)
+		t.Fatalf("calls %v, opened %q", b.CallLog(), opened)
 	}
 }
 
@@ -82,7 +82,7 @@ func TestWorkspaceVM_SaveFlowAsBlueprint_should_create_it_and_refresh_the_list(t
 	w.Wait()
 
 	if !done || !b.Called("CreateBlueprint F1 tpl Template") {
-		t.Fatalf("done %v calls %v", done, b.Calls)
+		t.Fatalf("done %v calls %v", done, b.CallLog())
 	}
 }
 
