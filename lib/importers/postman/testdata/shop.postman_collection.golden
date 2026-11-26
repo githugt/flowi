@@ -91,10 +91,10 @@ versions:
     url: "{{env.base_url}}/graphql"
     query:
       api_key: "{{secret.api_secret}}"
-    headers:
-      Content-Type: application/json
     body:
-      json: "{\"query\":\"query { me { id } }\",\"variables\":{\"a\":1}}"
+      graphql:
+        query: query { me { id } }
+        variables: "{\"a\": 1}"
 --- request Partner
 name: Partner
 versions:

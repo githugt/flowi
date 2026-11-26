@@ -286,6 +286,15 @@ export class Body {
              */
             this["Multipart"] = [];
         }
+        if (!("GraphQL" in $$source)) {
+            /**
+             * GraphQL is a GraphQL operation: the body is then the JSON object {query, variables, operationName} (for a
+             * GET, the same three parameters in the URL). Only an HTTP request has it.
+             * @member
+             * @type {GraphQL | null}
+             */
+            this["GraphQL"] = null;
+        }
 
         Object.assign(this, $$source);
     }
@@ -298,12 +307,16 @@ export class Body {
     static createFrom($$source = {}) {
         const $$createField3_0 = $$createType5;
         const $$createField4_0 = $$createType8;
+        const $$createField5_0 = $$createType10;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("Form" in $$parsedSource) {
             $$parsedSource["Form"] = $$createField3_0($$parsedSource["Form"]);
         }
         if ("Multipart" in $$parsedSource) {
             $$parsedSource["Multipart"] = $$createField4_0($$parsedSource["Multipart"]);
+        }
+        if ("GraphQL" in $$parsedSource) {
+            $$parsedSource["GraphQL"] = $$createField5_0($$parsedSource["GraphQL"]);
         }
         return new Body(/** @type {Partial<Body>} */($$parsedSource));
     }
@@ -342,7 +355,7 @@ export class Branch {
      * @returns {Branch}
      */
     static createFrom($$source = {}) {
-        const $$createField1_0 = $$createType10;
+        const $$createField1_0 = $$createType12;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("Nodes" in $$parsedSource) {
             $$parsedSource["Nodes"] = $$createField1_0($$parsedSource["Nodes"]);
@@ -384,7 +397,7 @@ export class Case {
      * @returns {Case}
      */
     static createFrom($$source = {}) {
-        const $$createField1_0 = $$createType10;
+        const $$createField1_0 = $$createType12;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("Nodes" in $$parsedSource) {
             $$parsedSource["Nodes"] = $$createField1_0($$parsedSource["Nodes"]);
@@ -464,7 +477,7 @@ export class DataFile {
      * @returns {DataFile}
      */
     static createFrom($$source = {}) {
-        const $$createField3_0 = $$createType11;
+        const $$createField3_0 = $$createType13;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("Params" in $$parsedSource) {
             $$parsedSource["Params"] = $$createField3_0($$parsedSource["Params"]);
@@ -546,7 +559,7 @@ export class Dataset {
      * @returns {Dataset}
      */
     static createFrom($$source = {}) {
-        const $$createField3_0 = $$createType11;
+        const $$createField3_0 = $$createType13;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("Params" in $$parsedSource) {
             $$parsedSource["Params"] = $$createField3_0($$parsedSource["Params"]);
@@ -745,8 +758,8 @@ export class GRPC {
      */
     static createFrom($$source = {}) {
         const $$createField2_0 = $$createType6;
-        const $$createField3_0 = $$createType11;
-        const $$createField4_0 = $$createType11;
+        const $$createField3_0 = $$createType13;
+        const $$createField4_0 = $$createType13;
         const $$createField5_0 = $$createType3;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("Body" in $$parsedSource) {
@@ -762,6 +775,70 @@ export class GRPC {
             $$parsedSource["Receive"] = $$createField5_0($$parsedSource["Receive"]);
         }
         return new GRPC(/** @type {Partial<GRPC>} */($$parsedSource));
+    }
+}
+
+/**
+ * GraphQL is a GraphQL operation sent as the body of an HTTP request: a query, a mutation or a subscription, with
+ * its variables. The version's URL, Headers, Auth and Method stay what they are for any HTTP request; the method is
+ * POST (the operation travels as a JSON body) unless it is GET (a query travels in the URL).
+ */
+export class GraphQL {
+    /**
+     * Creates a new GraphQL instance.
+     * @param {Partial<GraphQL>} [$$source = {}] - The source object to create the GraphQL.
+     */
+    constructor($$source = {}) {
+        if (!("Query" in $$source)) {
+            /**
+             * Query is the GraphQL document, sent as written. It is not templated: a value belongs in Variables, where it
+             * cannot change what the document means (the same rule as a SQL query's params).
+             * @member
+             * @type {string}
+             */
+            this["Query"] = "";
+        }
+        if (!("Variables" in $$source)) {
+            /**
+             * Variables is a JSON object as text. It is templated like a JSON body, so {{env.user_id}} works inside it.
+             * @member
+             * @type {string}
+             */
+            this["Variables"] = "";
+        }
+        if (!("Operation" in $$source)) {
+            /**
+             * Operation names the operation to run when the document holds more than one. Empty: the only one.
+             * @member
+             * @type {string}
+             */
+            this["Operation"] = "";
+        }
+        if (!("Receive" in $$source)) {
+            /**
+             * Receive, for a subscription, says how many events to wait for, for how long, and which count. Nil: the first
+             * event, within 30 seconds. It means nothing for a query or a mutation.
+             * @member
+             * @type {AsyncReceive | null}
+             */
+            this["Receive"] = null;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new GraphQL instance from a string or object.
+     * @param {any} [$$source = {}]
+     * @returns {GraphQL}
+     */
+    static createFrom($$source = {}) {
+        const $$createField3_0 = $$createType3;
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        if ("Receive" in $$parsedSource) {
+            $$parsedSource["Receive"] = $$createField3_0($$parsedSource["Receive"]);
+        }
+        return new GraphQL(/** @type {Partial<GraphQL>} */($$parsedSource));
     }
 }
 
@@ -799,7 +876,7 @@ export class HookControl {
      * @returns {HookControl}
      */
     static createFrom($$source = {}) {
-        const $$createField1_0 = $$createType11;
+        const $$createField1_0 = $$createType13;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("Skip" in $$parsedSource) {
             $$parsedSource["Skip"] = $$createField1_0($$parsedSource["Skip"]);
@@ -842,8 +919,8 @@ export class HookStep {
      * @returns {HookStep}
      */
     static createFrom($$source = {}) {
-        const $$createField0_0 = $$createType13;
-        const $$createField1_0 = $$createType10;
+        const $$createField0_0 = $$createType15;
+        const $$createField1_0 = $$createType12;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("Flow" in $$parsedSource) {
             $$parsedSource["Flow"] = $$createField0_0($$parsedSource["Flow"]);
@@ -898,9 +975,9 @@ export class Hooks {
      * @returns {Hooks}
      */
     static createFrom($$source = {}) {
-        const $$createField0_0 = $$createType15;
-        const $$createField1_0 = $$createType15;
-        const $$createField2_0 = $$createType15;
+        const $$createField0_0 = $$createType17;
+        const $$createField1_0 = $$createType17;
+        const $$createField2_0 = $$createType17;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("Pre" in $$parsedSource) {
             $$parsedSource["Pre"] = $$createField0_0($$parsedSource["Pre"]);
@@ -1220,17 +1297,17 @@ export class Node {
      * @returns {Node}
      */
     static createFrom($$source = {}) {
-        const $$createField4_0 = $$createType11;
-        const $$createField5_0 = $$createType11;
-        const $$createField6_0 = $$createType11;
-        const $$createField19_0 = $$createType17;
-        const $$createField20_0 = $$createType19;
-        const $$createField21_0 = $$createType10;
-        const $$createField22_0 = $$createType21;
-        const $$createField23_0 = $$createType10;
-        const $$createField24_0 = $$createType10;
-        const $$createField25_0 = $$createType23;
-        const $$createField26_0 = $$createType25;
+        const $$createField4_0 = $$createType13;
+        const $$createField5_0 = $$createType13;
+        const $$createField6_0 = $$createType13;
+        const $$createField19_0 = $$createType19;
+        const $$createField20_0 = $$createType21;
+        const $$createField21_0 = $$createType12;
+        const $$createField22_0 = $$createType23;
+        const $$createField23_0 = $$createType12;
+        const $$createField24_0 = $$createType12;
+        const $$createField25_0 = $$createType25;
+        const $$createField26_0 = $$createType27;
         const $$createField27_0 = $$createType8;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("Needs" in $$parsedSource) {
@@ -1500,11 +1577,11 @@ export class RequestCall {
      * @returns {RequestCall}
      */
     static createFrom($$source = {}) {
-        const $$createField0_0 = $$createType12;
-        const $$createField6_0 = $$createType26;
+        const $$createField0_0 = $$createType14;
+        const $$createField6_0 = $$createType28;
         const $$createField7_0 = $$createType5;
         const $$createField8_0 = $$createType5;
-        const $$createField9_0 = $$createType28;
+        const $$createField9_0 = $$createType30;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("Request" in $$parsedSource) {
             $$parsedSource["Request"] = $$createField0_0($$parsedSource["Request"]);
@@ -1708,17 +1785,17 @@ export class RequestVersion {
         const $$createField4_0 = $$createType5;
         const $$createField5_0 = $$createType5;
         const $$createField6_0 = $$createType6;
-        const $$createField7_0 = $$createType30;
-        const $$createField8_0 = $$createType11;
-        const $$createField10_0 = $$createType28;
-        const $$createField11_0 = $$createType31;
-        const $$createField12_0 = $$createType33;
+        const $$createField7_0 = $$createType32;
+        const $$createField8_0 = $$createType13;
+        const $$createField10_0 = $$createType30;
+        const $$createField11_0 = $$createType33;
+        const $$createField12_0 = $$createType35;
         const $$createField13_0 = $$createType5;
-        const $$createField15_0 = $$createType35;
-        const $$createField16_0 = $$createType37;
-        const $$createField17_0 = $$createType39;
-        const $$createField18_0 = $$createType41;
-        const $$createField19_0 = $$createType43;
+        const $$createField15_0 = $$createType37;
+        const $$createField16_0 = $$createType39;
+        const $$createField17_0 = $$createType41;
+        const $$createField18_0 = $$createType43;
+        const $$createField19_0 = $$createType45;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("Query" in $$parsedSource) {
             $$parsedSource["Query"] = $$createField4_0($$parsedSource["Query"]);
@@ -1901,7 +1978,7 @@ export class SubflowCall {
      * @returns {SubflowCall}
      */
     static createFrom($$source = {}) {
-        const $$createField0_0 = $$createType12;
+        const $$createField0_0 = $$createType14;
         const $$createField1_0 = $$createType5;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("Flow" in $$parsedSource) {
@@ -1924,43 +2001,45 @@ const $$createType5 = $Create.Array($$createType4);
 const $$createType6 = Body.createFrom;
 const $$createType7 = Field.createFrom;
 const $$createType8 = $Create.Array($$createType7);
-const $$createType9 = Node.createFrom;
-const $$createType10 = $Create.Array($$createType9);
-const $$createType11 = $Create.Array($Create.Any);
-const $$createType12 = Ref.createFrom;
-const $$createType13 = $Create.Nullable($$createType12);
-const $$createType14 = HookStep.createFrom;
-const $$createType15 = $Create.Array($$createType14);
-const $$createType16 = RequestCall.createFrom;
-const $$createType17 = $Create.Nullable($$createType16);
-const $$createType18 = SubflowCall.createFrom;
+const $$createType9 = GraphQL.createFrom;
+const $$createType10 = $Create.Nullable($$createType9);
+const $$createType11 = Node.createFrom;
+const $$createType12 = $Create.Array($$createType11);
+const $$createType13 = $Create.Array($Create.Any);
+const $$createType14 = Ref.createFrom;
+const $$createType15 = $Create.Nullable($$createType14);
+const $$createType16 = HookStep.createFrom;
+const $$createType17 = $Create.Array($$createType16);
+const $$createType18 = RequestCall.createFrom;
 const $$createType19 = $Create.Nullable($$createType18);
-const $$createType20 = Branch.createFrom;
-const $$createType21 = $Create.Array($$createType20);
-const $$createType22 = Case.createFrom;
+const $$createType20 = SubflowCall.createFrom;
+const $$createType21 = $Create.Nullable($$createType20);
+const $$createType22 = Branch.createFrom;
 const $$createType23 = $Create.Array($$createType22);
-const $$createType24 = SetValue.createFrom;
+const $$createType24 = Case.createFrom;
 const $$createType25 = $Create.Array($$createType24);
-const $$createType26 = HookControl.createFrom;
-const $$createType27 = Outcome.createFrom;
-const $$createType28 = $Create.Array($$createType27);
-const $$createType29 = Extraction.createFrom;
+const $$createType26 = SetValue.createFrom;
+const $$createType27 = $Create.Array($$createType26);
+const $$createType28 = HookControl.createFrom;
+const $$createType29 = Outcome.createFrom;
 const $$createType30 = $Create.Array($$createType29);
-var $$createType31 = /** @type {(...args: any[]) => any} */(function $$initCreateType31(...args) {
-    if ($$createType31 === $$initCreateType31) {
-        $$createType31 = $$createType32;
+const $$createType31 = Extraction.createFrom;
+const $$createType32 = $Create.Array($$createType31);
+var $$createType33 = /** @type {(...args: any[]) => any} */(function $$initCreateType33(...args) {
+    if ($$createType33 === $$initCreateType33) {
+        $$createType33 = $$createType34;
     }
-    return $$createType31(...args);
+    return $$createType33(...args);
 });
-const $$createType32 = $Create.Map($Create.Any, $Create.Any);
-const $$createType33 = Hooks.createFrom;
-const $$createType34 = Auth.createFrom;
-const $$createType35 = $Create.Nullable($$createType34);
-const $$createType36 = Async.createFrom;
+const $$createType34 = $Create.Map($Create.Any, $Create.Any);
+const $$createType35 = Hooks.createFrom;
+const $$createType36 = Auth.createFrom;
 const $$createType37 = $Create.Nullable($$createType36);
-const $$createType38 = GRPC.createFrom;
+const $$createType38 = Async.createFrom;
 const $$createType39 = $Create.Nullable($$createType38);
-const $$createType40 = Dataset.createFrom;
+const $$createType40 = GRPC.createFrom;
 const $$createType41 = $Create.Nullable($$createType40);
-const $$createType42 = DataFile.createFrom;
+const $$createType42 = Dataset.createFrom;
 const $$createType43 = $Create.Nullable($$createType42);
+const $$createType44 = DataFile.createFrom;
+const $$createType45 = $Create.Nullable($$createType44);

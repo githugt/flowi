@@ -206,7 +206,7 @@ func (d *decoder) lenientStrings(e entry) []string {
 	return out
 }
 
-// body reads exactly one of json, text, file, form or multipart.
+// body reads exactly one of json, text, file, form, multipart or graphql.
 func (m *mapping) body() model.Body {
 	bm, ok := m.child("body")
 	if !ok {
@@ -216,6 +216,7 @@ func (m *mapping) body() model.Body {
 	if e, ok := bm.take("multipart"); ok {
 		b.Multipart = m.d.multipartParts(e)
 	}
+	b.GraphQL = bm.graphQL()
 	bm.closeStrict()
 	if countBodyKinds(b) > 1 {
 		m.d.typeError(bm.path, bm.startNode(), "body", "one body kind")
@@ -253,8 +254,23 @@ func (d *decoder) multipartParts(e entry) []model.Field {
 	return out
 }
 
+// graphQL reads the graphql: block of a body, nil when there is none. An empty block is still a GraphQL body.
+func (m *mapping) graphQL() *model.GraphQL {
+	gm, ok := m.child("graphql")
+	if !ok {
+		return nil
+	}
+	g := &model.GraphQL{Query: gm.str("query"), Variables: gm.str("variables"), Operation: gm.str("operation")}
+	if rm, ok := gm.child("receive"); ok {
+		g.Receive = &model.AsyncReceive{Count: int(rm.integer("count")), Timeout: rm.duration("timeout"), Match: rm.str("match")}
+		rm.closeStrict()
+	}
+	gm.closeStrict()
+	return g
+}
+
 func countBodyKinds(b model.Body) int {
-	kinds := []bool{b.JSON != "", b.Text != "", b.File != "", len(b.Form) > 0, len(b.Multipart) > 0}
+	kinds := []bool{b.JSON != "", b.Text != "", b.File != "", len(b.Form) > 0, len(b.Multipart) > 0, b.GraphQL != nil}
 	n := 0
 	for _, set := range kinds {
 		if set {
@@ -434,6 +450,24 @@ func encodeBody(b model.Body) yaml.MapSlice {
 	o.put("file", b.File)
 	o.put("form", keyValues(b.Form))
 	o.put("multipart", multipartToYAML(b.Multipart))
+	if g := b.GraphQL; g != nil {
+		var gm omap
+		gm.put("query", g.Query)
+		gm.put("variables", g.Variables)
+		gm.put("operation", g.Operation)
+		if g.Receive != nil {
+			var r omap
+			if g.Receive.Count != 0 {
+				r.put("count", g.Receive.Count)
+			}
+			if g.Receive.Timeout != 0 {
+				r.put("timeout", g.Receive.Timeout.String())
+			}
+			r.put("match", g.Receive.Match)
+			gm.putAlways("receive", presentMap(r.items))
+		}
+		o.putAlways("graphql", gm.items)
+	}
 	return o.items
 }
 

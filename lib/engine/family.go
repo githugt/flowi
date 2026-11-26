@@ -31,6 +31,8 @@ func (x *execution) exchange() exchange {
 		return messagingExchange{x}
 	case model.FamilyDataset, model.FamilyFile:
 		return datasetExchange{x}
+	case model.FamilyGraphQL:
+		return graphQLExchange{x}
 	}
 	return httpExchange{x}
 }

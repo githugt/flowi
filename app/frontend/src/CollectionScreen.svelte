@@ -16,7 +16,8 @@
   import Tabs, { type TabItem } from './Tabs.svelte'
   import { app } from './lib/app.svelte'
   import { agoText } from './lib/ago'
-  import { type Drift, type Endpoint, GROUPINGS, type GroupBy, type Impact, driftText, endpointMatches, impactText, groupCount, groupEndpoints, headline, levelChoices, levelShown, ofTotal, pageCollection, runTone, type SpecRule } from './lib/collectionpage'
+  import { type Drift, type Endpoint, GROUPINGS, type GroupBy, type Impact, driftText, endpointMatches, impactText, groupCount, groupEndpoints, headline, levelChoices, levelShown, ofTotal, pageCollection, runTone, type SpecRule, unlistedProblems } from './lib/collectionpage'
+  import { plural } from './lib/plural'
   import { debounced } from './lib/debounce'
   import { errorText } from './lib/errors'
   import { latest } from './lib/latest'
@@ -45,6 +46,7 @@
       driftMoved: number
       specTotal: number
       specErrors: number
+      specNotes: number
     }
     uses: { auths: string[]; blueprints: string[]; overlays: string[]; secrets: { name: string; count: number; where: string }[] }
     setup: {
@@ -314,25 +316,26 @@
             {/each}
           </ul>
         {/if}
-        <h3>API description{#if page.state.specTotal} <span class="muted">({page.state.specTotal})</span>{/if}</h3>
-        {#if page.state.specTotal === 0}
+        <h3>API description{#if page.state.specTotal || page.state.specNotes}&nbsp;<span class="muted">{[page.state.specTotal ? `(${page.state.specTotal})` : '', page.state.specNotes ? plural(page.state.specNotes, 'note') : ''].filter(Boolean).join(' · ')}</span>{/if}</h3>
+        {#if page.state.specTotal === 0 && page.state.specNotes === 0}
           {#if page.about.specs.length}
             <p class="muted">The kept description passes its rules.</p>
           {:else}
             <p class="muted">This collection kept no description to check.</p>
           {/if}
         {:else}
+          {#if page.state.specTotal === 0}<p class="muted">No problems, only suggestions.</p>{/if}
           <ul class="rows">
             {#each page.state.spec as f (f.path + f.message)}
               <li>
-                <Status tone={f.severity === 'error' ? 'bad' : 'warn'}>{f.severity}</Status>
+                <Status tone={f.severity === 'error' ? 'bad' : f.severity === 'note' ? 'info' : 'warn'}>{f.severity}</Status>
                 <span>{f.message}</span>
                 {#if f.hint}<span class="muted">{f.hint}</span>{/if}
                 {#if f.file}<code class="at" title={f.path ? `${f.file}, at ${f.path}` : f.file}>{f.file}{f.line ? `:${f.line}` : ''}</code>{/if}
               </li>
             {/each}
           </ul>
-          {#if page.state.specTotal > page.state.spec.length}<p class="muted">{page.state.specTotal - page.state.spec.length} more are in the Problems panel.</p>{/if}
+          {#if unlistedProblems(page.state.spec, page.state.specTotal) > 0}<p class="muted">{unlistedProblems(page.state.spec, page.state.specTotal)} more are in the Problems panel.</p>{/if}
         {/if}
         <details class="rules">
           <summary>Rules ({rules.filter((r) => r.chosen).length} chosen)</summary>

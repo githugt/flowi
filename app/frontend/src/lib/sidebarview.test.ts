@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { countLeaves, leavesOf, loadTab, loadView, saveTab, saveView, sectionRoots, sectionsFor, subtitle } from './sidebarview'
+import { countLeaves, leavesOf, loadTab, loadView, menuRowOf, saveTab, saveView, sectionRoots, sectionsFor, subtitle } from './sidebarview'
 import type { TreeNode } from './types'
 
 const req = (id: string, label: string, where = '', typeName = 'HTTP'): TreeNode => ({ id, label, kind: 'request', method: 'GET', type: 'http', typeName, where })
@@ -111,5 +111,17 @@ describe('what the sidebar keeps of its view', () => {
 
     expect([loadView(blocked), loadTab(blocked), loadView(odd), loadTab(odd)]).toEqual(['tree', 'all', 'tree', 'all'])
     expect(() => saveView(blocked, 'list')).not.toThrow()
+  })
+})
+
+describe('menuRowOf', () => {
+  // Before: right-clicking a collection in Flows and choosing New folder made the folder under Requests.
+  it('asks a collection in the Flows section for its Flows group menu, and every other row for its own', () => {
+    const inFlows = sectionRoots(roots, 'flows', [])[0]
+    const inRequests = sectionRoots(roots, 'requests', [])[0]
+
+    expect(menuRowOf(inFlows)).toBe('c:shop/flows')
+    expect(menuRowOf(inRequests)).toBe('c:shop')
+    expect(menuRowOf(inFlows.children![0])).toBe('fl1')
   })
 })

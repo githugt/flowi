@@ -164,6 +164,7 @@ func cloneRequest(r model.Request) model.Request {
 	for i, v := range r.Versions {
 		v.Query, v.Headers, v.Extract, v.Assert = slices.Clone(v.Query), slices.Clone(v.Headers), slices.Clone(v.Extract), slices.Clone(v.Assert)
 		v.Body.Form, v.Body.Multipart = slices.Clone(v.Body.Form), slices.Clone(v.Body.Multipart)
+		v.Body.GraphQL = cloneGraphQL(v.Body.GraphQL)
 		v.Outcomes = slices.Clone(v.Outcomes)
 		v.Settings = cloneSettings(v.Settings)
 		v.Hooks = cloneHooks(v.Hooks)

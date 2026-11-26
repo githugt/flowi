@@ -159,3 +159,15 @@ func TestCollectionImpact_Given_a_broken_example_When_asked_Then_the_report_of_e
 		t.Fatal("an unknown collection gave no error")
 	}
 }
+
+func TestCallers_Given_the_example_collection_When_asked_for_login_Then_the_user_creation_flow_is_named(t *testing.T) {
+	// Before: deleting a request a flow runs said nothing, and the flow showed FLW-REF-001 afterwards.
+	w := demoWorkspace(t)
+	login := loginTarget(t, w)
+
+	got := w.Callers([]RequestTarget{login})[login]
+
+	if !slices.ContainsFunc(got, func(c analysis.Caller) bool { return c.Flow == "user-creation" && c.Node == "login" }) {
+		t.Fatalf("got %+v, want the login step of user-creation", got)
+	}
+}

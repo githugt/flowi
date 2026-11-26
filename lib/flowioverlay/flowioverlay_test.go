@@ -224,6 +224,26 @@ func TestDiff_should_name_the_parts_an_overlay_cannot_hold(t *testing.T) {
 	}
 }
 
+// Before: with a GraphQL base, a JSON body was diffed as a merge patch against the empty JSON of the base.
+func TestDiff_Given_a_graphql_body_Then_the_change_is_reported_not_held(t *testing.T) {
+	// Arrange
+	base := baseVersion()
+	base.Body = model.Body{GraphQL: &model.GraphQL{Query: "{ a }"}}
+	edited := base
+	edited.Body = model.Body{GraphQL: &model.GraphQL{Query: "{ b }"}}
+	asJSON := base
+	asJSON.Body = model.Body{JSON: `{"a": 1}`}
+
+	// Act
+	opsEdited, unsupportedEdited := Diff(base, edited)
+	opsJSON, unsupportedJSON := Diff(base, asJSON)
+
+	// Assert
+	if len(opsEdited) != 0 || len(unsupportedEdited) != 1 || len(opsJSON) != 0 || len(unsupportedJSON) != 1 {
+		t.Errorf("edited %v %v; as json %v %v", opsEdited, unsupportedEdited, opsJSON, unsupportedJSON)
+	}
+}
+
 func TestEncode_should_round_trip_through_Decode(t *testing.T) {
 	// Arrange
 	o := model.Overlay{

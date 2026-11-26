@@ -160,7 +160,13 @@ func targetOf(v model.RequestVersion) (label, target string, facts []HoverFact) 
 		f := v.File
 		return "File", f.Path, []HoverFact{{"Format", f.Format}, {"Query", clip(singleLine(f.Query), maxHoverText)}}
 	}
-	return "URL", clip(model.RedactedTarget(v.URL), maxHoverText), nil
+	if v.Body.GraphQL != nil {
+		kind, name := graphQLFacts(v)
+		if kind != "" {
+			facts = append(facts, HoverFact{"Operation", strings.TrimSpace(kind + " " + name)})
+		}
+	}
+	return "URL", clip(model.RedactedTarget(v.URL), maxHoverText), facts
 }
 
 func hoverFlow(card *HoverCard, n TreeNode, c model.Collection) {

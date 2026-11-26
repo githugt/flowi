@@ -8,6 +8,7 @@ import (
 	"github.com/githugt/flowi/lib/transport"
 	"github.com/githugt/flowi/lib/transport/amqp"
 	"github.com/githugt/flowi/lib/transport/amqp10"
+	"github.com/githugt/flowi/lib/transport/graphqlws"
 	"github.com/githugt/flowi/lib/transport/kafka"
 	"github.com/githugt/flowi/lib/transport/mqtt"
 	"github.com/githugt/flowi/lib/transport/nats"
@@ -35,5 +36,6 @@ func New() transport.Registry {
 		model.ProtocolSQS:        sqs.New(),
 		model.ProtocolSNS:        sns.New(),
 		model.ProtocolServiceBus: servicebus.New(),
+		model.ProtocolGraphQLWS:  graphqlws.New(), // not an async protocol a request names: a GraphQL subscription uses it
 	}
 }

@@ -10,14 +10,16 @@ import { collectionOfRow, pageNode } from './collectionpage'
 
 const needsTabsClosed = ['rename', 'delete', 'discardDraft']
 
-export async function rowMenu(id: string): Promise<MenuItem[]> {
-  const ids = app.marked.includes(id) ? [...app.marked] : [id]
+// `as` is the row whose menu it is when that is not the row itself: a collection in the Flows section asks for the
+// menu of its Flows group, so its New folder makes a folder among the flows.
+export async function rowMenu(id: string, as = id): Promise<MenuItem[]> {
+  const ids = app.marked.includes(id) ? [...app.marked] : [as]
   if (!app.marked.includes(id)) app.marked = []
   const entries = (await WorkspaceService.Menu(ids)) as unknown as MenuEntry[]
   const items: MenuItem[] = entries.map((e) => ({ label: e.label, run: () => run(e, ids) }))
   // A collection's row also opens its page: what it is about, how it stands, what it uses and how it is set up.
-  const collection = ids.length === 1 ? collectionOfRow(app.find(ids[0])) : ''
-  if (collection) items.unshift({ label: 'Collection overview', run: () => app.openScreen(pageNode(collection), app.find(ids[0])?.label ?? 'Collection') })
+  const collection = ids.length === 1 ? collectionOfRow(app.find(id)) : ''
+  if (collection) items.unshift({ label: 'Collection overview', run: () => app.openScreen(pageNode(collection), app.find(id)?.label ?? 'Collection') })
   // Wherever a flow can be made, it can also be made from a blueprint, there.
   const at = items.findIndex((_, i) => entries[i].action === 'newFlow')
   if (at >= 0 && ids.length === 1) {
@@ -62,11 +64,11 @@ async function run(e: MenuEntry, ids: string[]) {
         label: e.prompt.label,
         initial: e.prompt.initial,
         protocols: e.prompt.protocols?.map((p) => ({ id: p.id, label: p.label })),
-        protocolsLabel: e.action === 'newDataset' ? 'Database' : undefined,
+        protocolsLabel: e.action === 'newDataset' ? 'Database' : e.action === 'newDataFile' ? 'File type' : undefined,
         done: (text, protocol) => go(text, protocol),
       })
     } else if (e.confirm) {
-      ui.confirm('Delete', `${e.confirm} ${lost}`.trim(), () => go())
+      ui.confirm(e.confirmTitle || 'Delete', `${e.confirm} ${lost}`.trim(), () => go(), e.confirmAction || 'Delete')
     } else {
       void go()
     }
@@ -84,13 +86,14 @@ export async function tabsAffected(ids: string[]): Promise<string[]> {
 
 // The "New" menu: quick starts and creation in a chosen collection or folder.
 // Before: one flat list of 17 items, six of them the same six kinds again "in a collection…". Now the first list
-// has the quick starts and one "New in a collection…" that opens the second, so the menu is ten items and two rules.
+// has the quick starts and one "New in a collection…" that opens the second, so the menu is eleven items and two rules.
 export function newMenu(at?: { x: number; y: number }): MenuItem[] {
   return [
     { label: 'New request', run: () => WorkspaceService.NewScratchRequest() },
     { label: 'New flow', run: () => WorkspaceService.NewScratchFlow() },
     { label: 'New message request', run: newScratchMessage },
-    { label: 'New gRPC request', run: () => WorkspaceService.NewAt('grpc', '', '', '') },
+    { label: 'New GraphQL request', run: () => newScratchNamed('graphql', 'New GraphQL request') },
+    { label: 'New gRPC request', run: () => newScratchNamed('grpc', 'New gRPC request') },
     { label: 'New database query', run: newScratchDataset },
     { label: 'New data file query', run: newScratchFileQuery },
     { separator: true, label: '', run: () => {} },
@@ -119,6 +122,7 @@ export function newInCollectionMenu(): MenuItem[] {
   return [
     { label: 'Request…', run: ask('request', 'New request', 'requests', 'Name or path (for example users/create)') },
     { label: 'Message request…', run: ask('async', 'New message request', 'requests', 'Name or path (for example orders/placed)', true) },
+    { label: 'GraphQL request…', run: ask('graphql', 'New GraphQL request', 'requests', 'Name or path (for example users/get-user)') },
     { label: 'gRPC request…', run: ask('grpc', 'New gRPC request', 'requests', 'Name or path (for example shop/get-order)') },
     { label: 'Database query…', run: ask('dataset', 'New database query', 'requests', 'Name or path (for example customers/by-id)', true, databases, 'Database') },
     { label: 'Data file query…', run: ask('dataset', 'New data file query', 'requests', 'Name or path (for example reports/sales)', true, dataFiles, 'File type') },
@@ -137,6 +141,17 @@ const databases = [
 
 // Data files are their own kind of source: no server, no login, just a file or a folder of them.
 const dataFiles = [['csv', 'CSV files'], ['xlsx', 'Excel files'], ['parquet', 'Parquet files']].map(([id, label]) => ({ id, label }))
+
+// A GraphQL or gRPC request asks for its name first, like the same entry of the right-click menu; blank is the next
+// "untitled". The draft goes to Scratch like New request.
+function newScratchNamed(kind: string, title: string) {
+  ui.prompt({
+    title,
+    label: 'Name (blank for untitled)',
+    initial: '',
+    done: (path) => WorkspaceService.NewAt(kind, '', path, ''),
+  })
+}
 
 // A dataset query needs its database before it can be made; the draft goes to Scratch like New request.
 function newScratchDataset() {

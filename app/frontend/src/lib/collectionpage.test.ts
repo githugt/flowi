@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { type Drift, type Endpoint, type Impact, collectionOfRow, driftText, impactText, endpointMatches, groupCount, groupEndpoints, headline, levelChoices, levelShown, pageCollection, pageNode, runTone } from './collectionpage'
+import { type Drift, type Endpoint, type Impact, collectionOfRow, driftText, impactText, endpointMatches, groupCount, groupEndpoints, headline, levelChoices, levelShown, pageCollection, pageNode, runTone, unlistedProblems } from './collectionpage'
 
 const state = (o: Partial<Parameters<typeof headline>[0]> = {}) => ({ operationsUsed: 0, operationsTotal: 0, failing: 0, neverRan: 0, broken: [], specTotal: 0, specErrors: 0, impactBroken: 0, driftMoved: 0, ...o })
 
@@ -56,7 +56,7 @@ describe('runTone', () => {
 describe('spec rule levels', () => {
   const rule = { name: 'path-case', about: '', default: 'off', level: 'error', chosen: true }
   it('offers the default first, named with its level', () => {
-    expect(levelChoices(rule).map((c) => c.label)).toEqual(['Default (off)', 'Off', 'Warning', 'Error'])
+    expect(levelChoices(rule).map((c) => c.label)).toEqual(['Default (off)', 'Off', 'Note', 'Warning', 'Error'])
     expect(levelChoices(rule)[0].value).toBe('')
   })
   it('shows the choice, or the default when nothing was chosen', () => {
@@ -136,5 +136,15 @@ describe('driftText', () => {
     expect(driftText(drift({ noSchema: true })).tone).toBe('warn')
     expect(driftText(drift({ new: 2 }))).toEqual({ text: '2 moved: 2 new', tone: 'warn' })
     expect(driftText(drift({ new: 1, missing: 1, changed: 2 }))).toEqual({ text: '4 moved: 1 new, 1 missing, 2 changed', tone: 'bad' })
+  })
+})
+
+describe('unlistedProblems', () => {
+  it('counts the problems the cap cut off, not the notes that are listed', () => {
+    // Before: three listed notes made the page claim fewer problems were in the Problems panel than there were.
+    const listed = [{ severity: 'warning' }, { severity: 'note' }, { severity: 'note' }, { severity: 'note' }]
+
+    expect(unlistedProblems(listed, 5)).toBe(4)
+    expect(unlistedProblems([], 0)).toBe(0)
   })
 })

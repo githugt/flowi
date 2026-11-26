@@ -182,13 +182,15 @@ type Backend struct {
 	ParsedFlow   *model.Flow             // ParseFlowSource returns this flow (else the stored flow, unchanged)
 	// SourcedFlow is the flow FlowSource was last asked to write: what a copy put on the clipboard.
 	SourcedFlow  model.Flow
-	SourceDiags  diag.List                  // ParseFlowSource reports these
-	EnvImpacts   map[string]flowi.EnvImpact // EnvironmentImpact answers with this, by environment file
-	DraftDiags   diag.List                  // CheckFlowDraft reports these
-	SecretErr    error                      // SetSecret and UnsetSecret fail with it
-	SecretValues map[string]string          // RevealSecret answers from these, by "env/name"; others are FLW-SEC-001
-	CookieJar    []flowi.CookieInfo         // Cookies lists these; DeleteCookie removes from them
-	CookiesErr   error                      // Cookies fails with it
+	SourceDiags  diag.List                                 // ParseFlowSource reports these
+	EnvImpacts   map[string]flowi.EnvImpact                // EnvironmentImpact answers with this, by environment file
+	SpecFindings diag.List                                 // LintSpecs answers with this
+	CallersOf    map[flowi.RequestTarget][]analysis.Caller // Callers answers with this, by request
+	DraftDiags   diag.List                                 // CheckFlowDraft reports these
+	SecretErr    error                                     // SetSecret and UnsetSecret fail with it
+	SecretValues map[string]string                         // RevealSecret answers from these, by "env/name"; others are FLW-SEC-001
+	CookieJar    []flowi.CookieInfo                        // Cookies lists these; DeleteCookie removes from them
+	CookiesErr   error                                     // Cookies fails with it
 	// FailDeleteAt makes the nth (1-based) Delete* call fail with it, the others succeed.
 	FailDeleteAt int
 	// OnDelete, when set, runs inside every Delete* call (before it changes anything).
@@ -1027,6 +1029,15 @@ func (f *Backend) NewAsyncRequest(collection model.ID, path, protocol string) (f
 	return flowi.RequestTarget{Collection: collection, Request: "new"}, nil
 }
 
+// NewGraphQLRequest records the call and fails like NewRequest.
+func (f *Backend) NewGraphQLRequest(collection model.ID, path string) (flowi.RequestTarget, error) {
+	f.record("NewGraphQLRequest " + path)
+	if f.NewErr != nil {
+		return flowi.RequestTarget{}, f.NewErr
+	}
+	return flowi.RequestTarget{Collection: collection, Request: "new"}, nil
+}
+
 // NewGRPCRequest records the call and fails like NewRequest.
 func (f *Backend) NewGRPCRequest(collection model.ID, path string) (flowi.RequestTarget, error) {
 	f.record("NewGRPCRequest " + path)
@@ -1441,6 +1452,28 @@ func (f *Backend) Impact(flowi.RequestTarget, string) (analysis.Report, diag.Lis
 	f.Mu.Lock()
 	defer f.Mu.Unlock()
 	return f.ImpactReport, nil, nil
+}
+
+// LintSpecs answers with SpecFindings: the spec findings of every collection, notes included.
+func (f *Backend) LintSpecs(model.ID) (diag.List, error) {
+	f.record("LintSpecs")
+	f.Mu.Lock()
+	defer f.Mu.Unlock()
+	return f.SpecFindings, nil
+}
+
+// Callers answers with what CallersOf holds for each requested request.
+func (f *Backend) Callers(ts []flowi.RequestTarget) map[flowi.RequestTarget][]analysis.Caller {
+	f.record("Callers")
+	f.Mu.Lock()
+	defer f.Mu.Unlock()
+	out := map[flowi.RequestTarget][]analysis.Caller{}
+	for _, t := range ts {
+		if c := f.CallersOf[t]; len(c) > 0 {
+			out[t] = c
+		}
+	}
+	return out
 }
 
 func (f *Backend) ImpactOfDraft(flowi.RequestTarget, model.Request) (analysis.Report, diag.List, error) {

@@ -97,3 +97,31 @@ func TestImport_Given_auth_set_on_the_collection_and_a_folder_Then_requests_use_
 		t.Fatalf("auths %+v", res.Auths)
 	}
 }
+
+// Before: a GraphQL body was flattened into a JSON body, so Flowi never knew the request was GraphQL.
+func TestImport_Given_a_graphql_body_Then_it_becomes_a_graphql_body_with_its_variables_translated(t *testing.T) {
+	src := `{"info": {"name": "C", "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"},
+  "item": [{"name": "A", "request": {"method": "POST", "url": {"raw": "https://api.example.com/graphql"},
+    "body": {"mode": "graphql", "graphql": {"query": "query U($id: ID!) { user(id: $id) { name } }", "variables": "{\"id\": \"{{userId}}\"}"}}}}]}`
+
+	r, _ := Import([]byte(src), "c.json")
+
+	g := r.Requests[0].Versions[0].Body.GraphQL
+	if g == nil || g.Query != "query U($id: ID!) { user(id: $id) { name } }" || g.Variables != `{"id": "{{env.userId}}"}` {
+		t.Fatalf("body %+v", r.Requests[0].Versions[0].Body)
+	}
+}
+
+func TestImport_Given_a_graphql_query_with_a_template_in_it_Then_it_stays_a_json_body_and_the_report_says_so(t *testing.T) {
+	src := `{"info": {"name": "C", "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"},
+  "item": [{"name": "A", "request": {"method": "POST", "url": {"raw": "https://api.example.com/graphql"},
+    "body": {"mode": "graphql", "graphql": {"query": "{ user(id: \"{{userId}}\") { name } }"}}}}]}`
+
+	r, _ := Import([]byte(src), "c.json")
+
+	v := r.Requests[0].Versions[0]
+	out := importerstest.Render(t, r, nil)
+	if v.Body.GraphQL != nil || !strings.Contains(v.Body.JSON, "{{env.userId}}") || !strings.Contains(out, "kept as a JSON body") {
+		t.Fatalf("body %+v\n%s", v.Body, out)
+	}
+}

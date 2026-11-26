@@ -22,7 +22,7 @@ export interface FilterChoices {
   collections: { name: string; term: string; count: number }[]
 }
 
-const TYPE_ORDER = ['http', 'grpc', 'message', 'db', 'file', 'flow']
+const TYPE_ORDER = ['http', 'graphql', 'grpc', 'message', 'db', 'file', 'flow']
 
 /** What the rows carry that a filter can pick: the statuses and tags, the types of request, and the collections. */
 export function filterChoices(roots: TreeNode[]): FilterChoices {

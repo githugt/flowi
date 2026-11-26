@@ -3,6 +3,7 @@
 package vm
 
 import (
+	"encoding/json"
 	"errors"
 	"slices"
 	"strings"
@@ -11,10 +12,11 @@ import (
 	"github.com/githugt/flowi/lib/model"
 )
 
-// The ids of the request types: the five families. Which protocol, database or file format a message, database or
+// The ids of the request types: the six kinds. Which protocol, database or file format a message, database or
 // data file request uses is not part of the type; the address row's own picker chooses it.
 const (
 	TypeHTTP    = "http"
+	TypeGraphQL = "graphql"
 	TypeGRPC    = "grpc"
 	TypeMessage = "message"
 	TypeDB      = "db"
@@ -31,6 +33,8 @@ func TypeName(id string) string {
 	switch id {
 	case TypeHTTP:
 		return "HTTP"
+	case TypeGraphQL:
+		return "GraphQL"
 	case TypeGRPC:
 		return "gRPC"
 	case TypeMessage:
@@ -56,13 +60,15 @@ func TypeOf(v model.RequestVersion) string {
 		return TypeFile
 	case v.Dataset != nil:
 		return TypeDB
+	case v.Body.GraphQL != nil:
+		return TypeGraphQL
 	}
 	return TypeHTTP
 }
 
 // TypeIDs are every type a request can be switched to, in the order a menu lists them.
 func TypeIDs() []string {
-	return []string{TypeHTTP, TypeGRPC, TypeMessage, TypeDB, TypeFile}
+	return []string{TypeHTTP, TypeGraphQL, TypeGRPC, TypeMessage, TypeDB, TypeFile}
 }
 
 // TypeIcon is the icon a type is drawn with.
@@ -70,6 +76,8 @@ func TypeIcon(id string) string {
 	switch id {
 	case TypeHTTP:
 		return "globe"
+	case TypeGraphQL:
+		return "graphql"
 	case TypeGRPC:
 		return "grpc"
 	case TypeMessage:
@@ -143,7 +151,7 @@ func ConvertVersion(v model.RequestVersion, id string) (model.RequestVersion, []
 	out.Headers = nil
 	out.Async, out.GRPC, out.Dataset, out.File = nil, nil, nil, nil
 	out.Variables = slices.Clone(v.Variables)
-	httpLike := id == TypeHTTP
+	httpLike := id == TypeHTTP || id == TypeGraphQL // both send an HTTP request: the status they expect and their auth stay
 
 	if !httpLike && v.Expect != "" {
 		c.lost = append(c.lost, "the expected status")
@@ -157,6 +165,8 @@ func ConvertVersion(v model.RequestVersion, id string) (model.RequestVersion, []
 	switch id {
 	case TypeHTTP:
 		toHTTP(&out, &c)
+	case TypeGraphQL:
+		toGraphQL(&out, &c)
 	case TypeGRPC:
 		toGRPC(&out, &c)
 	case TypeMessage:
@@ -226,6 +236,13 @@ func carryOf(v model.RequestVersion) carry {
 		}
 	default:
 		c.address, c.body, c.headers, c.query = v.URL, v.Body, v.Headers, v.Query
+		if g := v.Body.GraphQL; g != nil {
+			// Another type has no GraphQL body: the operation travels as the JSON it is sent as.
+			c.body = model.Body{}
+			if !g.IsZero() {
+				c.body.JSON = graphQLPayloadJSON(*g)
+			}
+		}
 		// GET and POST are what any type implies (a message is sent, a body is posted), so only another method is noted.
 		if m := strings.ToUpper(v.Method); m != "" && m != "GET" && m != "POST" {
 			c.method = m
@@ -277,6 +294,41 @@ func toHTTP(out *model.RequestVersion, c *carry) {
 	}
 	out.URL = httpAddress(c.address)
 	out.Body, out.Headers, out.Query = c.body, c.headers, c.query
+}
+
+// toGraphQL makes a GraphQL operation of what an HTTP request had: its address, headers and query parameters stay.
+// A JSON body that is already {"query": …} becomes the operation; any other body cannot be one and is left behind.
+func toGraphQL(out *model.RequestVersion, c *carry) {
+	out.Method = "POST"
+	out.URL = httpAddress(c.address)
+	out.Headers, out.Query = c.headers, c.query
+	g := model.GraphQL{}
+	if from, ok := graphQLOfJSON(c.body.JSON); ok {
+		g = from
+	} else if bodyHasContent(c.body) {
+		c.lost = append(c.lost, "the body")
+	}
+	out.Body = model.Body{GraphQL: &g}
+	if c.method != "" {
+		c.lost = append(c.lost, "the method "+c.method)
+	}
+}
+
+// graphQLOfJSON reads a GraphQL-over-HTTP JSON body ({"query", "variables", "operationName"}); false for any other.
+func graphQLOfJSON(text string) (model.GraphQL, bool) {
+	var doc struct {
+		Query         string          `json:"query"`
+		Variables     json.RawMessage `json:"variables"`
+		OperationName string          `json:"operationName"`
+	}
+	if json.Unmarshal([]byte(text), &doc) != nil || strings.TrimSpace(doc.Query) == "" {
+		return model.GraphQL{}, false
+	}
+	g := model.GraphQL{Query: doc.Query, Operation: doc.OperationName}
+	if len(doc.Variables) > 0 && string(doc.Variables) != "null" {
+		g.Variables = string(doc.Variables)
+	}
+	return g, true
 }
 
 func toGRPC(out *model.RequestVersion, c *carry) {

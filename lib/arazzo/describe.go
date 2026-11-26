@@ -124,7 +124,7 @@ func slug(s string) string {
 }
 
 func newOperation(r model.Request, v model.RequestVersion, id string) operation {
-	op := operation{req: r, version: v, id: id, method: cmp.Or(v.Method, "GET")}
+	op := operation{req: r, version: v, id: id, method: cmp.Or(v.Method, defaultMethod(v))}
 	rest := v.URL
 	if m := envPrefix.FindStringSubmatch(rest); m != nil {
 		op.server = m[1]
@@ -313,6 +313,8 @@ func requestBodyOf(op operation, schemas SchemaLookup) any {
 				schema = s
 			}
 		}
+	case b.GraphQL != nil:
+		media, schema = "application/json", graphQLSchema()
 	case len(b.Form) > 0:
 		media, schema = "application/x-www-form-urlencoded", formSchema(b.Form)
 	case len(b.Multipart) > 0:
@@ -325,6 +327,24 @@ func requestBodyOf(op operation, schemas SchemaLookup) any {
 		return nil
 	}
 	return yaml.MapSlice{{Key: "content", Value: yaml.MapSlice{{Key: media, Value: yaml.MapSlice{{Key: "schema", Value: schema}}}}}}
+}
+
+// defaultMethod is the method of a version that names none: GET, and POST for a GraphQL operation.
+func defaultMethod(v model.RequestVersion) string {
+	if v.Body.GraphQL != nil {
+		return "POST"
+	}
+	return "GET"
+}
+
+// graphQLSchema is the request of GraphQL over HTTP: a document, its variables and the operation to run.
+func graphQLSchema() yaml.MapSlice {
+	props := yaml.MapSlice{
+		{Key: "query", Value: yaml.MapSlice{{Key: "type", Value: "string"}}},
+		{Key: "operationName", Value: yaml.MapSlice{{Key: "type", Value: "string"}}},
+		{Key: "variables", Value: yaml.MapSlice{{Key: "type", Value: "object"}}},
+	}
+	return yaml.MapSlice{{Key: "type", Value: "object"}, {Key: "required", Value: []string{"query"}}, {Key: "properties", Value: props}}
 }
 
 func formSchema(fields []model.KeyValue) yaml.MapSlice {

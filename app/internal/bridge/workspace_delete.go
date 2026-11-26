@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	flowi "github.com/githugt/flowi/lib"
+	"github.com/githugt/flowi/lib/analysis"
 
 	"github.com/githugt/flowi/app/internal/vm"
 )
@@ -82,6 +83,77 @@ func envEffects(name string, impact flowi.EnvImpact) string {
 		parts = append(parts, fmt.Sprintf("%s %s on %s and would lose what it gives.", strings.Join(impact.Dependents, ", "), verb, name))
 	}
 	return strings.Join(parts, " ")
+}
+
+// DeleteQuestion is what the window asks before a delete: Text is empty when it just goes. Title and Action are empty
+// for the plain "Delete"; a delete that breaks flow steps names that on both, so the button is not a plain "Delete".
+type DeleteQuestion struct {
+	Text, Title, Action string
+}
+
+// deleteUse is one flow step that runs a request about to be deleted.
+type deleteUse struct{ Request, Where string }
+
+// maxUsesListed is how many steps the question names; the rest are counted.
+const maxUsesListed = 6
+
+// callerPlace says where a step is, the way the rest of the window does: "Collection › flow, step name".
+func callerPlace(c analysis.Caller) string {
+	where := c.Flow
+	if where == "" {
+		where = "hook " + c.Hook
+	}
+	return fmt.Sprintf("%s › %s, step %s", c.Collection, where, c.Node)
+}
+
+// usesText names the flow steps that would be left without their request. "" when there are none.
+//
+// Before: deleting a request that flows ran said nothing, and each of them showed "unknown request id" afterwards.
+func usesText(uses []deleteUse) string {
+	if len(uses) == 0 {
+		return ""
+	}
+	requests := map[string]bool{}
+	for _, u := range uses {
+		requests[u.Request] = true
+	}
+	steps := fmt.Sprintf("%d steps", len(uses))
+	if len(uses) == 1 {
+		steps = "1 step"
+	}
+	var b strings.Builder
+	if len(requests) == 1 {
+		fmt.Fprintf(&b, "%s is used by %s:", uses[0].Request, steps)
+	} else {
+		fmt.Fprintf(&b, "%s run the requests you are deleting:", steps)
+	}
+	for _, u := range uses[:min(len(uses), maxUsesListed)] {
+		if len(requests) == 1 {
+			fmt.Fprintf(&b, "\n• %s", u.Where)
+		} else {
+			fmt.Fprintf(&b, "\n• %s (%s)", u.Where, u.Request)
+		}
+	}
+	if more := len(uses) - maxUsesListed; more > 0 {
+		fmt.Fprintf(&b, "\n• and %d more", more)
+	}
+	b.WriteString("\nThose steps will show an error until you pick another request for them.")
+	return b.String()
+}
+
+// withUses adds the flow steps a delete would break to the question, and says so on the title and the button. after is
+// what is true of this delete once they are named, such as that Undo brings the request back.
+func withUses(q DeleteQuestion, uses []deleteUse, after string) DeleteQuestion {
+	text := usesText(uses)
+	if text == "" {
+		return q
+	}
+	if q.Text != "" {
+		text = q.Text + "\n\n" + text
+	}
+	q.Text = text + after
+	q.Title, q.Action = "Delete a request in use", "Delete anyway"
+	return q
 }
 
 // Undo puts items that a delete sent to the trash back where they were. It returns a problem to show, or "".

@@ -31,6 +31,26 @@ func (w *Workspace) Impact(t RequestTarget, version string) (analysis.Report, di
 	return rep, w.positioned(diags), err
 }
 
+// Callers lists, for each request in ts, the flow steps (and inline hook steps) of every mounted collection that run
+// it: what a delete would leave pointing at nothing. A request nothing runs has no entry. It reads no examples, so it is
+// cheap enough to ask for a whole selection while a menu opens.
+func (w *Workspace) Callers(ts []RequestTarget) map[RequestTarget][]analysis.Caller {
+	targets := make([]analysis.Target, len(ts))
+	for i, t := range ts {
+		targets[i] = analysis.Target{Collection: t.Collection, Request: t.Request}
+	}
+	w.mu.RLock()
+	defer w.mu.RUnlock()
+	found := analysis.Callers(w.collections, targets)
+	out := make(map[RequestTarget][]analysis.Caller, len(found))
+	for _, t := range ts {
+		if cs := found[analysis.Target{Collection: t.Collection, Request: t.Request}]; len(cs) > 0 {
+			out[t] = cs
+		}
+	}
+	return out
+}
+
 // ImpactOfDraft is Impact for request t as it would be once draft, an edited copy of it, is saved: nothing is
 // written. Compare it with Impact to see what the edit would break for the request's consumers (a removed extraction
 // a flow reads, say).

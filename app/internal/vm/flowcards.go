@@ -3,6 +3,8 @@
 package vm
 
 import (
+	"cmp"
+	"encoding/json"
 	"fmt"
 	"slices"
 	"strconv"
@@ -161,10 +163,23 @@ func versionFactsOf(v model.RequestVersion) card.Facts {
 	if v.Auth != nil {
 		auth = authLabel(v.Auth)
 	}
+	if v.Body.GraphQL != nil {
+		kind, name := graphQLFacts(v)
+		return card.Facts{Kind: "graphql", Method: kind, Target: cmp.Or(name, pathOf(v.URL)), Auth: auth, Variables: graphQLVariableCount(*v.Body.GraphQL), Headers: len(headers)}
+	}
 	return card.Facts{
 		Kind: "http", Method: v.Method, Target: pathOf(v.URL), Auth: auth,
 		Query: countOn(v.Query), Headers: len(headers), Body: bodyKind(v.Body),
 	}
+}
+
+// graphQLVariableCount is how many variables the body sends: the keys of its JSON object, 0 when it is not one.
+func graphQLVariableCount(g model.GraphQL) int {
+	var vars map[string]json.RawMessage
+	if json.Unmarshal([]byte(g.Variables), &vars) != nil {
+		return 0
+	}
+	return len(vars)
 }
 
 func grpcFacts(v model.RequestVersion) card.Facts {

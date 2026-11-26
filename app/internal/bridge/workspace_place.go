@@ -57,6 +57,8 @@ func (s *WorkspaceService) NewAt(kind, row, text, protocol string) {
 			ws.CreateRequest(collection, below, open, fail)
 		case "async":
 			ws.CreateAsyncRequest(collection, below, protocol, open, fail)
+		case "graphql":
+			ws.CreateGraphQLRequest(collection, below, open, fail)
 		case "grpc":
 			ws.CreateGRPCRequest(collection, below, open, fail)
 		case "dataset":

@@ -45,13 +45,26 @@ func authSchemeLabels() map[string]string {
 	}
 }
 
-func authSchemeChoices() []Choice {
+// authSchemeChoices lists the schemes a form offers: all of them, or only the allowed ones when allowed is not nil
+// (a WebSocket or SSE request cannot use the ones that sign the request or answer a 401).
+func authSchemeChoices(allowed []string) []Choice {
 	labels := authSchemeLabels()
 	out := make([]Choice, 0, len(labels))
 	for _, t := range model.AuthTypes() {
-		out = append(out, Choice{ID: "scheme:" + t, Label: labels[t]})
+		if allowed == nil || slices.Contains(allowed, t) {
+			out = append(out, Choice{ID: "scheme:" + t, Label: labels[t]})
+		}
 	}
 	return out
+}
+
+// allowedAuthTypes are the schemes the request can use when its protocol restricts them, nil when it does not (HTTP
+// and gRPC show every scheme).
+func allowedAuthTypes(r *vm.Request) []string {
+	if !r.IsAsync() {
+		return nil
+	}
+	return model.AsyncAuthTypes(r.Async().Protocol)
 }
 
 func authKinds() map[string]vm.AuthKind {
@@ -61,16 +74,24 @@ func authKinds() map[string]vm.AuthKind {
 // authViewOf is the Auth section of r; named are the named authentications
 // of every mounted collection, of which the request's own are offered.
 func authViewOf(r *vm.Request, named []vm.NamedAuth) AuthView {
-	v := AuthView{Kind: "none", Fields: []AuthFieldView{}, Schemes: authSchemeChoices(), Named: []Choice{}}
+	allowed := allowedAuthTypes(r)
+	v := AuthView{Kind: "none", Fields: []AuthFieldView{}, Schemes: authSchemeChoices(allowed), Named: []Choice{}}
 	labels := authSchemeLabels()
+	use := r.AuthUse()
+	found := false
 	for _, a := range named {
-		if a.Collection == r.Target().Collection {
+		if a.Collection != r.Target().Collection {
+			continue
+		}
+		found = found || a.Name == use
+		// Only the authentications the request can use are offered, and the one it uses already, so it can be seen and changed.
+		if allowed == nil || slices.Contains(allowed, a.Auth.Type) || a.Name == use {
 			v.Named = append(v.Named, Choice{ID: a.Name, Label: a.Name + " (" + labels[a.Auth.Type] + ")"})
 		}
 	}
-	if use := r.AuthUse(); use != "" {
+	if use != "" {
 		v.Kind, v.Use = "use", use
-		v.UseMissing = !slices.ContainsFunc(v.Named, func(c Choice) bool { return c.ID == use })
+		v.UseMissing = !found
 		return v
 	}
 	if scheme, params := r.AuthScheme(); scheme != "" {
@@ -163,7 +184,17 @@ func (s *RequestService) SetRows(node, table string, rows []model.KeyValue) erro
 	return err
 }
 
-// SetBodyKind chooses none, text, form or file.
+// SetGraphQL changes one part of a GraphQL body: field is query, variables or operation.
+func (s *RequestService) SetGraphQL(node, field, text string) {
+	s.with(node, func(o *openRequest) { o.req.SetGraphQL(vm.GraphQLField(field), text) })
+}
+
+// SetGraphQLReceive sets what a subscription waits for; nil goes back to the default (the first event).
+func (s *RequestService) SetGraphQLReceive(node string, receive *model.AsyncReceive) {
+	s.with(node, func(o *openRequest) { o.req.SetGraphQLReceive(receive) })
+}
+
+// SetBodyKind chooses none, text, form, file or graphql.
 func (s *RequestService) SetBodyKind(node, kind string) {
 	s.with(node, func(o *openRequest) { o.req.SetBodyKind(vm.BodyKind(kind)) })
 }

@@ -63,6 +63,9 @@ func VersionTemplates(file string, v model.RequestVersion) []Site {
 		Site{File: file, Path: yamlpath.Key(body, "text"), Field: "body", Src: v.Body.Text},
 		Site{File: file, Path: yamlpath.Key(body, "file"), Field: "body file", Src: v.Body.File})
 	sites = append(sites, keyValueSites(file, yamlpath.Key(body, "form"), "form field ", v.Body.Form)...)
+	if g := v.Body.GraphQL; g != nil { // the query is never templated: only the variables are
+		sites = append(sites, Site{File: file, Path: yamlpath.Key(yamlpath.Key(body, "graphql"), "variables"), Field: "graphql variables", Src: g.Variables})
+	}
 	for i, check := range v.Assert {
 		sites = append(sites, Site{File: file, Path: yamlpath.Index(yamlpath.Key(base, "assert"), i), Field: "assert", Src: check, Expression: true})
 	}

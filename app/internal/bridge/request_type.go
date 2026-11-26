@@ -17,6 +17,8 @@ func typeLabel(id string) string {
 	switch id {
 	case vm.TypeHTTP:
 		return "HTTP"
+	case vm.TypeGraphQL:
+		return "GraphQL"
 	case vm.TypeGRPC:
 		return "gRPC"
 	case vm.TypeMessage:

@@ -8,6 +8,8 @@ import type { TreeNode } from './types'
 /** A row as a section shows it: a collection stands for its Requests or Flows group, whose id it keeps. */
 export interface RowNode extends TreeNode {
   groupId?: string
+  /** Which section shows this collection: the same collection row is in more than one. */
+  section?: 'requests' | 'flows'
   children?: RowNode[]
 }
 
@@ -38,7 +40,7 @@ export function sectionRoots(roots: TreeNode[], section: SectionId, favourites: 
       const group = (c.children ?? []).find((k) => k.kind === GROUP_OF[section])
       const kids = group?.children ?? []
       if (!kids.length && (section === 'flows' || !keepEmpty)) return []
-      return [{ ...c, children: kids, groupId: group?.id }]
+      return [{ ...c, children: kids, groupId: group?.id, section }]
     })
   const rank = (c: TreeNode): number => {
     const star = favourites.indexOf(c.id)
@@ -46,6 +48,14 @@ export function sectionRoots(roots: TreeNode[], section: SectionId, favourites: 
   }
   return picked.map((c, i) => ({ c, i })).sort((a, b) => rank(a.c) - rank(b.c) || a.i - b.i).map((x) => x.c)
 }
+
+/**
+ * The row whose menu a click on this row opens. A collection in the Flows section stands for its Flows group, so its
+ * menu is that group's: New flow and New folder, which makes the folder among the flows. The collection's own menu
+ * makes folders among the requests.
+ * Before: right-clicking a collection in Flows and choosing New folder made the folder under Requests.
+ */
+export const menuRowOf = (n: Pick<RowNode, 'id' | 'section' | 'groupId'>): string => (n.section === 'flows' && n.groupId ? n.groupId : n.id)
 
 const LEAVES = ['request', 'flow', 'environment', 'broken']
 

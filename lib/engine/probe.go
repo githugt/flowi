@@ -158,6 +158,11 @@ func (e rpcExchange) probe(ctx context.Context) Probe {
 func (e messagingExchange) probe(ctx context.Context) Probe {
 	x := e.x
 	b, diags := x.renderAsync(false)
+	return x.probeAsync(ctx, b, diags)
+}
+
+// probeAsync tests the connection of a rendered operation.
+func (x *execution) probeAsync(ctx context.Context, b builtAsync, diags diag.List) Probe {
 	diags = append(diags, x.r.secrets.problems(x.env, b.missing)...)
 	if diags.HasErrors() {
 		return Probe{Status: ProbeFailed, Diags: diags}

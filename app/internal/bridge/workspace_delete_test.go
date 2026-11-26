@@ -3,11 +3,13 @@
 package bridge
 
 import (
+	"fmt"
 	"slices"
 	"strings"
 	"testing"
 
 	flowi "github.com/githugt/flowi/lib"
+	"github.com/githugt/flowi/lib/analysis"
 )
 
 func TestDeletedNotice_should_name_one_item_and_count_several(t *testing.T) {
@@ -143,4 +145,122 @@ func TestDelete_menu_for_an_environment_should_name_its_secrets_and_the_environm
 			t.Errorf("%q is missing %q", got, want)
 		}
 	}
+}
+
+func deleteEntry(t *testing.T, app *App, ids ...string) MenuEntry {
+	t.Helper()
+	for _, e := range app.Workspace().Menu(ids) {
+		if e.Action == "delete" {
+			return e
+		}
+	}
+	t.Fatalf("no delete entry for %v", ids)
+	return MenuEntry{}
+}
+
+func TestUsesText_Given_steps_Then_names_each_place_and_what_happens(t *testing.T) {
+	// Before: deleting a request that flows ran said nothing, and each of them showed "unknown request id" afterwards.
+	none := usesText(nil)
+	one := usesText([]deleteUse{{Request: "Login", Where: "Shop › signup, step login"}})
+	many := usesText([]deleteUse{{"Login", "Shop › a, step x"}, {"Login", "Shop › b, step y"}})
+	mixed := usesText([]deleteUse{{"Login", "Shop › a, step x"}, {"Verify", "Shop › a, step z"}})
+
+	if none != "" {
+		t.Errorf("nothing uses it: %q", none)
+	}
+	for _, want := range []string{"Login is used by 1 step:", "• Shop › signup, step login", "show an error"} {
+		if !strings.Contains(one, want) {
+			t.Errorf("one: %q is missing %q", one, want)
+		}
+	}
+	if !strings.Contains(many, "Login is used by 2 steps:") {
+		t.Errorf("many: %q", many)
+	}
+	if !strings.Contains(mixed, "2 steps run the requests you are deleting:") || !strings.Contains(mixed, "(Verify)") {
+		t.Errorf("mixed: %q", mixed)
+	}
+}
+
+func TestUsesText_Given_more_steps_than_it_lists_Then_counts_the_rest(t *testing.T) {
+	var uses []deleteUse
+	for i := range maxUsesListed + 3 {
+		uses = append(uses, deleteUse{Request: "Login", Where: fmt.Sprintf("Shop › flow%d, step s", i)})
+	}
+
+	got := usesText(uses)
+
+	if !strings.Contains(got, "and 3 more") || strings.Contains(got, fmt.Sprintf("flow%d,", maxUsesListed)) {
+		t.Errorf("got %q", got)
+	}
+}
+
+func TestDelete_menu_Given_a_flow_runs_the_request_Then_the_question_names_the_flow_and_the_button_says_anyway(t *testing.T) {
+	// Before: a request went to the trash without a word, and the flow that ran it broke.
+	app, _, b := twoCollections(t)
+	login := rowOf(t, app, "request", "Login")
+	n := app.workspace.Node(login)
+	b.CallersOf = map[flowi.RequestTarget][]analysis.Caller{
+		{Collection: n.Collection, Request: n.Request}: {{Collection: "Shop", File: "/s/flows/signup.arazzo.yaml", Flow: "signup", Node: "login"}},
+	}
+
+	e := deleteEntry(t, app, login)
+
+	for _, want := range []string{"Login is used by 1 step", "Shop › signup, step login", "Undo brings the request back"} {
+		if !strings.Contains(e.Confirm, want) {
+			t.Errorf("%q is missing %q", e.Confirm, want)
+		}
+	}
+	if e.ConfirmAction != "Delete anyway" || e.ConfirmTitle == "" {
+		t.Errorf("title %q, button %q", e.ConfirmTitle, e.ConfirmAction)
+	}
+}
+
+func TestDelete_menu_Given_the_only_user_is_a_flow_deleted_too_Then_nothing_is_asked(t *testing.T) {
+	// Before: a step that goes with its flow counted as left pointing at nothing.
+	app, _, b := twoCollections(t)
+	login := rowOf(t, app, "request", "Login")
+	flow := firstRow(t, app, "flow")
+	n := app.workspace.Node(login)
+	b.CallersOf = map[flowi.RequestTarget][]analysis.Caller{
+		{Collection: n.Collection, Request: n.Request}: {{Collection: "Shop", File: app.workspace.Node(flow).File, Flow: "signup", Node: "login"}},
+	}
+
+	e := deleteEntry(t, app, login, flow)
+
+	if e.Confirm != "" || e.ConfirmAction != "" {
+		t.Errorf("both go together, so no step is left behind: %q %q", e.Confirm, e.ConfirmAction)
+	}
+}
+
+func TestDelete_menu_Given_no_flow_runs_the_request_Then_it_still_goes_without_a_question(t *testing.T) {
+	app, _, _ := twoCollections(t)
+	login := rowOf(t, app, "request", "Login")
+
+	e := deleteEntry(t, app, login)
+
+	if e.Confirm != "" || e.ConfirmAction != "" || e.ConfirmTitle != "" {
+		t.Errorf("%+v", e)
+	}
+}
+
+// firstRow finds the first tree row of a kind, whatever its label.
+func firstRow(t *testing.T, app *App, kind string) string {
+	t.Helper()
+	var walk func([]TreeNode) string
+	walk = func(nodes []TreeNode) string {
+		for _, n := range nodes {
+			if n.Kind == kind {
+				return n.ID
+			}
+			if id := walk(n.Children); id != "" {
+				return id
+			}
+		}
+		return ""
+	}
+	if id := walk(app.Workspace().Tree().Roots); id != "" {
+		return id
+	}
+	t.Fatalf("no %s row", kind)
+	return ""
 }

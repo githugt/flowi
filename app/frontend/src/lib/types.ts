@@ -575,7 +575,7 @@ export interface RequestVersion {
   URL: string
   Query: KV[] | null
   Headers: KV[] | null
-  Body: { JSON: string; Text: string; File: string; Form: KV[] | null; Multipart: unknown[] | null }
+  Body: { JSON: string; Text: string; File: string; Form: KV[] | null; Multipart: unknown[] | null; GraphQL?: { Query: string; Variables: string; Operation: string; Receive?: { Count: number; Timeout: number; Match: string } | null } | null }
   Extract: Extraction[] | null
   Assert: string[] | null
   /** The status the request is meant to answer with ("401", "4xx", "200, 404"); empty: any 2xx passes. */
@@ -676,6 +676,17 @@ export interface ConnectionInfo {
   tookMs: number
 }
 
+/** What the editor shows about a GraphQL body besides its text (see vm.GraphQLInfo). */
+export interface GraphQLInfo {
+  operations: { kind: 'query' | 'mutation' | 'subscription'; name: string }[]
+  /** The kind of the operation that will run; empty when it cannot be told. */
+  kind: '' | 'query' | 'mutation' | 'subscription'
+  problem: string
+  variablesProblem: string
+  /** Only a query may be sent with GET. */
+  getOK: boolean
+}
+
 export interface RequestView {
   needsDrop: boolean
   flowiOverlay: string
@@ -702,7 +713,7 @@ export interface RequestView {
   current: RequestVersion
   fullUrl: string
   hookChain: string[]
-  bodyKind: 'none' | 'text' | 'form' | 'file'
+  bodyKind: 'none' | 'text' | 'form' | 'file' | 'graphql'
   bodyFormat: 'json' | 'xml' | 'yaml' | 'raw'
   /** The parts of a multipart form body: text, or a file by its path. */
   parts: { name: string; file: boolean; value: string; contentType: string }[]
@@ -717,6 +728,8 @@ export interface RequestView {
   async?: AsyncInfo
   grpc?: GRPCInfo
   dataset?: DatasetInfo
+  /** For a GraphQL body: its operations, the one that runs and what is wrong with the query or the variables. */
+  graphql?: GraphQLInfo
   /** For a message or database request: the Test connection button and what its last use found. */
   connection?: ConnectionInfo
   pipeline: { kind: string; title: string; detail: string; method?: string; tip?: string; state: string; reason?: string; ms: number }[]
@@ -738,6 +751,9 @@ export interface MenuEntry {
   label: string
   prompt?: Prompt
   confirm?: string
+  /** A delete that leaves flow steps pointing at nothing names that on the question's title and its button. */
+  confirmTitle?: string
+  confirmAction?: string
   guard?: string
   /** 'move': the window asks where with the Move dialog. */
   dialog?: string
@@ -1050,6 +1066,8 @@ export interface AsyncInfo {
   mode: string
   bindings: string[]
   credentials: string[]
+  /** The protocol signs in with an auth block (WebSocket, SSE): it has an Auth section, not Credentials. */
+  auth: boolean
   /** A cloud service: signs in with the provider's own lookup, or the credentials written in the request. */
   cloud: boolean
   headersAreConnection: boolean

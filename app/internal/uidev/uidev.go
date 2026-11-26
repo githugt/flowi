@@ -20,6 +20,7 @@ import (
 	"time"
 
 	flowi "github.com/githugt/flowi/lib"
+	"github.com/githugt/flowi/lib/diag"
 	"github.com/githugt/flowi/lib/engine"
 	"github.com/githugt/flowi/lib/model"
 
@@ -59,7 +60,7 @@ func specRules() []flowi.SpecRule {
 		{Name: "info-description", About: "The description says what the API is for.", Default: "warning"},
 		{Name: "operation-description", About: "Every operation (or method, or channel operation) has a summary or a description.", Default: "warning"},
 		{Name: "operation-id", About: "Every operation has an operationId (OpenAPI, Swagger, AsyncAPI 2).", Default: "warning"},
-		{Name: "operation-tags", About: "Every operation has a tag.", Default: "warning"},
+		{Name: "operation-tags", About: "Every operation has a tag.", Default: "note"},
 		{Name: "operation-security", About: "Every operation has a security requirement, or says it is public with security: [].", Default: "warning"},
 		{Name: "success-response", About: "Every operation documents a 2xx response.", Default: "warning"},
 		{Name: "unused-component", About: "Every component is referred to somewhere.", Default: "warning"},
@@ -237,6 +238,10 @@ func (b *Backend) Send(_ context.Context, t flowi.RequestTarget, _ flowi.SendOpt
 	rec.Version = "1"
 	rec.At = time.Now()
 	result := engine.SendResult{RunID: "ui-dev", Status: status, Record: &rec, Seed: 1}
+	if t.Request == "M-gql" { // a GraphQL server answers 200 with the failure in the body: the step fails all the same
+		result.Status = engine.StatusFailed
+		result.Diags = diag.List{diag.New(diag.CodeRunGraphQLError, diag.Location{}, map[string]string{"request": "graphql/get-user", "count": "1 error(s)", "detail": `Cannot query field "broken" on type "Query".`})}
+	}
 	events := []engine.Event{
 		engine.RequestSent{RequestID: string(t.Request), Method: rec.Request.Method, URL: rec.Request.URL, Attempt: 1},
 		engine.ResponseReceived{RequestID: string(t.Request), Status: rec.Status, Duration: rec.Timings.Total, Attempt: 1},
@@ -284,6 +289,21 @@ func responseOf(id model.ID) (engine.Record, engine.Status) {
 		Timings: engine.Timings{TTFB: 38 * time.Millisecond, Total: 52 * time.Millisecond},
 	}
 	switch id {
+	case "M-gqlsub": // a subscription is a stream: the subscribe message and the events that came back
+		at := time.Now()
+		rec.Kind, rec.Proto, rec.Outcome = engine.KindAsync, model.ProtocolGraphQLWS, engine.OutcomeOK
+		rec.Status = 0
+		rec.Request = engine.SentRequest{Method: "GQL", URL: "https://staging.shop.example/graphql"}
+		rec.Messages = []engine.RecordMessage{
+			{Direction: "sent", At: at, Type: "subscribe", Body: engine.Body{Text: `{"query":"subscription Ticks { tick }","operationName":"Ticks"}`, Size: 58}},
+			{Direction: "received", At: at, Type: "next", Body: engine.Body{Text: `{"data":{"tick":{"n":1}}}`, ContentType: "application/json", JSON: map[string]any{"data": map[string]any{"tick": map[string]any{"n": 1}}}, Size: 25}},
+			{Direction: "received", At: at, Type: "next", Body: engine.Body{Text: `{"data":{"tick":{"n":2}}}`, ContentType: "application/json", JSON: map[string]any{"data": map[string]any{"tick": map[string]any{"n": 2}}}, Size: 25}},
+			{Direction: "received", At: at, Type: "next", Body: engine.Body{Text: `{"data":{"tick":{"n":3}}}`, ContentType: "application/json", JSON: map[string]any{"data": map[string]any{"tick": map[string]any{"n": 3}}}, Size: 25}},
+		}
+		rec.Body = rec.Messages[1].Body
+	case "M-gql":
+		rec.Request = engine.SentRequest{Method: "POST", URL: "https://staging.shop.example/graphql"}
+		rec.Body = engine.Body{JSON: map[string]any{"errors": []any{map[string]any{"message": `Cannot query field "broken" on type "Query".`}}}, ContentType: "application/graphql-response+json", Size: 80}
 	case "R-login":
 		rec.Request = engine.SentRequest{Method: "POST", URL: "https://staging.shop.example/login"}
 		rec.Body = engine.Body{JSON: map[string]any{"token": "demo-token", "expires_in": 3600}, ContentType: "application/json", Size: 44}

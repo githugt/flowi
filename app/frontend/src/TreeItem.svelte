@@ -12,7 +12,7 @@
   import IconButton from './IconButton.svelte'
   import StatusIcon from './StatusIcon.svelte'
   import { hover } from './lib/hovercard.svelte'
-  import { subtitle, type RowNode, type SectionId } from './lib/sidebarview'
+  import { menuRowOf, subtitle, type RowNode, type SectionId } from './lib/sidebarview'
   import { highlightParts } from './lib/treefilter'
   import { WorkspaceService } from '../bindings/github.com/githugt/flowi/app/internal/bridge'
   import { moved } from './lib/reorder'
@@ -140,13 +140,13 @@
     if (node.kind === 'broken') return
     if (e.key !== 'F2' && e.key !== 'Delete') return
     e.preventDefault()
-    menuItemForKey(await rowMenu(node.id), e.key)?.run()
+    menuItemForKey(await rowMenu(node.id, menuRowOf(node)), e.key)?.run()
   }
 
   async function contextmenu(e: MouseEvent) {
     e.preventDefault()
     if (node.kind === 'broken') return
-    ui.openMenu(e.clientX, e.clientY, await rowMenu(node.id))
+    ui.openMenu(e.clientX, e.clientY, await rowMenu(node.id, menuRowOf(node)))
   }
 </script>
 

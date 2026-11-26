@@ -68,7 +68,9 @@ versions:
     method: POST
     url: "{{env.base_url}}/graphql"
     body:
-      json: "{\"query\":\"{ me { id } }\",\"variables\":{\"a\": 1}}"
+      graphql:
+        query: "{ me { id } }"
+        variables: "{\"a\": 1}"
 --- request Token
 name: Token
 versions:

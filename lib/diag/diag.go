@@ -22,11 +22,17 @@ type Severity int
 const (
 	SeverityError   Severity = 1
 	SeverityWarning Severity = 2
+	// SeverityNote is a suggestion, not a problem: the Problems list, the warning counts and a validation leave it out.
+	// Only a screen that asks for it by name shows it (the spec rules of a collection's page).
+	SeverityNote Severity = 3
 )
 
 func (s Severity) String() string {
-	if s == SeverityWarning {
+	switch s {
+	case SeverityWarning:
 		return "warning"
+	case SeverityNote:
+		return "note"
 	}
 	return "error"
 }

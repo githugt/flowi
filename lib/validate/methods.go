@@ -16,7 +16,7 @@ func checkMethods(ix *index) diag.List {
 	for _, c := range ix.collections {
 		for _, r := range c.Requests {
 			for _, v := range r.Versions {
-				if v.Method == "" || v.Family() != model.FamilyHTTP {
+				if v.Method == "" || !v.Family().OverHTTP() {
 					continue
 				}
 				out = append(out, methodDiags(r, v)...)

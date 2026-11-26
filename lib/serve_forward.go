@@ -136,7 +136,7 @@ func (w *Workspace) ForwardTargets(env string) []ForwardTarget {
 	for _, c := range w.Collections() {
 		for _, r := range c.Requests {
 			for _, v := range r.Versions {
-				if v.Family() != model.FamilyHTTP {
+				if !v.Family().OverHTTP() {
 					continue
 				}
 				written := replay.BaseOf(v.URL)

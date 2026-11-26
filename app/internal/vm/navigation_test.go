@@ -38,8 +38,8 @@ func TestMenuFor_should_offer_what_a_single_row_can_do(t *testing.T) {
 		"request":     {"r:C1:R1", []vm.Action{vm.ActOpen, vm.ActDuplicate, vm.ActRename, vm.ActDelete}},
 		"flow":        {"f:C1:F1", []vm.Action{vm.ActOpen, vm.ActDuplicate, vm.ActCopyMermaid, vm.ActDelete}},
 		"environment": {"e:/c/environments/local.yaml", []vm.Action{vm.ActOpen, vm.ActDelete}},
-		"collection":  {"c:C1", []vm.Action{vm.ActNewRequest, vm.ActNewAsyncRequest, vm.ActNewGRPCRequest, vm.ActNewDatasetRequest, vm.ActNewFlow, vm.ActNewFolder, vm.ActFlowFromRequests}},
-		"folder":      {"c:C1/requests/auth", []vm.Action{vm.ActNewRequest, vm.ActNewAsyncRequest, vm.ActNewGRPCRequest, vm.ActNewDatasetRequest, vm.ActNewFolder, vm.ActFlowFromRequests, vm.ActRename, vm.ActDelete}},
+		"collection":  {"c:C1", []vm.Action{vm.ActNewRequest, vm.ActNewAsyncRequest, vm.ActNewGraphQLRequest, vm.ActNewGRPCRequest, vm.ActNewDatasetRequest, vm.ActNewDataFileRequest, vm.ActNewFlow, vm.ActNewFolder, vm.ActFlowFromRequests}},
+		"folder":      {"c:C1/requests/auth", []vm.Action{vm.ActNewRequest, vm.ActNewAsyncRequest, vm.ActNewGraphQLRequest, vm.ActNewGRPCRequest, vm.ActNewDatasetRequest, vm.ActNewDataFileRequest, vm.ActNewFolder, vm.ActFlowFromRequests, vm.ActRename, vm.ActDelete}},
 		"flows group": {"c:C1/flows", []vm.Action{vm.ActNewFlow, vm.ActNewFolder}},
 		"envs group":  {"environments", []vm.Action{vm.ActNewEnvironment}},
 	}

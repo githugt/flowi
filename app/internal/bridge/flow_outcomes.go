@@ -20,7 +20,7 @@ func (s *FlowService) outcomesOf(own model.Collection, n model.Node) (outcomes [
 		switch v.Family() {
 		case model.FamilyDataset, model.FamilyFile:
 			kind = "dataset"
-		case model.FamilyHTTP:
+		case model.FamilyHTTP, model.FamilyGraphQL:
 		default:
 			kind = "message"
 		}

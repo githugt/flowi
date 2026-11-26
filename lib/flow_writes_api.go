@@ -7,6 +7,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/githugt/flowi/lib/graphqlx"
 	"github.com/githugt/flowi/lib/internal/sites"
 	"github.com/githugt/flowi/lib/model"
 )
@@ -17,7 +18,7 @@ type FlowWrite struct {
 	Step string
 	// Request is the path of the request the step sends.
 	Request string
-	// What is how it writes: "POST", "gRPC call", "MQTT publish", "SQL query that may change data".
+	// What is how it writes: "POST", "GraphQL mutation", "gRPC call", "MQTT publish", "SQL query that may change data".
 	What string
 	// Via is the path of the subflow the step is in; empty for the flow itself.
 	Via string
@@ -79,6 +80,12 @@ func requestWrites(all []model.Collection, c model.Collection, f model.Flow, cal
 		return "", false
 	}
 	switch v.Family() {
+	case model.FamilyGraphQL:
+		// A GraphQL query is sent with POST and still reads: the document says whether it writes.
+		if op, err := graphqlx.Select(v.Body.GraphQL.Query, v.Body.GraphQL.Operation); err != nil || op.Kind == graphqlx.Mutation {
+			return "GraphQL mutation", true // a document that cannot be told apart is assumed to write
+		}
+		return "", false
 	case model.FamilyHTTP:
 		switch m := strings.ToUpper(v.Method); m {
 		case "", "GET", "HEAD", "OPTIONS":

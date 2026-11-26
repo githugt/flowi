@@ -343,3 +343,51 @@ func TestDefaultLevel_should_have_naming_rules_off_and_the_rest_on(t *testing.T)
 		t.Fatal("defaults changed")
 	}
 }
+
+func severityOf(l diag.List, code diag.Code) (diag.Severity, bool) {
+	for _, d := range l {
+		if d.Code == code {
+			return d.Severity, true
+		}
+	}
+	return 0, false
+}
+
+func TestLint_Given_a_missing_tag_When_the_level_is_chosen_or_not_Then_it_is_a_note_by_default_and_what_the_collection_says(t *testing.T) {
+	// Before: a missing tag was a warning, though tags are a nicety and not a requirement.
+	spec := `
+openapi: 3.0.3
+info: {title: Pets, version: "1", description: d}
+paths:
+  /pets:
+    get:
+      summary: List
+      operationId: l
+      security: []
+      responses: {"200": {description: ok}}
+`
+
+	byDefault, _ := severityOf(lint(t, spec, nil), diag.CodeSpecTags)
+	asNote, _ := severityOf(lint(t, spec, Config{"operation-tags": LevelNote}), diag.CodeSpecTags)
+	asWarning, _ := severityOf(lint(t, spec, Config{"operation-tags": LevelWarning}), diag.CodeSpecTags)
+	asError, _ := severityOf(lint(t, spec, Config{"operation-tags": LevelError}), diag.CodeSpecTags)
+	_, whenOff := severityOf(lint(t, spec, Config{"operation-tags": LevelOff}), diag.CodeSpecTags)
+
+	if byDefault != diag.SeverityNote || asNote != diag.SeverityNote {
+		t.Errorf("default %v, note %v: both want a note", byDefault, asNote)
+	}
+	if asWarning != diag.SeverityWarning || asError != diag.SeverityError || whenOff {
+		t.Errorf("warning %v, error %v, off found %v", asWarning, asError, whenOff)
+	}
+	if DefaultLevel("operation-tags") != LevelNote || DefaultLevel("operation-id") != LevelWarning {
+		t.Errorf("only the tag rule is a note by default")
+	}
+}
+
+func TestParseConfig_Given_note_When_read_Then_it_is_a_level(t *testing.T) {
+	cfg, problems := ParseConfig([]byte("rules:\n  operation-id: note\n"), "lint.yaml")
+
+	if len(problems) != 0 || cfg["operation-id"] != LevelNote {
+		t.Fatalf("cfg %v problems %v", cfg, problems)
+	}
+}

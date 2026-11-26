@@ -7,6 +7,7 @@
   import Select from './Select.svelte'
   import Toggle from './Toggle.svelte'
   import { headersHint } from './lib/headershint'
+  import { asyncSections } from './lib/asyncsections'
   import IconButton from './IconButton.svelte'
   import Segmented from './Segmented.svelte'
   import Menu, { type MenuItem } from './Menu.svelte'
@@ -83,6 +84,7 @@
   import FlowiOverlayDialog from './FlowiOverlayDialog.svelte'
   import FlowiOverlayEditor from './FlowiOverlayEditor.svelte'
   import FlowiOverlayWarning from './FlowiOverlayWarning.svelte'
+  import GraphQLBody from './GraphQLBody.svelte'
 
   let { view }: { view: RequestView } = $props()
   const node = $derived(view.node)
@@ -101,12 +103,7 @@
   const sections = $derived.by(() => {
     if (view.kind === 'dataset') return ['Query', 'Values', ...(urlDriver ? ['Credentials'] : []), 'Extract', 'Assert', 'Outcomes', 'Variables', 'Settings', 'Hooks', 'Docs', 'Code', 'Responses', 'Used by']
     if (view.kind === 'grpc') return ['Message', 'Headers', 'Receive', 'Auth', 'Proto', 'Variables', 'Extract', 'Assert', 'Outcomes', 'Settings', 'Hooks', 'Schema', 'Docs', 'Code', 'Responses', 'Used by']
-    if (view.kind === 'async') {
-      const p = view.async?.block.Protocol
-      return ['Message', 'Headers', 'Receive', ...(view.async?.credentials.length ? ['Credentials'] : []), 'Binding', 'Variables', 'Extract', 'Assert', 'Outcomes', 'Settings', 'Hooks', 'Schema', 'Docs', 'Code', 'Responses', 'Used by'].filter(
-        (s) => !(s === 'Receive' && p === 'sns') && !(s === 'Message' && p === 'sse' && !view.async?.block.Send),
-      )
-    }
+    if (view.kind === 'async') return asyncSections(view)
     return httpSections
   })
   // The sections shown as tabs: what most sends need. The rest are under "More", in their usual order.
@@ -116,7 +113,7 @@
       : view.kind === 'grpc'
         ? ['Message', 'Headers', 'Receive', 'Auth', 'Extract', 'Assert']
         : view.kind === 'async'
-          ? ['Message', 'Headers', 'Receive', 'Credentials', 'Extract', 'Assert']
+          ? ['Message', 'Headers', 'Receive', 'Credentials', 'Auth', 'Extract', 'Assert']
           : ['Params', 'Headers', 'Body', 'Auth', 'Extract', 'Assert'],
   )
   const ICON_TAB_W = 37 // an icon tab and the gap after it
@@ -226,7 +223,7 @@
   let hooks = $state(kept.hooks)
   $effect(() => setNodeUi(node, { section: chosen, hooks, replay: replayOpen }))
 
-  const bodyKinds = ['none', 'text', 'form', 'file']
+  const bodyKinds = ['none', 'text', 'form', 'file', 'graphql']
   const formats = ['json', 'xml', 'yaml', 'raw']
   const authKinds: [string, string][] = [['none', 'None'], ['bearer', 'Bearer token'], ['basic', 'Basic'], ['other', 'Other']]
   const bodyText = $derived(v.Body.JSON || v.Body.Text)
@@ -257,7 +254,7 @@
     if (m !== CUSTOM) return RequestService.SetMethod(node, m).catch(fail)
     ui.prompt({ title: 'Custom method', label: 'Method name (case matters: PURGE is not Purge)', initial: '', done: (name) => RequestService.SetMethod(node, name.trim()).catch(fail) })
   }
-  const bodyKindOptions: DropOption[] = [['none', 'None'], ['text', 'Text'], ['form', 'Form'], ['file', 'File']].map(([value, label]) => ({ value, label }))
+  const bodyKindOptions: DropOption[] = [['none', 'None'], ['text', 'Text'], ['form', 'Form'], ['file', 'File'], ['graphql', 'GraphQL']].map(([value, label]) => ({ value, label }))
   const formatOptions: DropOption[] = formats.map((f) => ({ value: f, label: f.toUpperCase() }))
   const authOptions = $derived<DropOption[]>([...authKinds.map(([value, label]) => ({ value, label })), { value: 'use', label: 'Named authentication' }, ...view.auth.schemes.map((s) => ({ value: s.id, label: s.label }))])
   // The collection's named authentications, and the one in use even when it is gone, so the picker can say so.
@@ -519,7 +516,7 @@
   }
   function send() {
     const env = app.tree?.selected ?? ''
-    const shape = { kind: view.kind, method: view.current.Method, writes: !!view.dataset?.block.Writes }
+    const shape = { kind: view.kind, method: view.current.Method, writes: !!view.dataset?.block.Writes, graphql: view.graphql?.kind }
     if (sendNeedsConfirm(env, app.tree?.protected ?? [], shape)) {
       const what = view.kind === 'http' ? `${view.current.Method.toUpperCase()} ${view.fullUrl}` : view.name
       ui.confirm(`Send to ${env}?`, `${env} is a protected environment. This request changes data: ${what}`, dispatch, 'Send')
@@ -757,7 +754,7 @@
             <KVRows spans={(t) => RequestService.TemplateSpans(node, t) as unknown as Promise<any>} suggest={(t, c) => RequestService.Suggest(node, t, c) as unknown as Promise<any>} rows={sendHeaders ? (view.async?.block.Send?.Headers ?? null) : v.Headers} describe toggle={!sendHeaders} keyLabel="header" suggestKeys={view.kind === 'http' ? COMMON_HEADERS : []} valuesOf={headerValues} marks={sendHeaders ? {} : overlayMarks('header', v.Headers)} onchange={(r) => RequestService.SetRows(node, 'headers', r)}
               empty={{ icon: 'headers', title: `No ${headerWord(view.kind)}s`, hint: view.kind === 'grpc' ? 'Metadata travels with the call, the way headers do for HTTP. Credentials go in Auth.' : headersHint(view.async ? (sendHeaders ? 'send' : 'connect') : 'http'), add: `Add ${headerWord(view.kind)}` }} />
             {#if view.kind === 'http' && !view.async}
-              {@const implicit = implicitHeaders({ body: v.Body, headers: (v.Headers ?? []).filter((h) => !h.Disabled).map((h) => h.Key), hasAuth: ['bearer', 'basic', 'header'].includes(view.auth.kind) })}
+              {@const implicit = implicitHeaders({ body: v.Body, method: v.Method, subscription: view.graphql?.kind === 'subscription', headers: (v.Headers ?? []).filter((h) => !h.Disabled).map((h) => h.Key), hasAuth: ['bearer', 'basic', 'header'].includes(view.auth.kind) })}
               {#each implicit as h (h.name)}
                 <p class="muted implicit"><code>{h.name}: {h.value}</code> <span>Sent by Flowi, {h.source}. Add a header of the same name to replace it.</span></p>
               {/each}
@@ -777,6 +774,8 @@
                 empty={{ icon: 'list', title: 'No form fields', hint: 'Each field is sent as name=value.', add: 'Add field' }} />
             {:else if view.bodyKind === 'form'}
               <PartsEditor parts={view.parts} onchange={(p) => RequestService.SetParts(node, p as never)} />
+            {:else if view.bodyKind === 'graphql'}
+              <GraphQLBody {view} {node} />
             {:else if view.bodyKind === 'file'}
               <Field label="File path"><TextInput mono value={v.Body.File} ontext={(t) => RequestService.SetBodyFile(node, t)} /></Field>
             {:else}

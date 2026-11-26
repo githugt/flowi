@@ -83,6 +83,69 @@ func TestWorkspace_CreateGRPCRequest_should_create_through_the_backend_and_seed_
 	}
 }
 
+func TestWorkspace_CreateGraphQLRequest_should_create_through_the_backend_and_seed_the_hooks(t *testing.T) {
+	b := sampleBackend()
+	ws, w := loadedWorkspace(t, b)
+
+	ws.CreateGraphQLRequest("C1", "users/get", func(string) {}, func(err error) { t.Fatal(err) })
+	w.Wait()
+
+	if !b.Called("NewGraphQLRequest users/get") || !b.Called("SeedRequestHooks new") {
+		t.Fatalf("calls %v", b.CallLog())
+	}
+}
+
+// Before: made with no collection chosen (the + menu), a request was numbered against nothing, so a second one asked for
+// "untitled" again and the library refused it as already existing.
+func TestWorkspace_Create_Given_no_collection_Then_untitled_is_numbered_against_Scratch(t *testing.T) {
+	creates := map[string]struct {
+		create func(ws *vm.Workspace)
+		want   string
+	}{
+		"a GraphQL request": {func(ws *vm.Workspace) { ws.CreateGraphQLRequest("", "", nil, nil) }, "NewGraphQLRequest untitled-3"},
+		"a gRPC request":    {func(ws *vm.Workspace) { ws.CreateGRPCRequest("", "", nil, nil) }, "NewGRPCRequest untitled-3"},
+		"a message request": {func(ws *vm.Workspace) { ws.CreateAsyncRequest("", "", "ws", nil, nil) }, "NewAsyncRequest untitled-3 ws"},
+		"a dataset query":   {func(ws *vm.Workspace) { ws.CreateDatasetRequest("", "", "sqlite", nil, nil) }, "NewDatasetRequest untitled-3 sqlite"},
+	}
+	for name, tt := range creates {
+		t.Run(name, func(t *testing.T) {
+			scratch := model.Collection{Root: "/drafts/Scratch", Manifest: model.Manifest{Meta: model.Meta{ID: vmtest.ScratchID, Name: "Scratch"}},
+				Requests: []model.Request{{Meta: model.Meta{ID: "r1"}, Path: "untitled"}, {Meta: model.Meta{ID: "r2"}, Path: "untitled-2"}}}
+			b := &vmtest.Backend{Cols: []model.Collection{vmtest.SampleCollection(), scratch}, DraftIDs: map[model.ID]bool{vmtest.ScratchID: true}}
+			ws, w := loadedWorkspace(t, b)
+
+			tt.create(ws)
+			w.Wait()
+
+			if !b.Called(tt.want) {
+				t.Fatalf("calls %v, want %s", b.CallLog(), tt.want)
+			}
+		})
+	}
+}
+
+func TestWorkspace_Create_Given_no_collection_and_no_Scratch_yet_Then_the_name_is_untitled(t *testing.T) {
+	b := sampleBackend()
+	ws, w := loadedWorkspace(t, b)
+
+	ws.CreateGRPCRequest("", "", nil, nil)
+	w.Wait()
+
+	if !b.Called("NewGRPCRequest untitled") {
+		t.Fatalf("calls %v", b.CallLog())
+	}
+}
+
+func TestMenuFor_should_offer_a_new_graphql_request_where_it_offers_a_new_grpc_one(t *testing.T) {
+	ws, _, _ := shopWorkspace(t)
+
+	for _, id := range []string{"c:C1", "c:C1/requests/auth"} {
+		if got := actionsOf(ws.MenuFor([]string{id})); !slices.Contains(got, vm.ActNewGraphQLRequest) {
+			t.Errorf("%s menu %v lacks a new GraphQL request", id, got)
+		}
+	}
+}
+
 func TestMenuFor_should_offer_a_new_grpc_request_where_it_offers_a_new_async_one(t *testing.T) {
 	ws, _, _ := shopWorkspace(t)
 

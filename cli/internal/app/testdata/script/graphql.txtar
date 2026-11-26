@@ -1,0 +1,177 @@
+# A GraphQL request is sent and run with no extra flags, like any other request.
+# Before: GraphQL was only a JSON body, so a query that failed with status 200 passed.
+server-url shop/environments/local.yaml
+exec flowi workspace mount ./shop
+
+# A query goes out as a POST with the operation name and variables; the answer is the response of any request.
+exec flowi send gql/me --env local
+stderr 'POST .*/graphql → 200'
+stdout '"operationName": "Me"'
+stdout '"id": 7'
+
+# A query can also be sent with GET.
+exec flowi send gql/me-get --env local
+stderr 'GET .*/graphql\?query='
+stdout '"operationName": "Me"'
+
+# A response with an errors list fails the step even though the status is 200: exit 1.
+! exec flowi send gql/broken --env local
+stderr '→ 200'
+stderr 'FLW-RUN-030'
+stderr 'Cannot query field "broken"'
+
+# A mutation cannot be sent with GET.
+! exec flowi send gql/bad-get --env local
+stderr 'FLW-GQL-001'
+stderr 'cannot be sent with GET'
+
+# A subscription is sent over a WebSocket and prints its events, with no extra flags.
+# Before: a subscription was refused.
+exec flowi send gql/ticks --env local
+stdout '"tick":3'
+stdout '"operationName":"Ticks"'
+
+# An event with errors fails the step, as a response with errors does.
+! exec flowi send gql/ticks-broken --env local
+stderr 'FLW-RUN-030'
+
+# A server that refuses the connection says why.
+! exec flowi send gql/ticks-denied --env local
+stderr 'FLW-GQL-002'
+stderr '4401'
+
+# In a flow it is a request step like any other, and a failing one fails the run.
+exec flowi run gql-ok --env local
+stdout '^✓ me '
+stdout '^✓ passed '
+! exec flowi run gql-broken --env local
+stdout '^✗ broken '
+
+-- shop/flowi.yaml --
+format: 1
+id: 01JA00000000000000000000G1
+name: Shop
+-- shop/environments/local.yaml --
+id: 01JA00000000000000000000G2
+vars:
+  base_url: SERVER_URL
+-- shop/requests/gql/me.req.yaml --
+id: 01JA00000000000000000000G3
+name: Me
+versions:
+  "1":
+    method: POST
+    url: "{{env.base_url}}/graphql"
+    body:
+      graphql:
+        query: |
+          query Me($id: Int!) { user(id: $id) { name } }
+        variables: '{"id": 7}'
+        operation: Me
+-- shop/requests/gql/me-get.req.yaml --
+id: 01JA00000000000000000000G4
+name: Me with GET
+versions:
+  "1":
+    method: GET
+    url: "{{env.base_url}}/graphql"
+    body:
+      graphql:
+        query: "query Me { user { name } }"
+        operation: Me
+-- shop/requests/gql/broken.req.yaml --
+id: 01JA00000000000000000000G5
+name: Broken
+versions:
+  "1":
+    url: "{{env.base_url}}/graphql"
+    body:
+      graphql:
+        query: "{ broken }"
+-- shop/requests/gql/bad-get.req.yaml --
+id: 01JA00000000000000000000G6
+name: Bad GET
+versions:
+  "1":
+    method: GET
+    url: "{{env.base_url}}/graphql"
+    body:
+      graphql:
+        query: "mutation { like(id: 1) }"
+-- shop/requests/gql/ticks.req.yaml --
+id: 01JA00000000000000000000G9
+name: Ticks
+versions:
+  "1":
+    url: "{{env.base_url}}/graphql"
+    body:
+      graphql:
+        query: "subscription Ticks { tick }"
+        operation: Ticks
+        receive:
+          count: 3
+          timeout: 5s
+-- shop/requests/gql/ticks-broken.req.yaml --
+id: 01JA00000000000000000000GA
+name: Broken ticks
+versions:
+  "1":
+    url: "{{env.base_url}}/graphql"
+    body:
+      graphql:
+        query: "subscription { broken }"
+-- shop/requests/gql/ticks-denied.req.yaml --
+id: 01JA00000000000000000000GB
+name: Denied ticks
+versions:
+  "1":
+    url: "{{env.base_url}}/graphql"
+    body:
+      graphql:
+        query: "subscription { denied }"
+-- shop/flows/gql-ok.arazzo.yaml --
+arazzo: 1.1.0
+info:
+  title: GraphQL
+  version: 1.0.0
+sourceDescriptions:
+  - name: flowi
+    url: ../descriptions/requests.openapi.yaml
+    type: openapi
+workflows:
+  - workflowId: gql-ok
+    steps:
+      - stepId: me
+        operationId: $sourceDescriptions.flowi.gql_me
+    x-flowi-flow:
+      id: 01JA00000000000000000000G7
+      name: gql-ok
+      nodes:
+        - id: me
+          type: request
+          request:
+            id: 01JA00000000000000000000G3
+            path: gql/me
+-- shop/flows/gql-broken.arazzo.yaml --
+arazzo: 1.1.0
+info:
+  title: GraphQL
+  version: 1.0.0
+sourceDescriptions:
+  - name: flowi
+    url: ../descriptions/requests.openapi.yaml
+    type: openapi
+workflows:
+  - workflowId: gql-broken
+    steps:
+      - stepId: broken
+        operationId: $sourceDescriptions.flowi.gql_broken
+    x-flowi-flow:
+      id: 01JA00000000000000000000G8
+      name: gql-broken
+      nodes:
+        - id: broken
+          type: request
+          request:
+            id: 01JA00000000000000000000G5
+            path: gql/broken

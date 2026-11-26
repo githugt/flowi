@@ -79,7 +79,7 @@ func applyOne(v *model.RequestVersion, op model.OverlayOp) []Problem {
 func notUsed(v model.RequestVersion, field string) string {
 	switch field {
 	case "method", "url", "query", "body":
-		if v.Family() != model.FamilyHTTP {
+		if !v.Family().OverHTTP() {
 			return "this kind of request does not use " + field
 		}
 	}
@@ -282,7 +282,7 @@ func applyBody(v *model.RequestVersion, op model.OverlayOp, kind string) (string
 	case kind == "json" && op.Verb == model.OverlayMerge:
 		return mergeJSONBody(v, op.Value)
 	case kind == "text" && op.Verb == model.OverlaySet:
-		if v.Body.JSON != "" || v.Body.File != "" || len(v.Body.Form) > 0 || len(v.Body.Multipart) > 0 {
+		if v.Body.JSON != "" || v.Body.File != "" || len(v.Body.Form) > 0 || len(v.Body.Multipart) > 0 || v.Body.GraphQL != nil {
 			return "the version's body is not plain text", ""
 		}
 		v.Body.Text = text(op.Value)
@@ -295,7 +295,7 @@ func applyBody(v *model.RequestVersion, op model.OverlayOp, kind string) (string
 // Only a JSON object can be patched; any other body is a problem, because
 // replacing it whole would be a different kind of change.
 func mergeJSONBody(v *model.RequestVersion, patch any) (string, string) {
-	if v.Body.Text != "" || v.Body.File != "" || len(v.Body.Form) > 0 || len(v.Body.Multipart) > 0 {
+	if v.Body.Text != "" || v.Body.File != "" || len(v.Body.Form) > 0 || len(v.Body.Multipart) > 0 || v.Body.GraphQL != nil {
 		return "the version's body is not JSON", ""
 	}
 	var base any = map[string]any{}

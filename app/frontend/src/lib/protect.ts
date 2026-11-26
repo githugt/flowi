@@ -5,12 +5,20 @@ export interface SendShape {
   kind: string // http, async, grpc or dataset
   method?: string // an HTTP request's method
   writes?: boolean // a dataset query that may change data
+  /** A GraphQL body: the kind of operation that runs ('' when it cannot be told). Undefined for any other body. */
+  graphql?: string
 }
 
-/** Whether sending a request changes data: any HTTP method but GET, HEAD and OPTIONS; any message or gRPC call; a query allowed to write. */
+/** Whether sending a request changes data: any HTTP method but GET, HEAD and OPTIONS (a GraphQL query is not one, whatever its method); any message or gRPC call; a query allowed to write. */
 export function sendWrites(r: SendShape): boolean {
   switch (r.kind) {
     case 'http':
+      // A GraphQL query goes out with POST and still only reads; a mutation, or a document that cannot be told apart, writes.
+      if (r.graphql !== undefined) {
+        const method = (r.method ?? 'POST').toUpperCase()
+        if (method !== 'POST' && method !== 'GET') return true
+        return r.graphql !== 'query' && r.graphql !== 'subscription'
+      }
       return !SAFE.has((r.method ?? 'GET').toUpperCase())
     case 'dataset':
       return !!r.writes

@@ -23,6 +23,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/coder/websocket"
 )
 
 // ClientID is what GET /v1/config returns and POST /v1/verify requires
@@ -220,6 +222,8 @@ func addHelpers(mux *http.ServeMux) {
 		_ = zw.Close()
 	})
 	mux.HandleFunc("/echo", echo)
+	mux.HandleFunc("POST /graphql", graphQL)
+	mux.HandleFunc("GET /graphql", graphQL)
 	mux.HandleFunc("GET /slow", func(w http.ResponseWriter, r *http.Request) {
 		select {
 		case <-r.Context().Done():
@@ -261,4 +265,94 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	_ = json.NewEncoder(w).Encode(v) // the client went away; nothing to do
+}
+
+// graphQL answers a GraphQL operation sent with POST (JSON body) or GET (query string): it echoes the query, the
+// operation name and the variables as data, and answers a query that mentions "broken" with status 200 and an
+// errors list, as a real GraphQL server does for a query it cannot run.
+func graphQL(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodGet && strings.EqualFold(r.Header.Get("Upgrade"), "websocket") {
+		graphQLSubscription(w, r)
+		return
+	}
+	var req struct {
+		Query         string          `json:"query"`
+		OperationName string          `json:"operationName"`
+		Variables     json.RawMessage `json:"variables"`
+	}
+	if r.Method == http.MethodGet {
+		q := r.URL.Query()
+		req.Query, req.OperationName, req.Variables = q.Get("query"), q.Get("operationName"), json.RawMessage(q.Get("variables"))
+	} else if err := json.NewDecoder(io.LimitReader(r.Body, 1<<20)).Decode(&req); err != nil {
+		http.Error(w, "the body is not a GraphQL request", http.StatusBadRequest)
+		return
+	}
+	reply := func(v any) {
+		w.Header().Set("Content-Type", "application/graphql-response+json") // the media type of GraphQL over HTTP
+		_ = json.NewEncoder(w).Encode(v)                                    // the client went away; nothing to do
+	}
+	if strings.Contains(req.Query, "broken") {
+		reply(map[string]any{"errors": []any{map[string]any{"message": `Cannot query field "broken" on type "Query".`}}})
+		return
+	}
+	var vars any
+	if len(req.Variables) > 0 {
+		_ = json.Unmarshal(req.Variables, &vars) // variables that are not JSON echo as null
+	}
+	reply(map[string]any{"data": map[string]any{"echo": map[string]any{"query": req.Query, "operationName": req.OperationName, "variables": vars}}})
+}
+
+// graphQLSubscription speaks graphql-transport-ws on the /graphql endpoint: after the handshake it answers a
+// subscribe message with three events (the echo of the operation and a counter) and completes. A query that holds
+// "broken" gets an event with errors, and one that holds "denied" closes the connection with 4401.
+func graphQLSubscription(w http.ResponseWriter, r *http.Request) {
+	c, err := websocket.Accept(w, r, &websocket.AcceptOptions{Subprotocols: []string{"graphql-transport-ws"}})
+	if err != nil {
+		return // Accept has already answered
+	}
+	defer func() { _ = c.CloseNow() }()
+	ctx := r.Context()
+	read := func() (frame struct {
+		ID      string          `json:"id"`
+		Type    string          `json:"type"`
+		Payload json.RawMessage `json:"payload"`
+	}, ok bool) {
+		_, data, err := c.Read(ctx)
+		return frame, err == nil && json.Unmarshal(data, &frame) == nil
+	}
+	write := func(v any) {
+		data, _ := json.Marshal(v)                    // the values are maps and strings
+		_ = c.Write(ctx, websocket.MessageText, data) // the client went away; the next read ends the handler
+	}
+	if f, ok := read(); !ok || f.Type != "connection_init" {
+		return
+	}
+	write(map[string]any{"type": "connection_ack"})
+	f, ok := read()
+	if !ok || f.Type != "subscribe" {
+		return
+	}
+	var req struct {
+		Query         string          `json:"query"`
+		OperationName string          `json:"operationName"`
+		Variables     json.RawMessage `json:"variables"`
+	}
+	_ = json.Unmarshal(f.Payload, &req) // a payload that is not a request echoes as empty
+	next := func(payload any) { write(map[string]any{"id": f.ID, "type": "next", "payload": payload}) }
+	switch {
+	case strings.Contains(req.Query, "denied"):
+		_ = c.Close(4401, "denied by the demo server")
+		return
+	case strings.Contains(req.Query, "broken"):
+		next(map[string]any{"errors": []any{map[string]any{"message": `Cannot subscribe to field "broken" on type "Subscription".`}}})
+	default:
+		var vars any
+		if len(req.Variables) > 0 {
+			_ = json.Unmarshal(req.Variables, &vars)
+		}
+		for i := 1; i <= 3; i++ {
+			next(map[string]any{"data": map[string]any{"tick": i, "echo": map[string]any{"query": req.Query, "operationName": req.OperationName, "variables": vars}}})
+		}
+	}
+	write(map[string]any{"id": f.ID, "type": "complete"})
 }

@@ -112,8 +112,13 @@ func build(in buildInput) (built, diag.List) {
 		shown = append(shown, Header{Name: "Content-Type", Value: sentBody.ContentType})
 	}
 	shown = b.addDefaultHeaders(header, shown)
-	req := httpx.Request{Method: in.version.Method, URL: requestURL, Header: header, Body: body}
-	sent := SentRequest{Method: in.version.Method, URL: shownURL, Header: shown, Body: sentBody}
+	shown = b.addGraphQLHeaders(header, shown)
+	method := in.version.Method
+	if method == "" && in.version.Body.GraphQL != nil {
+		method = http.MethodPost // a GraphQL operation travels in a POST unless the version says GET
+	}
+	req := httpx.Request{Method: method, URL: requestURL, Header: header, Body: body}
+	sent := SentRequest{Method: method, URL: shownURL, Header: shown, Body: sentBody}
 	return built{request: req, sent: sent, tainted: b.tainted, bodyText: b.bodyText, missingSecrets: b.missingSecrets, parts: b.parts, auth: b.auth()}, b.diags
 }
 
@@ -217,10 +222,22 @@ func (b *builder) url() (string, string) {
 		sendable = append(sendable, pair+url.QueryEscape(value))
 		shown = append(shown, pair+maskIf(b.tainted[key], url.QueryEscape(value)))
 	}
+	for _, pair := range b.graphQLQuery() {
+		sendable = append(sendable, pair)
+		shown = append(shown, maskGraphQLPair(pair, b.tainted["graphql variables"]))
+	}
 	if b.tainted["url"] {
 		return joinQuery(base, sendable), vault.Mask
 	}
 	return joinQuery(base, sendable), joinQuery(base, shown)
+}
+
+// maskGraphQLPair hides the value of a GraphQL GET's variables when they read a secret.
+func maskGraphQLPair(pair string, tainted bool) string {
+	if tainted && strings.HasPrefix(pair, "variables=") {
+		return "variables=" + vault.Mask
+	}
+	return pair
 }
 
 func (b *builder) queryDesc(k string) string { return "query parameter " + k }
@@ -310,6 +327,8 @@ func (b *builder) validHeader(name, value string) bool {
 func (b *builder) body() (httpx.BodySource, *Body) {
 	body := b.in.version.Body
 	switch {
+	case body.GraphQL != nil:
+		return b.graphQLBody()
 	case body.JSON != "":
 		return b.jsonBody(body.JSON)
 	case body.Text != "":

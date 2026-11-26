@@ -51,6 +51,7 @@ func TestWorkspaceService_NewAt_should_create_in_the_place_the_row_stands_for(t 
 		{name: "a request in a folder, unnamed", kind: "request", place: "Shop / auth", wantCall: "NewRequest auth/untitled"},
 		{name: "a request at the top of a collection", kind: "request", place: "Billing", text: "ping", wantCall: "NewRequest ping"},
 		{name: "a message request", kind: "async", place: "Billing", text: "orders", protocol: "mqtt", wantCall: "NewAsyncRequest orders mqtt"},
+		{name: "a GraphQL request", kind: "graphql", place: "Billing", text: "get-user", wantCall: "NewGraphQLRequest get-user"},
 		{name: "a gRPC request", kind: "grpc", place: "Billing", text: "get", wantCall: "NewGRPCRequest get"},
 		{name: "a dataset query", kind: "dataset", place: "Billing", text: "customers", protocol: "sqlite", wantCall: "NewDatasetRequest customers sqlite"},
 		{name: "a flow in a folder", kind: "flow", place: "Billing", text: "journeys/signup", wantCall: "NewFlow journeys/signup"},
@@ -132,7 +133,7 @@ func placeRow(t *testing.T, app *App, label string) string {
 
 // Before: a scheme added to the library without a label here showed as a blank entry in the Auth picker.
 func TestAuthSchemeChoices_should_label_every_scheme_the_library_has(t *testing.T) {
-	got := authSchemeChoices()
+	got := authSchemeChoices(nil)
 
 	if len(got) != len(model.AuthTypes()) {
 		t.Fatalf("%d choices for %d schemes", len(got), len(model.AuthTypes()))

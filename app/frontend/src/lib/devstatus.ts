@@ -37,7 +37,7 @@ export interface FilterContext {
 }
 
 /** The names `type:` takes, by the id the type has in Go: what people type ("async") next to what the files call it. */
-const TYPE_ALIASES: Record<string, string> = { http: 'http', grpc: 'grpc', async: 'message', message: 'message', db: 'db', sql: 'db', database: 'db', file: 'file', csv: 'file', flow: 'flow' }
+const TYPE_ALIASES: Record<string, string> = { http: 'http', graphql: 'graphql', gql: 'graphql', grpc: 'grpc', async: 'message', message: 'message', db: 'db', sql: 'db', database: 'db', file: 'file', csv: 'file', flow: 'flow' }
 
 /** What `type:` is typed as for a type id. */
 export const typeTerm = (id: string): string => (id === 'message' ? 'async' : id)

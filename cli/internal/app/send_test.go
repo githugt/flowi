@@ -255,3 +255,42 @@ versions:
 		t.Fatalf("send mute: code %d\nstderr: %s", timeoutCode, timeoutErr)
 	}
 }
+
+// Before: a WebSocket request had no auth block (validation refused it), so `flowi send` could only authenticate with
+// a header typed into the file.
+func TestSend_async_request_with_an_auth_block(t *testing.T) {
+	// Arrange
+	e := newSendEnv(t)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		c, err := websocket.Accept(w, r, nil)
+		if err != nil {
+			return
+		}
+		defer func() { _ = c.CloseNow() }()
+		_ = c.Write(r.Context(), websocket.MessageText, []byte("key:"+r.Header.Get("X-Key")+" token:"+r.URL.Query().Get("token")))
+	}))
+	t.Cleanup(srv.Close)
+	writeFile(t, filepath.Join(e.dir, "tools", "requests", "stream.req.yaml"), `id: 01JA00000000000000000000T6
+name: Stream
+versions:
+  "1":
+    async:
+      protocol: ws
+      server: ws`+strings.TrimPrefix(srv.URL, "http")+`
+      receive:
+        timeout: 5s
+    auth:
+      type: apikey
+      name: X-Key
+      value: '{{key}}'
+`)
+
+	// Act
+	code, out, errOut := e.run(t.Context(), "send", "stream", "--with", "key=abc")
+
+	// Assert
+	// The server echoed the header it received: the key reached the handshake, and the output shows it masked.
+	if code != 0 || !strings.HasPrefix(out, "key:•") || strings.Contains(out+errOut, "abc") {
+		t.Fatalf("send stream: code %d\nstdout: %q\nstderr: %s", code, out, errOut)
+	}
+}

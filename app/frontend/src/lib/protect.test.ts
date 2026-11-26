@@ -6,6 +6,13 @@ describe('sendWrites', () => {
     for (const m of ['GET', 'head', 'Options']) expect(sendWrites({ kind: 'http', method: m }), m).toBe(false)
     for (const m of ['POST', 'put', 'PATCH', 'DELETE']) expect(sendWrites({ kind: 'http', method: m }), m).toBe(true)
   })
+  it('treats a GraphQL query as a read even though it is a POST, and a mutation as a write', () => {
+    expect(sendWrites({ kind: 'http', method: 'POST', graphql: 'query' })).toBe(false)
+    expect(sendWrites({ kind: 'http', method: 'POST', graphql: 'subscription' })).toBe(false)
+    expect(sendWrites({ kind: 'http', method: 'POST', graphql: 'mutation' })).toBe(true)
+    expect(sendWrites({ kind: 'http', method: 'POST', graphql: '' }), 'a document that cannot be told apart').toBe(true)
+    expect(sendWrites({ kind: 'http', method: 'PUT', graphql: 'query' }), 'a method GraphQL does not use').toBe(true)
+  })
   it('treats messages and gRPC calls as writes, and a query only when it may write', () => {
     expect(sendWrites({ kind: 'async' })).toBe(true)
     expect(sendWrites({ kind: 'grpc' })).toBe(true)

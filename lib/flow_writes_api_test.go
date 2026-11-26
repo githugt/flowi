@@ -100,3 +100,30 @@ func TestFlowWrites_should_count_messages_sent_calls_and_writing_queries_but_not
 		t.Errorf("an unknown request was counted")
 	}
 }
+
+// Before: every GraphQL request is sent with POST, so a flow of plain queries was listed as writing data.
+func TestRequestWrites_should_tell_a_graphql_mutation_from_a_query(t *testing.T) {
+	cases := []struct {
+		name, query string
+		want        string
+	}{
+		{"query", `query Q { me { id } }`, ""},
+		{"shorthand query", `{ me { id } }`, ""},
+		{"mutation", `mutation M { like(id: 1) }`, "GraphQL mutation"},
+		{"a document that cannot be read", `fragment F on T { a }`, "GraphQL mutation"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			r := model.Request{Path: "g", Default: "1", Versions: []model.RequestVersion{{
+				Label: "1", Method: "POST", URL: "http://x/graphql", Body: model.Body{GraphQL: &model.GraphQL{Query: tc.query}},
+			}}}
+			c := model.Collection{Requests: []model.Request{r}}
+
+			got, writes := requestWrites([]model.Collection{c}, c, model.Flow{}, &model.RequestCall{Request: model.Ref{Path: "g"}})
+
+			if got != tc.want || writes != (tc.want != "") {
+				t.Errorf("requestWrites = %q, %v; want %q", got, writes, tc.want)
+			}
+		})
+	}
+}

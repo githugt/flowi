@@ -1,4 +1,4 @@
-const KNOWN_VERBS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'QUERY', 'WS', 'SSE', 'MQTT', 'KAFKA', 'AMQP', 'NATS', 'GRPC', 'SQL', 'REDIS', 'SQS', 'SNS', 'BUS', 'PUBSUB', 'FLOW', 'POSTGRES', 'MYSQL', 'MARIADB', 'SQLITE', 'CSV', 'XLSX', 'PARQUET']
+const KNOWN_VERBS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'QUERY', 'GQL', 'WS', 'SSE', 'MQTT', 'KAFKA', 'AMQP', 'NATS', 'GRPC', 'SQL', 'REDIS', 'SQS', 'SNS', 'BUS', 'PUBSUB', 'FLOW', 'POSTGRES', 'MYSQL', 'MARIADB', 'SQLITE', 'CSV', 'XLSX', 'PARQUET']
 
 /** The colour name of a verb (GET, MQTT, POSTGRES …): the suffix of its --v-* token. Databases and file stores have their own; others OTHER. */
 export function verbKey(verb: string): string {

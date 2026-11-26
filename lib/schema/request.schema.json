@@ -372,6 +372,28 @@
             "array"
           ],
           "description": "Parts by name; a list of one-entry mappings when a name repeats."
+        },
+        "graphql": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "A GraphQL operation: sent as the JSON body {query, variables, operationName} (a GET sends them in the URL).",
+          "properties": {
+            "query": {
+              "type": "string",
+              "description": "The GraphQL document, sent as written (no {{ templates: use variables)."
+            },
+            "variables": {
+              "type": "string",
+              "description": "A JSON object as text; templated."
+            },
+            "operation": {
+              "type": "string",
+              "description": "The operation to run when the document has several."
+            },
+            "receive": {
+              "$ref": "#/$defs/receive"
+            }
+          }
         }
       }
     },

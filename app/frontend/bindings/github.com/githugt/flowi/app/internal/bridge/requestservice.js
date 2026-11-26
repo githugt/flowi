@@ -819,7 +819,7 @@ export function SetBodyFormat(node, format) {
 }
 
 /**
- * SetBodyKind chooses none, text, form or file.
+ * SetBodyKind chooses none, text, form, file or graphql.
  * @param {string} node
  * @param {string} kind
  * @returns {$CancellablePromise<void>}
@@ -917,6 +917,27 @@ export function SetFormat(node, format) {
  */
 export function SetGRPC(node, g) {
     return $Call.ByID(3181546842, node, g);
+}
+
+/**
+ * SetGraphQL changes one part of a GraphQL body: field is query, variables or operation.
+ * @param {string} node
+ * @param {string} field
+ * @param {string} text
+ * @returns {$CancellablePromise<void>}
+ */
+export function SetGraphQL(node, field, text) {
+    return $Call.ByID(1039756159, node, field, text);
+}
+
+/**
+ * SetGraphQLReceive sets what a subscription waits for; nil goes back to the default (the first event).
+ * @param {string} node
+ * @param {model$0.AsyncReceive | null} receive
+ * @returns {$CancellablePromise<void>}
+ */
+export function SetGraphQLReceive(node, receive) {
+    return $Call.ByID(1948911028, node, receive);
 }
 
 /**

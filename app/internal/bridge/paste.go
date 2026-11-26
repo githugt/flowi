@@ -58,7 +58,7 @@ func (s *RequestService) FillFromPaste(node, kind, text string) (int, error) {
 	}
 	s.with(node, func(o *openRequest) {
 		cur := o.req.Current()
-		if cur.Family() != model.FamilyHTTP {
+		if !cur.Family().OverHTTP() {
 			err = ErrPasteNotHTTP
 			return
 		}

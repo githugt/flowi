@@ -153,7 +153,7 @@ func TestPageOf_Given_spec_findings_When_built_Then_only_this_collections_are_li
 	at := func(file string, code diag.Code, sev diag.Severity) diag.Diagnostic {
 		return diag.Diagnostic{Code: code, Severity: sev, Location: diag.Location{File: file, Path: "$.info"}, Args: map[string]string{"spec": "pets", "where": "GET /pets"}}
 	}
-	in.Problems = diag.List{
+	in.SpecFindings = diag.List{
 		at("/work/pets/descriptions/pets.openapi.yaml", diag.CodeSpecInfo, diag.SeverityWarning),
 		at("/work/pets/descriptions/pets.openapi.yaml", diag.CodeSpecSummary, diag.SeverityError),
 		at("/work/other/descriptions/x.openapi.yaml", diag.CodeSpecInfo, diag.SeverityWarning),
@@ -170,11 +170,33 @@ func TestPageOf_Given_spec_findings_When_built_Then_only_this_collections_are_li
 	}
 }
 
+func TestPageOf_Given_notes_among_the_findings_When_built_Then_they_come_last_and_are_not_problems(t *testing.T) {
+	// Before: a missing tag was a warning, so it counted on the State tab and in the Problems panel.
+	in := pageFixture()
+	in.Collection.Root = "/work/pets"
+	at := func(code diag.Code, sev diag.Severity) diag.Diagnostic {
+		return diag.Diagnostic{Code: code, Severity: sev, Location: diag.Location{File: "/work/pets/descriptions/pets.openapi.yaml", Path: "$.info"}, Args: map[string]string{"spec": "pets", "where": "GET /pets"}}
+	}
+	in.SpecFindings = diag.List{
+		at(diag.CodeSpecTags, diag.SeverityNote),
+		at(diag.CodeSpecInfo, diag.SeverityWarning),
+	}
+
+	st := pageOf(in).State
+
+	if st.SpecTotal != 1 || st.SpecNotes != 1 || st.SpecErrors != 0 || len(st.Spec) != 2 {
+		t.Fatalf("total %d notes %d errors %d list %+v", st.SpecTotal, st.SpecNotes, st.SpecErrors, st.Spec)
+	}
+	if st.Spec[0].Severity != "warning" || st.Spec[1].Severity != "note" {
+		t.Errorf("order %q then %q, want the warning first and the note last", st.Spec[0].Severity, st.Spec[1].Severity)
+	}
+}
+
 func TestPageOf_Given_more_spec_findings_than_the_page_lists_When_built_Then_the_rest_are_counted(t *testing.T) {
 	in := pageFixture()
 	in.Collection.Root = "/work/pets"
 	for i := 0; i < maxSpecFindings+5; i++ {
-		in.Problems = append(in.Problems, diag.Diagnostic{Code: diag.CodeSpecTags, Severity: diag.SeverityWarning, Location: diag.Location{File: "/work/pets/descriptions/a.openapi.yaml"}, Args: map[string]string{"spec": "a", "where": "GET /"}})
+		in.SpecFindings = append(in.SpecFindings, diag.Diagnostic{Code: diag.CodeSpecTags, Severity: diag.SeverityWarning, Location: diag.Location{File: "/work/pets/descriptions/a.openapi.yaml"}, Args: map[string]string{"spec": "a", "where": "GET /"}})
 	}
 
 	st := pageOf(in).State

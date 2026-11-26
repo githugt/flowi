@@ -229,6 +229,27 @@ func TestDeleteFolder_should_remove_the_folder_and_everything_in_it(t *testing.T
 	}
 }
 
+func TestNewFolder_Given_the_same_name_in_requests_and_flows_Then_both_exist_and_deleting_one_keeps_the_other(t *testing.T) {
+	// Before: nothing said that "requests/billing" and "flows/billing" are separate folders.
+	w := demoWorkspace(t)
+	c := w.Collections()[0]
+	has := func(dir string) bool {
+		return slices.ContainsFunc(w.Collections()[0].Folders, func(f model.Folder) bool { return f.Dir == dir })
+	}
+
+	inRequests := w.NewFolder(c.Manifest.ID, "requests", "billing")
+	inFlows := w.NewFolder(c.Manifest.ID, "flows", "billing")
+	bothMade := has("requests/billing") && has("flows/billing")
+	deleted := w.DeleteFolder(c.Manifest.ID, "requests", "billing")
+
+	if inRequests != nil || inFlows != nil || !bothMade {
+		t.Fatalf("requests %v flows %v folders %+v", inRequests, inFlows, w.Collections()[0].Folders)
+	}
+	if deleted != nil || has("requests/billing") || !has("flows/billing") {
+		t.Fatalf("delete %v folders %+v, want only flows/billing left", deleted, w.Collections()[0].Folders)
+	}
+}
+
 func requestIDAt(t *testing.T, w *Workspace, ref string) model.ID {
 	t.Helper()
 	target, err := w.FindRequest(ref, "")
