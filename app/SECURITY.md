@@ -2,7 +2,7 @@
 
 ## Supported versions
 
-Flowi is pre-alpha. Security fixes are made on the latest minor release only.
+Security fixes are made on the latest minor release only.
 
 ## Reporting a vulnerability
 

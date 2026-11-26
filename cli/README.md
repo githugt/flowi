@@ -3,8 +3,6 @@
 `flowi`, the command-line tool of **Flowi**: send saved API requests, run flows in CI, import and
 export API descriptions, and serve a fake API from your saved responses.
 
-> Status: **pre-alpha**. Commands and the file format will change.
-
 ## Why a command line
 
 The [desktop app](https://github.com/githugt/flowi) is where you build requests and flows. The CLI runs
