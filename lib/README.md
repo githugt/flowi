@@ -25,7 +25,7 @@ fill in a form, check the result. Flowi keeps a library of **requests** and chai
 | Area | Packages | What it does |
 |---|---|---|
 | Model and storage | `model`, `store`, `workspace`, `validate`, `schema` | Collections, requests, flows and environments as YAML; validation with positioned diagnostics (`FLW-…` codes); JSON Schemas for editors |
-| Requests | `engine`, `template`, `transport`, `grpcx`, `snippet` | HTTP, gRPC and message requests (Kafka, MQTT, AMQP, NATS, Redis, SQS, SNS, Pub/Sub, Service Bus, WebSocket, SSE); `{{templates}}` and generators; cookies, retries, HTTP/3; code snippets (curl and more) |
+| Requests | `engine`, `template`, `transport`, `grpcx`, `graphqlx`, `snippet` | HTTP, GraphQL (query, mutation and subscription; POST or GET; with variables), gRPC and message requests (Kafka, MQTT, AMQP, NATS, Redis, SQS, SNS, Pub/Sub, Service Bus, WebSocket, SSE); `{{templates}}` and generators; cookies, retries, HTTP/3; code snippets (curl and more) |
 | Flows | `engine`, `blueprint`, `analysis` | Flow runtime with 20+ node types (extract, assert, condition, batch, parallel, run_till, subflow, …); reports (JUnit, JSON, Markdown); templates; impact analysis |
 | Secrets | `vault` | Encrypted vault with the key in the OS keychain; secrets are masked everywhere |
 | Interop | `openapi`, `asyncapi`, `arazzo`, `importers/*`, `mermaid`, `specoverlay` | Import and export, with a per-item report; nothing is guessed |
