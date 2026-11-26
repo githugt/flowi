@@ -1,157 +1,163 @@
 # Flowi
 
-**A fast desktop app for testing APIs of every kind, and for chaining the calls into flows.** HTTP, gRPC, message
-brokers, databases and plain data files all use the same editor, the same checks and the same flows. Your work is
-plain files in your own git repository, and secrets stay in an encrypted vault on your machine.
+**Test your whole backend from one fast desktop app.** Send HTTP, GraphQL, gRPC, queue and broker messages, database queries and
+file queries from the same editor, then chain them into flows that run unchanged in CI. Everything is plain YAML in
+your own git repository, and secrets never leave your machine.
 
 ![Successful requests: HTTP, gRPC, SQS, NATS, PostgreSQL and a CSV file](app/docs/images/collage.png)
 
-## Why Flowi exists
+## What you can send
 
-Flowi started as an itch. The author kept running into the limits of the usual API tools:
+| HTTP | GraphQL | gRPC | Messaging | Databases | Data files |
+|---|---|---|---|---|---|
+| GET | Query | Unary | WebSocket | PostgreSQL | CSV |
+| POST | Mutation | Server streaming | Server-Sent Events | MySQL | XLSX |
+| PUT | Subscription | gRPC-Web | MQTT | MariaDB | Parquet |
+| PATCH | Variables | | Kafka | SQLite | Folder of files |
+| DELETE | Named operations | | AMQP 0-9-1 | | |
+| HEAD | POST or GET | | AMQP 1.0 | | |
+| OPTIONS | | | NATS | | |
+| QUERY | | | Redis | | |
+| Custom method | | | Amazon SQS | | |
+| | | | Amazon SNS | | |
+| | | | Azure Service Bus | | |
+| | | | Google Pub/Sub | | |
 
-- **Real checks go past HTTP.** Most of the author's own checks involved more than a request and a response: publish
-  an event and wait for the message it causes, look in the database to see what an API wrote, read a queue, call a
-  gRPC service. Tools built around the HTTP request make each of these a workaround.
-- **Full-cycle flows were too spread out.** Running a whole journey (log in, create something, wait for the event,
-  check the row, clean up) meant stitching scripts, collections and CI jobs together. Here it is one picture that runs
-  with one click, and the same file runs unchanged in CI.
-- **The UI should not feel sluggish.** Popular alternatives are Electron apps and often feel slow, especially with big
-  collections. Flowi's core is Go, and the window shows its screens in the system's own web view instead of bundling a
-  browser.
-- **Git should stay yours, and secrets should stay out of it.** Everything is plain YAML in a normal repository, so
-  branches, reviews and merges work the way they do for code. Flowi adds the checks that keep a password or a token from
-  being pushed by mistake.
-- **The OpenAPI ecosystem has moved on.** There are now overlays, Arazzo for workflows, AsyncAPI for events and
-  OpenTelemetry for tracing. Flowi uses them directly instead of inventing its own formats.
-- **Tests and scripts should be easy.** Checks on a response are a few clicks (asserts), and for anything more there
-  are hooks that run before and after a request.
+A GraphQL request is an HTTP request with a query, variables and an operation name. An answer with an `errors` list fails
+the step even though the status is 200. A subscription opens a WebSocket (`graphql-transport-ws`), waits for the number of
+events you set, and shows them like any other message request.
 
-## What you can do
+gRPC methods come from server reflection or `.proto` files. Databases and data files are queried with SQL, with values
+passed as parameters, and queries only read unless you allow writes.
 
-### Send any kind of request
+You can bring in what you already have: OpenAPI, AsyncAPI, `.proto`, Arazzo, Postman, Bruno, Insomnia, HAR, `.http` files and curl
+commands.
 
-One request editor covers all of it: `{{templates}}` from environments, secrets and generators, several **versions** of
-a request, **hooks** before and after, checks on the answer, values extracted from it, pinned examples, and a history
-of responses. The collage above shows six real answers: an HTTP login whose token is extracted for the next step, a
-gRPC call to a service found by server reflection, an SQS message sent and read back, a NATS request that waits for the
-reply, a PostgreSQL query with a parameter, and a SQL query over a CSV file.
+## Why Flowi
+
+- **Checks that go past HTTP.** Publish an event and wait for the message it causes. Look in the database for the row
+  your API wrote. Read a queue. These are requests like any other, so asserts, extracts and hooks work the same way on
+  all of them.
+- **Whole journeys, not single calls.** Log in, create something, wait for the event, verify it, clean up: draw it as a
+  flow and run it with one click. The same file runs in CI with `flowi run`.
+- **Fast, and not Electron.** Flowi is a native app with a Go core. It uses your system's own web view instead of
+  shipping a copy of Chromium, so it starts quickly, stays light on memory, and big collections stay responsive.
+- **Your files, your git.** Collections are plain YAML, so branches, reviews and merges work as they do for code. Flowi
+  warns about credentials typed into a request and about secrets headed for the wrong host, before they reach a commit.
+- **Built on open standards.** OpenAPI and its overlays, Arazzo workflows, AsyncAPI and OpenTelemetry are used directly,
+  not replaced by a private format.
+- **Tests without a framework.** A few clicks add an assert to a response. Hooks run before and after a request when you
+  need more.
+
+## Requests
+
+One editor covers every kind of request: `{{templates}}` from environments, secrets and generators, several **versions**
+of a request, **hooks**, checks on the answer, values extracted from it, pinned examples and a history of responses.
+The collage above shows six real answers: an HTTP login whose token feeds the next step, a gRPC call found by server
+reflection, an SQS message sent and read back, a NATS request that waits for its reply, a PostgreSQL query with a
+parameter, and a SQL query over a CSV file.
 
 ![The request editor with a response](app/docs/images/api-explorer.png)
 
-A **message request** can send, receive, or both: it subscribes first, sends, then collects the reply, so nothing is
-missed. You choose how many messages to wait for and a timeout, filter them with a condition, and check or extract
-values from them exactly as for an HTTP response.
+A **message request** can send, receive, or both. It subscribes first, sends, then collects the reply, so nothing is
+missed. Set how many messages to wait for and a timeout, filter them with a condition, and check or extract values from
+them as you would from an HTTP response. A WebSocket or SSE request has an Auth tab like an HTTP one (none, bearer,
+basic, an API key, OAuth 2.0, a JWT, a client certificate, or a named authentication): the credential goes on the
+connection when it opens, and is masked everywhere it could show.
 
 ![Receiving server-sent events, with message requests for each protocol in the tree](app/docs/images/async-messages.png)
 
 A **flowi overlay** is a named variant you lay over a request when you send it: the same call as a VIP customer, over a
 slow connection, or with a bad token. Flowi shows what it changes before it writes anything.
 
-### What it can talk to
+## Flows
 
-| | Supported |
-|---|---|
-| **HTTP** | `GET`, `POST`, `PUT`, `PATCH`, `DELETE`, `HEAD`, `OPTIONS`, `QUERY`; WebDAV and others (`PROPFIND`, `PROPPATCH`, `MKCOL`, `COPY`, `MOVE`, `LOCK`, `UNLOCK`, `REPORT`, `SEARCH`, `MKCALENDAR`, `VERSION-CONTROL`, `LINK`, `UNLINK`, `PURGE`) and any valid method token of your own |
-| **gRPC** | Unary and server-streaming methods, found by server reflection or from `.proto` files; gRPC-Web |
-| **Messaging** | WebSocket, Server-Sent Events, MQTT, Kafka, AMQP 0-9-1 (RabbitMQ), AMQP 1.0, NATS, Redis, Amazon SQS, Amazon SNS, Azure Service Bus, Google Pub/Sub |
-| **Databases** | PostgreSQL, MySQL, MariaDB, SQLite. Queries only read by default; values are passed as parameters |
-| **Data files** | CSV, XLSX and Parquet files, or a folder of them, queried with SQL |
-| **Imports** | OpenAPI, AsyncAPI, `.proto`, Arazzo, Postman, Bruno, HAR, `.http` files, curl commands |
-| **Exports** | Flows as Arazzo or Mermaid diagrams; OpenAPI and AsyncAPI descriptions generated from your requests; overlays as OpenAPI Overlay documents; run reports as JUnit, JSON and Markdown |
+Drag steps onto the canvas, wire them together and press Run. Steps can be requests, asserts, conditions, delays,
+subflows, webhooks and more. Dotted arcs show which values pass from one step to the next, and each step turns green or
+red as it runs. Open any step to see what it sent and what came back, or run only part of the flow.
 
-### Build flows on a canvas
+![A flow with a batch loop and a run-until loop](app/docs/images/flow-editor.png)
 
-Drag steps onto the canvas, wire them together and press Run. A step can be a request, a fetch, a webhook wait, a
-subflow, a value setter, an assert, a fuzz run, a condition, a delay, a log or a note. Dotted arcs show which values
-pass from one step to the next, and every step turns green or red as it runs. Open any step to see what it sent and
-what came back, or run only part of the flow.
+The flow above signs in, probes the API three times with a **batch**, polls with **run until** the answer says `ready`,
+and asserts the result. Loops are boxes: the steps inside repeat, and the run log shows every round.
 
-![A flow with a boxed loop and a poll: the batch runs its steps three times, two at a time, and the poll repeats until a field says ready](app/docs/images/flow-editor.png)
-
-The flow above signs in, probes the API three times with a **batch** (the box under `probes`), polls with **run until**
-(the box under `poll`) until the answer says `ready`, and then asserts the result. Loops are boxes: the steps inside
-repeat, and the run log shows each round. Beyond those there are `parallel`, `stop` and `loop_control` steps for the
-rest.
-
-Every step has **outcomes**: success and failure to begin with, and you can add your own, such as "401" or "slow".
-Drag from an outcome to the step that should run when it happens, which is how a flow handles a failed login without
-stopping. The **Checks** menu runs a flow across a matrix of environments and overlays, checks that another user cannot
-reach what the flow made, looks for drift from the responses seen before, and draws a sequence diagram of the last run.
+Every step has **outcomes**: success and failure to begin with, and you can add your own, such as "401" or "slow". Drag
+from an outcome to the step that should run when it happens, so a failed login can lead somewhere instead of stopping
+the run. The **Checks** menu runs a flow across a matrix of environments and overlays, checks that another user cannot
+reach what the flow made, looks for drift, and draws a sequence diagram of the last run.
 
 Every flow is also a readable file you can edit in the **Code** view, written as an
-[Arazzo](https://spec.openapis.org/arazzo/latest.html) workflow so that other tools can read it.
+[Arazzo](https://spec.openapis.org/arazzo/latest.html) workflow so that other tools can read it. Flows export to Arazzo
+and Mermaid.
 
 ![The Arazzo file view of a flow](app/docs/images/arazzo-code.png)
 
-### Replay and fake APIs
+## Replayer
 
-The **replayer** serves your saved responses as a local API, so a front end can work before the back end exists. Point
-it at a real API in *record* mode and it forwards each call, saves the answer and turns calls it has not seen into new
-requests. It can also misbehave on purpose, to try retries and error handling: answer a share of calls with an error,
+The replayer serves your saved responses as a local API, so a front end can work before the back end exists. Point it at
+a real API in *record* mode and it forwards each call, saves the answer and turns calls it has not seen into new
+requests. It can also misbehave on purpose, to test retries and error handling: answer a share of calls with an error,
 drop the connection or add a delay. A single call can ask for it with a header, such as `X-Flowi-Fault: error:418`.
 
 ![The replayer answering calls, with a share of injected faults](app/docs/images/replayer.png)
 
-### Schedule runs
+## Scheduler
 
-Add cron schedules with a time zone and start them from the app, or run them without a window with `flowi serve`.
-The same server can start a flow when it receives an HTTP call with a trigger token. The screen shows the next runs on
-a 24-hour timeline.
+Run flows on a cron schedule, each with its own time zone, from the app or without a window with `flowi serve`. The same
+server starts a flow when it receives an HTTP call with a trigger token. The screen draws the next runs on a 24-hour
+timeline.
 
 ![Schedules, the next 24 hours and the HTTP trigger](app/docs/images/scheduler.png)
 
-### Start from a blueprint
+## Blueprints
 
-**Blueprints** are templates: whole flows you can copy and adapt, and hook blueprints for the pre and post steps you
-use again and again (sign in first, clean up after). Create a flow or a hook from a blueprint, or save what you built as
-one.
+Blueprints are templates. Flow blueprints give you a whole flow to copy and adapt. Hook blueprints give you the steps
+you add to many requests, such as signing in first or cleaning up after. Start from one, or save what you built as a
+blueprint.
 
 ![The blueprints screen](app/docs/images/blueprints.png)
 
-### Catch drift before your users do
+## Drift checking
 
-Flowi learns a schema for each response it sees. **Check drift** runs a flow and compares every response with what was
-learned, and sorts the differences into *missing* (a required field is gone), *changed* (a field has another type) and
-*new* (a field the schema does not know). Press **Accept** on a request when the change is intended, so the next check
-measures against the new baseline. The dialog also gives the command to run the same check in CI.
+Flowi learns a schema from the responses it sees. **Check drift** runs a flow and compares every response with it, and
+sorts the differences into *missing* (a required field is gone), *changed* (a field has another type) and *new* (a field
+the schema does not know). When a change is intended, press **Accept** and the next check measures against the new
+shape. The dialog also gives the command that runs the same check in CI.
 
 ![A drift check: a missing field and a changed type, with Accept and the CI command](app/docs/images/drift-check.png)
 
-### Keep the collection in order
+## Collection governance
 
-Collections can be kept tidy and checked, which is the part that grows more useful with every request you add:
+Keep a growing collection in order, and catch mistakes while you work.
 
-- **Statuses and tags** (`planning`, `in-development`, `review`, `testing`, `production`) on requests, flows and
-  folders, inherited from where they sit. Filter the sidebar with `status:` and `tag:`, and group a collection's
-  endpoints by path, tag, folder or status.
-- **Checks that run while you work**, with codes you can look up: a declared secret with no value, a credential typed
-  straight into a request instead of a secret (`FLW-LINT-004`), credentials sent over plain `http` (`FLW-LINT-005`), a
-  secret that would be sent to a host it is not allowed for (`FLW-SEC-005`), and secrets in an environment file that
-  ships with the collection (`FLW-SEC-006`).
-- **Spec lint rules** on imported and generated API descriptions, and warnings when a response carries `Deprecation`
-  or `Sunset` headers.
-- **Impact, coverage and access checks**: what uses a request and does it still fit, how much of an API description the
-  flows use, and whether another user can reach what a flow made.
+- **Statuses and tags.** Mark requests, flows and folders as `planning`, `in-development`, `review`, `testing` or
+  `production`, and add tags. Both are inherited from the folder. Filter the sidebar with `status:` and `tag:`, and group
+  a collection's endpoints by path, tag, folder or status.
+- **Secret and credential checks.** Flowi flags a declared secret with no value, a credential typed straight into a
+  request instead of a secret (`FLW-LINT-004`), credentials sent over plain `http` (`FLW-LINT-005`), a secret about to
+  go to a host it is not allowed for (`FLW-SEC-005`), and secrets in an environment file that ships with the collection
+  (`FLW-SEC-006`).
+- **API description checks.** Lint rules for imported and generated descriptions, and a warning when a response carries
+  `Deprecation` or `Sunset` headers.
+- **Impact, coverage and access.** See what uses a request and whether it still fits, how much of an API description
+  your flows exercise, and whether another user can reach what a flow made.
 
 ![A collection's endpoints grouped by status, with the kind of each request](app/docs/images/collection-status.png)
 
-### And the small things that add up
+## Also included
 
-- **Named authentications.** Define "staging admin" or "partner API" once in the collection's `auths` folder and
-  pick it on any request.
-- **Environments you can compare.** See every variable of several environments side by side, with the gaps and the
-  differences tinted. Secrets only show whether they have a value, never the value.
-- **Schema generation.** Responses teach Flowi their schema, and from your requests plus those schemas it can write
-  an OpenAPI or AsyncAPI description.
-- **OpenTelemetry tracing.** Send traces of your runs to a collector (OTLP over HTTP). It is off by default and never
+- **Named authentication.** Define "staging admin" or "partner API" once in the collection's `auths` folder and pick it
+  on any request, including a WebSocket or SSE one.
+- **Environment comparison.** See every variable of several environments side by side, with differences and gaps
+  marked. A secret shows only whether it has a value, never the value.
+- **Schema generation.** Flowi writes an OpenAPI or AsyncAPI description from your requests and the schemas it learned.
+- **OpenTelemetry tracing.** Send traces of your runs to a collector over OTLP/HTTP. It is off by default and never
   includes bodies, headers or secrets.
-- **Secrets in a vault.** An encrypted local vault, with the key in the operating system's keychain. Secrets are masked
-  everywhere they could show.
-- **Import without leaking.** An import shows a preview of every file first and writes nothing until you confirm.
-  Credentials become secrets, never text in a file.
-- **Drafts and a trash** for experiments, a command palette, themes including a high-contrast one, and a settings
-  screen where every setting is explained.
+- **Encrypted vault.** Secrets are stored encrypted, with the key in the operating system's keychain, and masked
+  wherever they could show.
+- **Safe imports.** An import shows a preview of every file and writes nothing until you confirm. Credentials become
+  secrets, never text in a file.
+- **Drafts, a trash, a command palette and themes**, including a high-contrast one.
 
 ![Environments side by side: a secret shows only whether it has a value](app/docs/images/env-compare.png)
 
@@ -171,24 +177,21 @@ window needs on Linux.
 To try it with data, mount the example collection in [`lib/examples`](lib/examples) (the folder icon in the sidebar)
 and start its demo server.
 
-## The command line and the library
+## Command line and library
 
-The app has two siblings in this repository.
-
-**[`cli/`](cli)** is the `flowi` command, one static binary without cgo. It runs the same collections and flows in CI
-or on a server: `flowi send` and `flowi run` (with JUnit, JSON and Markdown reports), `flowi drift`, `flowi impact`,
-`flowi coverage`, `flowi access`, `flowi secret check` for a missing secret before a run starts, `flowi import` and
-`flowi export` for Arazzo, `flowi serve` for schedules, triggers and the replayer, and `flowi merge-driver install` so
-that git can merge flow files.
+**[`cli/`](cli)** is the `flowi` command, one static binary. It runs the same collections and flows in CI or on a server:
+`flowi send` and `flowi run` (with JUnit, JSON and Markdown reports), `flowi drift`, `flowi impact`, `flowi coverage`,
+`flowi access`, `flowi secret check` to fail early on a missing secret, `flowi import` and `flowi export`, `flowi serve`
+for schedules, triggers and the replayer, and `flowi merge-driver install` so that git can merge flow files.
 
 ```bash
 go install github.com/githugt/flowi/cli/cmd/flowi@latest
 flowi run user-creation --env staging --report junit=report.xml
 ```
 
-**[`lib/`](lib)** is the core both are built on: collections, requests, flows, transports, the vault and the importers,
-with no user interface and no cgo, for embedding in other Go programs. See its [README](lib/README.md) and the
-[development guide](lib/docs/development.md).
+**[`lib/`](lib)** is the Go library both are built on: collections, requests, flows, transports, the vault and the
+importers, with no user interface and no cgo, for embedding in your own programs. See its [README](lib/README.md) and
+the [development guide](lib/docs/development.md).
 
 ## Working in the repository
 

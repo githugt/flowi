@@ -91,6 +91,9 @@ const (
 	CodeDatasetQuery   Code = "FLW-DATA-002"
 	CodeDatasetTimeout Code = "FLW-DATA-003"
 
+	CodeGraphQLRequest      Code = "FLW-GQL-001"
+	CodeGraphQLSubscription Code = "FLW-GQL-002"
+
 	CodeOutcome Code = "FLW-OUT-001"
 
 	CodeExportLossy Code = "FLW-EXPORT-001"
@@ -279,8 +282,8 @@ func codeTable() map[Code]codeInfo {
 		CodeVersionPinnedAbsent:  {e, `pinned version "{label}" does not exist on request {request}`},
 		CodeVersionNone:          {e, "request has no versions"},
 
-		CodeRefUnknownRequest: {e, "unknown request id {id} — hint: the request was deleted or its id changed: pick another one in the step"},
-		CodeRefUnknownFlow:    {e, "unknown flow id {id} — hint: the flow was deleted or its id changed: pick another one"},
+		CodeRefUnknownRequest: {e, "unknown request {ref} — hint: the request was deleted or its id changed: pick another one in the step"},
+		CodeRefUnknownFlow:    {e, "unknown flow {ref} — hint: the flow was deleted or its id changed: pick another one"},
 		CodeRefUndeclared:     {e, `collection "{collection}" is not declared in depends_on — hint: add it to depends_on in the collection file`},
 		CodeRefNotMounted:     {e, `collection "{collection}" is not mounted` + hintMarker + `clone {repo} and run "flowi workspace mount"`},
 		CodeRefStalePath:      {w, `path hint "{got}" is out of date, should be "{want}" (run "flowi fmt")`},
@@ -335,10 +338,12 @@ func codeTable() map[Code]codeInfo {
 		CodeGRPCStatus:  {e, "the call ended with {code}: {message}"},
 		CodeGRPCField:   {w, "{detail}"},
 
-		CodeOutcome:        {e, "{detail}"},
-		CodeDatasetRequest: {e, "{detail}"},
-		CodeDatasetQuery:   {e, "the query failed: {detail}"},
-		CodeDatasetTimeout: {e, "the query did not finish in {timeout}"},
+		CodeOutcome:             {e, "{detail}"},
+		CodeDatasetRequest:      {e, "{detail}"},
+		CodeDatasetQuery:        {e, "the query failed: {detail}"},
+		CodeDatasetTimeout:      {e, "the query did not finish in {timeout}"},
+		CodeGraphQLRequest:      {e, "{detail}" + hintMarker + "a GraphQL body is a query document (sent as written), optional variables (a JSON object) and an operation name; a mutation or subscription needs POST"},
+		CodeGraphQLSubscription: {e, "the subscription failed: {detail}" + hintMarker + "a subscription runs over a WebSocket speaking graphql-transport-ws (not the older subscriptions-transport-ws); check the URL, the headers that sign in, and that the server supports subscriptions"},
 
 		CodeExportLossy:       {w, `node "{node}" ({type}) has no Arazzo equivalent and was left out`},
 		CodeServeSchedule:     {e, `schedule "{name}": {detail}`},
@@ -462,7 +467,7 @@ func codeTable() map[Code]codeInfo {
 		CodeRunExtractNoResp:  {e, `set "{node}" reads a response, but none is in reach` + hintMarker + "outside post-hooks read an earlier step: from: expr with {{nodes.<id>.body.…}}"},
 		CodeRunDigestTarget:   {e, `digest "{node}" cannot summarise "{of}": it is unknown or has not finished`},
 		CodeRunFlaky:          {w, `node "{node}" passed on try {try} of {tries}` + hintMarker + "a step that needs a retry to pass is flaky: find out why, or the retries only hide it"},
-		CodeRunGraphQLError:   {e, `the GraphQL response of "{request}" carries {count}: {detail}` + hintMarker + "a GraphQL server answers 200 even when the query failed: the errors are in the body (requests.graphql_errors: warn or ignore stops this)"},
+		CodeRunGraphQLError:   {e, `the GraphQL response of "{request}" carries {count}: {detail}` + hintMarker + "a GraphQL server answers 200 even when the operation failed: the errors are in the body. If you expect them, assert on response.body.errors, or set requests.graphql_errors to warn or ignore"},
 		CodeRunGraphQLWarning: {w, `the GraphQL response of "{request}" carries {count}: {detail}` + hintMarker + "a GraphQL server answers 200 even when the query failed: assert on response.body.errors, or set requests.graphql_errors to fail so the step fails, or to ignore"},
 		CodeRunExpectFailed:   {e, `"{request}" expected {expected}, got {status}` + hintMarker + "if {status} is right, change expect: in the request (a list or a range such as 4xx works); if not, the server answers differently than the test assumes"},
 		CodeExpectInvalid:     {e, "expect: {detail}" + hintMarker + "write the status the request should answer with: 401, a range 400-499, a class 4xx or a list 200, 404"},

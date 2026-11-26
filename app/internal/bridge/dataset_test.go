@@ -75,6 +75,37 @@ func TestRequestService_should_not_show_a_dataset_block_for_an_http_request(t *t
 	}
 }
 
+func TestWorkspaceService_Menu_should_offer_a_new_data_file_query_that_asks_for_the_file_type(t *testing.T) {
+	app, _ := fixture(t)
+	app.Start(t.Context())
+	coll := app.Workspace().Tree().Roots[0]
+
+	menu := app.Workspace().Menu([]string{coll.ID})
+
+	for _, e := range menu {
+		if e.Action != "newDataFile" {
+			continue
+		}
+		if e.Label != "New data file query…" || e.Prompt == nil || len(e.Prompt.Protocols) != 3 || e.Prompt.Protocols[0].ID != "csv" {
+			t.Fatalf("entry %+v prompt %+v", e, e.Prompt)
+		}
+		return
+	}
+	t.Fatalf("no new data file query entry in %+v", menu)
+}
+
+func TestWorkspaceService_Do_newDataFile_should_create_it_with_the_chosen_format(t *testing.T) {
+	app, pub := fixture(t)
+	app.Start(t.Context())
+	coll := app.Workspace().Tree().Roots[0]
+
+	app.Workspace().Do("newDataFile", []string{coll.ID}, "sales", "csv")
+
+	if opened, _ := pub.last["open"].(string); opened == "" {
+		t.Fatalf("nothing was opened: %v", pub.last)
+	}
+}
+
 func TestWorkspaceService_Menu_should_offer_a_new_dataset_query_that_asks_for_the_database(t *testing.T) {
 	app, _ := fixture(t)
 	app.Start(t.Context())
@@ -86,7 +117,7 @@ func TestWorkspaceService_Menu_should_offer_a_new_dataset_query_that_asks_for_th
 		if e.Action != "newDataset" {
 			continue
 		}
-		if e.Label != "New dataset query…" || e.Prompt == nil || len(e.Prompt.Protocols) != 7 || e.Prompt.Protocols[0].ID != "postgres" || e.Prompt.Protocols[0].Label != "PostgreSQL" {
+		if e.Label != "New database query…" || e.Prompt == nil || len(e.Prompt.Protocols) != 4 || e.Prompt.Protocols[0].ID != "postgres" || e.Prompt.Protocols[0].Label != "PostgreSQL" {
 			t.Fatalf("entry %+v prompt %+v", e, e.Prompt)
 		}
 		return

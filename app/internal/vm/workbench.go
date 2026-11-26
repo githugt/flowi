@@ -57,7 +57,8 @@ func (r *Request) Configured(s Section) bool {
 		return bodyHasContent(v.Body)
 	case SectionAuth:
 		kind, _ := r.Auth()
-		return kind != AuthNone
+		scheme, _ := r.AuthScheme()
+		return kind != AuthNone || scheme != "" || r.AuthUse() != ""
 	case SectionVars:
 		return len(v.Variables) > 0
 	case SectionDocs:

@@ -43,6 +43,8 @@ type Backend interface {
 	NewRequest(collection model.ID, path string) (flowi.RequestTarget, error)
 	// NewAsyncRequest is NewRequest for an async request of a protocol.
 	NewAsyncRequest(collection model.ID, path, protocol string) (flowi.RequestTarget, error)
+	// NewGraphQLRequest is NewRequest for a GraphQL request.
+	NewGraphQLRequest(collection model.ID, path string) (flowi.RequestTarget, error)
 	// NewGRPCRequest is NewRequest for a gRPC request.
 	NewGRPCRequest(collection model.ID, path string) (flowi.RequestTarget, error)
 	// NewDatasetRequest is NewRequest for a dataset request of the given driver.
@@ -168,6 +170,11 @@ type Backend interface {
 	Cookies(collection string) ([]flowi.CookieInfo, error)
 	DeleteCookie(collection, key string) error
 	Impact(t flowi.RequestTarget, version string) (analysis.Report, diag.List, error)
+	// LintSpecs is what the spec linter finds in the descriptions a collection kept, notes included: the findings the
+	// collection's page lists. Validate has the ones that are problems.
+	LintSpecs(collection model.ID) (diag.List, error)
+	// Callers lists the flow steps that run each request: what deleting it would leave pointing at nothing.
+	Callers(ts []flowi.RequestTarget) map[flowi.RequestTarget][]analysis.Caller
 	// ImpactOfDraft is Impact for the request as it would be once the edited copy is saved.
 	ImpactOfDraft(t flowi.RequestTarget, draft model.Request) (analysis.Report, diag.List, error)
 

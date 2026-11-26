@@ -13,7 +13,7 @@ func TestEdit_Given_a_commented_file_When_a_rule_is_set_Then_every_comment_stays
 			"# our house rules\n\nrules:\n  # paths are lowercase here\n  path-case: error   # since the 2.0 gateway\n  operation-tags: off\n  operation-id: error\n\n# end\n"},
 		{"forget drops the line only", "operation-tags", "",
 			"# our house rules\n\nrules:\n  # paths are lowercase here\n  path-case: error   # since the 2.0 gateway\n\n# end\n"},
-		{"the rule's own level counts as forgetting it", "operation-tags", "warning",
+		{"the rule's own level counts as forgetting it", "operation-tags", "note",
 			"# our house rules\n\nrules:\n  # paths are lowercase here\n  path-case: error   # since the 2.0 gateway\n\n# end\n"},
 	}
 	for _, c := range cases {
@@ -40,7 +40,7 @@ func TestEdit_Given_an_empty_or_missing_rules_key_When_a_rule_is_set_Then_it_is_
 	if got, want := string(Edit([]byte("# only a note\n"), "path-case", "error")), "# only a note\nrules:\n  path-case: error\n"; got != want {
 		t.Errorf("no key: got %q want %q", got, want)
 	}
-	if got, want := string(Edit(nil, "path-case", "error")), "# How seriously each rule about the API description is taken: off, warning or error.\nrules:\n  path-case: error\n"; got != want {
+	if got, want := string(Edit(nil, "path-case", "error")), "# How seriously each rule about the API description is taken: off, note, warning or error.\nrules:\n  path-case: error\n"; got != want {
 		t.Errorf("no file: got %q want %q", got, want)
 	}
 }

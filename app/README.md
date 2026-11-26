@@ -12,26 +12,28 @@ runs the same collections in CI, and the [core library](../lib) both are built o
 
 ## Why
 
-Most API tools stop at the single request, and most of them stop at HTTP. Real work is a sequence that crosses
-protocols: call an API, wait for the event it publishes, look in the database for the row it wrote. The sequence is what
-breaks when an API changes. Flowi keeps requests as reusable building blocks, draws the sequences, runs them, and tells
-you what a change to a request would break.
+Real API work is a sequence that crosses protocols: call an API, wait for the event it publishes, look in the database
+for the row it wrote. Flowi treats all of those as requests, draws the sequence as a flow, runs it with one click, and
+tells you what a change to a request would break.
 
-It is meant to stay fast. The core is Go, and the window shows its screens in the system's own web view (WKWebView,
-WebView2 or WebKitGTK) instead of bundling a browser, so large collections open quickly and a request is sent
-the moment you press Send. And it is meant to live in git: files are plain YAML, so branches and reviews work as they do
-for code, and Flowi checks for credentials typed into requests and for secrets that would go to the wrong host, so they
-are not pushed by mistake.
+It is not an Electron app. The core is Go, and the window uses the system's own web view (WKWebView, WebView2 or
+WebKitGTK) instead of shipping a copy of Chromium, so it starts quickly, stays light on memory, and big collections stay
+responsive. It lives in git: files are plain YAML,
+so branches and reviews work as they do for code, and Flowi warns about credentials typed into a request and about
+secrets headed for the wrong host before they reach a commit.
 
 ## What you can do
 
 ### Explore an API
 
-Build and send HTTP and gRPC requests. Use `{{templates}}` from environments, secrets and generators, keep several
+Build and send HTTP, GraphQL and gRPC requests. Use `{{templates}}` from environments, secrets and generators, keep several
 **versions** of a request, attach pre and post **hooks**, add checks on the answer (status, headers, a field of the
 body, a schema) and pin a response as an example. Responses show as a tree, with timing, the exact request sent, a
 history and a comparison with the previous answer. Copy a request as curl and other snippets. Besides the
-usual methods you can use `QUERY` or any method of your own. gRPC methods come from server reflection or from `.proto`
+usual methods you can use `QUERY` or any method of your own. A GraphQL request has a query editor and a variables box in
+its Body tab (pick GraphQL in the type menu or the body type), can run one named operation of a query that has several, and
+fails when the answer carries an `errors` list, even with status 200. A subscription waits for the number of events you
+set and lists them in the Messages tab. gRPC methods come from server reflection or from `.proto`
 files.
 
 A **flowi overlay** is a named variant you lay over a request when you send it: the same call as a VIP customer, with
@@ -148,7 +150,8 @@ description would break). Responses with `Deprecation` or `Sunset` headers are f
 **Environments** hold plain variables and secrets. Compare several side by side: a value that differs is tinted, a
 missing one is marked, and a secret only shows whether it has a value in the vault, never the value. Secrets live in an
 encrypted local vault with the key in the operating system's keychain, and they are masked wherever they could show.
-**Named authentications** (kept in the collection's `auths` folder) define how to sign in once, for any request to use.
+**Named authentications** (kept in the collection's `auths` folder) define how to sign in once, for any request to use. A WebSocket or SSE request has the same Auth tab as an HTTP one,
+limited to the schemes that work when a connection opens (API key, OAuth 2.0, JWT, client certificate).
 
 ![Two environments compared: a secret only shows whether it has a value](docs/images/env-compare.png)
 

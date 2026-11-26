@@ -254,3 +254,22 @@ func TestValidate_should_allow_only_mutual_TLS_as_the_auth_block_of_a_gRPC_call(
 		t.Fatalf("only the digest request should be reported, got %v in %v", files, got)
 	}
 }
+
+func TestRefs_Given_a_deleted_request_with_a_path_hint_Then_the_message_names_the_path(t *testing.T) {
+	// Before: the message said "unknown request id 01J…", an id the person never sees.
+	f := newFixture(t)
+	c := f.collection("c")
+	f.flow(&c, "x", model.Node{ID: "a", Type: "request", Request: &model.RequestCall{Request: model.Ref{ID: f.ids.New(), Path: "auth/login"}}})
+
+	got := Validate(Target{Collections: []model.Collection{c}})
+
+	var msg string
+	for _, d := range got {
+		if d.Code == diag.CodeRefUnknownRequest {
+			msg, _ = diag.English().Message(d)
+		}
+	}
+	if !strings.Contains(msg, `unknown request "auth/login" (id `) {
+		t.Fatalf("message %q", msg)
+	}
+}

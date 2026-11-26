@@ -3,6 +3,7 @@
 package bridge
 
 import (
+	"cmp"
 	"fmt"
 	"path"
 	"strings"
@@ -27,8 +28,12 @@ type MenuEntry struct {
 	Label   string  `json:"label"`
 	Prompt  *Prompt `json:"prompt,omitempty"`  // ask this first
 	Confirm string  `json:"confirm,omitempty"` // ask yes or no first
-	Guard   string  `json:"guard,omitempty"`   // "dirty": a tab of these rows may have unsaved edits; the window warns that they are lost before it goes on
-	Dialog  string  `json:"dialog,omitempty"`  // "move": the window asks where with its own dialog
+	// ConfirmTitle and ConfirmAction name the question and its yes button when the plain "Delete" would hide something:
+	// a delete that leaves flow steps pointing at nothing says so on both.
+	ConfirmTitle  string `json:"confirmTitle,omitempty"`
+	ConfirmAction string `json:"confirmAction,omitempty"`
+	Guard         string `json:"guard,omitempty"`  // "dirty": a tab of these rows may have unsaved edits; the window warns that they are lost before it goes on
+	Dialog        string `json:"dialog,omitempty"` // "move": the window asks where with its own dialog
 }
 
 // Notice is published as the "notice" event: something the user should see.
@@ -45,7 +50,7 @@ func actionNames() map[vm.Action]string {
 	return map[vm.Action]string{
 		vm.ActOpen: "open", vm.ActDuplicate: "duplicate", vm.ActRename: "rename", vm.ActDelete: "delete", vm.ActCopyMermaid: "mermaid",
 		vm.ActNewRequest: "newRequest", vm.ActNewEnvironment: "newEnvironment", vm.ActNewFlow: "newFlow", vm.ActFlowFromRequests: "flowFromRequests",
-		vm.ActNewFolder: "newFolder", vm.ActNewAsyncRequest: "newAsync", vm.ActNewGRPCRequest: "newGRPC", vm.ActNewDatasetRequest: "newDataset",
+		vm.ActNewFolder: "newFolder", vm.ActNewAsyncRequest: "newAsync", vm.ActNewGRPCRequest: "newGRPC", vm.ActNewGraphQLRequest: "newGraphQL", vm.ActNewDatasetRequest: "newDataset", vm.ActNewDataFileRequest: "newDataFile",
 	}
 }
 
@@ -82,13 +87,16 @@ func (s *WorkspaceService) entry(item vm.MenuItem, ids []string) MenuEntry {
 		e.Prompt = &Prompt{Title: title, Label: "Name", Initial: path.Base(n.Path)}
 		e.Guard = "dirty"
 	case vm.ActDelete:
-		e.Confirm, e.Guard = s.deleteQuestion(n, ids), "dirty"
-	case vm.ActNewRequest, vm.ActNewGRPCRequest:
+		q := s.deleteQuestion(n, ids)
+		e.Confirm, e.ConfirmTitle, e.ConfirmAction, e.Guard = q.Text, q.Title, q.Action, "dirty"
+	case vm.ActNewRequest, vm.ActNewGraphQLRequest, vm.ActNewGRPCRequest:
 		e.Prompt = &Prompt{Title: strings.TrimSuffix(e.Label, "…"), Label: nameLabel(where)}
 	case vm.ActNewAsyncRequest:
 		e.Prompt = &Prompt{Title: strings.TrimSuffix(e.Label, "…"), Label: nameLabel(where), Protocols: protocolChoices()}
 	case vm.ActNewDatasetRequest:
-		e.Prompt = &Prompt{Title: strings.TrimSuffix(e.Label, "…"), Label: nameLabel(where), Protocols: driverPromptChoices()}
+		e.Prompt = &Prompt{Title: strings.TrimSuffix(e.Label, "…"), Label: nameLabel(where), Protocols: databasePromptChoices()}
+	case vm.ActNewDataFileRequest:
+		e.Prompt = &Prompt{Title: strings.TrimSuffix(e.Label, "…"), Label: nameLabel(where), Protocols: dataFilePromptChoices()}
 	case vm.ActNewFolder:
 		e.Prompt = &Prompt{Title: "New folder", Label: nameLabel(where)}
 	case vm.ActNewEnvironment:
@@ -116,10 +124,14 @@ func menuLabel(item vm.MenuItem) string {
 		return "New request…"
 	case vm.ActNewAsyncRequest:
 		return "New async request…"
+	case vm.ActNewGraphQLRequest:
+		return "New GraphQL request…"
 	case vm.ActNewGRPCRequest:
 		return "New gRPC request…"
 	case vm.ActNewDatasetRequest:
-		return "New dataset query…"
+		return "New database query…"
+	case vm.ActNewDataFileRequest:
+		return "New data file query…"
 	case vm.ActNewEnvironment:
 		return "New environment…"
 	case vm.ActNewFolder:
@@ -168,9 +180,11 @@ func nameLabel(where string) string {
 	return fmt.Sprintf("Name (in %s)", where)
 }
 
-// deleteQuestion says what deleting the rows takes with it.
-func (s *WorkspaceService) deleteQuestion(n vm.TreeNode, ids []string) string {
+// deleteQuestion says what deleting the rows takes with it, and what it leaves broken: the flow steps that run a
+// request that goes.
+func (s *WorkspaceService) deleteQuestion(n vm.TreeNode, ids []string) DeleteQuestion {
 	ws := s.app.workspace
+	uses := s.usesOfDeleted(ids)
 	if n.Kind == vm.NodeFolder {
 		requests, flows := ws.ContentsOf(n.ID)
 		var what []string
@@ -181,9 +195,10 @@ func (s *WorkspaceService) deleteQuestion(n vm.TreeNode, ids []string) string {
 			what = append(what, fmt.Sprintf("%d flows", flows))
 		}
 		if len(what) == 0 {
-			return "" // an empty folder just goes
+			return DeleteQuestion{} // an empty folder just goes
 		}
-		return fmt.Sprintf("Delete the folder %s and everything in it (%s)? This cannot be undone.", ws.Display(n.ID), strings.Join(what, ", "))
+		text := fmt.Sprintf("Delete the folder %s and everything in it (%s)? This cannot be undone.", ws.Display(n.ID), strings.Join(what, ", "))
+		return withUses(DeleteQuestion{Text: text}, uses, "")
 	}
 	var envs, effects []string
 	others := 0
@@ -199,7 +214,49 @@ func (s *WorkspaceService) deleteQuestion(n vm.TreeNode, ids []string) string {
 			others++
 		}
 	}
-	return leafDeleteQuestion(envs, others, effects)
+	return withUses(DeleteQuestion{Text: leafDeleteQuestion(envs, others, effects)}, uses, " Undo brings the request back.")
+}
+
+// usesOfDeleted lists the flow steps, outside everything being deleted, that run a request among rows ids (or inside
+// a folder among them). Steps in a flow that goes with them are not a problem: they go too.
+func (s *WorkspaceService) usesOfDeleted(ids []string) []deleteUse {
+	ws := s.app.workspace
+	names := map[flowi.RequestTarget]string{}
+	var targets []flowi.RequestTarget
+	going := map[string]bool{}
+	var visit func(id string)
+	visit = func(id string) {
+		switch n := ws.Node(id); n.Kind {
+		case vm.NodeRequest:
+			t := flowi.RequestTarget{Collection: n.Collection, Request: n.Request}
+			names[t] = cmp.Or(n.Label, n.Path)
+			targets = append(targets, t)
+			going[n.File] = true
+		case vm.NodeFlow:
+			going[n.File] = true
+		default:
+			for _, child := range ws.Children(id) {
+				visit(child)
+			}
+		}
+	}
+	for _, id := range ids {
+		visit(id)
+	}
+	if len(targets) == 0 {
+		return nil
+	}
+	var out []deleteUse
+	callers := s.app.backend.Callers(targets)
+	for _, t := range targets {
+		for _, c := range callers[t] {
+			if going[c.File] {
+				continue
+			}
+			out = append(out, deleteUse{Request: names[t], Where: callerPlace(c)})
+		}
+	}
+	return out
 }
 
 // Inside lists the request rows at or below a row: the tabs an action on it
@@ -265,9 +322,11 @@ func (s *WorkspaceService) do(action string, ids []string, text, protocol string
 		ws.CreateRequest(n.Collection, prefix+text, open, fail)
 	case "newAsync":
 		ws.CreateAsyncRequest(n.Collection, prefix+text, protocol, open, fail)
+	case "newGraphQL":
+		ws.CreateGraphQLRequest(n.Collection, prefix+text, open, fail)
 	case "newGRPC":
 		ws.CreateGRPCRequest(n.Collection, prefix+text, open, fail)
-	case "newDataset":
+	case "newDataset", "newDataFile":
 		ws.CreateDatasetRequest(n.Collection, prefix+text, protocol, open, fail)
 	case "newFolder":
 		tree := n.Tree
@@ -312,9 +371,9 @@ func (s *WorkspaceService) NewScratchFlow() {
 	})
 }
 
-// NewIn creates a request, async request, gRPC request, dataset query or flow at path in a
+// NewIn creates a request, async request, GraphQL request, gRPC request, dataset query or flow at path in a
 // collection (by its tree row), then asks the window to open it. kind is
-// request, async, grpc, dataset or flow; protocol is for async, and the database for a dataset query.
+// request, async, graphql, grpc, dataset or flow; protocol is for async, and the database for a dataset query.
 func (s *WorkspaceService) NewIn(kind, collectionRow, path, protocol string) {
 	s.app.actor.Do(func() {
 		n := s.app.workspace.Node(collectionRow)
@@ -326,6 +385,8 @@ func (s *WorkspaceService) NewIn(kind, collectionRow, path, protocol string) {
 			ws.CreateRequest(n.Collection, path, open, fail)
 		case "async":
 			ws.CreateAsyncRequest(n.Collection, path, protocol, open, fail)
+		case "graphql":
+			ws.CreateGraphQLRequest(n.Collection, path, open, fail)
 		case "grpc":
 			ws.CreateGRPCRequest(n.Collection, path, open, fail)
 		case "dataset":

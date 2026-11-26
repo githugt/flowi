@@ -206,11 +206,16 @@ func (t *translator) formData(fields []kv) []model.Field {
 	return parts
 }
 
-// graphQL sends {"query", "variables"} as JSON, as Postman does.
+// graphQL makes a GraphQL body. A query that holds {{ cannot be one (a document is sent as written), so it stays a
+// JSON body {"query", "variables"}, as Postman sends it.
 func (t *translator) graphQL(b *body, v *model.RequestVersion) model.Body {
 	if b.GraphQL == nil {
 		return model.Body{}
 	}
+	if gq, ok := importers.GraphQLBody(b.GraphQL.Query, b.GraphQL.Variables, "", t.text, func(s string) string { return s }); ok {
+		return gq
+	}
+	t.it.Unmapped("GraphQL query with variables of the collection", "kept as a JSON body", "Flowi sends a GraphQL query as written: move the values into the variables to get a GraphQL body")
 	var vars any = map[string]any{}
 	if strings.TrimSpace(b.GraphQL.Variables) != "" {
 		if err := json.Unmarshal([]byte(b.GraphQL.Variables), &vars); err != nil {

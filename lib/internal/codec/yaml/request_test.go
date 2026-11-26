@@ -719,3 +719,88 @@ func TestDecodeRequest_Given_unresolved_merge_markers_Then_the_conflict_is_repor
 		t.Fatalf("%+v", diags)
 	}
 }
+
+func TestRequest_should_round_trip_a_graphql_body(t *testing.T) {
+	data := []byte(requestHeader + `versions:
+  "1":
+    method: POST
+    url: "{{env.base_url}}/graphql"
+    body:
+      graphql:
+        query: |
+          query GetUser($id: ID!) {
+            user(id: $id) { name }
+          }
+        variables: "{\"id\": \"{{env.user_id}}\"}"
+        operation: GetUser
+`)
+	c := newCodec()
+
+	r, diags := c.DecodeRequest("r.req.yaml", "r", data)
+	requireNoDiagnostics(t, diags)
+	out, err := c.EncodeRequest(r)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+	g := r.Versions[0].Body.GraphQL
+	if g == nil || g.Operation != "GetUser" || !strings.Contains(g.Query, "user(id: $id)") || g.Variables != `{"id": "{{env.user_id}}"}` {
+		t.Fatalf("decoded body %+v", g)
+	}
+	if string(out) != string(data) {
+		t.Fatalf("round trip differs:\n--- got\n%s\n--- want\n%s", out, data)
+	}
+}
+
+func TestDecodeRequest_Given_a_graphql_body_beside_another_kind_Then_one_body_kind_is_expected(t *testing.T) {
+	data := []byte(requestHeader + "versions:\n  \"1\":\n    url: http://x\n    body:\n      json: '{}'\n      graphql:\n        query: '{ a }'\n")
+
+	_, diags := newCodec().DecodeRequest("r.req.yaml", "r", data)
+
+	if !diags.HasErrors() {
+		t.Fatal("a body with json and graphql must be refused")
+	}
+}
+
+func TestRequest_should_keep_an_empty_graphql_body(t *testing.T) {
+	data := []byte(requestHeader + "versions:\n  \"1\":\n    url: http://x\n    body:\n      graphql: {}\n")
+	c := newCodec()
+
+	r, diags := c.DecodeRequest("r.req.yaml", "r", data)
+	requireNoDiagnostics(t, diags)
+	out, err := c.EncodeRequest(r)
+
+	if err != nil || r.Versions[0].Body.GraphQL == nil || string(out) != string(data) {
+		t.Fatalf("an empty graphql body was lost: %v\n%s", err, out)
+	}
+}
+
+func TestRequest_should_round_trip_what_a_subscription_waits_for(t *testing.T) {
+	data := []byte(requestHeader + `versions:
+  "1":
+    url: http://x/graphql
+    body:
+      graphql:
+        query: subscription S { tick }
+        receive:
+          count: 3
+          timeout: 10s
+          match: body.data.tick > 1
+`)
+	c := newCodec()
+
+	r, diags := c.DecodeRequest("r.req.yaml", "r", data)
+	requireNoDiagnostics(t, diags)
+	out, err := c.EncodeRequest(r)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+	rc := r.Versions[0].Body.GraphQL.Receive
+	if rc == nil || rc.Count != 3 || rc.Timeout.String() != "10s" || rc.Match != "body.data.tick > 1" {
+		t.Fatalf("decoded %+v", rc)
+	}
+	if string(out) != string(data) {
+		t.Fatalf("round trip differs:\n--- got\n%s\n--- want\n%s", out, data)
+	}
+}

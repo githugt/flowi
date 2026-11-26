@@ -53,3 +53,33 @@ func TestWorkspaceVM_CreateFolder_Given_no_name_Then_makes_new_folder_inside_the
 		}
 	}
 }
+
+func TestWorkspaceVM_CreateFolder_Given_the_same_name_in_requests_and_flows_Then_each_tree_has_its_own_folder(t *testing.T) {
+	// Before: nothing showed that a folder made under Flows stays out of Requests, and the other way round.
+	b := &vmtest.Backend{Cols: []model.Collection{vmtest.SampleCollection()}}
+	ws, w := loadedWorkspace(t, b)
+
+	ws.CreateFolder("C1", "requests", "billing", nil)
+	ws.CreateFolder("C1", "flows", "billing", nil)
+	w.Wait()
+
+	inRequests := ws.Node("c:C1/requests/billing")
+	inFlows := ws.Node("c:C1/flows/billing")
+	if inRequests.Kind != vm.NodeFolder || inRequests.Tree != "requests" || inFlows.Kind != vm.NodeFolder || inFlows.Tree != "flows" || inRequests.ID == inFlows.ID {
+		t.Fatalf("requests %+v flows %+v", inRequests, inFlows)
+	}
+}
+
+func TestWorkspaceVM_DeleteFolder_Given_the_same_name_in_both_trees_Then_only_that_tree_is_asked_to_delete(t *testing.T) {
+	col := vmtest.SampleCollection()
+	col.Folders = []model.Folder{{Dir: "requests/billing"}, {Dir: "flows/billing"}}
+	b := &vmtest.Backend{Cols: []model.Collection{col}}
+	ws, w := loadedWorkspace(t, b)
+
+	ws.DeleteFolder(ws.Node("c:C1/flows/billing"), nil)
+	w.Wait()
+
+	if !b.Called("DeleteFolder flows/billing") || b.Called("DeleteFolder requests/billing") {
+		t.Fatalf("calls %v", b.CallLog())
+	}
+}

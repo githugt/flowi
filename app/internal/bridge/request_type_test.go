@@ -12,7 +12,7 @@ import (
 // Before: a request could not change type, and its name could not be written on its screen.
 func TestRequestService_SwitchType_Given_an_http_request_Then_the_view_has_the_new_type_and_a_notice_says_what_was_left(t *testing.T) {
 	reqs, v, pub, _, _ := openLoginOptions(t)
-	if v.Type != "http" || len(v.Types) != 5 {
+	if v.Type != "http" || len(v.Types) != 6 {
 		t.Fatalf("type %q, %d types", v.Type, len(v.Types))
 	}
 
@@ -39,7 +39,7 @@ func TestRequestService_SwitchType_Given_an_unknown_type_Then_a_notice_refuses_i
 	}
 }
 
-func TestRequestService_SetName_Then_the_view_carries_it_unsaved_and_the_five_types_are_named(t *testing.T) {
+func TestRequestService_SetName_Then_the_view_carries_it_unsaved_and_the_types_are_named(t *testing.T) {
 	reqs, v, pub, _, _ := openLoginOptions(t)
 
 	reqs.SetName(v.Node, "Sign in")
@@ -55,7 +55,7 @@ func TestRequestService_SetName_Then_the_view_carries_it_unsaved_and_the_five_ty
 			t.Errorf("%s has no icon", c.ID)
 		}
 	}
-	if strings.Join(labels, ",") != "HTTP,gRPC,Messaging,Database,Data file" {
+	if strings.Join(labels, ",") != "HTTP,GraphQL,gRPC,Messaging,Database,Data file" {
 		t.Fatalf("labels %v", labels)
 	}
 }
@@ -80,5 +80,23 @@ func TestRequestService_SetName_Then_the_tree_shows_the_typed_name_and_clearing_
 
 	if typed != "Sign in" || cleared != "login" {
 		t.Fatalf("typed %q, cleared %q", typed, cleared)
+	}
+}
+
+// Before: the editor could not make a request a GraphQL operation, so there was no query to edit and no kind to show.
+func TestRequestService_SetBodyKind_Given_graphql_Then_the_view_has_the_operation_and_what_is_wrong_with_it(t *testing.T) {
+	reqs, v, pub, _, _ := openLoginOptions(t)
+
+	reqs.SetBodyKind(v.Node, "graphql")
+	empty := pub.last["request"].(bridge.RequestView)
+	reqs.SetGraphQL(v.Node, "query", "query GetUser($id: ID!) { user(id: $id) { name } }")
+	reqs.SetGraphQL(v.Node, "variables", `{"id": 1}`)
+	got := pub.last["request"].(bridge.RequestView)
+
+	if empty.BodyKind != "graphql" || empty.GraphQL == nil || empty.GraphQL.Problem == "" || empty.Type != "graphql" || empty.Verb != "GQL" || empty.Kind != "http" {
+		t.Fatalf("empty view: kind %q type %q verb %q kind %q info %+v", empty.BodyKind, empty.Type, empty.Verb, empty.Kind, empty.GraphQL)
+	}
+	if got.GraphQL == nil || got.GraphQL.Kind != "query" || got.GraphQL.Problem != "" || got.Current.Body.GraphQL == nil || got.Current.Body.GraphQL.Variables != `{"id": 1}` || !got.Dirty {
+		t.Fatalf("view after typing: %+v current %+v", got.GraphQL, got.Current.Body)
 	}
 }

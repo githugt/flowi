@@ -176,6 +176,12 @@ func (b *Workspace) NewAsyncRequest(collection model.ID, path, protocol string) 
 	return b.ws.NewAsyncRequest(collection, path, protocol)
 }
 
+// NewGraphQLRequest creates a GraphQL request.
+func (b *Workspace) NewGraphQLRequest(collection model.ID, path string) (flowi.RequestTarget, error) {
+	b.guard.Check("NewGraphQLRequest")
+	return b.ws.NewGraphQLRequest(collection, path)
+}
+
 // NewGRPCRequest creates a gRPC request.
 func (b *Workspace) NewGRPCRequest(collection model.ID, path string) (flowi.RequestTarget, error) {
 	b.guard.Check("NewGRPCRequest")
@@ -475,6 +481,16 @@ func (b *Workspace) AutoLockVault() bool {
 func (b *Workspace) DeclareSecret(env, name, value string) error {
 	b.guard.Check("DeclareSecret")
 	return b.ws.DeclareSecret(env, name, value)
+}
+
+func (b *Workspace) LintSpecs(collection model.ID) (diag.List, error) {
+	b.guard.Check("LintSpecs")
+	return b.ws.LintSpecs(collection)
+}
+
+func (b *Workspace) Callers(ts []flowi.RequestTarget) map[flowi.RequestTarget][]analysis.Caller {
+	b.guard.Check("Callers")
+	return b.ws.Callers(ts)
 }
 
 func (b *Workspace) ImpactOfDraft(t flowi.RequestTarget, draft model.Request) (analysis.Report, diag.List, error) {

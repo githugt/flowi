@@ -147,3 +147,19 @@ func keysOf(m map[string]any) []string {
 	}
 	return out
 }
+
+// Before: a GraphQL request had no body in the description, and with no method it was described as a GET.
+func TestDescribe_Given_a_graphql_request_Then_it_is_a_post_with_the_graphql_over_http_body(t *testing.T) {
+	c := describedCollection()
+	c.Requests = append(c.Requests, model.Request{Meta: model.Meta{ID: "R9", Name: "Me"}, Path: "gql/me", Versions: []model.RequestVersion{
+		{Label: "1", URL: "{{env.base_url}}/graphql", Body: model.Body{GraphQL: &model.GraphQL{Query: "{ me { id } }"}}},
+	}})
+
+	text, _ := describe(t, c, nil)
+
+	for _, want := range []string{"/graphql:", "post:", "application/json:", "operationName:", "variables:"} {
+		if !strings.Contains(text, want) {
+			t.Errorf("description lacks %q:\n%s", want, text)
+		}
+	}
+}

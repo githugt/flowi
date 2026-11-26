@@ -18,6 +18,7 @@ type AsyncInfo struct {
 	Mode                 string      `json:"mode"`
 	Bindings             []string    `json:"bindings"`    // the protocol's own options
 	Credentials          []string    `json:"credentials"` // the entries that sign in; none for ws and sse
+	Auth                 bool        `json:"auth"`        // the protocol takes an auth block (ws and sse): the Auth section stands in for Credentials
 	Cloud                bool        `json:"cloud"`       // a cloud service: its sign-in is the provider's own lookup or the credentials written here
 	HeadersAreConnection bool        `json:"headersAreConnection"`
 	ServerExample        string      `json:"serverExample"` // what the server box shows as its placeholder for this protocol
@@ -60,7 +61,7 @@ func asyncInfoOf(r *vm.Request) *AsyncInfo {
 	}
 	return &AsyncInfo{
 		Protocols: protocolChoices(), Modes: modes, Mode: string(r.Mode()), Bindings: nonNil(model.AsyncBindings(a.Protocol)),
-		Credentials: nonNil(model.AsyncCredentials(a.Protocol)), Cloud: model.CloudProtocol(a.Protocol), HeadersAreConnection: vm.AsyncHeadersAreConnection(a.Protocol), Block: a,
+		Credentials: nonNil(model.AsyncCredentials(a.Protocol)), Auth: len(model.AsyncAuthTypes(a.Protocol)) > 0, Cloud: model.CloudProtocol(a.Protocol), HeadersAreConnection: vm.AsyncHeadersAreConnection(a.Protocol), Block: a,
 		ServerExample: hint.Server, ChannelLabel: hint.Channel, ChannelHint: hint.ChannelHint,
 	}
 }

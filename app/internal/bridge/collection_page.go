@@ -19,7 +19,7 @@ import (
 )
 
 // maxSpecFindings bounds how many findings about the descriptions the page lists; the rest are counted. The Problems
-// panel has all of them.
+// panel has all the ones that are problems: a note is a suggestion and is only listed here.
 const maxSpecFindings = 40
 
 // CollectionService backs the page of one collection: what it is about, its state, what it uses and how it is set up.
@@ -103,7 +103,7 @@ type PageEndpoint struct {
 
 // PageFinding is one finding about a kept API description.
 type PageFinding struct {
-	Severity string `json:"severity"` // error | warning
+	Severity string `json:"severity"` // error | warning | note
 	Message  string `json:"message"`
 	Hint     string `json:"hint"`
 	Path     string `json:"path"` // where in the description, as a YAML path; "" for a .proto file
@@ -123,10 +123,12 @@ type PageState struct {
 	Failing         int             `json:"failing"`
 	Broken          []string        `json:"broken"` // files that could not be read
 	// Spec are the findings of the spec linter on the kept descriptions, worst first, at most maxSpecFindings;
-	// SpecTotal is how many there are, SpecErrors how many of them are errors.
+	// SpecTotal is how many of them are problems (errors and warnings), SpecErrors how many are errors and SpecNotes how
+	// many are suggestions, which come last and count for nothing else on the page.
 	Spec       []PageFinding `json:"spec"`
 	SpecTotal  int           `json:"specTotal"`
 	SpecErrors int           `json:"specErrors"`
+	SpecNotes  int           `json:"specNotes"`
 	// ImpactBroken counts the requests something reads that no longer fits their contract; DriftMoved the requests
 	// whose responses moved in the last drift check on the page.
 	ImpactBroken int `json:"impactBroken"`
@@ -204,18 +206,18 @@ type CollectionPage struct {
 
 // pageInput is what the page is built from: all of it read from the library by Page, so the build is plain data.
 type pageInput struct {
-	Collection model.Collection
-	Specs      []string
-	Exports    []flowi.ExportItem
-	Impact     []analysis.Report // one for each request something uses
-	Drift      []flowDrift       // the newest drift check of each flow
-	Coverage   analysis.Coverage
-	LastRun    map[model.ID]*flowi.RunSummary // a flow's newest saved run; absent when it never ran
-	Secrets    map[string][]flowi.SecretUse
-	Workspace  []model.Environment // the workspace's environments
-	Own        []model.Environment // the ones in the collection's own folder
-	Mounted    map[model.ID]bool
-	Problems   diag.List // the workspace's problems: the findings about this collection's descriptions are picked out
+	Collection   model.Collection
+	Specs        []string
+	Exports      []flowi.ExportItem
+	Impact       []analysis.Report // one for each request something uses
+	Drift        []flowDrift       // the newest drift check of each flow
+	Coverage     analysis.Coverage
+	LastRun      map[model.ID]*flowi.RunSummary // a flow's newest saved run; absent when it never ran
+	Secrets      map[string][]flowi.SecretUse
+	Workspace    []model.Environment // the workspace's environments
+	Own          []model.Environment // the ones in the collection's own folder
+	Mounted      map[model.ID]bool
+	SpecFindings diag.List // what the spec linter finds in this collection's kept descriptions, notes included
 }
 
 // Page gathers the page of a collection. A part that cannot be read is left empty; the rest still shows.
@@ -249,7 +251,9 @@ func (s *CollectionService) Page(collection string) (CollectionPage, error) {
 			in.LastRun[f.ID] = &runs[0]
 		}
 	}
-	in.Problems = s.app.backend.Validate()
+	if found, err := s.app.backend.LintSpecs(id); err == nil {
+		in.SpecFindings = found
+	}
 	in.Secrets = s.app.backend.SecretUses()
 	in.Workspace = s.app.backend.Environments()
 	if own, _, err := s.app.backend.CollectionEnvironments(id); err == nil {
@@ -339,7 +343,7 @@ func pageStateOf(in pageInput) PageState {
 	for _, b := range c.Broken {
 		st.Broken = append(st.Broken, b.Path)
 	}
-	st.Spec, st.SpecTotal, st.SpecErrors = specFindings(in)
+	st.Spec, st.SpecTotal, st.SpecErrors, st.SpecNotes = specFindings(in)
 	for _, i := range impact {
 		if i.Broken > 0 {
 			st.ImpactBroken++
@@ -353,11 +357,13 @@ func pageStateOf(in pageInput) PageState {
 	return st
 }
 
-// specFindings picks the spec linter's findings about this collection's files out of the workspace's problems,
-// errors first.
-func specFindings(in pageInput) (list []PageFinding, total, errs int) {
+// specFindings lists the spec linter's findings about this collection's files, errors first, then warnings, then notes.
+// total counts the problems among them, and notes the suggestions, which the rest of the page does not count.
+//
+// Before: a missing tag was a warning here and in the Problems panel; it is a note now, listed on this page only.
+func specFindings(in pageInput) (list []PageFinding, total, errs, notes int) {
 	var mine diag.List
-	for _, d := range in.Problems {
+	for _, d := range in.SpecFindings {
 		if !flowi.IsSpecDiagnostic(d) {
 			continue
 		}
@@ -369,21 +375,23 @@ func specFindings(in pageInput) (list []PageFinding, total, errs int) {
 	slices.SortStableFunc(mine, func(a, b diag.Diagnostic) int { return int(a.Severity) - int(b.Severity) })
 	list = []PageFinding{}
 	for i, d := range mine {
-		if d.Severity == diag.SeverityError {
+		switch d.Severity {
+		case diag.SeverityError:
 			errs++
+			total++
+		case diag.SeverityNote:
+			notes++
+		default:
+			total++
 		}
 		if i >= maxSpecFindings {
 			continue
 		}
 		msg, hint := diag.English().Message(d)
-		sev := "warning"
-		if d.Severity == diag.SeverityError {
-			sev = "error"
-		}
 		rel, _ := filepath.Rel(in.Collection.Root, d.File)
-		list = append(list, PageFinding{Severity: sev, Message: msg, Hint: hint, Path: d.Path, File: filepath.ToSlash(rel), Line: d.Pos.Line})
+		list = append(list, PageFinding{Severity: d.Severity.String(), Message: msg, Hint: hint, Path: d.Path, File: filepath.ToSlash(rel), Line: d.Pos.Line})
 	}
-	return list, len(mine), errs
+	return list, total, errs, notes
 }
 
 func pageFlowLabel(f model.Flow) string {

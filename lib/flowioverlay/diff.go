@@ -118,13 +118,13 @@ func diffBody(base, edited model.Body) ([]model.OverlayOp, string) {
 	if reflect.DeepEqual(base, edited) {
 		return nil, ""
 	}
-	if edited.JSON != "" && base.Text == "" && base.File == "" && len(base.Form) == 0 && len(base.Multipart) == 0 {
+	if edited.JSON != "" && base.Text == "" && base.File == "" && len(base.Form) == 0 && len(base.Multipart) == 0 && base.GraphQL == nil {
 		return diffJSONBody(base.JSON, edited.JSON)
 	}
-	if edited.Text != "" && base.JSON == "" && base.File == "" && len(base.Form) == 0 && len(base.Multipart) == 0 {
+	if edited.Text != "" && base.JSON == "" && base.File == "" && len(base.Form) == 0 && len(base.Multipart) == 0 && base.GraphQL == nil {
 		return []model.OverlayOp{{Verb: model.OverlaySet, Path: "body.text", Value: edited.Text, Was: nonEmpty(base.Text)}}, ""
 	}
-	return nil, "the body (an overlay holds a JSON or text body, not a form, file or a change of kind)"
+	return nil, "the body (an overlay holds a JSON or text body, not a form, file, GraphQL operation or a change of kind)"
 }
 
 func diffJSONBody(base, edited string) ([]model.OverlayOp, string) {

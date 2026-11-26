@@ -7,7 +7,7 @@ export function headersHint(kind: HeaderListKind): string {
     case 'send':
       return 'Headers travel with each message sent.'
     case 'connect':
-      return 'Sent when the connection opens. Put the credential here, for example Authorization: Bearer {{secret.token}}.'
+      return 'Sent when the connection opens. Credentials go in Auth.'
     default:
       return 'Content-Type, Accept and the like. Credentials go in Auth.'
   }

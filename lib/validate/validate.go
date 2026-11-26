@@ -57,6 +57,7 @@ func checks() []check {
 		checkMethods,
 		checkAsync,
 		checkDataset,
+		checkGraphQL,
 		checkOutcomes,
 		checkExpect,
 		checkAuth,

@@ -71,6 +71,23 @@ func TestNewGRPCRequest_should_create_a_grpc_version_that_loads_back(t *testing.
 	}
 }
 
+func TestNewGraphQLRequest_should_create_a_graphql_version_that_loads_back_and_validates(t *testing.T) {
+	w := demoWorkspace(t)
+
+	target, err := w.NewGraphQLRequest(w.Collections()[0].Manifest.ID, "users/get")
+
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, r, err := w.requestFor(target)
+	if err != nil || r.Versions[0].Body.GraphQL == nil || r.Versions[0].Method != "POST" || r.Versions[0].Body.GraphQL.Query != StarterGraphQLQuery {
+		t.Fatalf("loaded back as %+v, err %v", r.Versions, err)
+	}
+	if r.Versions[0].Family() != model.FamilyGraphQL {
+		t.Errorf("family %v", r.Versions[0].Family())
+	}
+}
+
 func TestGRPCMethods_should_list_the_methods_of_the_server_the_request_points_at(t *testing.T) {
 	w := demoWorkspace(t)
 	addr := startReflectingServer(t)

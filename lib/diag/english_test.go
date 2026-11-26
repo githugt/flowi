@@ -20,7 +20,7 @@ func TestEnglish_should_have_template_for_every_code(t *testing.T) {
 }
 
 func TestEnglish_should_substitute_args(t *testing.T) {
-	d := New(CodeRefUnknownRequest, Location{}, map[string]string{"id": "01JABCDEF"})
+	d := New(CodeRefUnknownRequest, Location{}, map[string]string{"ref": "id 01JABCDEF"})
 
 	msg, _ := English().Message(d)
 

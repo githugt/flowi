@@ -6,13 +6,20 @@ describe('the New menu', () => {
   const second = menus.slice(menus.indexOf('export function newInCollectionMenu'), menus.indexOf('const protocols'))
   const labels = (src: string) => [...src.matchAll(/label: '([^']+)'/g)].map((m) => m[1]).filter((l) => l)
 
-  it('has ten items, with the kinds made in a collection behind one entry', () => {
+  it('has eleven items, with the kinds made in a collection behind one entry', () => {
     // Before: 17 items in one list, six of them the same kinds again "in a collection…".
-    expect(labels(first)).toHaveLength(10)
+    expect(labels(first)).toHaveLength(11)
     expect(labels(first)).toContain('New in a collection…')
     expect(first).toContain('newInCollectionMenu()')
   })
+  it('asks for a name before it makes a GraphQL or gRPC request in Scratch', () => {
+    // Before: the two entries made the request at once, so the name could not be chosen.
+    expect(first).toContain("newScratchNamed('graphql'")
+    expect(first).toContain("newScratchNamed('grpc'")
+    expect(first).not.toContain("NewAt('graphql'")
+    expect(first).not.toContain("NewAt('grpc'")
+  })
   it('keeps every kind in the second list', () => {
-    expect(labels(second)).toEqual(['Request…', 'Message request…', 'gRPC request…', 'Database query…', 'Data file query…', 'Flow…'])
+    expect(labels(second)).toEqual(['Request…', 'Message request…', 'GraphQL request…', 'gRPC request…', 'Database query…', 'Data file query…', 'Flow…'])
   })
 })

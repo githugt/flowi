@@ -11,6 +11,14 @@ type Body struct {
 	File      string
 	Form      []KeyValue
 	Multipart []Field
+	// GraphQL is a GraphQL operation: the body is then the JSON object {query, variables, operationName} (for a
+	// GET, the same three parameters in the URL). Only an HTTP request has it.
+	GraphQL *GraphQL
+}
+
+// Empty reports whether the body has no content of any kind.
+func (b Body) Empty() bool {
+	return b.JSON == "" && b.Text == "" && b.File == "" && len(b.Form) == 0 && len(b.Multipart) == 0 && b.GraphQL == nil
 }
 
 // Extraction names a value taken from a response. From is one of body,

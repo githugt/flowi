@@ -54,6 +54,19 @@ func AuthTypes() []string {
 	return []string{AuthAPIKey, AuthDigest, AuthOAuth2, AuthOAuth1, AuthAWSSigV4, AuthJWT, AuthHawk, AuthMutualTLS, AuthNTLM, AuthHTTPSig, AuthDPoP}
 }
 
+// AsyncAuthTypes are the schemes of the auth block a message request of protocol p can use: the ones that add a
+// credential to the connection (a header, a query parameter, a token) or present a client certificate before the
+// connection opens. WebSocket and SSE open with an HTTP request, so they take the same block as HTTP minus the schemes
+// that sign the request or answer a 401 (they have no request body to sign and no second try). Every other message
+// protocol takes its credentials in its bindings (nil).
+func AsyncAuthTypes(p string) []string {
+	switch p {
+	case ProtocolWS, ProtocolSSE:
+		return []string{AuthAPIKey, AuthOAuth2, AuthJWT, AuthMutualTLS}
+	}
+	return nil
+}
+
 // AuthParams lists the parameter names a scheme understands, in the order a
 // form shows them; nil for an unknown scheme.
 func AuthParams(authType string) []string {

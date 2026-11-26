@@ -17,6 +17,7 @@ import (
 	"github.com/githugt/flowi/lib/template"
 	"github.com/githugt/flowi/lib/transport"
 	transportall "github.com/githugt/flowi/lib/transport/all"
+	"github.com/githugt/flowi/lib/transport/graphqlws"
 )
 
 // asyncMaxBytes stops a receive whose messages add up to more than this: a
@@ -29,6 +30,11 @@ type builtAsync struct {
 	sent     SentRequest // as recorded: secret-bearing fields already masked
 	missing  []string    // declared secrets with no value (FLW-SEC-001)
 	protocol string
+	receive  model.AsyncReceive // what the request waits for, defaults filled in
+	match    string             // a GraphQL subscription's filter (a message request's is read from its version)
+	// auth is the version's auth block with its parameters rendered; only WebSocket and SSE requests carry one
+	// (model.AsyncAuthTypes), the other protocols take their credentials in their bindings.
+	auth *model.Auth
 }
 
 // registry is the transports this run uses.
@@ -44,9 +50,15 @@ func (r *runner) registry() transport.Registry {
 // and save, in the order an HTTP request has.
 func (x *execution) sendAsync(ctx context.Context, post []HookRef) {
 	b, ok := x.buildAsync()
-	if !ok {
+	if !ok || !x.authenticateAsync(ctx, &b) {
 		return
 	}
+	x.finishAsync(ctx, post, b)
+}
+
+// finishAsync runs a built operation and does what follows it: record the messages, extract, assert, post-hooks and
+// save. A message request and a GraphQL subscription both end here.
+func (x *execution) finishAsync(ctx context.Context, post []HookRef, b builtAsync) {
 	tr, ok := x.r.registry().Lookup(b.protocol)
 	if !ok {
 		x.fail(StatusError, diag.List{diag.New(diag.CodeAsyncProtocol, diag.Location{}, map[string]string{"protocol": b.protocol})})
@@ -77,13 +89,14 @@ func (x *execution) sendAsync(ctx context.Context, post []HookRef) {
 	x.observeAsync(res)
 	if err != nil {
 		if !errors.Is(err, errMessageHook) {
-			x.failAsync(err, res) // a failed message hook has reported itself
+			x.failAsync(err, res, b.receive) // a failed message hook has reported itself
 		}
 		x.save() // the messages that did arrive are worth keeping
 		return
 	}
 	x.extractOutputs()
 	x.checkAssertions()
+	x.checkSubscriptionErrors()
 	x.runPhase(ctx, post, nodes.PhasePost)
 	if ctx.Err() == nil {
 		x.save()
@@ -124,11 +137,15 @@ func (x *execution) runTransport(ctx context.Context, tr transport.Transport, b 
 }
 
 // failAsync turns a transport error into the request's diagnostics.
-func (x *execution) failAsync(err error, res transport.Result) {
+func (x *execution) failAsync(err error, res transport.Result, rc model.AsyncReceive) {
 	if errors.Is(err, transport.ErrTimeout) {
-		rc := normalizedReceive(x.version.Async.Receive)
 		x.fail(StatusError, diag.List{diag.New(diag.CodeAsyncTimeout, diag.Location{}, map[string]string{
 			"got": itoa(len(res.Received)), "want": itoa(rc.Count), "timeout": rc.Timeout.String()})})
+		return
+	}
+	var se *graphqlws.ServerError
+	if errors.As(err, &se) {
+		x.fail(StatusError, diag.List{diag.New(diag.CodeGraphQLSubscription, diag.Location{}, map[string]string{"detail": x.r.secrets.String(se.Detail)})})
 		return
 	}
 	var ce connectionError
@@ -150,13 +167,17 @@ func (x *execution) buildAsync() (builtAsync, bool) {
 	return b, true
 }
 
-func (x *execution) renderAsync(lenient bool) (builtAsync, diag.List) {
-	in := buildInput{
+// asyncInput is what an operation that is not an HTTP request renders from.
+func (x *execution) asyncInput(lenient bool) buildInput {
+	return buildInput{
 		version: x.version, scope: x.scope(lenient), empty: x.cfg.empty, label: x.c.request.Path,
 		root: x.c.collection.Root, secretVars: x.env.secrets, envValues: x.env.values, missingSecret: x.r.secrets.isMissing(x.env.name), memo: x.memo,
 		secret: x.r.secrets.derived, verbatim: lenient,
 	}
-	b, diags := buildAsync(in)
+}
+
+func (x *execution) renderAsync(lenient bool) (builtAsync, diag.List) {
+	b, diags := buildAsync(x.asyncInput(lenient))
 	tlsCfg, err := httpx.TLSConfig(x.cfg.caFiles)
 	if err != nil {
 		diags = append(diags, diag.New(diag.CodeHTTPFailed, diag.Location{}, map[string]string{"detail": err.Error()}))
@@ -202,13 +223,17 @@ func buildAsync(in buildInput) (builtAsync, diag.List) {
 	if a.Send != nil {
 		op.Send, shownHeaders, shownBody = renderSend(b, a.Send, shownConn)
 	}
+	out.receive = normalizedReceive(a.Receive)
 	if a.Receive != nil {
-		rc := normalizedReceive(a.Receive)
+		rc := out.receive
 		op.Receive = &transport.Receive{Count: rc.Count, Timeout: rc.Timeout, MaxBytes: asyncMaxBytes}
 	}
 	out.op = op
 	out.sent = SentRequest{
 		Method: model.ProtocolVerb(a.Protocol), URL: shownTarget(b, a.Protocol, server, channel), Header: shownHeaders, Body: shownBody,
+	}
+	if len(model.AsyncAuthTypes(a.Protocol)) > 0 {
+		out.auth = b.auth()
 	}
 	out.missing = b.missingSecrets
 	return out, b.diags

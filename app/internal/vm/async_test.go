@@ -360,3 +360,48 @@ func TestAsyncModesFor_should_offer_no_choice_to_one_way_protocols(t *testing.T)
 		t.Errorf("pubsub modes %v", got)
 	}
 }
+
+// Before: an auth block (a scheme or a named authentication) did not light the Auth section's dot, only an Authorization header did.
+func TestRequestVM_Configured_should_mark_the_auth_section_for_a_scheme_or_a_named_authentication(t *testing.T) {
+	r, _ := asyncRequestVM(t, asyncBackend())
+	none := r.Configured(vm.SectionAuth)
+
+	r.SetAuthScheme(model.AuthAPIKey)
+	scheme := r.Configured(vm.SectionAuth)
+	r.SetAuthUse("stream-key")
+	named := r.Configured(vm.SectionAuth)
+
+	if none || !scheme || !named {
+		t.Fatalf("none %v scheme %v named %v", none, scheme, named)
+	}
+}
+
+// Before: moving a WebSocket request with an API key to MQTT left an auth block that validation refuses (FLW-AUTH-001).
+func TestRequestVM_SetProtocol_should_fit_the_auth_block_to_the_new_protocol(t *testing.T) {
+	tests := []struct {
+		name     string
+		start    string
+		auth     *model.Auth
+		to       string
+		wantAuth bool
+	}{
+		{"usable scheme stays between ws and sse", "ws", &model.Auth{Type: model.AuthAPIKey}, "sse", true},
+		{"unusable scheme is dropped", "ws", &model.Auth{Type: model.AuthAPIKey}, "mqtt", false},
+		{"scheme the new protocol cannot use is dropped", "mqtt", &model.Auth{Type: model.AuthDigest}, "ws", false},
+		{"named authentication stays for a protocol that takes one", "ws", &model.Auth{Use: "stream-key"}, "sse", true},
+		{"named authentication goes with a protocol that takes none", "ws", &model.Auth{Use: "stream-key"}, "nats", false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r, _ := asyncRequestVM(t, asyncBackend())
+			r.SetProtocol(tt.start)
+			r.Edit(func(v *model.RequestVersion) { v.Auth = tt.auth })
+
+			r.SetProtocol(tt.to)
+
+			if got := r.Current().Auth != nil; got != tt.wantAuth {
+				t.Fatalf("auth %+v, want present %v", r.Current().Auth, tt.wantAuth)
+			}
+		})
+	}
+}

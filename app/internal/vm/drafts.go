@@ -67,6 +67,23 @@ func (ws *Workspace) CreateAsyncRequest(collection model.ID, path, protocol stri
 	}, ws.openThenReport(open, fail, &seedErr), fail)
 }
 
+// CreateGraphQLRequest is CreateRequest for a GraphQL request.
+func (ws *Workspace) CreateGraphQLRequest(collection model.ID, path string, open func(nodeID string), fail func(error)) {
+	var seedErr error
+	path = ws.untitledIfBlank(collection, path)
+	ws.create(func() (string, error) {
+		id, err := ws.orScratch(collection)
+		if err != nil {
+			return "", err
+		}
+		t, err := ws.b.NewGraphQLRequest(id, path)
+		if err == nil {
+			seedErr = ws.b.SeedRequestHooks(t) // a GraphQL request is HTTP: it gets the same starting hooks
+		}
+		return requestNodeID(t), err
+	}, ws.openThenReport(open, fail, &seedErr), fail)
+}
+
 // CreateGRPCRequest is CreateRequest for a gRPC request.
 func (ws *Workspace) CreateGRPCRequest(collection model.ID, path string, open func(nodeID string), fail func(error)) {
 	var seedErr error
@@ -198,7 +215,7 @@ func (ws *Workspace) untitledIfBlank(collection model.ID, path string) string {
 		return path
 	}
 	taken := map[string]bool{}
-	if c, ok := ws.Collection(collection); ok {
+	if c, ok := ws.numberingCollection(collection); ok {
 		for _, r := range c.Requests {
 			taken[r.Path] = true
 		}
@@ -208,6 +225,20 @@ func (ws *Workspace) untitledIfBlank(collection model.ID, path string) string {
 		name = fmt.Sprintf("%suntitled-%d", path, n)
 	}
 	return name
+}
+
+// numberingCollection is the collection a new request is numbered against: collection, or Scratch when it is "" (a
+// request made without choosing one goes to Scratch). Without Scratch yet, nothing is taken.
+func (ws *Workspace) numberingCollection(collection model.ID) (model.Collection, bool) {
+	if collection != "" {
+		return ws.Collection(collection)
+	}
+	for _, c := range ws.snap.collections {
+		if ws.IsScratch(c) {
+			return c, true
+		}
+	}
+	return model.Collection{}, false
 }
 
 // openThenReport opens the new node, then reports a seeding error, which does

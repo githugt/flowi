@@ -5,6 +5,8 @@
 // validation and execution live in other packages.
 package model
 
+import "fmt"
+
 // ID is a ULID in canonical upper-case form.
 type ID string
 
@@ -49,6 +51,15 @@ type Ref struct {
 	// that fills this reference when the blueprint is used; ID and Path are
 	// then empty.
 	Param string
+}
+
+// Label says which request or flow r points at for a person reading a message: the path the file remembers, which is
+// what the sidebar shows, then the id ("auth/login" (id 01J…)); just the id when the file has no path hint.
+func (r Ref) Label() string {
+	if r.Path == "" {
+		return "id " + string(r.ID)
+	}
+	return fmt.Sprintf("%q (id %s)", r.Path, r.ID)
 }
 
 // HookStep is one pre or post hook: a reusable flow or inline nodes.

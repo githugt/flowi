@@ -28,11 +28,15 @@ export interface ImplicitHeader {
 }
 
 interface Shape {
-  body: { JSON?: string; Text?: string; Form?: unknown[] | null; Multipart?: unknown[] | null; File?: string }
+  body: { JSON?: string; Text?: string; Form?: unknown[] | null; Multipart?: unknown[] | null; File?: string; GraphQL?: unknown }
+  /** The request's method; a GraphQL body is a JSON body for any but GET, which sends it in the address. */
+  method?: string
   /** The names of the headers the request sets, as typed. */
   headers: string[]
   /** An auth scheme is chosen. */
   hasAuth: boolean
+  /** The GraphQL operation is a subscription: it opens a WebSocket, so the body's headers are not sent. */
+  subscription?: boolean
 }
 
 /**
@@ -43,8 +47,11 @@ export function implicitHeaders(s: Shape): ImplicitHeader[] {
   const set = new Set(s.headers.map((h) => h.trim().toLowerCase()))
   const out: ImplicitHeader[] = []
   const b = s.body
-  const type = b.JSON ? 'application/json' : b.Text ? 'text/plain; charset=utf-8' : b.Form?.length ? 'application/x-www-form-urlencoded' : b.Multipart?.length ? 'multipart/form-data' : ''
+  if (s.subscription) return out // a subscription is not an HTTP request with a body: the handshake carries the headers it names
+  const graphql = !!b.GraphQL
+  const type = graphql ? (s.method?.toUpperCase() === 'GET' ? '' : 'application/json') : b.JSON ? 'application/json' : b.Text ? 'text/plain; charset=utf-8' : b.Form?.length ? 'application/x-www-form-urlencoded' : b.Multipart?.length ? 'multipart/form-data' : ''
   if (type && !set.has('content-type')) out.push({ name: 'Content-Type', value: type, source: 'from Body' })
+  if (graphql && !set.has('accept')) out.push({ name: 'Accept', value: 'application/graphql-response+json, application/json', source: 'from Body' })
   if (s.hasAuth && !set.has('authorization')) out.push({ name: 'Authorization', value: '…', source: 'from Auth' })
   return out
 }

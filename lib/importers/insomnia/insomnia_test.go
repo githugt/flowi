@@ -69,3 +69,21 @@ func TestImport_should_refuse_what_is_not_an_export(t *testing.T) {
 		})
 	}
 }
+
+// Before: an Insomnia GraphQL body was imported as plain JSON, so Flowi never knew the request was GraphQL.
+func TestImport_Given_a_graphql_body_Then_it_becomes_a_graphql_body_with_its_operation_name(t *testing.T) {
+	src := `{"_type": "export", "__export_format": 4, "resources": [
+  {"_id": "wrk_1", "_type": "workspace", "name": "W"},
+  {"_id": "req_1", "_type": "request", "parentId": "wrk_1", "name": "G", "method": "POST", "url": "https://api.example.com/graphql",
+   "body": {"mimeType": "application/graphql", "text": "{\"query\": \"query Me { me { id } }\", \"variables\": {\"a\": 1}, \"operationName\": \"Me\"}"}}]}`
+
+	r, fatal := Import([]byte(src), "g.json")
+
+	if len(fatal) != 0 || len(r.Requests) != 1 {
+		t.Fatalf("fatal %v requests %d", fatal, len(r.Requests))
+	}
+	g := r.Requests[0].Versions[0].Body.GraphQL
+	if g == nil || g.Query != "query Me { me { id } }" || g.Operation != "Me" || g.Variables != `{"a": 1}` {
+		t.Fatalf("body %+v", r.Requests[0].Versions[0].Body)
+	}
+}

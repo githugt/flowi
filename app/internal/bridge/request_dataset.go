@@ -47,11 +47,17 @@ func driverChoices() []DriverChoice {
 	return out
 }
 
-// driverPromptChoices are the drivers as the choices of a prompt that asks which database to query.
-func driverPromptChoices() []Choice {
+// databasePromptChoices are the databases as the choices of a prompt that asks which one to query.
+func databasePromptChoices() []Choice { return promptChoices(model.DatasetDrivers()) }
+
+// dataFilePromptChoices are the file formats as the choices of a prompt that asks what kind of file to query.
+func dataFilePromptChoices() []Choice { return promptChoices(model.DataFileFormats()) }
+
+func promptChoices(ids []string) []Choice {
+	labels := driverLabels()
 	out := []Choice{}
-	for _, d := range driverChoices() {
-		out = append(out, Choice{ID: d.ID, Label: d.Label})
+	for _, id := range ids {
+		out = append(out, Choice{ID: id, Label: labels[id]})
 	}
 	return out
 }

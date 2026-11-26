@@ -76,7 +76,7 @@ type RequestView struct {
 	FullURL        string               `json:"fullUrl"`    // the URL with its query rows, as typed in the URL bar
 	ReplayPath     string               `json:"replayPath"` // the path the replayer answers this request on (HTTP only)
 	HookChain      []string             `json:"hookChain"`
-	BodyKind       string               `json:"bodyKind"`   // none, text, form or file
+	BodyKind       string               `json:"bodyKind"`   // none, text, form, file or graphql
 	BodyFormat     string               `json:"bodyFormat"` // json, xml, yaml or raw
 	Multipart      bool                 `json:"multipart"`
 	Auth           AuthView             `json:"auth"`
@@ -91,6 +91,7 @@ type RequestView struct {
 	Async          *AsyncInfo           `json:"async,omitempty"`
 	GRPC           *GRPCInfo            `json:"grpc,omitempty"`
 	Dataset        *DatasetInfo         `json:"dataset,omitempty"`
+	GraphQL        *vm.GraphQLInfo      `json:"graphql,omitempty"`    // for a GraphQL body: its operations, the one that runs and what is wrong
 	Connection     *ConnectionView      `json:"connection,omitempty"` // for a message or database request: the Test connection button and its last result
 
 	// Parts are the parts of a multipart form body, for its editor.
@@ -278,7 +279,7 @@ func (s *RequestService) view(node string, o *openRequest) RequestView {
 		Node: node, Name: d.Name, Path: d.Path, Kind: kind, Type: vm.TypeOf(r.Current()), Types: typeChoices(), Verb: vm.Verb(r.Current()), Versions: r.Labels(), VersionNames: versionNamesOf(d), Selected: r.SelectedLabel(), Default: d.Default,
 		BodyKind: string(r.BodyKind()), BodyFormat: string(r.BodyFormat()), Multipart: r.Multipart(), Auth: authViewOf(r, s.app.workspace.NamedAuths()),
 		Dirty: r.Dirty(), OnDisk: r.ChangedOnDisk(), NeedsDrop: r.NeedsDropConfirm(), Error: r.Err(), Current: emptyCollections(r.Current()), FullURL: vm.URLWithQuery(r.Current().URL, r.Current().Query), HookChain: nonNil(r.HookChain()),
-		InScratch: s.app.workspace.InScratch(node), Snippet: snippetViewOf(o.snip), Pipeline: pipelineOf(r, s.app.send.TraceFor(t)), Live: liveOf(s.app.send.TraceFor(t)), Async: asyncInfoOf(r), GRPC: grpcInfoOf(r), Dataset: datasetInfoOf(r), Connection: connectionOf(r), Sending: s.app.send.RunningFor(t), SendError: s.app.send.ErrFor(t),
+		InScratch: s.app.workspace.InScratch(node), Snippet: snippetViewOf(o.snip), Pipeline: pipelineOf(r, s.app.send.TraceFor(t)), Live: liveOf(s.app.send.TraceFor(t)), Async: asyncInfoOf(r), GRPC: grpcInfoOf(r), Dataset: datasetInfoOf(r), GraphQL: r.GraphQLInfo(), Connection: connectionOf(r), Sending: s.app.send.RunningFor(t), SendError: s.app.send.ErrFor(t),
 	}
 	v.FlowiOverlay, v.FlowiOverlays, v.FlowiOverlayNotes = r.OverlayName(), flowiOverlaysOf(r), nonNil(r.OverlayNotes())
 	v.FlowiOverlayMarks = flowiOverlayMarksOf(r)

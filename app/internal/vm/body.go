@@ -4,6 +4,7 @@ package vm
 
 import (
 	"fmt"
+	"reflect"
 	"slices"
 	"strings"
 
@@ -20,6 +21,8 @@ const (
 	BodyText BodyKind = "text"
 	BodyFile BodyKind = "file"
 	BodyForm BodyKind = "form"
+	// BodyGraphQL is a GraphQL operation: a query, variables and an operation name.
+	BodyGraphQL BodyKind = "graphql"
 )
 
 // BodyFormat is the text kind's second picker.
@@ -50,13 +53,15 @@ func formatType(f BodyFormat) string {
 }
 
 func bodyHasContent(b model.Body) bool {
-	return b.JSON != "" || b.Text != "" || len(b.Form) > 0 || len(b.Multipart) > 0 || b.File != ""
+	return b.JSON != "" || b.Text != "" || len(b.Form) > 0 || len(b.Multipart) > 0 || b.File != "" || (b.GraphQL != nil && !b.GraphQL.IsZero())
 }
 
 // BodyKind is the selected version's body kind.
 func (r *Request) BodyKind() BodyKind {
 	b := r.Current().Body
 	switch {
+	case b.GraphQL != nil:
+		return BodyGraphQL
 	case b.JSON != "" || b.Text != "":
 		return BodyText
 	case len(b.Form) > 0 || len(b.Multipart) > 0:
@@ -226,6 +231,12 @@ func (r *Request) SetBodyKind(k BodyKind) {
 			setText(&v.Body, text, r.BodyFormat())
 			return
 		}
+		if k == BodyGraphQL {
+			v.Body.GraphQL = &model.GraphQL{}
+			if v.Method == "" {
+				v.Method = "POST"
+			}
+		}
 		// Only text bodies use the picker's Content-Type: a form or file
 		// keeps the engine's own (and multipart needs its boundary).
 		v.Headers = withManagedType(v.Headers, FormatJSON)
@@ -275,7 +286,7 @@ func (r *Request) editBody(f func(v *model.RequestVersion)) {
 }
 
 func sameBodyAndHeaders(a, b model.RequestVersion) bool {
-	return a.Body.JSON == b.Body.JSON && a.Body.Text == b.Body.Text && a.Body.File == b.Body.File &&
+	return a.Body.JSON == b.Body.JSON && a.Body.Text == b.Body.Text && a.Body.File == b.Body.File && reflect.DeepEqual(a.Body.GraphQL, b.Body.GraphQL) &&
 		slices.Equal(a.Body.Form, b.Body.Form) && len(a.Body.Multipart) == len(b.Body.Multipart) &&
 		slices.Equal(a.Headers, b.Headers) && slices.EqualFunc(a.Body.Multipart, b.Body.Multipart, func(x, y model.Field) bool { return x.Key == y.Key })
 }

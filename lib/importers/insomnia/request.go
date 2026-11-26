@@ -3,6 +3,7 @@
 package insomnia
 
 import (
+	"encoding/json"
 	"regexp"
 	"slices"
 	"strings"
@@ -118,6 +119,8 @@ func (t *translator) body(b map[string]any, v *model.RequestVersion) model.Body 
 		return model.Body{}
 	case text == "":
 		return model.Body{}
+	case mime == "application/graphql" && t.graphQL(text) != nil:
+		return *t.graphQL(text)
 	case mime == "application/json" || strings.HasSuffix(mime, "+json") || mime == "application/graphql":
 		return model.Body{JSON: t.Item.RedactBodyText(t.text(text), "the request body")}
 	}
@@ -219,4 +222,26 @@ func (t *translator) oauth2(a map[string]any, v *model.RequestVersion) {
 	default:
 		t.Item.Unmapped("OAuth 2.0 grant "+grant, "left out", "Flowi has client credentials, password and authorization code; fetch the token another way and send it as a Bearer header")
 	}
+}
+
+// graphQL reads an Insomnia GraphQL body, which is the JSON {"query", "variables", "operationName"}; nil when the
+// text is not that, or its query holds {{ (a document is sent as written), so it stays a JSON body.
+func (t *translator) graphQL(text string) *model.Body {
+	var doc struct {
+		Query         string          `json:"query"`
+		Variables     json.RawMessage `json:"variables"`
+		OperationName string          `json:"operationName"`
+	}
+	if json.Unmarshal([]byte(text), &doc) != nil || strings.TrimSpace(doc.Query) == "" {
+		return nil
+	}
+	vars := string(doc.Variables)
+	if vars == "null" {
+		vars = ""
+	}
+	body, ok := importers.GraphQLBody(doc.Query, vars, doc.OperationName, t.text, func(s string) string { return t.Item.RedactBodyText(s, "the request body") })
+	if !ok {
+		return nil
+	}
+	return &body
 }

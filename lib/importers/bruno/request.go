@@ -182,6 +182,10 @@ func (b requestBuilder) multipart() []model.Field {
 }
 
 func (b requestBuilder) graphQL(query, vars string, v *model.RequestVersion) model.Body {
+	if gq, ok := importers.GraphQLBody(query, vars, "", b.t.Text, func(s string) string { return b.it.RedactBodyText(s, "the request body") }); ok {
+		return gq
+	}
+	b.it.Unmapped("GraphQL query with variables of the collection", "kept as a JSON body", "Flowi sends a GraphQL query as written: move the values into the variables to get a GraphQL body")
 	var parsed any = map[string]any{}
 	if vars != "" {
 		if err := json.Unmarshal([]byte(vars), &parsed); err != nil {

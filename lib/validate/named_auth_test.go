@@ -23,7 +23,7 @@ func TestCheckAuth_Given_a_version_uses_a_named_auth_the_collection_has_When_val
 	f := newFixture(t)
 	c := f.collection("a")
 	f.request(&c, "r", "1")
-	f.namedAuth(&c, "key", model.Auth{Type: model.AuthAPIKey, Params: []model.KeyValue{{Key: "value", Value: "k"}}})
+	f.namedAuth(&c, "key", model.Auth{Type: model.AuthAPIKey, Params: []model.KeyValue{{Key: "value", Value: "{{secret.key}}"}}})
 	useAuth(&c, model.Auth{Use: "key"})
 
 	diags := Validate(Target{Collections: []model.Collection{c}})

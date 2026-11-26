@@ -33,7 +33,9 @@ const (
 	ActNewFolder
 	ActNewAsyncRequest
 	ActNewGRPCRequest
+	ActNewGraphQLRequest
 	ActNewDatasetRequest
+	ActNewDataFileRequest
 )
 
 // MenuItem is one entry of the context menu. Count is how many rows or
@@ -85,9 +87,9 @@ func (ws *Workspace) menuForOne(n TreeNode) []MenuItem {
 		if n.Tree == "flows" {
 			return withDelete(n, items(ActNewFlow, ActNewFolder))
 		}
-		return withDelete(n, append(items(ActNewRequest, ActNewAsyncRequest, ActNewGRPCRequest, ActNewDatasetRequest, ActNewFolder), ws.flowFromRequestsItem(n.ID)...))
+		return withDelete(n, append(items(ActNewRequest, ActNewAsyncRequest, ActNewGraphQLRequest, ActNewGRPCRequest, ActNewDatasetRequest, ActNewDataFileRequest, ActNewFolder), ws.flowFromRequestsItem(n.ID)...))
 	case NodeCollection:
-		out := append(items(ActNewRequest, ActNewAsyncRequest, ActNewGRPCRequest, ActNewDatasetRequest, ActNewFlow, ActNewFolder), ws.flowFromRequestsItem(n.ID)...)
+		out := append(items(ActNewRequest, ActNewAsyncRequest, ActNewGraphQLRequest, ActNewGRPCRequest, ActNewDatasetRequest, ActNewDataFileRequest, ActNewFlow, ActNewFolder), ws.flowFromRequestsItem(n.ID)...)
 		if n.Draft {
 			out = append(out, items(ActMoveToFolder, ActDiscardDraft)...)
 		}

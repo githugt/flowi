@@ -15,6 +15,7 @@ export {
     Extraction,
     Field,
     GRPC,
+    GraphQL,
     HookControl,
     HookStep,
     Hooks,

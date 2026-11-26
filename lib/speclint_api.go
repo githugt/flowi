@@ -34,13 +34,13 @@ func SpecLintRules() []string { return speclint.RuleNames() }
 type SpecRule struct {
 	Name    string
 	About   string
-	Default string // off, warning or error
+	Default string // off, note, warning or error
 	Level   string // what the collection chose, or the default when it chose nothing
 	Chosen  bool   // the collection's lint file sets it
 }
 
 // ErrNoSpecRule is returned for a rule or a level the linter does not have.
-var ErrNoSpecRule = errors.New("that is not a spec rule or not a level (off, warning or error)")
+var ErrNoSpecRule = errors.New("that is not a spec rule or not a level (off, note, warning or error)")
 
 // SpecLintRules lists the rules with their level in the collection's lint file.
 func (w *Workspace) SpecLintRules(collection model.ID) ([]SpecRule, error) {
@@ -60,11 +60,11 @@ func (w *Workspace) SpecLintRules(collection model.ID) ([]SpecRule, error) {
 	return out, nil
 }
 
-// SetSpecLintRule sets how seriously a rule is taken in the collection: "off", "warning" or "error", or "" for the
+// SetSpecLintRule sets how seriously a rule is taken in the collection: "off", "note", "warning" or "error", or "" for the
 // rule's default. Only that rule's line changes: the comments in the file, and the order of its other lines, stay
 // (speclint.Edit says when a file has to be written again).
 func (w *Workspace) SetSpecLintRule(collection model.ID, rule, level string) error {
-	if speclint.DefaultLevel(rule) == "" || !slices.Contains([]string{"", speclint.LevelOff, speclint.LevelWarning, speclint.LevelError}, level) {
+	if speclint.DefaultLevel(rule) == "" || !slices.Contains([]string{"", speclint.LevelOff, speclint.LevelNote, speclint.LevelWarning, speclint.LevelError}, level) {
 		return ErrNoSpecRule
 	}
 	root, err := w.collectionRoot(collection)
@@ -103,7 +103,8 @@ func (w *Workspace) collectionRoot(collection model.ID) (string, error) {
 func IsSpecDiagnostic(d diag.Diagnostic) bool { return len(d.Code) > 9 && d.Code[:9] == "FLW-SPEC-" }
 
 // LintSpecs checks the API descriptions a collection kept at import, as they are with the overlays laid over them, so
-// a description added in an overlay clears its finding. Each finding points at the kept file by the YAML path of the
+// a description added in an overlay clears its finding. Notes are included: they are suggestions that Validate leaves
+// out. Each finding points at the kept file by the YAML path of the
 // place in the effective description. Nothing is written.
 func (w *Workspace) LintSpecs(collection model.ID) (diag.List, error) {
 	w.mu.RLock()
@@ -117,11 +118,14 @@ func (w *Workspace) LintSpecs(collection model.ID) (diag.List, error) {
 	return w.positioned(w.lintSpecsOf(c)), nil
 }
 
-// specDiags are the findings for every collection's kept descriptions. Callers hold mu.
+// specDiags are the problems with every collection's kept descriptions, as a validation reports them: a note is left
+// out, since it is a suggestion and LintSpecs is where it shows. Callers hold mu.
+//
+// Before: a missing tag was a warning in the Problems list of every collection that kept a description.
 func (w *Workspace) specDiags(cs []model.Collection) diag.List {
 	var out diag.List
 	for _, c := range cs {
-		out = append(out, w.lintSpecsOf(c)...)
+		out = append(out, slices.DeleteFunc(w.lintSpecsOf(c), func(d diag.Diagnostic) bool { return d.Severity == diag.SeverityNote })...)
 	}
 	return out
 }

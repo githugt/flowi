@@ -79,21 +79,37 @@ func madeUpFindings() []specFinding {
 }
 
 // Validate is the fixture's problems with the made-up description findings added, at the levels the Rules editor chose.
+// A note is no problem, so it is left out here, as in the real workspace.
 func (b *Backend) Validate() diag.List {
-	out := slices.Clone(b.Backend.Validate())
+	return append(slices.Clone(b.Backend.Validate()), b.specFindings(false)...)
+}
+
+// LintSpecs is the made-up findings at the levels the Rules editor chose, notes included.
+func (b *Backend) LintSpecs(model.ID) (diag.List, error) { return b.specFindings(true), nil }
+
+// specFindings turns the made-up findings into diagnostics at the level chosen for each rule, or its default.
+func (b *Backend) specFindings(withNotes bool) diag.List {
 	b.rulesMu.Lock()
 	defer b.rulesMu.Unlock()
+	defaults := map[string]string{}
+	for _, r := range specRules() {
+		defaults[r.Name] = r.Default
+	}
+	var out diag.List
 	for _, f := range madeUpFindings() {
-		level := "warning"
+		level := defaults[f.rule]
 		if l, ok := b.rules[f.rule]; ok {
 			level = l
 		}
-		if level == "off" {
+		if level == "off" || (level == "note" && !withNotes) {
 			continue
 		}
 		d := diag.New(f.code, diag.Location{File: f.file, Path: f.path, Pos: diag.Position{Line: f.line}}, f.args)
-		if level == "error" {
+		switch level {
+		case "error":
 			d.Severity = diag.SeverityError
+		case "note":
+			d.Severity = diag.SeverityNote
 		}
 		out = append(out, d)
 	}

@@ -21,7 +21,10 @@ import (
 
 // Levels a rule can be set to.
 const (
-	LevelOff     = "off"
+	LevelOff = "off"
+	// LevelNote reports a finding as a suggestion: it shows where the description is read, but is no problem, so the
+	// Problems list and the warning counts leave it out.
+	LevelNote    = "note"
 	LevelWarning = "warning"
 	LevelError   = "error"
 )
@@ -46,13 +49,13 @@ type rule struct {
 }
 
 // rules is every check, in the order their findings are reported. Naming rules are off until a collection wants them:
-// they are a house style, not a mistake.
+// they are a house style, not a mistake. Tags are a nicety, so a missing one is a note, not a warning.
 func rules() []rule {
 	return []rule{
 		{"info-description", diag.CodeSpecInfo, LevelWarning, "The description says what the API is for.", infoDescription},
 		{"operation-description", diag.CodeSpecSummary, LevelWarning, "Every operation (or method, or channel operation) has a summary or a description.", operationDescription},
 		{"operation-id", diag.CodeSpecOperation, LevelWarning, "Every operation has an operationId (OpenAPI, Swagger, AsyncAPI 2).", operationID},
-		{"operation-tags", diag.CodeSpecTags, LevelWarning, "Every operation has a tag.", operationTags},
+		{"operation-tags", diag.CodeSpecTags, LevelNote, "Every operation has a tag.", operationTags},
 		{"operation-security", diag.CodeSpecSecurity, LevelWarning, "Every operation has a security requirement, or says it is public with security: [].", operationSecurity},
 		{"success-response", diag.CodeSpecSuccess, LevelWarning, "Every operation documents a 2xx response.", successResponse},
 		{"unused-component", diag.CodeSpecUnused, LevelWarning, "Every component is referred to somewhere.", unusedComponents},
@@ -90,7 +93,7 @@ func Info() []RuleInfo {
 // says only what the collection chose.
 func Render(cfg Config) []byte {
 	var b strings.Builder
-	b.WriteString("# How seriously each rule about the API description is taken: off, warning or error.\n")
+	b.WriteString("# How seriously each rule about the API description is taken: off, note, warning or error.\n")
 	chosen := 0
 	for _, r := range rules() {
 		if l, ok := cfg[r.name]; ok && l != r.defaultLevel {
@@ -147,6 +150,8 @@ func normaliseLevel(s string) string {
 	switch strings.ToLower(strings.TrimSpace(s)) {
 	case "off", "false", "none":
 		return LevelOff
+	case "note", "info":
+		return LevelNote
 	case "warning", "warn":
 		return LevelWarning
 	case "error":
@@ -200,8 +205,11 @@ func finish(r rule, level, spec, file string, f finding) diag.Diagnostic {
 		args[k] = v
 	}
 	item := diag.New(r.code, diag.Location{File: file, Path: f.path, Pos: diag.Position{Line: f.line}}, args)
-	if level == LevelError {
+	switch level {
+	case LevelError:
 		item.Severity = diag.SeverityError
+	case LevelNote:
+		item.Severity = diag.SeverityNote
 	}
 	return item
 }

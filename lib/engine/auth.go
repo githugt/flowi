@@ -52,14 +52,14 @@ func (x *execution) applyAuth(ctx context.Context, signer authx.Signer, b *built
 		return err
 	}
 	for _, a := range applied {
-		x.recordApplied(b, a)
+		x.recordApplied(&b.sent, a)
 	}
 	return nil
 }
 
 // recordApplied shows what a scheme added in the recorded request, and keeps
 // its secret values out of every output.
-func (x *execution) recordApplied(b *built, a authx.Applied) {
+func (x *execution) recordApplied(sent *SentRequest, a authx.Applied) {
 	if a.Secret {
 		x.r.secrets.derived(a.Value)
 		if a.Where == "query" {
@@ -72,9 +72,9 @@ func (x *execution) recordApplied(b *built, a authx.Applied) {
 		if a.Where == "cookie" {
 			name = "Cookie"
 		}
-		b.sent.Header = replaceHeader(b.sent.Header, Header{Name: name, Value: a.Value})
+		sent.Header = replaceHeader(sent.Header, Header{Name: name, Value: a.Value})
 	case "query":
-		b.sent.URL = withQueryParam(b.sent.URL, a.Name, a.Value)
+		sent.URL = withQueryParam(sent.URL, a.Name, a.Value)
 	}
 }
 
@@ -155,6 +155,17 @@ func withNamedAuth(c model.Collection, v model.RequestVersion) (model.RequestVer
 	}
 	v.Auth = &model.Auth{Type: named.Auth.Type, Params: named.Auth.Params}
 	return v, nil
+}
+
+// withoutUnusableDefault drops an auth block a request inherited from auth.default when its protocol cannot use that
+// scheme. A collection-wide default is written for HTTP requests; a WebSocket or SSE request in the same collection
+// uses it when it can and goes without when it cannot, where a request's own auth block that it cannot use is a
+// validation error. Message requests of other protocols never read the auth block.
+func withoutUnusableDefault(v model.RequestVersion) model.RequestVersion {
+	if v.Async != nil && v.Auth != nil && !slices.Contains(model.AsyncAuthTypes(v.Async.Protocol), v.Auth.Type) {
+		v.Auth = nil
+	}
+	return v
 }
 
 func loadClientCert(a model.Auth, root string) (tls.Certificate, error) {

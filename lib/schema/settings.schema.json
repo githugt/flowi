@@ -57,11 +57,12 @@
         "graphql_errors": {
           "type": "string",
           "enum": [
+            "auto",
             "warn",
             "fail",
             "ignore"
           ],
-          "default": "warn"
+          "default": "auto"
         }
       }
     },

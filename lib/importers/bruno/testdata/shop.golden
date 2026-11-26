@@ -46,9 +46,10 @@ versions:
     headers:
       x-client: bruno
       Authorization: Basic {{toBase64("admin" + ":" + secret.password)}}
-      Content-Type: application/json
     body:
-      json: "{\"query\":\"query { me { id } }\",\"variables\":{\"a\":1}}"
+      graphql:
+        query: query { me { id } }
+        variables: "{\"a\": 1}"
 --- request users/create-user
 name: Create user
 versions:

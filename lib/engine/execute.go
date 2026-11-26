@@ -144,12 +144,16 @@ func (r *runner) prepare(c call) (*execution, diag.List) {
 	}
 	v, overlayNotes := laidOver(c, v)
 	cfg := newConfig(r.deps.Lookup.Settings(c.collection.Manifest.ID, folderOf(c.request), v.Settings))
-	if v.Auth == nil && cfg.defaultAuth != "" {
+	inherited := v.Auth == nil && cfg.defaultAuth != ""
+	if inherited {
 		v.Auth = &model.Auth{Use: cfg.defaultAuth} // inherited from the collection or a folder, unless the request has its own
 	}
 	v, diags = withNamedAuth(c.collection, v)
 	if diags.HasErrors() {
 		return nil, diags
+	}
+	if inherited {
+		v = withoutUnusableDefault(v)
 	}
 	env, diags := selectEnvironment(c.collection, r.env, cfg.defaultEnv)
 	if diags.HasErrors() {

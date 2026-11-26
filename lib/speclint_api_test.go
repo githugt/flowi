@@ -143,7 +143,7 @@ func TestSetSpecLintRule_Given_choices_When_set_and_read_back_Then_the_file_says
 		t.Fatalf("levels %v chosen %v", levels, chosen)
 	}
 	data, _ := os.ReadFile(filepath.Join(root, "descriptions", SpecLintFile))
-	if want := "# How seriously each rule about the API description is taken: off, warning or error.\nrules:\n  path-case: error\n  operation-tags: off\n"; string(data) != want {
+	if want := "# How seriously each rule about the API description is taken: off, note, warning or error.\nrules:\n  path-case: error\n  operation-tags: off\n"; string(data) != want {
 		t.Fatalf("file:\n%s", data)
 	}
 	if got, _ := w.LintSpecs(c); len(specCodes(got)) != 1 { // only info-description is left: tags off, path ok
@@ -176,15 +176,44 @@ func TestLintSpecs_Given_a_finding_When_validated_Then_it_has_the_line_it_is_on_
 	root := collectionRoot(t, w, c)
 	writeKept(t, root, "pets.openapi.yaml", "openapi: 3.0.3\ninfo: {title: Pets, version: '1', description: d}\npaths:\n  /pets:\n    get:\n      summary: List\n      operationId: l\n      security: []\n      responses: {'200': {description: ok}}\n")
 
-	var got []diag.Diagnostic
-	for _, d := range w.Validate() {
-		if IsSpecDiagnostic(d) {
-			got = append(got, d)
+	got, err := w.LintSpecs(c)
+
+	if err != nil || len(got) != 1 || got[0].Code != diag.CodeSpecTags || got[0].Pos.Line != 5 {
+		t.Fatalf("findings = %+v %v, want the missing tag on line 5 (the get)", got, err)
+	}
+}
+
+// Before: a missing tag was a warning in the Problems list of every collection that kept a description, though tags
+// are a nicety.
+func TestValidate_Given_a_missing_tag_When_the_rule_is_a_note_Then_it_is_no_problem_and_a_warning_once_chosen(t *testing.T) {
+	w, c := petsCollection(t)
+	root := collectionRoot(t, w, c)
+	writeKept(t, root, "pets.openapi.yaml", "openapi: 3.0.3\ninfo: {title: Pets, version: '1', description: d}\npaths:\n  /pets:\n    get:\n      summary: List\n      operationId: l\n      security: []\n      responses: {'200': {description: ok}}\n")
+	tagProblems := func() []diag.Diagnostic {
+		var out []diag.Diagnostic
+		for _, d := range w.Validate() {
+			if d.Code == diag.CodeSpecTags {
+				out = append(out, d)
+			}
 		}
+		return out
 	}
 
-	if len(got) != 1 || got[0].Code != diag.CodeSpecTags || got[0].Pos.Line != 5 {
-		t.Fatalf("findings = %+v, want the missing tag on line 5 (the get)", got)
+	byDefault := tagProblems()
+	notes, _ := w.LintSpecs(c)
+	if err := w.SetSpecLintRule(c, "operation-tags", "warning"); err != nil {
+		t.Fatal(err)
+	}
+	chosen := tagProblems()
+
+	if len(byDefault) != 0 {
+		t.Errorf("by default the missing tag is a note, so Validate leaves it out: %+v", byDefault)
+	}
+	if len(notes) != 1 || notes[0].Severity != diag.SeverityNote {
+		t.Errorf("LintSpecs still reports it, as a note: %+v", notes)
+	}
+	if len(chosen) != 1 || chosen[0].Severity != diag.SeverityWarning {
+		t.Errorf("a collection that asks for a warning gets one: %+v", chosen)
 	}
 }
 

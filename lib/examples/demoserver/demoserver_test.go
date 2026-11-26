@@ -4,11 +4,13 @@ package demoserver_test
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -20,6 +22,8 @@ import (
 	"github.com/githugt/flowi/lib/model"
 	"github.com/githugt/flowi/lib/settings"
 	"github.com/githugt/flowi/lib/store"
+	"github.com/githugt/flowi/lib/transport"
+	"github.com/githugt/flowi/lib/transport/graphqlws"
 	"github.com/githugt/flowi/lib/vault"
 )
 
@@ -263,5 +267,74 @@ func TestDemoServer_status_should_turn_ready_after_two_polls(t *testing.T) {
 
 	if fmt.Sprint(states) != "[pending pending ready]" || other != http.StatusBadRequest {
 		t.Fatalf("states %v, other subject %d", states, other)
+	}
+}
+
+func TestGraphQL_should_echo_an_operation_sent_with_post_or_get_and_answer_200_with_errors_for_a_broken_query(t *testing.T) {
+	srv := httptest.NewServer(demoserver.Handler(demoserver.Options{Password: "pw"}))
+	defer srv.Close()
+	post := func(body string) map[string]any {
+		req, _ := http.NewRequestWithContext(context.Background(), http.MethodPost, srv.URL+"/graphql", strings.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer func() { _ = resp.Body.Close() }()
+		var out map[string]any
+		_ = json.NewDecoder(resp.Body).Decode(&out)
+		if resp.StatusCode != http.StatusOK {
+			t.Fatalf("status %d", resp.StatusCode)
+		}
+		return out
+	}
+
+	ok := post(`{"query": "query Q { a }", "operationName": "Q", "variables": {"n": 1}}`)
+	broken := post(`{"query": "{ broken }"}`)
+	getReq, _ := http.NewRequestWithContext(context.Background(), http.MethodGet, srv.URL+"/graphql?query=%7B+a+%7D&operationName=A", nil)
+	resp, err := http.DefaultClient.Do(getReq)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+	var viaGet map[string]any
+	_ = json.NewDecoder(resp.Body).Decode(&viaGet)
+
+	echo := ok["data"].(map[string]any)["echo"].(map[string]any)
+	if echo["operationName"] != "Q" || echo["variables"].(map[string]any)["n"] != float64(1) {
+		t.Errorf("post echo %v", echo)
+	}
+	if _, has := broken["errors"]; !has {
+		t.Errorf("a broken query must carry errors: %v", broken)
+	}
+	if viaGet["data"].(map[string]any)["echo"].(map[string]any)["operationName"] != "A" {
+		t.Errorf("get echo %v", viaGet)
+	}
+}
+
+func TestGraphQL_should_answer_a_subscription_over_a_websocket(t *testing.T) {
+	srv := httptest.NewServer(demoserver.Handler(demoserver.Options{Password: "pw"}))
+	defer srv.Close()
+	run := func(query string) transport.Result {
+		op := transport.Operation{
+			Server:  srv.URL + "/graphql",
+			Send:    &transport.Message{Body: []byte(`{"query":` + strconv.Quote(query) + `,"operationName":"S"}`)},
+			Receive: &transport.Receive{Count: 10, Timeout: 5 * time.Second},
+		}
+		res, err := graphqlws.New().Run(t.Context(), op)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return res
+	}
+
+	ticks := run("subscription S { tick }")
+	broken := run("subscription S { broken }")
+
+	if len(ticks.Received) != 3 || !strings.Contains(string(ticks.Received[2].Body), `"tick":3`) || !strings.Contains(string(ticks.Received[0].Body), `"operationName":"S"`) {
+		t.Errorf("ticks %v", ticks.Received)
+	}
+	if len(broken.Received) != 1 || !strings.Contains(string(broken.Received[0].Body), `"errors"`) {
+		t.Errorf("broken %v", broken.Received)
 	}
 }

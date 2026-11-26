@@ -202,7 +202,7 @@ func namedAuthKey(a vm.NamedAuth) string { return fmt.Sprintf("%s/%s", a.Collect
 func schemeType(scheme string) string { return strings.TrimPrefix(scheme, "scheme:") }
 
 func (s *AuthsService) view() AuthsView {
-	v := AuthsView{Auths: []NamedAuthView{}, Collections: []Choice{}, Schemes: authSchemeChoices(), Forms: map[string][]AuthFieldView{}}
+	v := AuthsView{Auths: []NamedAuthView{}, Collections: []Choice{}, Schemes: authSchemeChoices(nil), Forms: map[string][]AuthFieldView{}}
 	for _, c := range s.app.workspace.Collections() {
 		v.Collections = append(v.Collections, Choice{ID: string(c.Manifest.ID), Label: c.Manifest.Name, Path: c.Manifest.Name})
 	}

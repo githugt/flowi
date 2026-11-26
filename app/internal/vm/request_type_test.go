@@ -171,7 +171,7 @@ func TestConvertVersion_Given_an_unknown_type_Then_it_is_refused(t *testing.T) {
 func TestTypeOf_names_the_family_of_each_kind_and_every_listed_type_has_an_icon(t *testing.T) {
 	cases := map[string]model.RequestVersion{
 		"http": {}, "grpc": {GRPC: &model.GRPC{}}, "message": {Async: &model.Async{Protocol: "kafka"}},
-		"db": {Dataset: &model.Dataset{Driver: "sqlite"}}, "file": {File: &model.DataFile{Format: "parquet"}},
+		"graphql": {Body: model.Body{GraphQL: &model.GraphQL{}}}, "db": {Dataset: &model.Dataset{Driver: "sqlite"}}, "file": {File: &model.DataFile{Format: "parquet"}},
 	}
 	for want, v := range cases {
 		if got := vm.TypeOf(v); got != want {
@@ -183,8 +183,8 @@ func TestTypeOf_names_the_family_of_each_kind_and_every_listed_type_has_an_icon(
 			t.Errorf("%s has no icon", id)
 		}
 	}
-	if got := vm.TypeIDs(); len(got) != 5 {
-		t.Errorf("types %v: the menu is the five families", got)
+	if got := vm.TypeIDs(); len(got) != 6 {
+		t.Errorf("types %v: the menu is HTTP, GraphQL, gRPC, messaging, database and data file", got)
 	}
 }
 

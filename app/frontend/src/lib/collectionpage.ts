@@ -68,15 +68,21 @@ export interface SpecRule {
   chosen: boolean
 }
 
-/** What a rule's select offers: its default first (so choosing it forgets the choice), then the three levels. */
+/** What a rule's select offers: its default first (so choosing it forgets the choice), then the four levels. A note is
+ *  a suggestion listed on the collection's page; a warning or an error is a problem that also reaches the Problems panel. */
 export function levelChoices(rule: SpecRule): { value: string; label: string }[] {
   return [
     { value: '', label: `Default (${rule.default})` },
     { value: 'off', label: 'Off' },
+    { value: 'note', label: 'Note' },
     { value: 'warning', label: 'Warning' },
     { value: 'error', label: 'Error' },
   ]
 }
+
+/** How many problems the page does not list because of its cap: the Problems panel has them. Notes are not problems, and
+ *  only the page lists them. */
+export const unlistedProblems = (listed: { severity: string }[], problems: number): number => problems - listed.filter((f) => f.severity !== 'note').length
 
 /** The value a rule's select shows: '' when the collection chose nothing. */
 export const levelShown = (rule: SpecRule): string => (rule.chosen ? rule.level : '')

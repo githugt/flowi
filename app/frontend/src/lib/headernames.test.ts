@@ -32,6 +32,18 @@ describe('implicitHeaders', () => {
     expect(implicitHeaders({ body: noBody, headers: [], hasAuth: true }).map((h) => h.name)).toEqual(['Authorization'])
     expect(implicitHeaders({ body: noBody, headers: ['Authorization'], hasAuth: true })).toEqual([])
   })
+  it('lists the Content-Type and Accept of a GraphQL body, and no Content-Type for a GET', () => {
+    // Before: a GraphQL request was a JSON body, and the Accept header Flowi now sends was not there to list.
+    const post = implicitHeaders({ body: { ...noBody, GraphQL: {} }, method: 'POST', headers: [], hasAuth: false })
+    const get = implicitHeaders({ body: { ...noBody, GraphQL: {} }, method: 'GET', headers: [], hasAuth: false })
+    expect(post.map((h) => h.name)).toEqual(['Content-Type', 'Accept'])
+    expect(get.map((h) => h.name)).toEqual(['Accept'])
+    expect(implicitHeaders({ body: { ...noBody, GraphQL: {} }, method: 'POST', headers: ['accept'], hasAuth: false }).map((h) => h.name)).toEqual(['Content-Type'])
+  })
+  it('lists nothing for a subscription, which opens a WebSocket instead of posting a body', () => {
+    // Before: a subscription listed the Content-Type and Accept of a POST that is never made.
+    expect(implicitHeaders({ body: { ...noBody, GraphQL: {} }, method: 'POST', headers: [], hasAuth: false, subscription: true })).toEqual([])
+  })
   it('lists nothing for an empty request', () => {
     expect(implicitHeaders({ body: noBody, headers: [], hasAuth: false })).toEqual([])
   })

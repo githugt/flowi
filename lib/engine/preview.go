@@ -84,7 +84,7 @@ func previewOf(body model.Body, b built, exact bool) PreviewRequest {
 		p.URL, p.Headers = b.request.URL, realHeaders(b)
 	}
 	switch {
-	case body.JSON != "" || body.Text != "":
+	case body.JSON != "" || body.Text != "" || (body.GraphQL != nil && b.bodyText != ""):
 		p.BodyKind, p.Body = "text", maskedBody(b, exact)
 	case len(body.Form) > 0:
 		p.BodyKind, p.Body = "form", maskedBody(b, exact)
@@ -147,13 +147,22 @@ func realHeaders(b built) []Header {
 // method, and the server and channel for the URL.
 func previewAsync(in buildInput, includeSecrets bool) Preview {
 	b, diags := buildAsync(in)
+	return previewBuiltAsync(b, diags, includeSecrets)
+}
+
+// previewBuiltAsync is the preview of an operation already rendered.
+func previewBuiltAsync(b builtAsync, diags diag.List, includeSecrets bool) Preview {
 	masked := PreviewRequest{Method: b.sent.Method, URL: b.sent.URL, Headers: b.sent.Header}
 	if b.sent.Body != nil {
 		masked.BodyKind, masked.Body = "text", b.sent.Body.Text
 	}
 	out := Preview{Masked: masked, Diags: diags}
 	if includeSecrets {
-		exact := PreviewRequest{Method: b.sent.Method, URL: model.TargetURL(b.protocol, b.op.Server, b.op.Channel), Headers: b.sent.Header}
+		target := model.TargetURL(b.protocol, b.op.Server, b.op.Channel)
+		if b.protocol == model.ProtocolGraphQLWS {
+			target = b.op.Server
+		}
+		exact := PreviewRequest{Method: b.sent.Method, URL: target, Headers: b.sent.Header}
 		if b.op.Send != nil {
 			exact.BodyKind, exact.Body = "text", string(b.op.Send.Body)
 		}

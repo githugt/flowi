@@ -3,6 +3,8 @@
 package uidev
 
 import (
+	"time"
+
 	"github.com/githugt/flowi/lib/diag"
 	"github.com/githugt/flowi/lib/model"
 
@@ -57,6 +59,10 @@ func sidebarCollections() []model.Collection {
 			versionRequest("messaging", "M-mqtt", "messaging/sensors/temperature", "temperature", model.RequestVersion{Async: &model.Async{Protocol: model.ProtocolMQTT, Server: "mqtt://broker:1883", Channel: "sensors/temp"}}),
 			versionRequest("messaging", "M-pg", "datasets/postgres-call", "postgres-call", model.RequestVersion{Dataset: &model.Dataset{Driver: "postgres", Server: "postgres://app:{{secret.db_password}}@db.example:5432/shop", Query: "SELECT id, total\nFROM orders\nWHERE total > $1", Params: []string{"100"}}}),
 			versionRequest("messaging", "M-csv", "datasets/sample-csv", "sample-csv", model.RequestVersion{File: &model.DataFile{Format: "csv", Path: "data/people.csv", Query: "SELECT * FROM people"}}),
+			versionRequest("messaging", "M-gql", "graphql/get-user", "get-user", model.RequestVersion{Method: "POST", URL: "{{env.base_url}}/graphql", Body: model.Body{GraphQL: &model.GraphQL{
+				Query: "query GetUser($id: ID!) {\n  user(id: $id) {\n    name\n    email\n  }\n}\n\nquery Broken {\n  broken\n}", Variables: "{\"id\": \"{{env.user_id}}\"}", Operation: "Broken"}}}),
+			versionRequest("messaging", "M-gqlsub", "graphql/ticks", "ticks", model.RequestVersion{URL: "{{env.base_url}}/graphql", Body: model.Body{GraphQL: &model.GraphQL{
+				Query: "subscription Ticks($from: Int) {\n  tick(from: $from) {\n    n\n  }\n}", Variables: "{\"from\": 1}", Operation: "Ticks", Receive: &model.AsyncReceive{Count: 3, Timeout: 10 * time.Second}}}}),
 			versionRequest("messaging", "M-grpc", "grpc/ExampleService/GetExample", "GetExample", model.RequestVersion{GRPC: &model.GRPC{Server: "grpc://localhost:50051", Method: "example.ExampleService/GetExample"}}),
 			versionRequest("messaging", "M-grpc2", "grpc/ExampleService/ListExamples", "ListExamples", model.RequestVersion{GRPC: &model.GRPC{Server: "grpc://localhost:50051", Method: "example.ExampleService/ListExamples"}}),
 			versionRequest("messaging", "M-grpc3", "grpc/Health/Check", "Check", model.RequestVersion{GRPC: &model.GRPC{Server: "grpc://localhost:50051", Method: "grpc.health.v1.Health/Check"}}),

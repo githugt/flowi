@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net"
 	"net/url"
+	"slices"
 	"strings"
 	"unicode"
 
@@ -70,6 +71,9 @@ func lintSites(c model.Collection) []lintSite {
 			sites = append(sites, versionSites(r.File, v)...)
 		}
 	}
+	for _, a := range c.Auths {
+		sites = append(sites, authSites(a.File, yamlpath.Key("$", "auth"), a.Auth)...)
+	}
 	for _, f := range c.Flows {
 		sites = append(sites, lintSite{f.File, "$.name", "name", f.Name, ""})
 	}
@@ -102,6 +106,25 @@ func versionSites(file string, v model.RequestVersion) []lintSite {
 			continue
 		}
 		sites = append(sites, lintSite{file, yamlpath.Key(yamlpath.Key(base, "query"), q.Key), "query " + q.Key, q.Value, q.Key})
+	}
+	if v.Auth != nil {
+		sites = append(sites, authSites(file, yamlpath.Key(base, "auth"), *v.Auth)...)
+	}
+	return sites
+}
+
+// authSites are the parameters of an auth block: each is linted as a value, and one that holds a credential (the
+// scheme's secret parameters, such as an API key's value) is tested for being typed in directly. Its name carries
+// "auth", which credname counts as a credential word, since the parameter's own name (value) might not.
+func authSites(file, path string, a model.Auth) []lintSite {
+	secret := model.AuthSecretParams(a.Type)
+	var sites []lintSite
+	for _, kv := range a.Params {
+		credential := ""
+		if slices.Contains(secret, kv.Key) {
+			credential = "auth " + kv.Key
+		}
+		sites = append(sites, lintSite{file, yamlpath.Key(path, kv.Key), "auth " + kv.Key, kv.Value, credential})
 	}
 	return sites
 }
@@ -152,30 +175,48 @@ func typedCredential(name, value string) bool {
 }
 
 // plainCredentials warns for a request version that sends a credential (a header or query parameter with a
-// credential name, or user:password in the URL) over http or ws to a host that is not on this machine or a
-// private network. A host written with a template is unknown and is left alone.
+// credential name, an auth block that adds one, or user:password in the URL) over http or ws to a host that is not on
+// this machine or a private network. A host written with a template is unknown and is left alone. A WebSocket or SSE
+// request is read at its server address.
 //
-// Before: nothing warned when a token was sent in clear text across the internet.
+// Before: nothing warned when a token was sent in clear text across the internet, and a WebSocket or SSE request
+// (whose address is not the url field) was never looked at.
 func plainCredentials(c model.Collection) diag.List {
 	var out diag.List
 	for _, r := range c.Requests {
 		for _, v := range r.Versions {
-			scheme, host, ok := plainRemote(v.URL)
-			if !ok {
-				continue
-			}
-			if !sendsCredential(v) {
+			target, field := connectionTarget(v)
+			scheme, host, ok := plainRemote(target)
+			if !ok || !sendsCredential(c, v, target) {
 				continue
 			}
 			base := yamlpath.Key(yamlpath.Key("$", "versions"), v.Label)
-			out = append(out, diag.New(diag.CodeLintPlainKey, diag.Location{File: r.File, Path: yamlpath.Key(base, "url")},
-				map[string]string{"field": "url", "scheme": scheme, "host": host}))
+			path := yamlpath.Key(base, field)
+			if v.Async != nil {
+				path = yamlpath.Key(yamlpath.Key(base, "async"), field)
+			}
+			out = append(out, diag.New(diag.CodeLintPlainKey, diag.Location{File: r.File, Path: path},
+				map[string]string{"field": field, "scheme": scheme, "host": host}))
 		}
 	}
 	return out
 }
 
-func sendsCredential(v model.RequestVersion) bool {
+// connectionTarget is the address a version connects to and the name of the field that holds it: the url of an HTTP
+// request, the server (and channel) of a WebSocket or SSE one. Other message requests have their own schemes and
+// credential bindings and are not read here.
+func connectionTarget(v model.RequestVersion) (target, field string) {
+	if v.Async == nil {
+		return v.URL, "url"
+	}
+	if len(model.AsyncAuthTypes(v.Async.Protocol)) == 0 {
+		return "", "server"
+	}
+	server := model.NormalizeServer(v.Async.Protocol, v.Async.Server)
+	return model.TargetURL(v.Async.Protocol, server, v.Async.Channel), "server"
+}
+
+func sendsCredential(c model.Collection, v model.RequestVersion, target string) bool {
 	for _, h := range v.Headers {
 		if !h.Disabled && typedCredentialOrTemplate(h.Key, h.Value) {
 			return true
@@ -186,10 +227,27 @@ func sendsCredential(v model.RequestVersion) bool {
 			return true
 		}
 	}
-	if u, err := url.Parse(v.URL); err == nil && u.User != nil {
+	if u, err := url.Parse(target); err == nil && u.User != nil {
 		return true
 	}
-	return false
+	return authSendsCredential(c, v.Auth)
+}
+
+// authSendsCredential is an auth block that adds a credential to the request: any scheme but mutual TLS, whose
+// certificate is presented in the handshake and is not readable on the wire. A named authentication is read as the
+// block it stands for; one the collection does not have is reported elsewhere.
+func authSendsCredential(c model.Collection, a *model.Auth) bool {
+	if a == nil {
+		return false
+	}
+	if a.Use != "" {
+		named, ok := c.NamedAuth(a.Use)
+		if !ok {
+			return false
+		}
+		a = &named.Auth
+	}
+	return a.Type != "" && a.Type != model.AuthMutualTLS
 }
 
 // typedCredentialOrTemplate is a credential-named field with something in it, typed or by reference.

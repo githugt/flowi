@@ -31,6 +31,9 @@ func Verb(v model.RequestVersion) string {
 	if v.Async != nil {
 		return model.ProtocolVerb(v.Async.Protocol)
 	}
+	if v.Body.GraphQL != nil {
+		return GraphQLVerb
+	}
 	return v.Method
 }
 
@@ -63,10 +66,31 @@ func (r *Request) EditAsync(f func(a *model.Async)) {
 }
 
 // SetProtocol moves the selected async version to another protocol. Binding
-// options the new protocol does not know are dropped, so the switch never
-// leaves the version invalid.
+// options the new protocol does not know are dropped, and so is an auth block
+// the new protocol cannot use, so the switch never leaves the version invalid.
 func (r *Request) SetProtocol(protocol string) {
-	r.EditAsync(func(a *model.Async) { moveProtocol(a, protocol) })
+	if !r.IsAsync() {
+		return
+	}
+	r.Edit(func(v *model.RequestVersion) {
+		moveProtocol(v.Async, protocol)
+		fitAuth(v)
+	})
+}
+
+// fitAuth drops the auth block of v when its protocol takes none (only WebSocket and SSE do), or when the block names a
+// scheme the protocol cannot use. A named authentication is kept for a protocol that takes an auth block: its scheme is
+// the collection's to say, and validation reports one that does not fit.
+//
+// Before: moving a WebSocket request with an API key to MQTT left an auth block that validation refused (FLW-AUTH-001).
+func fitAuth(v *model.RequestVersion) {
+	if v.Auth == nil {
+		return
+	}
+	allowed := model.AsyncAuthTypes(v.Async.Protocol)
+	if len(allowed) == 0 || (v.Auth.Use == "" && !slices.Contains(allowed, v.Auth.Type)) {
+		v.Auth = nil
+	}
 }
 
 // moveProtocol sets a's protocol and fits the rest of the block to it.

@@ -60,6 +60,7 @@ export const ICONS: Record<string, string> = {
   stop: 'M6 6h12v12H6z',
   close: 'M6 6l12 12 M18 6L6 18',
   more: 'M4 12a1 1 0 1 0 2 0a1 1 0 1 0-2 0 M11 12a1 1 0 1 0 2 0a1 1 0 1 0-2 0 M18 12a1 1 0 1 0 2 0a1 1 0 1 0-2 0',
+  graphql: 'M12 3l8 4.6v8.8L12 21l-8-4.6V7.6z M12 3l8 13.4H4z',
   grpc: 'M4 8h13 M13 4l4 4-4 4 M20 16H7 M11 12l-4 4 4 4',
   message: 'M4 5h16v11H9l-5 4z M8 9h8 M8 12h5',
   database: 'M4 6c0-1.7 3.6-3 8-3s8 1.3 8 3-3.6 3-8 3-8-1.3-8-3z M4 6v12c0 1.7 3.6 3 8 3s8-1.3 8-3V6 M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3',

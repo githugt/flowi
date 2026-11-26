@@ -11,6 +11,9 @@ type Family string
 const (
 	// FamilyHTTP is a request and its response over HTTP.
 	FamilyHTTP Family = "http"
+	// FamilyGraphQL is a GraphQL operation: an HTTP request whose body is a query, mutation or subscription. It
+	// shares everything with FamilyHTTP (URL, method, headers, auth, the response) and differs in its body.
+	FamilyGraphQL Family = "graphql"
 	// FamilyRPC is a call of a method of a remote service (gRPC).
 	FamilyRPC Family = "rpc"
 	// FamilyMessaging is a message sent to or received from a channel (WebSocket, SSE, MQTT, Kafka, AMQP, NATS, …).
@@ -65,9 +68,14 @@ func (v RequestVersion) Family() Family {
 		return FamilyRPC
 	case v.Async != nil:
 		return FamilyMessaging
+	case v.Body.GraphQL != nil:
+		return FamilyGraphQL
 	}
 	return FamilyHTTP
 }
+
+// OverHTTP reports whether the family is sent as an HTTP request: it has a method, a URL, headers and a status.
+func (f Family) OverHTTP() bool { return f == FamilyHTTP || f == FamilyGraphQL }
 
 // Exchange is which directions the version has. Only messaging varies: a published message sends, a subscription
 // receives, request and reply does both; every other family sends and receives the answer.

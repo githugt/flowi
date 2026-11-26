@@ -30,7 +30,7 @@ var _ nodes.Runtime = (*nodeRuntime)(nil)
 func (rt *nodeRuntime) Request(ctx context.Context, c nodes.RequestCall) nodes.Outcome {
 	coll, req, ok := rt.r.deps.Lookup.Request(c.Ref, rt.f.fs.collection.Manifest.ID)
 	if !ok {
-		return nodes.Outcome{Diags: diag.List{diag.New(diag.CodeRefUnknownRequest, diag.Location{}, map[string]string{"id": string(c.Ref.ID)})}}
+		return nodes.Outcome{Diags: diag.List{diag.New(diag.CodeRefUnknownRequest, diag.Location{}, map[string]string{"ref": c.Ref.Label()})}}
 	}
 	with := c.With
 	if with == nil {
@@ -72,7 +72,7 @@ func (rt *nodeRuntime) Subflow(ctx context.Context, ref model.Ref, inputs map[st
 	r := rt.r
 	coll, fl, ok := r.deps.Lookup.Flow(ref, rt.f.fs.collection.Manifest.ID)
 	if !ok {
-		return nodes.Outcome{Diags: diag.List{diag.New(diag.CodeRefUnknownFlow, diag.Location{}, map[string]string{"id": string(ref.ID)})}}
+		return nodes.Outcome{Diags: diag.List{diag.New(diag.CodeRefUnknownFlow, diag.Location{}, map[string]string{"ref": ref.Label()})}}
 	}
 	cfg := newConfig(r.deps.Lookup.Settings(coll.Manifest.ID, flowFolder(fl), nil))
 	env, diags := selectEnvironment(coll, r.env, cfg.defaultEnv)

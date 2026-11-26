@@ -190,7 +190,20 @@ func (f *fixture) handler() http.Handler {
 			writeJSON(w, map[string]any{"data": nil, "errors": []any{map[string]any{"message": "Cannot query field \"broken\""}, map[string]any{"message": "second"}}})
 			return
 		}
-		writeJSON(w, map[string]any{"data": map[string]any{"ok": true}})
+		var sent map[string]any
+		_ = json.Unmarshal(body, &sent) // not every test sends JSON; echo is then nil
+		writeJSON(w, map[string]any{"data": map[string]any{"ok": true, "echo": sent, "contentType": r.Header.Get("Content-Type"), "accept": r.Header.Get("Accept")}})
+	})
+	mux.HandleFunc("GET /graphql-ws", subscriptionServer)
+	mux.HandleFunc("GET /graphql", func(w http.ResponseWriter, r *http.Request) {
+		q := r.URL.Query()
+		if strings.Contains(q.Get("query"), "broken") {
+			writeJSON(w, map[string]any{"errors": []any{map[string]any{"message": "Cannot query field \"broken\""}}})
+			return
+		}
+		var vars any
+		_ = json.Unmarshal([]byte(q.Get("variables")), &vars) // absent variables echo as null
+		writeJSON(w, map[string]any{"data": map[string]any{"echo": map[string]any{"query": q.Get("query"), "operationName": q.Get("operationName"), "variables": vars}}})
 	})
 	mux.HandleFunc("/limited", func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("RateLimit-Policy", `"default";q=100;w=60`)

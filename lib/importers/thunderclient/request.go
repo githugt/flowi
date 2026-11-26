@@ -201,12 +201,17 @@ func (t *translator) multipart(b map[string]any) model.Body {
 	return model.Body{Multipart: parts}
 }
 
-// graphql sends Thunder Client's {query, variables} as a JSON body.
+// graphql makes a GraphQL body of Thunder Client's {query, variables}. A query that holds {{ stays a JSON body (a
+// document is sent as written).
 func (t *translator) graphql(g map[string]any) model.Body {
 	query := loose.Str(g["query"])
 	if query == "" {
 		return model.Body{}
 	}
+	if gq, ok := importers.GraphQLBody(query, loose.Str(g["variables"]), "", t.Text, func(s string) string { return t.Item.RedactBodyText(s, "the request body") }); ok {
+		return gq
+	}
+	t.Item.Unmapped("GraphQL query with variables of the collection", "kept as a JSON body", "Flowi sends a GraphQL query as written: move the values into the variables to get a GraphQL body")
 	doc := `{"query":` + strconv.Quote(query)
 	if vars := strings.TrimSpace(loose.Str(g["variables"])); vars != "" {
 		doc += `,"variables":` + vars

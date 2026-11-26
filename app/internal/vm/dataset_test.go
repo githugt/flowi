@@ -93,6 +93,16 @@ func TestRequest_EditDataset_Given_a_file_version_Then_the_change_is_written_to_
 	}
 }
 
+func TestMenuFor_should_offer_a_new_data_file_request_beside_the_database_one(t *testing.T) {
+	ws, _, _ := shopWorkspace(t)
+
+	for _, id := range []string{"c:C1", "c:C1/requests/auth"} {
+		if got := actionsOf(ws.MenuFor([]string{id})); !slices.Contains(got, vm.ActNewDataFileRequest) {
+			t.Errorf("%s menu %v lacks a new data file request", id, got)
+		}
+	}
+}
+
 func TestMenuFor_should_offer_a_new_dataset_request_where_it_offers_a_new_grpc_one(t *testing.T) {
 	ws, _, _ := shopWorkspace(t)
 

@@ -144,6 +144,16 @@ func (w *Workspace) NewGRPCRequest(collection model.ID, path string) (RequestTar
 	return w.newRequestWith(collection, path, model.RequestVersion{Label: "1", GRPC: &model.GRPC{}})
 }
 
+// StarterGraphQLQuery is the query a new GraphQL request starts with: every GraphQL server can answer it, so the first
+// Send shows the request works before the owner writes their own.
+const StarterGraphQLQuery = "query {\n  __typename\n}"
+
+// NewGraphQLRequest is NewRequest for a GraphQL request: its version "1" is a POST with a GraphQL body that holds a
+// query any server can answer, and an empty URL.
+func (w *Workspace) NewGraphQLRequest(collection model.ID, path string) (RequestTarget, error) {
+	return w.newRequestWith(collection, path, model.RequestVersion{Label: "1", Method: "POST", Body: model.Body{GraphQL: &model.GraphQL{Query: StarterGraphQLQuery}}})
+}
+
 // NewDatasetRequest is NewRequest for a dataset request of the given driver (any of model.DatasetDrivers): its version
 // "1" has a server and a query that run as they are on any store of that driver, and one param to show how a value
 // is passed. An unknown driver is FLW-DATA-001.
