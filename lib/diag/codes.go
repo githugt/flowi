@@ -282,8 +282,8 @@ func codeTable() map[Code]codeInfo {
 		CodeVersionPinnedAbsent:  {e, `pinned version "{label}" does not exist on request {request}`},
 		CodeVersionNone:          {e, "request has no versions"},
 
-		CodeRefUnknownRequest: {e, "unknown request id {id} — hint: the request was deleted or its id changed: pick another one in the step"},
-		CodeRefUnknownFlow:    {e, "unknown flow id {id} — hint: the flow was deleted or its id changed: pick another one"},
+		CodeRefUnknownRequest: {e, "unknown request {ref} — hint: the request was deleted or its id changed: pick another one in the step"},
+		CodeRefUnknownFlow:    {e, "unknown flow {ref} — hint: the flow was deleted or its id changed: pick another one"},
 		CodeRefUndeclared:     {e, `collection "{collection}" is not declared in depends_on — hint: add it to depends_on in the collection file`},
 		CodeRefNotMounted:     {e, `collection "{collection}" is not mounted` + hintMarker + `clone {repo} and run "flowi workspace mount"`},
 		CodeRefStalePath:      {w, `path hint "{got}" is out of date, should be "{want}" (run "flowi fmt")`},

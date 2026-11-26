@@ -609,7 +609,7 @@ func TestFlowDoc_KeepEdits_Given_no_edits_Then_keeps_nothing(t *testing.T) {
 func TestFlowDoc_ApplySource_should_apply_the_text_and_note_what_is_wrong_with_the_flow_now(t *testing.T) {
 	// Arrange
 	d, b, w := newFlowDoc(t)
-	b.DraftDiags = diag.List{diag.New(diag.CodeRefUnknownRequest, diag.Location{Path: "$.nodes[0].request.id"}, map[string]string{"id": "01X"})}
+	b.DraftDiags = diag.List{diag.New(diag.CodeRefUnknownRequest, diag.Location{Path: "$.nodes[0].request.id"}, map[string]string{"ref": "id 01X"})}
 	var problems, notes []string
 
 	// Act

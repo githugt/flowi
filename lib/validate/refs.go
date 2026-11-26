@@ -95,13 +95,13 @@ func (ix *index) checkRef(from model.Collection, site refSite) diag.List {
 	if site.kind == refFlow {
 		f, ok := ix.flows[key]
 		if !ok {
-			return diag.List{diag.New(diag.CodeRefUnknownFlow, at("id"), map[string]string{"id": string(site.ref.ID)})}
+			return diag.List{diag.New(diag.CodeRefUnknownFlow, at("id"), map[string]string{"ref": site.ref.Label()})}
 		}
 		return stalePath(site, f.Path, at("path"))
 	}
 	r, ok := ix.requests[key]
 	if !ok {
-		return diag.List{diag.New(diag.CodeRefUnknownRequest, at("id"), map[string]string{"id": string(site.ref.ID)})}
+		return diag.List{diag.New(diag.CodeRefUnknownRequest, at("id"), map[string]string{"ref": site.ref.Label()})}
 	}
 	out := stalePath(site, r.Path, at("path"))
 	if site.pinned != "" && !hasVersion(r, site.pinned) {

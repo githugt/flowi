@@ -50,7 +50,7 @@ func (x *execution) runStep(ctx context.Context, ref HookRef, label string) (Sta
 	if f := ref.Step.Flow; f != nil {
 		coll, flow, ok := x.r.deps.Lookup.Flow(*f, x.c.collection.Manifest.ID)
 		if !ok {
-			return StatusFailed, diag.List{diag.New(diag.CodeRefUnknownFlow, diag.Location{}, map[string]string{"id": string(f.ID)})}
+			return StatusFailed, diag.List{diag.New(diag.CodeRefUnknownFlow, diag.Location{}, map[string]string{"ref": f.Label()})}
 		}
 		fs.collection, fs.flow, fs.prefer, fs.onBranchError = coll, &flow, flow.PreferVersion, flow.Execution.OnBranchError
 		list = flow.Nodes

@@ -17,7 +17,7 @@ import (
 
 func TestProblemsVM_messages_and_targets(t *testing.T) {
 	b := &vmtest.Backend{Cols: []model.Collection{vmtest.SampleCollection()}, Diags: diag.List{
-		diag.New(diag.CodeRefUnknownRequest, diag.Location{File: "/c/requests/auth/login.req.yaml", Pos: diag.Position{Line: 3, Column: 5}}, map[string]string{"id": "X"}),
+		diag.New(diag.CodeRefUnknownRequest, diag.Location{File: "/c/requests/auth/login.req.yaml", Pos: diag.Position{Line: 3, Column: 5}}, map[string]string{"ref": "id X"}),
 		diag.New(diag.CodeLintWhitespace, diag.Location{File: "/c/environments/staging.yaml"}, map[string]string{"field": "base_url"}),
 		diag.New(diag.CodeYAMLSyntax, diag.Location{File: "/c/flowi.yaml"}, map[string]string{"detail": "bad"}),
 	}}

@@ -44,7 +44,7 @@ func TestList_Err_should_be_nil_with_only_warnings(t *testing.T) {
 
 func TestList_Err_should_return_ListError_with_first_error_message(t *testing.T) {
 	l := List{
-		New(CodeRefUnknownRequest, Location{File: "a.yaml"}, map[string]string{"id": "X"}),
+		New(CodeRefUnknownRequest, Location{File: "a.yaml"}, map[string]string{"ref": "id X"}),
 		New(CodeIDMissing, Location{File: "b.yaml"}, nil),
 	}
 
