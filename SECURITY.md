@@ -4,7 +4,7 @@ This repository holds three parts: `lib` (Apache-2.0), `cli` and `app` (AGPL-3.0
 
 ## Supported versions
 
-Flowi is pre-alpha. Security fixes are made on the latest minor release only.
+Security fixes are made on the latest minor release only.
 
 ## Reporting a vulnerability
 

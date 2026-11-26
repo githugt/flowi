@@ -4,8 +4,6 @@ The core library of **Flowi**: everything that is not a user interface. The
 [CLI](https://github.com/githugt/flowi/tree/master/cli) and the [desktop app](https://github.com/githugt/flowi)
 are thin layers over it, and other Go programs can embed it.
 
-> Status: **pre-alpha**. The file format and the API will change.
-
 ## Why Flowi
 
 Most API tools stop at the single request. Real work is a journey: log in, take the token, verify,

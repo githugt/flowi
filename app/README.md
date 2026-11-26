@@ -4,27 +4,35 @@ A desktop app for exploring APIs and stitching requests into **flows**: log in, 
 in a form, check the result, and run the whole journey with one click. Your work is plain YAML files in your own
 git repository; secrets stay in an encrypted local vault.
 
-> Status: **pre-alpha**. The file format and the app will change.
-
-![A flow after a run, with the request of the selected step](docs/images/flow-editor.png)
+![A flow with loops after a run, with the settings of the flow on the right](docs/images/flow-editor.png)
 
 Flowi is one repository with three parts: this app (`app/`), the [command-line tool](../cli) that
-runs the same collections in CI, and the [core library](../lib) both are built on.
+runs the same collections in CI, and the [core library](../lib) both are built on. The
+[repository README](../README.md) has the overview, including the full table of what Flowi can talk to.
 
 ## Why
 
-Most API tools stop at the single request. Real work is a sequence, and the sequence is what breaks when an API
-changes. Flowi keeps requests as reusable building blocks, draws the sequences, runs them, and tells you what a
-change to a request would break.
+Most API tools stop at the single request, and most of them stop at HTTP. Real work is a sequence that crosses
+protocols: call an API, wait for the event it publishes, look in the database for the row it wrote. The sequence is what
+breaks when an API changes. Flowi keeps requests as reusable building blocks, draws the sequences, runs them, and tells
+you what a change to a request would break.
+
+It is meant to stay fast. The core is Go, and the window shows its screens in the system's own web view (WKWebView,
+WebView2 or WebKitGTK) instead of bundling a browser, so large collections open quickly and a request is sent
+the moment you press Send. And it is meant to live in git: files are plain YAML, so branches and reviews work as they do
+for code, and Flowi checks for credentials typed into requests and for secrets that would go to the wrong host, so they
+are not pushed by mistake.
 
 ## What you can do
 
 ### Explore an API
 
 Build and send HTTP and gRPC requests. Use `{{templates}}` from environments, secrets and generators, keep several
-**versions** of a request, attach pre and post **hooks**, and pin a response as an example. Responses show as a
-tree, with timing, the exact request sent, and a history. Copy a request as curl and other snippets. Besides the
-usual methods you can use `QUERY` or any method of your own.
+**versions** of a request, attach pre and post **hooks**, add checks on the answer (status, headers, a field of the
+body, a schema) and pin a response as an example. Responses show as a tree, with timing, the exact request sent, a
+history and a comparison with the previous answer. Copy a request as curl and other snippets. Besides the
+usual methods you can use `QUERY` or any method of your own. gRPC methods come from server reflection or from `.proto`
+files.
 
 A **flowi overlay** is a named variant you lay over a request when you send it: the same call as a VIP customer, with
 a slow connection, or with a bad token. Save one from what you have on screen, and Flowi shows what it changes before
@@ -43,17 +51,26 @@ Each run connects, does its work and closes.
 
 ![Receiving server-sent events, with message requests for each protocol in the tree](docs/images/async-messages.png)
 
-### Query a database
+### Query a database or a data file
 
-A request can also be a query: PostgreSQL, MySQL, MariaDB or SQLite. Write the SQL, give its values as parameters, and
-see the rows in a table. A query only reads, and a flow's request step can run it like any other request, so a flow
-can check what an API wrote.
+A request can also be a query: PostgreSQL, MySQL, MariaDB or SQLite, or a CSV, XLSX or Parquet file (or a folder of
+them) in your collection. Write the SQL, give its values as parameters, and see the rows in a table. A query only reads,
+and a flow's request step can run it like any other request, so a flow can check what an API wrote.
+
+The same editor, with the same response panel, checks and hooks, covers every kind of request:
+
+![HTTP, gRPC, SQS, NATS, PostgreSQL and CSV requests, each with a successful answer](docs/images/collage.png)
 
 ### Build flows on a canvas
 
-Drag steps onto the canvas: request, extract, assert, condition, delay, batch, parallel, run until, subflow and
-more. Dotted arcs show which values pass from one step to another. Run the flow and watch each step turn green or red,
-then open what it sent and what came back, or run only part of it.
+Drag steps onto the canvas: request, fetch, webhook, subflow, set, assert, fuzz, condition, delay, batch, parallel,
+run until, log, note and more. Dotted arcs show which values pass from one step to another. Run the flow and watch each
+step turn green or red, then open what it sent and what came back, or run only part of it.
+
+**Loops are boxes.** A *batch* box repeats the steps inside it over a list, a number of times, or both at once, with a
+limit on how many run together. A *run until* box repeats them until a condition holds, for example until a status
+field says `ready`, with a limit and a pause between rounds. In the flow above, the first box probes the API three times
+and the second polls until the onboarding is ready.
 
 Every step has **outcomes**: success and failure to begin with, and you can add your own, such as "401" or "slow".
 Drag from an outcome to the step that should run when it happens, and click an arrow to say whether it fires on
@@ -83,21 +100,64 @@ Serve your saved responses as a local API, so a front end can work before the ba
 real API to **record**: it forwards each call, saves the answer, and turns calls it has not seen into new requests.
 It can also misbehave on purpose, to try retries and error handling: answer a share of calls with an error, drop the
 connection, or add a random delay. One call can ask for it with a header, such as `X-Flowi-Fault: error:418`.
+In the list of calls, filter by status or by the faults it injected.
 
-![The replayer answering calls](docs/images/replayer.png)
+![The replayer answering calls, some with injected faults](docs/images/replayer.png)
 
 ### Run flows on a schedule
 
-Add cron schedules and start them from the app, or run them without a window with `flowi serve`. Flows can also
-be started by an HTTP call.
+Add cron schedules, each with a time zone, and start them from the app, or run them without a window with
+`flowi serve`. The next runs are drawn on a 24-hour timeline. Flows can also be started by an HTTP call with a trigger
+token, which you make on the same screen.
 
 ![The schedules screen](docs/images/scheduler.png)
 
+### Start from a blueprint
+
+A **blueprint** is a template. Flow blueprints give you a whole flow to copy and adapt; hook blueprints give you the pre
+and post steps you use again and again, such as signing in before a request or cleaning up after it. Create from one, or
+save what you built as a blueprint.
+
+![The blueprints screen](docs/images/blueprints.png)
+
+### Check for drift
+
+Every response Flowi sees teaches it a schema. **Check drift** runs a flow and compares each response with the schema
+stored for it: fields the schema does not know are *new*, required fields that are gone are *missing*, and fields of
+another type are *changed*. Press **Accept** on a request to take the new shape as the baseline. The dialog also gives
+the `flowi drift` command to run the same check in CI.
+
+![A drift check showing a missing field and a changed type](docs/images/drift-check.png)
+
+### Keep the collection in order
+
+A collection's page shows what it holds and what state it is in. Give requests, flows and folders a **status**
+(planning, in-development, review, testing, production) and **tags**; both are inherited from the folder, filter the
+sidebar (`status:review`, `tag:billing`), and group the collection's endpoints by path, tag, folder or status.
+
+Checks run while you work and say what is wrong in plain words: a secret with no value, a credential typed straight
+into a request instead of a secret, credentials sent over plain `http`, a secret that would go to a host it is not
+allowed for, a secret in an environment file that ships with the collection. For imported API descriptions there are
+spec lint rules, a coverage check (how much of the API your flows use) and a spec-change check (what a newer
+description would break). Responses with `Deprecation` or `Sunset` headers are flagged.
+
+![A collection's endpoints grouped by status](docs/images/collection-status.png)
+
+### Environments, secrets and authentication
+
+**Environments** hold plain variables and secrets. Compare several side by side: a value that differs is tinted, a
+missing one is marked, and a secret only shows whether it has a value in the vault, never the value. Secrets live in an
+encrypted local vault with the key in the operating system's keychain, and they are masked wherever they could show.
+**Named authentications** (kept in the collection's `auths` folder) define how to sign in once, for any request to use.
+
+![Two environments compared: a secret only shows whether it has a value](docs/images/env-compare.png)
+
 ### And more
 
-Environments and an encrypted **secrets** vault; **impact analysis** of what uses a request; flow **blueprints**
-(templates); drafts you can try things in before saving; a trash for abandoned drafts; themes; and a
-settings screen where every setting is explained.
+**Impact analysis** of what uses a request; **schema generation**, which writes an OpenAPI or AsyncAPI description from
+your requests and the schemas learned from their answers; **OpenTelemetry tracing** of runs, off by default and never
+including bodies, headers or secrets; drafts you can try things in before saving; a trash for abandoned drafts; a
+command palette; themes, including a high-contrast one; and a settings screen where every setting is explained.
 
 ## Install a release
 
@@ -155,6 +215,10 @@ its demo server.
 just check        # tidy, lint, Go tests with the race detector, svelte-check and the front end's unit tests
 just bindings     # regenerate frontend/bindings after changing a service's Go methods (needs wails3)
 ```
+
+See [`AGENTS.md`](AGENTS.md) for the rules the code follows. The screenshots in this file are taken from the browser
+build of the front end (`go build -tags server`) over a made-up collection and local test backends; they contain no real
+names, paths or secrets.
 
 ## Licence
 
